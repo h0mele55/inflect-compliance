@@ -1,0 +1,16 @@
+/**
+ * Barrel export for typed domain hooks.
+ *
+ * Usage:
+ *   import { useControls, usePolicy, useCreateRisk } from '@/lib/hooks';
+ */
+
+export { useApi, useMutation } from './use-api';
+export type { UseApiResult, UseMutationResult } from './use-api';
+
+export { useControls, useControl, useControlDashboard, useCreateControl, useUpdateControl, useDeleteControl } from './use-controls';
+export { usePolicies, usePolicy, useCreatePolicy, useUpdatePolicy, useDeletePolicy } from './use-policies';
+export { useRisks, useRisk, useCreateRisk, useUpdateRisk, useDeleteRisk } from './use-risks';
+export { useTasks, useTask, useCreateTask, useUpdateTask, useDeleteTask } from './use-tasks';
+export { useAssets, useAsset, useCreateAsset, useUpdateAsset, useDeleteAsset } from './use-assets';
+export { useEvidence, useEvidenceItem, useCreateEvidence, useDeleteEvidence } from './use-evidence';

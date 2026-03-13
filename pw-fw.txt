@@ -1,0 +1,111 @@
+﻿
+Running 14 tests using 1 worker
+
+[1A[2K[1/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:32:9 тА║ Framework Coverage UI тА║ frameworks page loads with 5 framework cards
+node.exe : [1A[2K[2m[WebServer] [
+22mError: You cannot use different sl
+ug names for the same dynamic path ('
+frameworkKey' !== 'key').
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe
+" "C:\Users\Lenovo\AppData\Roaming ..
+.
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpe 
+   cified: ([1A[2K[2m[We...ey' !  
+  == 'key').:String) [], RemoteExc   
+ eption
+    + FullyQualifiedErrorId : Native 
+   CommandError
+ 
+[2m[WebServer] [22m    at handleSlu
+g [90m(C:\Users\Lenovo\.gemini\antig
+ravity\scratch\inflect-compliance\[3
+9mnode_modules\[4mnext[24m\dist\sha
+red\lib\router\utils\sorted-routes.js
+:94:31[90m)[39m
+[2m[WebServer] [22m    at UrlNode._
+insert [90m(C:\Users\Lenovo\.gemini\
+antigravity\scratch\inflect-complianc
+e\[39mnode_modules\[4mnext[24m\dis
+t\shared\lib\router\utils\sorted-rout
+es.js:131:17[90m)[39m
+[2m[WebServer] [22m    at UrlNode._
+insert [90m(C:\Users\Lenovo\.gemini\
+antigravity\scratch\inflect-complianc
+e\[39mnode_modules\[4mnext[24m\dis
+t\shared\lib\router\utils\sorted-rout
+es.js:142:40[90m)[39m
+[2m[WebServer] [22m    at UrlNode._
+insert [90m(C:\Users\Lenovo\.gemini\
+antigravity\scratch\inflect-complianc
+e\[39mnode_modules\[4mnext[24m\dis
+t\shared\lib\router\utils\sorted-rout
+es.js:142:40[90m)[39m
+[2m[WebServer] [22m    at UrlNode._
+insert [90m(C:\Users\Lenovo\.gemini\
+antigravity\scratch\inflect-complianc
+e\[39mnode_modules\[4mnext[24m\dis
+t\shared\lib\router\utils\sorted-rout
+es.js:142:40[90m)[39m
+[2m[WebServer] [22m    at UrlNode.i
+nsert [90m(C:\Users\Lenovo\.gemini\a
+ntigravity\scratch\inflect-compliance
+\[39mnode_modules\[4mnext[24m\dist
+\shared\lib\router\utils\sorted-route
+s.js:13:14[90m)[39m
+[2m[WebServer] [22m    at [90mC:\U
+sers\Lenovo\.gemini\antigravity\scrat
+ch\inflect-compliance\[39mnode_modul
+es\[4mnext[24m\dist\shared\lib\rout
+er\utils\sorted-routes.js:165:46
+[2m[WebServer] [22m    at Array.for
+Each (<anonymous>)
+[2m[WebServer] [22m    at getSorted
+Routes [90m(C:\Users\Lenovo\.gemini\
+antigravity\scratch\inflect-complianc
+e\[39mnode_modules\[4mnext[24m\dis
+t\shared\lib\router\utils\sorted-rout
+es.js:165:21[90m)[39m
+[2m[WebServer] [22m    at Watchpack
+.<anonymous> [90m(C:\Users\Lenovo\.g
+emini\antigravity\scratch\inflect-com
+pliance\[39mnode_modules\[4mnext[2
+4m\dist\server\lib\router-utils\setup
+-dev-bundler.js:558:65[90m)[39m
+
+[1A[2K  1) [chromium] тА║ tests\e2e\frameworks.spec.ts:32:9 тА║ Framework Coverage UI тА║ frameworks page loads with 5 framework cards 
+
+    Error: page.goto: net::ERR_CONNECTION_RESET at http://localhost:3006/login
+    Call log:
+    [2m  - navigating to "http://localhost:3006/login", waiting until "load"[22m
+
+
+      4 |
+      5 | async function loginAndGetTenant(page: Page): Promise<string> {
+    > 6 |     await page.goto('/login');
+        |                ^
+      7 |     await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+      8 |     await page.fill('input[type="email"]', TEST_USER.email);
+      9 |     await page.fill('input[type="password"]', TEST_USER.password);
+        at loginAndGetTenant (C:\Users\Lenovo\.gemini\antigravity\scratch\inflect-compliance\tests\e2e\frameworks.spec.ts:6:16)
+        at C:\Users\Lenovo\.gemini\antigravity\scratch\inflect-compliance\tests\e2e\frameworks.spec.ts:25:28
+
+
+[1A[2K[2/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:41:9 тА║ Framework Coverage UI тА║ framework cards show View Details buttons
+[1A[2K[3/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:47:9 тА║ Framework Coverage UI тА║ navigate to ISO27001 detail page
+[1A[2K[4/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:53:9 тА║ Framework Coverage UI тА║ detail page shows tabs
+[1A[2K[5/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:59:9 тА║ Framework Coverage UI тА║ requirements tab shows requirements grouped by section
+[1A[2K[6/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:67:9 тА║ Framework Coverage UI тА║ requirements search filters results
+[1A[2K[7/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:76:9 тА║ Framework Coverage UI тА║ packs tab shows available packs
+[1A[2K[8/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:83:9 тА║ Framework Coverage UI тА║ navigate to install wizard
+[1A[2K[9/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:89:9 тА║ Framework Coverage UI тА║ install wizard shows preview with new controls count
+[1A[2K[10/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:96:9 тА║ Framework Coverage UI тА║ install pack and see result
+[1A[2K[11/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:109:9 тА║ Framework Coverage UI тА║ after install, coverage shows mapped requirements
+[1A[2K[12/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:118:9 тА║ Framework Coverage UI тА║ full coverage report page loads
+[1A[2K[13/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:127:9 тА║ Framework Coverage UI тА║ coverage report has export buttons
+[1A[2K[14/14] [chromium] тА║ tests\e2e\frameworks.spec.ts:132:9 тА║ Framework Coverage UI тА║ coverage report has filter buttons
+[1A[2K  1 failed
+    [chromium] тА║ tests\e2e\frameworks.spec.ts:32:9 тА║ Framework Coverage UI тА║ frameworks page loads with 5 framework cards 
+  13 did not run

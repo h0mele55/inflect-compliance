@@ -1,0 +1,416 @@
+import { RequestContext } from '../types';
+import { PolicyRepository } from '../repositories/PolicyRepository';
+import { PolicyVersionRepository } from '../repositories/PolicyVersionRepository';
+import { PolicyApprovalRepository } from '../repositories/PolicyApprovalRepository';
+import { PolicyTemplateRepository } from '../repositories/PolicyTemplateRepository';
+import { assertCanRead, assertCanWrite, assertCanAdmin } from '../policies/common';
+import { logEvent } from '../events/audit';
+import { notFound, badRequest, forbidden, conflict } from '@/lib/errors/types';
+import { runInTenantContext } from '@/lib/db-context';
+
+// ─── Slug helper ───
+
+function slugify(text: string): string {
+    return text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 80);
+}
+
+// ─── Queries ───
+
+export async function listPolicies(ctx: RequestContext, filters?: { status?: string; category?: string; q?: string }) {
+    assertCanRead(ctx);
+    return runInTenantContext(ctx, (db) =>
+        PolicyRepository.list(db, ctx, filters)
+    );
+}
+
+export async function getPolicy(ctx: RequestContext, policyId: string) {
+    assertCanRead(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const policy = await PolicyRepository.getById(db, ctx, policyId);
+        if (!policy) throw notFound('Policy not found');
+        return policy;
+    });
+}
+
+export async function listPolicyTemplates(ctx: RequestContext) {
+    assertCanRead(ctx);
+    return runInTenantContext(ctx, (db) =>
+        PolicyTemplateRepository.list(db)
+    );
+}
+
+export async function getPolicyActivity(ctx: RequestContext, policyId: string) {
+    assertCanRead(ctx);
+    return runInTenantContext(ctx, (db) =>
+        db.auditLog.findMany({
+            where: {
+                tenantId: ctx.tenantId,
+                entity: 'Policy',
+                entityId: policyId,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            include: {
+                user: { select: { id: true, name: true } },
+            },
+        })
+    );
+}
+
+
+// ─── Create ───
+
+export async function createPolicy(ctx: RequestContext, data: {
+    title: string;
+    description?: string | null;
+    category?: string | null;
+    ownerUserId?: string | null;
+    reviewFrequencyDays?: number | null;
+    language?: string | null;
+    content?: string | null;
+}) {
+    assertCanWrite(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        // Generate unique slug
+        let baseSlug = slugify(data.title);
+        if (!baseSlug) baseSlug = 'policy';
+        let slug = baseSlug;
+        let counter = 0;
+        while (await PolicyRepository.getBySlug(db, ctx, slug)) {
+            counter++;
+            slug = `${baseSlug}-${counter}`;
+        }
+
+        const policy = await PolicyRepository.create(db, ctx, {
+            slug,
+            title: data.title,
+            description: data.description,
+            category: data.category,
+            ownerUserId: data.ownerUserId,
+            reviewFrequencyDays: data.reviewFrequencyDays,
+            language: data.language,
+        });
+
+        // Create initial version if content provided
+        if (data.content) {
+            const version = await PolicyVersionRepository.create(db, ctx, policy.id, {
+                contentType: 'MARKDOWN',
+                contentText: data.content,
+                changeSummary: 'Initial version',
+            });
+            await PolicyRepository.setCurrentVersion(db, ctx, policy.id, version.id);
+        }
+
+        await logEvent(db, ctx, {
+            action: 'POLICY_CREATED',
+            entityType: 'Policy',
+            entityId: policy.id,
+            details: `Created policy: ${policy.title}`,
+        });
+
+        return policy;
+    });
+}
+
+export async function createPolicyFromTemplate(ctx: RequestContext, templateId: string, overrides?: {
+    title?: string;
+    description?: string | null;
+    category?: string | null;
+    ownerUserId?: string | null;
+    language?: string | null;
+}) {
+    assertCanWrite(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const template = await PolicyTemplateRepository.getById(db, templateId);
+        if (!template) throw notFound('Policy template not found');
+
+        const title = overrides?.title || template.title;
+        let baseSlug = slugify(title);
+        if (!baseSlug) baseSlug = 'policy';
+        let slug = baseSlug;
+        let counter = 0;
+        while (await PolicyRepository.getBySlug(db, ctx, slug)) {
+            counter++;
+            slug = `${baseSlug}-${counter}`;
+        }
+
+        const policy = await PolicyRepository.create(db, ctx, {
+            slug,
+            title,
+            description: overrides?.description ?? null,
+            category: overrides?.category || template.category,
+            ownerUserId: overrides?.ownerUserId,
+            language: overrides?.language || template.language,
+        });
+
+        // Create version from template content
+        const version = await PolicyVersionRepository.create(db, ctx, policy.id, {
+            contentType: template.contentType,
+            contentText: template.contentText,
+            changeSummary: `Created from template: ${template.title}`,
+        });
+        await PolicyRepository.setCurrentVersion(db, ctx, policy.id, version.id);
+
+        await logEvent(db, ctx, {
+            action: 'POLICY_CREATED',
+            entityType: 'Policy',
+            entityId: policy.id,
+            details: `Created from template: ${template.title}`,
+            metadata: { templateId: template.id },
+        });
+
+        return policy;
+    });
+}
+
+// ─── Version ───
+
+export async function createPolicyVersion(ctx: RequestContext, policyId: string, data: {
+    contentType: string;
+    contentText?: string | null;
+    externalUrl?: string | null;
+    changeSummary?: string | null;
+}) {
+    assertCanWrite(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const policy = await PolicyRepository.getById(db, ctx, policyId);
+        if (!policy) throw notFound('Policy not found');
+
+        if (policy.status === 'ARCHIVED') {
+            throw badRequest('Cannot create version for an archived policy');
+        }
+
+        // Validate content based on type
+        if (data.contentType === 'EXTERNAL_LINK' && !data.externalUrl) {
+            throw badRequest('externalUrl is required for EXTERNAL_LINK content type');
+        }
+        if ((data.contentType === 'MARKDOWN' || data.contentType === 'HTML') && !data.contentText) {
+            throw badRequest('contentText is required for MARKDOWN/HTML content type');
+        }
+
+        const version = await PolicyVersionRepository.create(db, ctx, policyId, data);
+
+        // Move policy back to DRAFT if it was in a published/approved state
+        if (policy.status === 'PUBLISHED' || policy.status === 'APPROVED') {
+            await PolicyRepository.updateStatus(db, ctx, policyId, 'DRAFT');
+        }
+
+        await logEvent(db, ctx, {
+            action: 'POLICY_VERSION_CREATED',
+            entityType: 'Policy',
+            entityId: policyId,
+            details: `Version ${version.versionNumber} created`,
+            metadata: { versionId: version.id, versionNumber: version.versionNumber },
+        });
+
+        return version;
+    });
+}
+
+// ─── Metadata ───
+
+export async function updatePolicyMetadata(ctx: RequestContext, policyId: string, data: {
+    title?: string;
+    description?: string | null;
+    category?: string | null;
+    ownerUserId?: string | null;
+    reviewFrequencyDays?: number | null;
+    nextReviewAt?: string | null;
+    language?: string | null;
+}) {
+    assertCanWrite(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const policy = await PolicyRepository.getById(db, ctx, policyId);
+        if (!policy) throw notFound('Policy not found');
+
+        const updateData: Record<string, unknown> = { ...data };
+        if (data.nextReviewAt !== undefined) {
+            updateData.nextReviewAt = data.nextReviewAt ? new Date(data.nextReviewAt) : null;
+        }
+
+        await PolicyRepository.updateMetadata(db, ctx, policyId, updateData);
+
+        await logEvent(db, ctx, {
+            action: 'POLICY_UPDATED',
+            entityType: 'Policy',
+            entityId: policyId,
+            details: `Metadata updated`,
+            metadata: data,
+        });
+
+        return PolicyRepository.getById(db, ctx, policyId);
+    });
+}
+
+// ─── Approval Workflow ───
+
+export async function requestPolicyApproval(ctx: RequestContext, policyId: string, versionId: string) {
+    assertCanWrite(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const policy = await PolicyRepository.getById(db, ctx, policyId);
+        if (!policy) throw notFound('Policy not found');
+
+        // Verify the version belongs to this policy
+        const version = await PolicyVersionRepository.getById(db, versionId);
+        if (!version || version.policyId !== policyId) {
+            throw badRequest('Version does not belong to this policy');
+        }
+
+        // Move policy to IN_REVIEW
+        await PolicyRepository.updateStatus(db, ctx, policyId, 'IN_REVIEW');
+
+        const approval = await PolicyApprovalRepository.request(db, ctx, policyId, versionId);
+
+        await logEvent(db, ctx, {
+            action: 'POLICY_APPROVAL_REQUESTED',
+            entityType: 'Policy',
+            entityId: policyId,
+            details: `Approval requested for version ${version.versionNumber}`,
+            metadata: { versionId, approvalId: approval.id },
+        });
+
+        return approval;
+    });
+}
+
+export async function decidePolicyApproval(ctx: RequestContext, approvalId: string, decision: {
+    decision: 'APPROVED' | 'REJECTED';
+    comment?: string | null;
+}) {
+    assertCanAdmin(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const approval = await PolicyApprovalRepository.getById(db, approvalId);
+        if (!approval) throw notFound('Approval request not found');
+
+        // Verify tenant ownership
+        if (approval.policy.tenantId !== ctx.tenantId) {
+            throw forbidden('Access denied');
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((approval as any).status !== 'PENDING') {
+            throw conflict('This approval request has already been decided');
+        }
+
+        const result = await PolicyApprovalRepository.decide(
+            db, ctx, approvalId, decision.decision, decision.comment || undefined
+        );
+
+        // Update policy status based on decision
+        if (decision.decision === 'APPROVED') {
+            await PolicyRepository.updateStatus(db, ctx, approval.policyId, 'APPROVED');
+        } else {
+            await PolicyRepository.updateStatus(db, ctx, approval.policyId, 'DRAFT');
+        }
+
+        const action = decision.decision === 'APPROVED' ? 'POLICY_APPROVED' : 'POLICY_REJECTED';
+        await logEvent(db, ctx, {
+            action,
+            entityType: 'Policy',
+            entityId: approval.policyId,
+            details: `Policy ${decision.decision.toLowerCase()}`,
+            metadata: { approvalId, decision: decision.decision, comment: decision.comment },
+        });
+
+        return result;
+    });
+}
+
+// ─── Publish / Archive ───
+
+export async function publishPolicy(ctx: RequestContext, policyId: string, versionId: string) {
+    assertCanAdmin(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const policy = await PolicyRepository.getById(db, ctx, policyId);
+        if (!policy) throw notFound('Policy not found');
+
+        // Verify the version belongs to this policy
+        const version = await PolicyVersionRepository.getById(db, versionId);
+        if (!version || version.policyId !== policyId) {
+            throw badRequest('Version does not belong to this policy');
+        }
+
+        // Set as current version and publish
+        await PolicyRepository.setCurrentVersion(db, ctx, policyId, versionId);
+        await PolicyRepository.updateStatus(db, ctx, policyId, 'PUBLISHED');
+
+        await logEvent(db, ctx, {
+            action: 'POLICY_PUBLISHED',
+            entityType: 'Policy',
+            entityId: policyId,
+            details: `Published version ${version.versionNumber}`,
+            metadata: { versionId, versionNumber: version.versionNumber },
+        });
+
+        return PolicyRepository.getById(db, ctx, policyId);
+    });
+}
+
+export async function archivePolicy(ctx: RequestContext, policyId: string) {
+    assertCanAdmin(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const policy = await PolicyRepository.getById(db, ctx, policyId);
+        if (!policy) throw notFound('Policy not found');
+
+        await PolicyRepository.updateStatus(db, ctx, policyId, 'ARCHIVED');
+
+        await logEvent(db, ctx, {
+            action: 'POLICY_ARCHIVED',
+            entityType: 'Policy',
+            entityId: policyId,
+            details: `Policy archived: ${policy.title}`,
+        });
+
+        return { success: true };
+    });
+}
+
+// ─── Soft Delete / Restore / Purge ───
+
+import { restoreEntity, purgeEntity } from './soft-delete-operations';
+import { withDeleted } from '@/lib/soft-delete';
+
+export async function deletePolicy(ctx: RequestContext, id: string) {
+    assertCanAdmin(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const policy = await PolicyRepository.getById(db, ctx, id);
+        if (!policy) throw notFound('Policy not found');
+
+        await db.policy.delete({ where: { id } });
+
+        await logEvent(db, ctx, {
+            action: 'SOFT_DELETE',
+            entityType: 'Policy',
+            entityId: id,
+            details: `Policy soft-deleted: ${policy.title}`,
+        });
+        return { success: true };
+    });
+}
+
+export async function restorePolicy(ctx: RequestContext, id: string) {
+    return restoreEntity(ctx, 'Policy', id);
+}
+
+export async function purgePolicy(ctx: RequestContext, id: string) {
+    return purgeEntity(ctx, 'Policy', id);
+}
+
+export async function listPoliciesWithDeleted(ctx: RequestContext) {
+    assertCanAdmin(ctx);
+    return runInTenantContext(ctx, (db) =>
+        db.policy.findMany(withDeleted({ where: { tenantId: ctx.tenantId }, orderBy: { createdAt: 'desc' as const } }))
+    );
+}

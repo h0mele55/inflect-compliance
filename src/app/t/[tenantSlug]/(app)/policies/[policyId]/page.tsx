@@ -1,0 +1,550 @@
+'use client';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import type { PolicyDetailDTO, PolicyVersionDTO, AuditLogEntry } from '@/lib/dto';
+
+const STATUS_BADGE: Record<string, string> = {
+    DRAFT: 'badge-neutral', PUBLISHED: 'badge-success', ARCHIVED: 'badge-warning',
+};
+const APPROVAL_BADGE: Record<string, string> = {
+    PENDING: 'badge-info', APPROVED: 'badge-success', REJECTED: 'badge-danger',
+};
+const EVENT_ICONS: Record<string, string> = {
+    POLICY_CREATED: '📝', POLICY_VERSION_CREATED: '📄', POLICY_UPDATED: '✏️',
+    POLICY_APPROVAL_REQUESTED: '📨', POLICY_APPROVED: '✅', POLICY_REJECTED: '❌',
+    POLICY_PUBLISHED: '🚀', POLICY_ARCHIVED: '🗃️', POLICY_REVIEW_OVERDUE: '⚠️',
+};
+
+type ContentMode = 'MARKDOWN' | 'EXTERNAL_LINK' | 'FILE';
+
+export default function PolicyDetailPage() {
+    const params = useParams();
+    const apiUrl = useTenantApiUrl();
+    const tenantHref = useTenantHref();
+    const tenant = useTenantContext();
+    const policyId = params?.policyId as string;
+
+    const [policy, setPolicy] = useState<PolicyDetailDTO | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [tab, setTab] = useState<'current' | 'versions' | 'editor' | 'activity'>('current');
+
+    // Editor state
+    const [contentMode, setContentMode] = useState<ContentMode>('MARKDOWN');
+    const [editorContent, setEditorContent] = useState('');
+    const [externalUrl, setExternalUrl] = useState('');
+    const [changeSummary, setChangeSummary] = useState('');
+    const [showPreview, setShowPreview] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+    // Review editing
+    const [editingReview, setEditingReview] = useState(false);
+    const [reviewDays, setReviewDays] = useState('');
+    const [nextReview, setNextReview] = useState('');
+    const [savingReview, setSavingReview] = useState(false);
+
+    // Activity feed
+    const [activities, setActivities] = useState<AuditLogEntry[]>([]);
+    const [activitiesLoading, setActivitiesLoading] = useState(false);
+
+    // Action state
+    const [actionLoading, setActionLoading] = useState('');
+
+    const fetchPolicy = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(apiUrl(`/policies/${policyId}`));
+            if (!res.ok) throw new Error('Policy not found');
+            const data = await res.json();
+            setPolicy(data);
+            setReviewDays(data.reviewFrequencyDays?.toString() || '');
+            setNextReview(data.nextReviewAt ? data.nextReviewAt.substring(0, 10) : '');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [apiUrl, policyId]);
+
+    const fetchActivity = useCallback(async () => {
+        setActivitiesLoading(true);
+        try {
+            const res = await fetch(apiUrl(`/policies/${policyId}/activity`));
+            if (res.ok) setActivities(await res.json());
+        } finally {
+            setActivitiesLoading(false);
+        }
+    }, [apiUrl, policyId]);
+
+    useEffect(() => { fetchPolicy(); }, [fetchPolicy]);
+    useEffect(() => { if (tab === 'activity') fetchActivity(); }, [tab, fetchActivity]);
+
+    // ── Actions ──
+
+    const createVersion = async () => {
+        if (contentMode === 'MARKDOWN' && !editorContent.trim()) return;
+        if (contentMode === 'EXTERNAL_LINK' && !externalUrl.trim()) return;
+        if (contentMode === 'FILE' && !selectedFile) return;
+        setSaving(true);
+        setError('');
+        try {
+            const body: Record<string, unknown> = {
+                contentType: contentMode === 'FILE' ? 'MARKDOWN' : contentMode,
+                changeSummary: changeSummary || null,
+            };
+
+            if (contentMode === 'MARKDOWN') {
+                body.contentText = editorContent;
+            } else if (contentMode === 'EXTERNAL_LINK') {
+                body.contentType = 'EXTERNAL_LINK';
+                body.externalUrl = externalUrl;
+                body.contentText = `External document: ${externalUrl}`;
+            } else if (contentMode === 'FILE' && selectedFile) {
+                // Upload file first
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                const uploadRes = await fetch(apiUrl('/evidence'), {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (!uploadRes.ok) throw new Error('File upload failed');
+                const uploadData = await uploadRes.json();
+                body.contentText = `📎 File: ${selectedFile.name}`;
+                body.changeSummary = changeSummary || `Uploaded file: ${selectedFile.name}`;
+            }
+
+            const res = await fetch(apiUrl(`/policies/${policyId}/versions`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || 'Failed to create version');
+            }
+            setEditorContent(''); setExternalUrl(''); setChangeSummary('');
+            setSelectedFile(null); setTab('versions');
+            await fetchPolicy();
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Unknown error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const saveReview = async () => {
+        setSavingReview(true);
+        try {
+            const body: Record<string, unknown> = {};
+            if (reviewDays) body.reviewFrequencyDays = parseInt(reviewDays);
+            if (nextReview) body.nextReviewAt = nextReview;
+            await fetch(apiUrl(`/policies/${policyId}`), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            setEditingReview(false);
+            await fetchPolicy();
+        } finally {
+            setSavingReview(false);
+        }
+    };
+
+    const requestApproval = async (versionId: string) => {
+        setActionLoading('approve-' + versionId);
+        try {
+            const res = await fetch(apiUrl(`/policies/${policyId}/approval`), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ versionId }),
+            });
+            if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed'); }
+            await fetchPolicy();
+        } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Unknown error'); } finally { setActionLoading(''); }
+    };
+
+    const decideApproval = async (approvalId: string, decision: 'APPROVED' | 'REJECTED') => {
+        setActionLoading('decide-' + approvalId);
+        try {
+            const res = await fetch(apiUrl(`/policies/${policyId}/approval/${approvalId}/decide`), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision }),
+            });
+            if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed'); }
+            await fetchPolicy();
+        } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Unknown error'); } finally { setActionLoading(''); }
+    };
+
+    const publishVersion = async (versionId: string) => {
+        setActionLoading('publish-' + versionId);
+        try {
+            const res = await fetch(apiUrl(`/policies/${policyId}/publish`), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ versionId }),
+            });
+            if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed'); }
+            await fetchPolicy();
+        } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Unknown error'); } finally { setActionLoading(''); }
+    };
+
+    const archivePolicy = async () => {
+        setActionLoading('archive');
+        try {
+            const res = await fetch(apiUrl(`/policies/${policyId}/archive`), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+            });
+            if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed'); }
+            await fetchPolicy();
+        } catch (err: unknown) { setError(err instanceof Error ? err.message : 'Unknown error'); } finally { setActionLoading(''); }
+    };
+
+    // ── Helpers ──
+
+    const renderVersionContent = (v: PolicyVersionDTO) => {
+        if (v.contentType === 'EXTERNAL_LINK' && v.externalUrl) {
+            return (
+                <a href={v.externalUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-brand-400 hover:text-brand-300 underline flex items-center gap-1">
+                    🔗 {v.externalUrl}
+                </a>
+            );
+        }
+        return (
+            <div className="prose prose-sm prose-invert max-w-none text-slate-300 whitespace-pre-wrap text-sm">
+                {v.contentText || <span className="text-slate-500 italic">No content</span>}
+            </div>
+        );
+    };
+
+    const relativeTime = (date: string) => {
+        const d = new Date(date);
+        const diff = Date.now() - d.getTime();
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'just now';
+        if (mins < 60) return `${mins}m ago`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        const days = Math.floor(hrs / 24);
+        return days === 1 ? 'yesterday' : `${days}d ago`;
+    };
+
+    const isOverdue = policy?.nextReviewAt && new Date(policy.nextReviewAt) < new Date() && policy.status !== 'ARCHIVED';
+
+    // ── Render ──
+
+    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading policy...</div>;
+    if (error && !policy) return (
+        <div className="glass-card p-12 text-center text-red-400 animate-fadeIn">
+            <p className="text-lg">{error}</p>
+            <Link href={tenantHref('/policies')} className="btn btn-secondary mt-4">← Back to Policies</Link>
+        </div>
+    );
+    if (!policy) return null;
+
+    const currentVersion = policy.currentVersion || policy.versions?.[0];
+    const versions = policy.versions || [];
+    const canWrite = tenant.permissions.canWrite;
+    const canAdmin = tenant.permissions.canAdmin;
+
+    const tabItems = ['current', 'versions', ...(canWrite ? ['editor'] : []), 'activity'] as const;
+    const tabLabels: Record<string, string> = {
+        current: '📄 Current', versions: '📋 Versions', editor: '✏️ Editor', activity: '📊 Activity',
+    };
+
+    return (
+        <div className="space-y-6 animate-fadeIn">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Link href={tenantHref('/policies')} className="hover:text-brand-400 transition">Policies</Link>
+                <span>/</span>
+                <span className="text-slate-200 truncate">{policy.title}</span>
+            </div>
+
+            {error && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                    {error}
+                    <button onClick={() => setError('')} className="ml-2 text-red-300 hover:text-white">×</button>
+                </div>
+            )}
+
+            {/* Header */}
+            <div className="glass-card p-6">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-2">
+                            <h1 className="text-xl font-bold truncate" id="policy-title">{policy.title}</h1>
+                            <span className={`badge ${STATUS_BADGE[policy.status] || 'badge-neutral'}`} id="policy-status">{policy.status}</span>
+                            {isOverdue && <span className="badge badge-danger text-xs">⚠️ Overdue</span>}
+                        </div>
+                        {policy.description && <p className="text-sm text-slate-400 mb-3">{policy.description}</p>}
+                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
+                            {policy.category && <span>📁 {policy.category}</span>}
+                            {policy.owner && <span>👤 {policy.owner.name}</span>}
+                            {policy.nextReviewAt && (
+                                <span className={isOverdue ? 'text-red-400' : ''}>
+                                    📅 Review: {new Date(policy.nextReviewAt).toLocaleDateString()}
+                                </span>
+                            )}
+                            {policy.reviewFrequencyDays && <span>🔄 Every {policy.reviewFrequencyDays}d</span>}
+                            <span>📝 {versions.length} version{versions.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        {/* Review edit toggle */}
+                        {canWrite && !editingReview && (
+                            <button onClick={() => setEditingReview(true)} className="text-xs text-brand-400 hover:text-brand-300 mt-2">
+                                Edit review schedule
+                            </button>
+                        )}
+                        {editingReview && (
+                            <div className="flex gap-2 items-end mt-2">
+                                <div>
+                                    <label className="text-xs text-slate-500">Frequency (days)</label>
+                                    <input type="number" className="input w-24 text-sm" value={reviewDays}
+                                        onChange={e => setReviewDays(e.target.value)} min={1} />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500">Next review</label>
+                                    <input type="date" className="input w-36 text-sm" value={nextReview}
+                                        onChange={e => setNextReview(e.target.value)} />
+                                </div>
+                                <button onClick={saveReview} disabled={savingReview} className="btn btn-xs btn-primary">
+                                    {savingReview ? '...' : 'Save'}
+                                </button>
+                                <button onClick={() => setEditingReview(false)} className="btn btn-xs btn-ghost">Cancel</button>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                        {canWrite && policy.status !== 'ARCHIVED' && (
+                            <button onClick={() => { setTab('editor'); setEditorContent(currentVersion?.contentText || ''); }}
+                                className="btn btn-primary btn-sm" id="new-version-btn">✏️ New Version</button>
+                        )}
+                        {canAdmin && policy.status !== 'ARCHIVED' && (
+                            <button onClick={archivePolicy} disabled={actionLoading === 'archive'}
+                                className="btn btn-ghost btn-sm text-slate-400 hover:text-red-400" id="archive-btn">
+                                {actionLoading === 'archive' ? '...' : '🗃️ Archive'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 border-b border-slate-700/50">
+                {tabItems.map(t => (
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    <button key={t} onClick={() => setTab(t as any)}
+                        className={`px-4 py-2.5 text-sm font-medium transition border-b-2 ${tab === t ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+                            }`}>{tabLabels[t]}</button>
+                ))}
+            </div>
+
+            {/* ── Current Version ── */}
+            {tab === 'current' && (
+                <div className="glass-card p-6 space-y-4">
+                    {currentVersion ? (
+                        <>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="text-sm text-slate-400">
+                                    Version {currentVersion.versionNumber} · {currentVersion.createdBy?.name} · {new Date(currentVersion.createdAt).toLocaleDateString()}
+                                    {currentVersion.contentType === 'EXTERNAL_LINK' && <span className="ml-2 badge badge-info text-xs">External</span>}
+                                </div>
+                            </div>
+                            {renderVersionContent(currentVersion)}
+                        </>
+                    ) : (
+                        <div className="text-center text-slate-500 py-8">
+                            <p>No version published yet.</p>
+                            {canWrite && <p className="text-sm mt-1">Create a version in the Editor tab.</p>}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* ── Version History ── */}
+            {tab === 'versions' && (
+                <div className="space-y-3" id="version-history">
+                    {versions.length === 0 ? (
+                        <div className="glass-card p-8 text-center text-slate-500">No versions yet.</div>
+                    ) : versions.map((v: PolicyVersionDTO) => {
+                        const vApprovals = (v.approvals || []).filter((a) => a.status === 'PENDING' || a.status === 'APPROVED' || a.status === 'REJECTED');
+                        const hasPending = vApprovals.some((a) => a.status === 'PENDING');
+                        const hasApproved = vApprovals.some((a) => a.status === 'APPROVED');
+                        const isCurrentPublished = policy.currentVersionId === v.id;
+
+                        return (
+                            <div key={v.id} className="glass-card p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm font-semibold text-brand-400">v{v.versionNumber}</span>
+                                        {isCurrentPublished && <span className="badge badge-success text-xs">Published</span>}
+                                        {v.contentType === 'EXTERNAL_LINK' && <span className="badge badge-info text-xs">External Link</span>}
+                                        <span className="text-xs text-slate-500">
+                                            {v.createdBy?.name} · {new Date(v.createdAt).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {canWrite && !hasPending && !isCurrentPublished && (
+                                            <button onClick={() => requestApproval(v.id)} disabled={!!actionLoading}
+                                                className="btn btn-sm btn-secondary" id={`request-approval-${v.versionNumber}`}>
+                                                {actionLoading === 'approve-' + v.id ? '...' : '📨 Request Approval'}
+                                            </button>
+                                        )}
+                                        {canAdmin && hasApproved && !isCurrentPublished && (
+                                            <button onClick={() => publishVersion(v.id)} disabled={!!actionLoading}
+                                                className="btn btn-sm btn-success" id={`publish-version-${v.versionNumber}`}>
+                                                {actionLoading === 'publish-' + v.id ? '...' : '🚀 Publish'}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                {v.changeSummary && <p className="text-sm text-slate-400 italic">{v.changeSummary}</p>}
+                                <details className="group">
+                                    <summary className="text-xs text-brand-400 cursor-pointer hover:text-brand-300">Show content</summary>
+                                    <div className="mt-2 border-t border-slate-700 pt-2">{renderVersionContent(v)}</div>
+                                </details>
+                                {vApprovals.length > 0 && (
+                                    <div className="border-t border-slate-700/50 pt-2 space-y-1">
+                                        <p className="text-xs font-semibold text-slate-500">Approvals</p>
+                                        {vApprovals.map((a) => (
+                                            <div key={a.id} className="flex items-center justify-between text-xs">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`badge text-xs ${APPROVAL_BADGE[a.status]}`}>{a.status}</span>
+                                                    <span className="text-slate-400">
+                                                        by {a.requestedBy?.name || 'Unknown'}
+                                                        {a.decidedAt && ` · ${new Date(a.decidedAt).toLocaleDateString()}`}
+                                                    </span>
+                                                </div>
+                                                {canAdmin && a.status === 'PENDING' && (
+                                                    <div className="flex gap-1">
+                                                        <button onClick={() => decideApproval(a.id, 'APPROVED')} disabled={!!actionLoading}
+                                                            className="btn btn-xs btn-success" id={`approve-${a.id}`}>
+                                                            {actionLoading === 'decide-' + a.id ? '...' : '✅ Approve'}
+                                                        </button>
+                                                        <button onClick={() => decideApproval(a.id, 'REJECTED')} disabled={!!actionLoading}
+                                                            className="btn btn-xs btn-danger">Reject</button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* ── Editor ── */}
+            {tab === 'editor' && canWrite && (
+                <div className="glass-card p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-slate-300">Create New Version</h3>
+                    </div>
+
+                    {/* Content type selector */}
+                    <div className="flex gap-2">
+                        {([
+                            { key: 'MARKDOWN' as const, label: '📝 Markdown', icon: '' },
+                            { key: 'EXTERNAL_LINK' as const, label: '🔗 External Link', icon: '' },
+                            { key: 'FILE' as const, label: '📎 File Upload', icon: '' },
+                        ]).map(opt => (
+                            <button key={opt.key} onClick={() => setContentMode(opt.key)}
+                                className={`px-3 py-1.5 text-xs rounded-lg border transition ${contentMode === opt.key
+                                        ? 'border-brand-500 bg-brand-500/10 text-brand-400'
+                                        : 'border-slate-700 text-slate-400 hover:text-slate-200'
+                                    }`} id={`mode-${opt.key.toLowerCase()}`}>{opt.label}</button>
+                        ))}
+                    </div>
+
+                    {/* Markdown editor */}
+                    {contentMode === 'MARKDOWN' && (
+                        <>
+                            <div className="flex justify-end">
+                                <button onClick={() => setShowPreview(!showPreview)} className="btn btn-xs btn-ghost text-slate-400">
+                                    {showPreview ? '✏️ Edit' : '👁️ Preview'}
+                                </button>
+                            </div>
+                            {showPreview ? (
+                                <div className="prose prose-sm prose-invert max-w-none text-slate-300 whitespace-pre-wrap text-sm min-h-[300px] border border-slate-700 rounded-lg p-4">
+                                    {editorContent || <span className="text-slate-500 italic">Nothing to preview</span>}
+                                </div>
+                            ) : (
+                                <textarea className="input w-full min-h-[300px] font-mono text-sm" value={editorContent}
+                                    onChange={e => setEditorContent(e.target.value)}
+                                    placeholder="# Policy Content&#10;&#10;Write your policy here..." id="version-editor" />
+                            )}
+                        </>
+                    )}
+
+                    {/* External link input */}
+                    {contentMode === 'EXTERNAL_LINK' && (
+                        <div>
+                            <label className="input-label">External Document URL</label>
+                            <input type="url" className="input w-full" value={externalUrl}
+                                onChange={e => setExternalUrl(e.target.value)}
+                                placeholder="https://docs.google.com/..." id="external-url-input" />
+                            <p className="text-xs text-slate-500 mt-1">Link to an external policy document (Google Docs, Confluence, etc.)</p>
+                        </div>
+                    )}
+
+                    {/* File upload */}
+                    {contentMode === 'FILE' && (
+                        <div>
+                            <label className="input-label">Upload File</label>
+                            <input type="file" className="input w-full" id="file-upload-input"
+                                onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+                                accept=".pdf,.doc,.docx,.txt,.md" />
+                            {selectedFile && (
+                                <p className="text-xs text-brand-400 mt-1">📎 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
+                            )}
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="input-label">Change Summary (optional)</label>
+                        <input className="input w-full" value={changeSummary} onChange={e => setChangeSummary(e.target.value)}
+                            placeholder="What changed in this version?" id="change-summary-input" />
+                    </div>
+
+                    <button onClick={createVersion} disabled={saving} className="btn btn-primary" id="save-version-btn">
+                        {saving ? 'Saving...' : '💾 Save as New Version'}
+                    </button>
+                </div>
+            )}
+
+            {/* ── Activity Feed ── */}
+            {tab === 'activity' && (
+                <div className="glass-card p-6" id="activity-feed">
+                    <h3 className="text-sm font-semibold text-slate-300 mb-4">Activity Timeline</h3>
+                    {activitiesLoading ? (
+                        <div className="text-center text-slate-500 animate-pulse py-8">Loading activity...</div>
+                    ) : activities.length === 0 ? (
+                        <div className="text-center text-slate-500 py-8">No activity recorded yet.</div>
+                    ) : (
+                        <div className="space-y-3">
+                            {activities.map((evt: AuditLogEntry) => (
+                                <div key={evt.id} className="flex items-start gap-3 text-sm">
+                                    <span className="text-base mt-0.5">{EVENT_ICONS[evt.action] || '📌'}</span>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-slate-200 text-xs">
+                                                {evt.action.replace('POLICY_', '').replace(/_/g, ' ')}
+                                            </span>
+                                            <span className="text-xs text-slate-500">{relativeTime(evt.createdAt)}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-400 mt-0.5 truncate">
+                                            {evt.user?.name || 'System'}{evt.details ? ` — ${evt.details.split('\n')[0]}` : ''}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}

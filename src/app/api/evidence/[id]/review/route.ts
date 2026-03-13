@@ -1,0 +1,12 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getLegacyCtx } from '@/app-layer/context';
+import { reviewEvidence } from '@/app-layer/usecases/evidence';
+import { withValidatedBody } from '@/lib/validation/route';
+import { EvidenceReviewSchema } from '@/lib/schemas';
+import { withApiErrorHandling } from '@/lib/errors/api';
+
+export const POST = withApiErrorHandling(withValidatedBody(EvidenceReviewSchema, async (req, { params }: { params: { id: string } }, body) => {
+    const ctx = await getLegacyCtx(req);
+    const review = await reviewEvidence(ctx, params.id, body);
+    return NextResponse.json(review, { status: 201 });
+}));

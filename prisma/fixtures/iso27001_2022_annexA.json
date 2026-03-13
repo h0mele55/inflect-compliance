@@ -1,0 +1,746 @@
+[
+    {
+        "key": "5.1",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 1,
+        "title": "Policies for information security",
+        "summary": "Establish and maintain information security policy framework"
+    },
+    {
+        "key": "5.2",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 2,
+        "title": "Information security roles and responsibilities",
+        "summary": "Define and assign information security roles"
+    },
+    {
+        "key": "5.3",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 3,
+        "title": "Segregation of duties",
+        "summary": "Ensure conflicting duties are segregated"
+    },
+    {
+        "key": "5.4",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 4,
+        "title": "Management responsibilities",
+        "summary": "Management enforces security policy compliance"
+    },
+    {
+        "key": "5.5",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 5,
+        "title": "Contact with authorities",
+        "summary": "Maintain contacts with relevant authorities"
+    },
+    {
+        "key": "5.6",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 6,
+        "title": "Contact with special interest groups",
+        "summary": "Maintain contacts with security forums and groups"
+    },
+    {
+        "key": "5.7",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 7,
+        "title": "Threat intelligence",
+        "summary": "Collect and analyze threat intelligence"
+    },
+    {
+        "key": "5.8",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 8,
+        "title": "Information security in project management",
+        "summary": "Integrate security into project management"
+    },
+    {
+        "key": "5.9",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 9,
+        "title": "Inventory of information and other associated assets",
+        "summary": "Maintain inventory of information assets"
+    },
+    {
+        "key": "5.10",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 10,
+        "title": "Acceptable use of information and other associated assets",
+        "summary": "Define acceptable use rules for assets"
+    },
+    {
+        "key": "5.11",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 11,
+        "title": "Return of assets",
+        "summary": "Ensure return of assets upon termination"
+    },
+    {
+        "key": "5.12",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 12,
+        "title": "Classification of information",
+        "summary": "Classify information according to needs"
+    },
+    {
+        "key": "5.13",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 13,
+        "title": "Labelling of information",
+        "summary": "Implement labelling procedures for classified information"
+    },
+    {
+        "key": "5.14",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 14,
+        "title": "Information transfer",
+        "summary": "Secure information transfer policies and procedures"
+    },
+    {
+        "key": "5.15",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 15,
+        "title": "Access control",
+        "summary": "Establish access control policy and rules"
+    },
+    {
+        "key": "5.16",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 16,
+        "title": "Identity management",
+        "summary": "Manage identity lifecycle for access control"
+    },
+    {
+        "key": "5.17",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 17,
+        "title": "Authentication information",
+        "summary": "Manage allocation and use of authentication info"
+    },
+    {
+        "key": "5.18",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 18,
+        "title": "Access rights",
+        "summary": "Provision, review and revoke access rights"
+    },
+    {
+        "key": "5.19",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 19,
+        "title": "Information security in supplier relationships",
+        "summary": "Address security in supplier agreements"
+    },
+    {
+        "key": "5.20",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 20,
+        "title": "Addressing information security within supplier agreements",
+        "summary": "Include security requirements in supplier contracts"
+    },
+    {
+        "key": "5.21",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 21,
+        "title": "Managing information security in the ICT supply chain",
+        "summary": "Secure the ICT supply chain"
+    },
+    {
+        "key": "5.22",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 22,
+        "title": "Monitoring, review and change management of supplier services",
+        "summary": "Monitor and review supplier services"
+    },
+    {
+        "key": "5.23",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 23,
+        "title": "Information security for use of cloud services",
+        "summary": "Manage cloud service security requirements"
+    },
+    {
+        "key": "5.24",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 24,
+        "title": "Information security incident management planning and preparation",
+        "summary": "Plan incident management processes"
+    },
+    {
+        "key": "5.25",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 25,
+        "title": "Assessment and decision on information security events",
+        "summary": "Assess and decide on security events"
+    },
+    {
+        "key": "5.26",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 26,
+        "title": "Response to information security incidents",
+        "summary": "Respond to incidents per documented procedures"
+    },
+    {
+        "key": "5.27",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 27,
+        "title": "Learning from information security incidents",
+        "summary": "Learn from incidents to improve security"
+    },
+    {
+        "key": "5.28",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 28,
+        "title": "Collection of evidence",
+        "summary": "Collect and preserve evidence for incidents"
+    },
+    {
+        "key": "5.29",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 29,
+        "title": "Information security during disruption",
+        "summary": "Maintain security during business disruptions"
+    },
+    {
+        "key": "5.30",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 30,
+        "title": "ICT readiness for business continuity",
+        "summary": "Ensure ICT supports business continuity"
+    },
+    {
+        "key": "5.31",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 31,
+        "title": "Legal, statutory, regulatory and contractual requirements",
+        "summary": "Identify and comply with legal requirements"
+    },
+    {
+        "key": "5.32",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 32,
+        "title": "Intellectual property rights",
+        "summary": "Protect intellectual property rights"
+    },
+    {
+        "key": "5.33",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 33,
+        "title": "Protection of records",
+        "summary": "Protect records per legal and business requirements"
+    },
+    {
+        "key": "5.34",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 34,
+        "title": "Privacy and protection of PII",
+        "summary": "Ensure privacy and PII protection"
+    },
+    {
+        "key": "5.35",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 35,
+        "title": "Independent review of information security",
+        "summary": "Conduct independent security reviews"
+    },
+    {
+        "key": "5.36",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 36,
+        "title": "Compliance with policies, rules and standards for information security",
+        "summary": "Ensure compliance with security policies"
+    },
+    {
+        "key": "5.37",
+        "theme": "ORGANIZATIONAL",
+        "themeNumber": 5,
+        "sortOrder": 37,
+        "title": "Documented operating procedures",
+        "summary": "Document and maintain operating procedures"
+    },
+    {
+        "key": "6.1",
+        "theme": "PEOPLE",
+        "themeNumber": 6,
+        "sortOrder": 38,
+        "title": "Screening",
+        "summary": "Verify backgrounds of personnel"
+    },
+    {
+        "key": "6.2",
+        "theme": "PEOPLE",
+        "themeNumber": 6,
+        "sortOrder": 39,
+        "title": "Terms and conditions of employment",
+        "summary": "Include security responsibilities in employment terms"
+    },
+    {
+        "key": "6.3",
+        "theme": "PEOPLE",
+        "themeNumber": 6,
+        "sortOrder": 40,
+        "title": "Information security awareness, education and training",
+        "summary": "Provide security awareness training"
+    },
+    {
+        "key": "6.4",
+        "theme": "PEOPLE",
+        "themeNumber": 6,
+        "sortOrder": 41,
+        "title": "Disciplinary process",
+        "summary": "Define disciplinary process for policy violations"
+    },
+    {
+        "key": "6.5",
+        "theme": "PEOPLE",
+        "themeNumber": 6,
+        "sortOrder": 42,
+        "title": "Responsibilities after termination or change of employment",
+        "summary": "Define post-employment security responsibilities"
+    },
+    {
+        "key": "6.6",
+        "theme": "PEOPLE",
+        "themeNumber": 6,
+        "sortOrder": 43,
+        "title": "Confidentiality or non-disclosure agreements",
+        "summary": "Use NDAs to protect information"
+    },
+    {
+        "key": "6.7",
+        "theme": "PEOPLE",
+        "themeNumber": 6,
+        "sortOrder": 44,
+        "title": "Remote working",
+        "summary": "Secure remote working arrangements"
+    },
+    {
+        "key": "6.8",
+        "theme": "PEOPLE",
+        "themeNumber": 6,
+        "sortOrder": 45,
+        "title": "Information security event reporting",
+        "summary": "Enable personnel to report security events"
+    },
+    {
+        "key": "7.1",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 46,
+        "title": "Physical security perimeters",
+        "summary": "Define and protect physical security perimeters"
+    },
+    {
+        "key": "7.2",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 47,
+        "title": "Physical entry",
+        "summary": "Control physical access to secure areas"
+    },
+    {
+        "key": "7.3",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 48,
+        "title": "Securing offices, rooms and facilities",
+        "summary": "Secure offices and facilities"
+    },
+    {
+        "key": "7.4",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 49,
+        "title": "Physical security monitoring",
+        "summary": "Monitor premises for unauthorized access"
+    },
+    {
+        "key": "7.5",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 50,
+        "title": "Protecting against physical and environmental threats",
+        "summary": "Protect against environmental threats"
+    },
+    {
+        "key": "7.6",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 51,
+        "title": "Working in secure areas",
+        "summary": "Define procedures for working in secure areas"
+    },
+    {
+        "key": "7.7",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 52,
+        "title": "Clear desk and clear screen",
+        "summary": "Implement clear desk and screen policy"
+    },
+    {
+        "key": "7.8",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 53,
+        "title": "Equipment siting and protection",
+        "summary": "Site and protect equipment appropriately"
+    },
+    {
+        "key": "7.9",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 54,
+        "title": "Security of assets off-premises",
+        "summary": "Protect off-premises assets"
+    },
+    {
+        "key": "7.10",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 55,
+        "title": "Storage media",
+        "summary": "Manage storage media throughout lifecycle"
+    },
+    {
+        "key": "7.11",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 56,
+        "title": "Supporting utilities",
+        "summary": "Protect equipment from utility failures"
+    },
+    {
+        "key": "7.12",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 57,
+        "title": "Cabling security",
+        "summary": "Protect power and network cabling"
+    },
+    {
+        "key": "7.13",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 58,
+        "title": "Equipment maintenance",
+        "summary": "Maintain equipment to ensure availability"
+    },
+    {
+        "key": "7.14",
+        "theme": "PHYSICAL",
+        "themeNumber": 7,
+        "sortOrder": 59,
+        "title": "Secure disposal or re-use of equipment",
+        "summary": "Securely dispose or reuse equipment"
+    },
+    {
+        "key": "8.1",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 60,
+        "title": "User endpoint devices",
+        "summary": "Secure user endpoint devices"
+    },
+    {
+        "key": "8.2",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 61,
+        "title": "Privileged access rights",
+        "summary": "Restrict and manage privileged access"
+    },
+    {
+        "key": "8.3",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 62,
+        "title": "Information access restriction",
+        "summary": "Restrict access to information per policy"
+    },
+    {
+        "key": "8.4",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 63,
+        "title": "Access to source code",
+        "summary": "Restrict access to source code"
+    },
+    {
+        "key": "8.5",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 64,
+        "title": "Secure authentication",
+        "summary": "Implement secure authentication mechanisms"
+    },
+    {
+        "key": "8.6",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 65,
+        "title": "Capacity management",
+        "summary": "Monitor and manage resource capacity"
+    },
+    {
+        "key": "8.7",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 66,
+        "title": "Protection against malware",
+        "summary": "Implement malware protection measures"
+    },
+    {
+        "key": "8.8",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 67,
+        "title": "Management of technical vulnerabilities",
+        "summary": "Manage technical vulnerabilities systematically"
+    },
+    {
+        "key": "8.9",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 68,
+        "title": "Configuration management",
+        "summary": "Manage system configurations securely"
+    },
+    {
+        "key": "8.10",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 69,
+        "title": "Information deletion",
+        "summary": "Delete information when no longer needed"
+    },
+    {
+        "key": "8.11",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 70,
+        "title": "Data masking",
+        "summary": "Mask data per access control policy"
+    },
+    {
+        "key": "8.12",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 71,
+        "title": "Data leakage prevention",
+        "summary": "Prevent unauthorized data disclosure"
+    },
+    {
+        "key": "8.13",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 72,
+        "title": "Information backup",
+        "summary": "Maintain and test backup copies"
+    },
+    {
+        "key": "8.14",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 73,
+        "title": "Redundancy of information processing facilities",
+        "summary": "Ensure redundancy for availability"
+    },
+    {
+        "key": "8.15",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 74,
+        "title": "Logging",
+        "summary": "Produce and protect activity logs"
+    },
+    {
+        "key": "8.16",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 75,
+        "title": "Monitoring activities",
+        "summary": "Monitor networks, systems, applications"
+    },
+    {
+        "key": "8.17",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 76,
+        "title": "Clock synchronization",
+        "summary": "Synchronize system clocks"
+    },
+    {
+        "key": "8.18",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 77,
+        "title": "Use of privileged utility programs",
+        "summary": "Restrict and control utility programs"
+    },
+    {
+        "key": "8.19",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 78,
+        "title": "Installation of software on operational systems",
+        "summary": "Control software installation"
+    },
+    {
+        "key": "8.20",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 79,
+        "title": "Networks security",
+        "summary": "Secure and manage networks"
+    },
+    {
+        "key": "8.21",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 80,
+        "title": "Security of network services",
+        "summary": "Address security in network service agreements"
+    },
+    {
+        "key": "8.22",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 81,
+        "title": "Segregation of networks",
+        "summary": "Segregate networks by security requirements"
+    },
+    {
+        "key": "8.23",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 82,
+        "title": "Web filtering",
+        "summary": "Filter access to external websites"
+    },
+    {
+        "key": "8.24",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 83,
+        "title": "Use of cryptography",
+        "summary": "Define and implement cryptography rules"
+    },
+    {
+        "key": "8.25",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 84,
+        "title": "Secure development life cycle",
+        "summary": "Apply security throughout development lifecycle"
+    },
+    {
+        "key": "8.26",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 85,
+        "title": "Application security requirements",
+        "summary": "Identify and address application security needs"
+    },
+    {
+        "key": "8.27",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 86,
+        "title": "Secure system architecture and engineering principles",
+        "summary": "Apply secure engineering principles"
+    },
+    {
+        "key": "8.28",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 87,
+        "title": "Secure coding",
+        "summary": "Apply secure coding practices"
+    },
+    {
+        "key": "8.29",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 88,
+        "title": "Security testing in development and acceptance",
+        "summary": "Test security during development and acceptance"
+    },
+    {
+        "key": "8.30",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 89,
+        "title": "Outsourced development",
+        "summary": "Manage security for outsourced development"
+    },
+    {
+        "key": "8.31",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 90,
+        "title": "Separation of development, test and production environments",
+        "summary": "Separate dev, test, and production"
+    },
+    {
+        "key": "8.32",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 91,
+        "title": "Change management",
+        "summary": "Manage changes to information processing facilities"
+    },
+    {
+        "key": "8.33",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 92,
+        "title": "Test information",
+        "summary": "Protect test data appropriately"
+    },
+    {
+        "key": "8.34",
+        "theme": "TECHNOLOGICAL",
+        "themeNumber": 8,
+        "sortOrder": 93,
+        "title": "Protection of information systems during audit testing",
+        "summary": "Protect systems during audit testing"
+    }
+]

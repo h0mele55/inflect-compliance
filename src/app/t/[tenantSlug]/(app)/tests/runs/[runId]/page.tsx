@@ -1,0 +1,378 @@
+'use client';
+import { useEffect, useState, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+
+interface EvidenceLink {
+    id: string;
+    kind: string;
+    url: string | null;
+    note: string | null;
+    fileId: string | null;
+    evidenceId: string | null;
+    evidence?: { id: string; title: string; type: string } | null;
+    createdBy?: { name: string | null; email: string } | null;
+    createdAt: string;
+}
+
+interface TestRunDetail {
+    id: string;
+    status: string;
+    result: string | null;
+    notes: string | null;
+    findingSummary: string | null;
+    executedAt: string | null;
+    controlId: string;
+    testPlanId: string;
+    testPlan?: { id: string; name: string; controlId: string; frequency: string } | null;
+    executedBy?: { name: string | null; email: string } | null;
+    createdBy?: { name: string | null; email: string } | null;
+    evidence: EvidenceLink[];
+    createdAt: string;
+}
+
+const RESULT_BADGE: Record<string, string> = {
+    PASS: 'badge-success', FAIL: 'badge-danger', INCONCLUSIVE: 'badge-warning',
+};
+
+export default function TestRunPage() {
+    const params = useParams();
+    const router = useRouter();
+    const apiUrl = useTenantApiUrl();
+    const tenantHref = useTenantHref();
+    const { permissions } = useTenantContext();
+    const runId = params?.runId as string;
+
+    const [run, setRun] = useState<TestRunDetail | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    // Complete form
+    const [result, setResult] = useState<'PASS' | 'FAIL' | 'INCONCLUSIVE'>('PASS');
+    const [notes, setNotes] = useState('');
+    const [findingSummary, setFindingSummary] = useState('');
+    const [completing, setCompleting] = useState(false);
+
+    // Evidence form
+    const [showEvForm, setShowEvForm] = useState(false);
+    const [evKind, setEvKind] = useState<'LINK' | 'EVIDENCE'>('LINK');
+    const [evUrl, setEvUrl] = useState('');
+    const [evNote, setEvNote] = useState('');
+    const [evEvidenceId, setEvEvidenceId] = useState('');
+    const [linkingEv, setLinkingEv] = useState(false);
+    const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
+
+    const [retesting, setRetesting] = useState(false);
+
+    const handleRetest = async () => {
+        setRetesting(true);
+        try {
+            const res = await fetch(apiUrl(`/tests/runs/${runId}/retest`), { method: 'POST' });
+            if (res.ok) {
+                const newRun = await res.json();
+                router.push(tenantHref(`/tests/runs/${newRun.id}`));
+            }
+        } finally {
+            setRetesting(false);
+        }
+    };
+
+    const fetchRun = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(apiUrl(`/tests/runs/${runId}`));
+            if (!res.ok) throw new Error('Run not found');
+            setRun(await res.json());
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : 'Unknown error');
+        } finally {
+            setLoading(false);
+        }
+    }, [apiUrl, runId]);
+
+    useEffect(() => { fetchRun(); }, [fetchRun]);
+
+    const completeRun = async () => {
+        setCompleting(true);
+        try {
+            const body: Record<string, unknown> = { result, notes: notes || null };
+            if (result === 'FAIL') body.findingSummary = findingSummary || null;
+            const res = await fetch(apiUrl(`/tests/runs/${runId}/complete`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (res.ok) {
+                await fetchRun();
+            }
+        } finally {
+            setCompleting(false);
+        }
+    };
+
+    const linkEvidence = async () => {
+        setLinkingEv(true);
+        try {
+            const body: Record<string, unknown> = { kind: evKind, note: evNote || null };
+            if (evKind === 'LINK') body.url = evUrl;
+            if (evKind === 'EVIDENCE') body.evidenceId = evEvidenceId;
+            const res = await fetch(apiUrl(`/tests/runs/${runId}/evidence`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (res.ok) {
+                setShowEvForm(false);
+                setEvUrl('');
+                setEvNote('');
+                setEvEvidenceId('');
+                await fetchRun();
+            }
+        } finally {
+            setLinkingEv(false);
+        }
+    };
+
+    const unlinkEvidence = async (linkId: string) => {
+        setUnlinkingId(linkId);
+        try {
+            await fetch(apiUrl(`/tests/runs/${runId}/evidence/${linkId}`), { method: 'DELETE' });
+            await fetchRun();
+        } finally {
+            setUnlinkingId(null);
+        }
+    };
+
+    const formatDate = (d: string | null) => {
+        if (!d) return '—';
+        return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+
+    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading test run...</div>;
+    if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
+    if (!run) return <div className="p-12 text-center text-slate-500">Run not found.</div>;
+
+    const isCompleted = run.status === 'COMPLETED';
+
+    return (
+        <div className="space-y-6 animate-fadeIn">
+            {/* Breadcrumb */}
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+                {run.testPlan && (
+                    <Link href={tenantHref(`/controls/${run.testPlan.controlId}/tests/${run.testPlanId}`)} className="hover:text-white transition">
+                        ← {run.testPlan.name}
+                    </Link>
+                )}
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold" id="test-run-title">
+                        Test Run {run.testPlan ? `— ${run.testPlan.name}` : ''}
+                    </h1>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className={`badge ${run.status === 'COMPLETED' ? 'badge-success' : run.status === 'RUNNING' ? 'badge-info' : 'badge-neutral'}`} id="test-run-status">
+                            {run.status}
+                        </span>
+                        {run.result && (
+                            <span className={`badge ${RESULT_BADGE[run.result] || 'badge-neutral'}`} id="test-run-result">
+                                {run.result}
+                            </span>
+                        )}
+                        {run.executedAt && (
+                            <span className="text-xs text-slate-400">Executed: {formatDate(run.executedAt)}</span>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Complete Form — only if not completed */}
+            {!isCompleted && permissions.canWrite && (
+                <div className="glass-card p-5 space-y-4 border-l-4 border-brand-500">
+                    <h3 className="text-sm font-semibold text-white">Complete This Test Run</h3>
+
+                    <div>
+                        <label className="text-xs text-slate-400 block mb-1">Result *</label>
+                        <div className="flex gap-3">
+                            {(['PASS', 'FAIL', 'INCONCLUSIVE'] as const).map(r => (
+                                <button
+                                    key={r}
+                                    className={`btn btn-sm ${result === r
+                                        ? r === 'PASS' ? 'bg-green-600 text-white' : r === 'FAIL' ? 'bg-red-600 text-white' : 'bg-yellow-600 text-white'
+                                        : 'btn-ghost'
+                                    }`}
+                                    onClick={() => setResult(r)}
+                                    id={`result-btn-${r}`}
+                                >
+                                    {r === 'PASS' ? '✅' : r === 'FAIL' ? '❌' : '⚠️'} {r}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs text-slate-400 block mb-1">Notes</label>
+                        <textarea
+                            className="input w-full h-20"
+                            value={notes}
+                            onChange={e => setNotes(e.target.value)}
+                            placeholder="Observation notes..."
+                            id="test-run-notes"
+                        />
+                    </div>
+
+                    {result === 'FAIL' && (
+                        <div className="animate-fadeIn">
+                            <label className="text-xs text-slate-400 block mb-1">Finding Summary (for auto-created task)</label>
+                            <textarea
+                                className="input w-full h-16"
+                                value={findingSummary}
+                                onChange={e => setFindingSummary(e.target.value)}
+                                placeholder="Summarize the issue found..."
+                                id="test-run-finding-summary"
+                            />
+                        </div>
+                    )}
+
+                    <button
+                        className="btn btn-primary btn-sm"
+                        onClick={completeRun}
+                        disabled={completing}
+                        id="complete-test-run-btn"
+                    >
+                        {completing ? '⏳ Completing...' : `✓ Complete as ${result}`}
+                    </button>
+                </div>
+            )}
+
+            {/* Completed Info */}
+            {isCompleted && (
+                <div className="glass-card p-4 space-y-2">
+                    {run.notes && (
+                        <div>
+                            <span className="text-xs text-slate-400">Notes:</span>
+                            <p className="text-sm text-slate-300 whitespace-pre-wrap mt-1">{run.notes}</p>
+                        </div>
+                    )}
+                    {run.findingSummary && (
+                        <div>
+                            <span className="text-xs text-red-400">Finding Summary:</span>
+                            <p className="text-sm text-red-300 whitespace-pre-wrap mt-1">{run.findingSummary}</p>
+                        </div>
+                    )}
+                    {run.executedBy && (
+                        <div className="text-xs text-slate-500 mt-2">
+                            Executed by {run.executedBy.name || run.executedBy.email} at {formatDate(run.executedAt)}
+                        </div>
+                    )}
+
+                    {/* Retest button for FAIL/INCONCLUSIVE */}
+                    {permissions.canWrite && (run.result === 'FAIL' || run.result === 'INCONCLUSIVE') && (
+                        <div className="mt-3 pt-3 border-t border-slate-700/50">
+                            <button
+                                onClick={handleRetest}
+                                disabled={retesting}
+                                className="btn btn-sm btn-secondary"
+                                id="retest-btn"
+                            >
+                                {retesting ? '⏳ Creating...' : '🔄 Retest'}
+                            </button>
+                            <span className="text-xs text-slate-500 ml-2">Create a new run for this test plan</span>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Evidence Section */}
+            <div className="glass-card p-4">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-slate-300">📎 Evidence ({run.evidence?.length ?? 0})</h3>
+                    {permissions.canWrite && (
+                        <button
+                            className="btn btn-secondary btn-xs"
+                            onClick={() => setShowEvForm(!showEvForm)}
+                            id="link-evidence-btn"
+                        >
+                            {showEvForm ? 'Cancel' : '+ Link Evidence'}
+                        </button>
+                    )}
+                </div>
+
+                {showEvForm && (
+                    <div className="space-y-3 mb-4 p-3 rounded bg-slate-800/50 animate-fadeIn">
+                        <div>
+                            <label className="text-xs text-slate-400 block mb-1">Evidence Type</label>
+                            <select className="input w-full" value={evKind} onChange={e => setEvKind(e.target.value as 'LINK' | 'EVIDENCE')} id="evidence-kind-select">
+                                <option value="LINK">URL / Link</option>
+                                <option value="EVIDENCE">Existing Evidence Record</option>
+                            </select>
+                        </div>
+                        {evKind === 'LINK' && (
+                            <div>
+                                <label className="text-xs text-slate-400 block mb-1">URL</label>
+                                <input className="input w-full" value={evUrl} onChange={e => setEvUrl(e.target.value)} placeholder="https://..." id="evidence-url-input" />
+                            </div>
+                        )}
+                        {evKind === 'EVIDENCE' && (
+                            <div>
+                                <label className="text-xs text-slate-400 block mb-1">Evidence ID</label>
+                                <input className="input w-full" value={evEvidenceId} onChange={e => setEvEvidenceId(e.target.value)} placeholder="Evidence record ID" id="evidence-id-input" />
+                            </div>
+                        )}
+                        <div>
+                            <label className="text-xs text-slate-400 block mb-1">Note</label>
+                            <input className="input w-full" value={evNote} onChange={e => setEvNote(e.target.value)} placeholder="Optional note..." id="evidence-note-input" />
+                        </div>
+                        <button className="btn btn-primary btn-xs" onClick={linkEvidence} disabled={linkingEv} id="save-evidence-link-btn">
+                            {linkingEv ? '⏳ Linking...' : '🔗 Link'}
+                        </button>
+                    </div>
+                )}
+
+                {run.evidence.length === 0 ? (
+                    <p className="text-sm text-slate-500">No evidence linked yet.</p>
+                ) : (
+                    <div className="divide-y divide-slate-700/50">
+                        {run.evidence.map(ev => (
+                            <div key={ev.id} className="flex items-center justify-between py-2 group">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="badge badge-xs badge-neutral">{ev.kind}</span>
+                                        {ev.evidence && (
+                                            <span className="text-sm text-slate-300">{ev.evidence.title}</span>
+                                        )}
+                                        {ev.url && (
+                                            <a href={ev.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-400 hover:underline truncate">
+                                                {ev.url}
+                                            </a>
+                                        )}
+                                    </div>
+                                    {ev.note && <p className="text-xs text-slate-500 mt-0.5">{ev.note}</p>}
+                                    <p className="text-xs text-slate-600 mt-0.5">
+                                        {ev.createdBy?.name || ev.createdBy?.email} • {formatDate(ev.createdAt)}
+                                    </p>
+                                </div>
+                                {permissions.canWrite && (
+                                    <button
+                                        className="btn btn-ghost btn-xs text-red-400 opacity-0 group-hover:opacity-100 transition"
+                                        onClick={() => unlinkEvidence(ev.id)}
+                                        disabled={unlinkingId === ev.id}
+                                    >
+                                        {unlinkingId === ev.id ? '⏳' : '✕'}
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Meta */}
+            <div className="text-xs text-slate-600">
+                Created {formatDate(run.createdAt)} by {run.createdBy?.name || run.createdBy?.email || 'Unknown'}
+            </div>
+        </div>
+    );
+}

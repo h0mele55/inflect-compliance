@@ -1,0 +1,135 @@
+﻿
+Running 57 tests using 1 worker
+
+[1A[2K[1/57] [chromium] тА║ tests\e2e\auth.spec.ts:30:9 тА║ Authentication Flow тА║ login page loads and shows sign-in options
+[1A[2K[2/57] [chromium] тА║ tests\e2e\auth.spec.ts:42:9 тА║ Authentication Flow тА║ credentials login тЖТ redirect to dashboard
+[1A[2K[3/57] [chromium] тА║ tests\e2e\auth.spec.ts:47:9 тА║ Authentication Flow тА║ protected dashboard page shows user identity after login
+[1A[2K[4/57] [chromium] тА║ tests\e2e\auth.spec.ts:52:9 тА║ Authentication Flow тА║ session cookie is httpOnly
+[1A[2K[5/57] [chromium] тА║ tests\e2e\auth.spec.ts:67:9 тА║ Authentication Flow тА║ logout works and blocks access to dashboard
+[1A[2K[6/57] [chromium] тА║ tests\e2e\auth.spec.ts:79:9 тА║ Authentication Flow тА║ unauthenticated access to /dashboard redirects to /login with next param
+[1A[2K[7/57] [chromium] тА║ tests\e2e\auth.spec.ts:87:9 тА║ Authentication Flow тА║ session API does not expose tokens
+[1A[2K[8/57] [chromium] тА║ tests\e2e\auth.spec.ts:106:9 тА║ Authentication Flow тА║ CSRF token endpoint works
+[1A[2K[9/57] [chromium] тА║ tests\e2e\auth.spec.ts:116:9 тА║ Middleware Auth Guard тА║ unauthenticated API request returns 401 JSON (not redirect)
+[1A[2K[10/57] [chromium] тА║ tests\e2e\auth.spec.ts:125:9 тА║ Middleware Auth Guard тА║ authenticated API request returns 200
+[1A[2K[11/57] [chromium] тА║ tests\e2e\auth.spec.ts:136:9 тА║ Middleware Auth Guard тА║ /api/auth/session is always accessible (public route)
+[1A[2K[12/57] [chromium] тА║ tests\e2e\auth.spec.ts:141:9 тА║ Middleware Auth Guard тА║ /api/auth/providers is always accessible
+[1A[2K[13/57] [chromium] тА║ tests\e2e\auth.spec.ts:146:9 тА║ Middleware Auth Guard тА║ redirect includes next param for return navigation
+[1A[2K[14/57] [chromium] тА║ tests\e2e\auth.spec.ts:153:9 тА║ Middleware Auth Guard тА║ static assets are not blocked by middleware
+[1A[2K[15/57] [chromium] тА║ tests\e2e\controls-enhanced.spec.ts:23:9 тА║ Controls Enhanced тА║ dashboard loads and shows metrics
+[1A[2K[16/57] [chromium] тА║ tests\e2e\controls-enhanced.spec.ts:32:9 тА║ Controls Enhanced тА║ mark test completed updates last tested
+[1A[2K[17/57] [chromium] тА║ tests\e2e\controls-enhanced.spec.ts:55:9 тА║ Controls Enhanced тА║ activity tab shows events
+[1A[2K[18/57] [chromium] тА║ tests\e2e\controls-enhanced.spec.ts:77:9 тА║ Controls Enhanced тА║ automation section is visible on detail page
+[1A[2K[19/57] [chromium] тА║ tests\e2e\controls.spec.ts:24:9 тА║ Controls Center тА║ controls list page loads with filters and CTAs
+[1A[2K[20/57] [chromium] тА║ tests\e2e\controls.spec.ts:34:9 тА║ Controls Center тА║ create a new control and see detail
+[1A[2K[21/57] [chromium] тА║ tests\e2e\controls.spec.ts:49:9 тА║ Controls Center тА║ open control тЖТ create task тЖТ mark done
+[1A[2K[22/57] [chromium] тА║ tests\e2e\controls.spec.ts:77:9 тА║ Controls Center тА║ attach evidence тЖТ see it listed
+[1A[2K[23/57] [chromium] тА║ tests\e2e\controls.spec.ts:100:9 тА║ Controls Center тА║ mark NOT_APPLICABLE requires justification
+[1A[2K[24/57] [chromium] тА║ tests\e2e\controls.spec.ts:129:9 тА║ Controls Center тА║ reader user sees view-only controls
+[1A[2K[25/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:35:9 тА║ Framework Coverage UI тА║ frameworks page loads
+[1A[2K[26/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:41:9 тА║ Framework Coverage UI тА║ framework cards are visible
+[1A[2K[27/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:50:9 тА║ Framework Coverage UI тА║ can navigate to framework detail
+[1A[2K[28/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:62:9 тА║ Framework Coverage UI тА║ detail page shows tabs
+[1A[2K[29/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:78:9 тА║ Framework Coverage UI тА║ requirements tab works
+[1A[2K[30/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:89:9 тА║ Framework Coverage UI тА║ packs tab works
+[1A[2K[31/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:97:9 тА║ Framework Coverage UI тА║ coverage tab works
+[1A[2K[32/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:104:9 тА║ Framework Coverage UI тА║ install wizard loads
+[1A[2K[33/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:112:9 тА║ Framework Coverage UI тА║ install wizard shows preview
+[1A[2K[34/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:124:9 тА║ Framework Coverage UI тА║ can install pack
+[1A[2K[35/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:140:9 тА║ Framework Coverage UI тА║ coverage report page loads
+[1A[2K[36/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:148:9 тА║ Framework Coverage UI тА║ coverage report has metrics
+[1A[2K[37/57] [chromium] тА║ tests\e2e\frameworks.spec.ts:155:9 тА║ Framework Coverage UI тА║ coverage report has export and filter buttons
+[1A[2K[38/57] [chromium] тА║ tests\e2e\issues.spec.ts:24:9 тА║ Issue Management тА║ issues list page loads with filters and CTA
+[1A[2K[39/57] [chromium] тА║ tests\e2e\issues.spec.ts:35:9 тА║ Issue Management тА║ create a new issue and see detail
+[1A[2K[40/57] [chromium] тА║ tests\e2e\issues.spec.ts:53:9 тА║ Issue Management тА║ change issue status
+[1A[2K[41/57] [chromium] тА║ tests\e2e\issues.spec.ts:71:9 тА║ Issue Management тА║ assign issue
+[1A[2K[42/57] [chromium] тА║ tests\e2e\issues.spec.ts:99:9 тА║ Issue Management тА║ add link to issue
+[1A[2K[43/57] [chromium] тА║ tests\e2e\issues.spec.ts:124:9 тА║ Issue Management тА║ add comment to issue
+[1A[2K[44/57] [chromium] тА║ tests\e2e\issues.spec.ts:145:9 тА║ Issue Management тА║ dashboard page renders metrics
+[1A[2K[45/57] [chromium] тА║ tests\e2e\issues.spec.ts:155:9 тА║ Issue Management тА║ bulk action toolbar appears when issues selected
+[1A[2K[46/57] [chromium] тА║ tests\e2e\issues.spec.ts:174:9 тА║ Issue Management тА║ reader user sees view-only issues
+[1A[2K[47/57] [chromium] тА║ tests\e2e\policies.spec.ts:25:9 тА║ Policy Center тА║ policies list page loads with controls
+[1A[2K[48/57] [chromium] тА║ tests\e2e\policies.spec.ts:35:9 тА║ Policy Center тА║ template library page loads
+[1A[2K[49/57] [chromium] тА║ tests\e2e\policies.spec.ts:43:9 тА║ Policy Center тА║ create a blank policy and see detail
+[1A[2K[50/57] [chromium] тА║ tests\e2e\policies.spec.ts:58:9 тА║ Policy Center тА║ create version via editor and view history
+[1A[2K[51/57] [chromium] тА║ tests\e2e\policies.spec.ts:76:9 тА║ Policy Center тА║ create external link version
+[1A[2K[52/57] [chromium] тА║ tests\e2e\policies.spec.ts:100:9 тА║ Policy Center тА║ activity feed tab loads
+[1A[2K[53/57] [chromium] тА║ tests\e2e\policies.spec.ts:114:9 тА║ Policy Center тА║ policy detail shows role-gated action buttons
+[1A[2K[54/57] [chromium] тА║ tests\e2e\vendors.spec.ts:23:9 тА║ Vendor Management тА║ vendor register page loads
+[1A[2K[55/57] [chromium] тА║ tests\e2e\vendors.spec.ts:31:9 тА║ Vendor Management тА║ create vendor and navigate to detail
+[1A[2K[56/57] [chromium] тА║ tests\e2e\vendors.spec.ts:45:9 тА║ Vendor Management тА║ vendor detail tabs work
+[1A[2K[57/57] [chromium] тА║ tests\e2e\vendors.spec.ts:58:9 тА║ Vendor Management тА║ add document to vendor
+node.exe : [1A[2K[2m[WebServe
+r] [22m[API Error 400] [ID: d48
+7d065-36b8-4c7b-9704-7490e8c4562
+0] POST http://localhost:3006/ap
+i/t/acme-corp/vendors/cmmjbel5g0
+05e101h0z3lbtcp/documents -  App
+Error: Invalid JSON payload
+At line:1 char:1
++ & "C:\Program Files\nodejs/nod
+e.exe" "C:\Users\Lenovo\AppData\
+Roaming ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~
+    + CategoryInfo          : N 
+   otSpecified: ([1A[2K[2m[  
+  We...id JSON payload:String   
+ ) [], RemoteException
+    + FullyQualifiedErrorId : N 
+   ativeCommandError
+ 
+[2m[WebServer] [22m    at badR
+equest (webpack-internal:///(rsc
+)/./src/lib/errors/types.ts:35:4
+0)
+[2m[WebServer] [22m    at eval
+ (webpack-internal:///(rsc)/./sr
+c/lib/validation/route.ts:18:80)
+[2m[WebServer] [22m    at asyn
+c eval (webpack-internal:///(rsc
+)/./src/lib/errors/api.ts:31:30)
+[2m[WebServer] [22m    at asyn
+c [90mC:\Users\Lenovo\.gemini\a
+ntigravity\scratch\inflect-compl
+iance\[39mnode_modules\[4mnext
+[24m\dist\compiled\next-server\
+app-route.runtime.dev.js:6:57228
+[2m[WebServer] [22m    at asyn
+c eT.execute [90m(C:\Users\Leno
+vo\.gemini\antigravity\scratch\i
+nflect-compliance\[39mnode_modu
+les\[4mnext[24m\dist\compiled\
+next-server\app-route.runtime.de
+v.js:6:46851[90m)[39m
+[2m[WebServer] [22m    at asyn
+c eT.handle [90m(C:\Users\Lenov
+o\.gemini\antigravity\scratch\in
+flect-compliance\[39mnode_modul
+es\[4mnext[24m\dist\compiled\n
+ext-server\app-route.runtime.dev
+.js:6:58760[90m)[39m
+[2m[WebServer] [22m    at asyn
+c doRender [90m(C:\Users\Lenovo
+\.gemini\antigravity\scratch\inf
+lect-compliance\[39mnode_module
+s\[4mnext[24m\dist\server\base
+-server.js:1366:42[90m)[39m
+[2m[WebServer] [22m    at asyn
+c cacheEntry.responseCache.get.r
+outeKind [90m(C:\Users\Lenovo\.
+gemini\antigravity\scratch\infle
+ct-compliance\[39mnode_modules\
+[4mnext[24m\dist\server\base-s
+erver.js:1576:40[90m)[39m {
+[2m[WebServer] [22m  code: [3
+2m'BAD_REQUEST'[39m,
+[2m[WebServer] [22m  status: 
+[33m400[39m,
+[2m[WebServer] [22m  expose: 
+[33mtrue[39m,
+[2m[WebServer] [22m  details: 
+[90mundefined[39m
+[2m[WebServer] [22m}
+
+[1A[2K  57 passed (4.9m)

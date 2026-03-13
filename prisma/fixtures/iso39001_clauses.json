@@ -1,0 +1,140 @@
+[
+    {
+        "key": "4.1",
+        "section": "Clause 4 - Context of the organization",
+        "sortOrder": 1,
+        "title": "Understanding the organization and its context"
+    },
+    {
+        "key": "4.2",
+        "section": "Clause 4 - Context of the organization",
+        "sortOrder": 2,
+        "title": "Understanding the needs and expectations of interested parties"
+    },
+    {
+        "key": "4.3",
+        "section": "Clause 4 - Context of the organization",
+        "sortOrder": 3,
+        "title": "Determining the scope of the RTS management system"
+    },
+    {
+        "key": "4.4",
+        "section": "Clause 4 - Context of the organization",
+        "sortOrder": 4,
+        "title": "Road traffic safety management system"
+    },
+    {
+        "key": "5.1",
+        "section": "Clause 5 - Leadership",
+        "sortOrder": 5,
+        "title": "Leadership and commitment"
+    },
+    {
+        "key": "5.2",
+        "section": "Clause 5 - Leadership",
+        "sortOrder": 6,
+        "title": "RTS policy"
+    },
+    {
+        "key": "5.3",
+        "section": "Clause 5 - Leadership",
+        "sortOrder": 7,
+        "title": "Organizational roles, responsibilities and authorities"
+    },
+    {
+        "key": "6.1",
+        "section": "Clause 6 - Planning",
+        "sortOrder": 8,
+        "title": "Actions to address risks and opportunities"
+    },
+    {
+        "key": "6.2",
+        "section": "Clause 6 - Planning",
+        "sortOrder": 9,
+        "title": "RTS performance factors, objectives and targets"
+    },
+    {
+        "key": "6.3",
+        "section": "Clause 6 - Planning",
+        "sortOrder": 10,
+        "title": "Planning of changes"
+    },
+    {
+        "key": "7.1",
+        "section": "Clause 7 - Support",
+        "sortOrder": 11,
+        "title": "Resources"
+    },
+    {
+        "key": "7.2",
+        "section": "Clause 7 - Support",
+        "sortOrder": 12,
+        "title": "Competence"
+    },
+    {
+        "key": "7.3",
+        "section": "Clause 7 - Support",
+        "sortOrder": 13,
+        "title": "Awareness"
+    },
+    {
+        "key": "7.4",
+        "section": "Clause 7 - Support",
+        "sortOrder": 14,
+        "title": "Communication"
+    },
+    {
+        "key": "7.5",
+        "section": "Clause 7 - Support",
+        "sortOrder": 15,
+        "title": "Documented information"
+    },
+    {
+        "key": "8.1",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 16,
+        "title": "Operational planning and control"
+    },
+    {
+        "key": "8.2",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 17,
+        "title": "Emergency preparedness and response"
+    },
+    {
+        "key": "9.1",
+        "section": "Clause 9 - Performance evaluation",
+        "sortOrder": 18,
+        "title": "Monitoring, measurement, analysis and evaluation"
+    },
+    {
+        "key": "9.2",
+        "section": "Clause 9 - Performance evaluation",
+        "sortOrder": 19,
+        "title": "Investigation of road traffic crashes and incidents"
+    },
+    {
+        "key": "9.3",
+        "section": "Clause 9 - Performance evaluation",
+        "sortOrder": 20,
+        "title": "Internal audit"
+    },
+    {
+        "key": "9.4",
+        "section": "Clause 9 - Performance evaluation",
+        "sortOrder": 21,
+        "title": "Management review"
+    },
+    {
+        "key": "10.1",
+        "section": "Clause 10 - Improvement",
+        "sortOrder": 22,
+        "title": "Nonconformity and corrective action"
+    },
+    {
+        "key": "10.2",
+        "section": "Clause 10 - Improvement",
+        "sortOrder": 23,
+        "title": "Continual improvement"
+    }
+]

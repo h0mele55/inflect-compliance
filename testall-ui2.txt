@@ -1,0 +1,751 @@
+﻿
+> inflect-compliance@1.0.0 test:all
+> jest && playwright test
+
+node.exe : PASS tests/unit/audit-read
+iness.test.ts
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe
+" "C:\Users\Lenovo\AppData\Roaming ..
+.
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpe 
+   cified: (PASS tests/unit/audit-r  
+  eadiness.test.ts:String) [], Rem   
+ oteException
+    + FullyQualifiedErrorId : Native 
+   CommandError
+ 
+PASS tests/unit/no-direct-prisma.test
+.ts
+PASS tests/unit/tenant-isolation-stru
+ctural.test.ts
+PASS tests/integration/framework-cove
+rage.test.ts
+PASS tests/unit/scope-guardrails.test
+.ts
+PASS tests/integration/rls-isolation.
+test.ts
+PASS tests/integration/vendor-audit.t
+est.ts
+PASS tests/unit/policy-center.test.ts
+PASS tests/integration/validation-rou
+tes.test.ts
+PASS tests/unit/authRateLimit.test.ts
+  тЧП Console
+
+    console.warn
+      [RateLimit block] IP exceeded l
+imit for tier high on /api/auth/signi
+n
+
+    [0m [90m 179 |[39m
+     [90m 180 |[39m         [36mif
+[39m ([33m![39mrlResult[33m.[39m
+ok) {
+    [31m[1m>[22m[39m[90m 181 |[
+39m             console[33m.[39mwar
+n([32m`[RateLimit block] IP exceeded
+ limit for tier ${tier} on ${pathname
+}`[39m)[33m;[39m
+     [90m     |[39m                
+     [31m[1m^[22m[39m
+     [90m 182 |[39m             rlH
+eaders[33m.[39m[36mset[39m([32m'
+Retry-After'[39m[33m,[39m rlResult
+[33m.[39mretryAfter[33m.[39mtoStr
+ing())[33m;[39m
+     [90m 183 |[39m
+     [90m 184 |[39m             [9
+0m// Return appropriate 429 response 
+structure[39m[0m
+
+      at checkAuthRateLimit (src/lib/
+rate-limit/authRateLimit.ts:181:21)
+      at Object.<anonymous> (tests/un
+it/authRateLimit.test.ts:42:26)
+
+    console.warn
+      [RateLimit block] IP exceeded l
+imit for tier high on /api/auth/signi
+n
+
+    [0m [90m 179 |[39m
+     [90m 180 |[39m         [36mif
+[39m ([33m![39mrlResult[33m.[39m
+ok) {
+    [31m[1m>[22m[39m[90m 181 |[
+39m             console[33m.[39mwar
+n([32m`[RateLimit block] IP exceeded
+ limit for tier ${tier} on ${pathname
+}`[39m)[33m;[39m
+     [90m     |[39m                
+     [31m[1m^[22m[39m
+     [90m 182 |[39m             rlH
+eaders[33m.[39m[36mset[39m([32m'
+Retry-After'[39m[33m,[39m rlResult
+[33m.[39mretryAfter[33m.[39mtoStr
+ing())[33m;[39m
+     [90m 183 |[39m
+     [90m 184 |[39m             [9
+0m// Return appropriate 429 response 
+structure[39m[0m
+
+      at checkAuthRateLimit (src/lib/
+rate-limit/authRateLimit.ts:181:21)
+      at Object.<anonymous> (tests/un
+it/authRateLimit.test.ts:62:13)
+
+    console.warn
+      [RateLimit block] IP exceeded l
+imit for tier high on /api/auth/signi
+n
+
+    [0m [90m 179 |[39m
+     [90m 180 |[39m         [36mif
+[39m ([33m![39mrlResult[33m.[39m
+ok) {
+    [31m[1m>[22m[39m[90m 181 |[
+39m             console[33m.[39mwar
+n([32m`[RateLimit block] IP exceeded
+ limit for tier ${tier} on ${pathname
+}`[39m)[33m;[39m
+     [90m     |[39m                
+     [31m[1m^[22m[39m
+     [90m 182 |[39m             rlH
+eaders[33m.[39m[36mset[39m([32m'
+Retry-After'[39m[33m,[39m rlResult
+[33m.[39mretryAfter[33m.[39mtoStr
+ing())[33m;[39m
+     [90m 183 |[39m
+     [90m 184 |[39m             [9
+0m// Return appropriate 429 response 
+structure[39m[0m
+
+      at checkAuthRateLimit (src/lib/
+rate-limit/authRateLimit.ts:181:21)
+      at Object.<anonymous> (tests/un
+it/authRateLimit.test.ts:65:28)
+
+    console.warn
+      [RateLimit block] IP exceeded l
+imit for tier high on /api/auth/signi
+n
+
+    [0m [90m 179 |[39m
+     [90m 180 |[39m         [36mif
+[39m ([33m![39mrlResult[33m.[39m
+ok) {
+    [31m[1m>[22m[39m[90m 181 |[
+39m             console[33m.[39mwar
+n([32m`[RateLimit block] IP exceeded
+ limit for tier ${tier} on ${pathname
+}`[39m)[33m;[39m
+     [90m     |[39m                
+     [31m[1m^[22m[39m
+     [90m 182 |[39m             rlH
+eaders[33m.[39m[36mset[39m([32m'
+Retry-After'[39m[33m,[39m rlResult
+[33m.[39mretryAfter[33m.[39mtoStr
+ing())[33m;[39m
+     [90m 183 |[39m
+     [90m 184 |[39m             [9
+0m// Return appropriate 429 response 
+structure[39m[0m
+
+      at checkAuthRateLimit (src/lib/
+rate-limit/authRateLimit.ts:181:21)
+      at Object.<anonymous> (tests/un
+it/authRateLimit.test.ts:79:13)
+
+PASS tests/integration/auth-ratelimit
+.test.ts
+  тЧП Console
+
+    console.warn
+      [RateLimit block] IP exceeded l
+imit for tier high on /api/auth/signi
+n
+
+    [0m [90m 179 |[39m
+     [90m 180 |[39m         [36mif
+[39m ([33m![39mrlResult[33m.[39m
+ok) {
+    [31m[1m>[22m[39m[90m 181 |[
+39m             console[33m.[39mwar
+n([32m`[RateLimit block] IP exceeded
+ limit for tier ${tier} on ${pathname
+}`[39m)[33m;[39m
+     [90m     |[39m                
+     [31m[1m^[22m[39m
+     [90m 182 |[39m             rlH
+eaders[33m.[39m[36mset[39m([32m'
+Retry-After'[39m[33m,[39m rlResult
+[33m.[39mretryAfter[33m.[39mtoStr
+ing())[33m;[39m
+     [90m 183 |[39m
+     [90m 184 |[39m             [9
+0m// Return appropriate 429 response 
+structure[39m[0m
+
+      at checkAuthRateLimit (src/lib/
+rate-limit/authRateLimit.ts:181:21)
+      at src/middleware.ts:35:26
+      at middleware (src/middleware.t
+s:110:17)
+      at Object.<anonymous> (tests/in
+tegration/auth-ratelimit.test.ts:47:2
+3)
+
+    console.warn
+      [RateLimit block] IP exceeded l
+imit for tier high on /api/auth/callb
+ack/google
+
+    [0m [90m 179 |[39m
+     [90m 180 |[39m         [36mif
+[39m ([33m![39mrlResult[33m.[39m
+ok) {
+    [31m[1m>[22m[39m[90m 181 |[
+39m             console[33m.[39mwar
+n([32m`[RateLimit block] IP exceeded
+ limit for tier ${tier} on ${pathname
+}`[39m)[33m;[39m
+     [90m     |[39m                
+     [31m[1m^[22m[39m
+     [90m 182 |[39m             rlH
+eaders[33m.[39m[36mset[39m([32m'
+Retry-After'[39m[33m,[39m rlResult
+[33m.[39mretryAfter[33m.[39mtoStr
+ing())[33m;[39m
+     [90m 183 |[39m
+     [90m 184 |[39m             [9
+0m// Return appropriate 429 response 
+structure[39m[0m
+
+      at checkAuthRateLimit (src/lib/
+rate-limit/authRateLimit.ts:181:21)
+      at src/middleware.ts:35:26
+      at middleware (src/middleware.t
+s:110:17)
+      at Object.<anonymous> (tests/in
+tegration/auth-ratelimit.test.ts:75:1
+3)
+
+    console.warn
+      [RateLimit block] IP exceeded l
+imit for tier high on /api/auth/callb
+ack/google
+
+    [0m [90m 179 |[39m
+     [90m 180 |[39m         [36mif
+[39m ([33m![39mrlResult[33m.[39m
+ok) {
+    [31m[1m>[22m[39m[90m 181 |[
+39m             console[33m.[39mwar
+n([32m`[RateLimit block] IP exceeded
+ limit for tier ${tier} on ${pathname
+}`[39m)[33m;[39m
+     [90m     |[39m                
+     [31m[1m^[22m[39m
+     [90m 182 |[39m             rlH
+eaders[33m.[39m[36mset[39m([32m'
+Retry-After'[39m[33m,[39m rlResult
+[33m.[39mretryAfter[33m.[39mtoStr
+ing())[33m;[39m
+     [90m 183 |[39m
+     [90m 184 |[39m             [9
+0m// Return appropriate 429 response 
+structure[39m[0m
+
+      at checkAuthRateLimit (src/lib/
+rate-limit/authRateLimit.ts:181:21)
+      at src/middleware.ts:35:26
+      at middleware (src/middleware.t
+s:110:17)
+      at Object.<anonymous> (tests/in
+tegration/auth-ratelimit.test.ts:79:2
+2)
+
+PASS tests/unit/scope-deprecation-sca
+n.test.ts
+  тЧП Console
+
+    console.log
+      
+      тХФтХРтХРтХРтХРтХРтХРтХРтХРтХРт
+ХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХ
+РтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРт
+ХРтХРтХРтХРтХЧ
+
+      at Object.<anonymous> (tests/un
+it/scope-deprecation-scan.test.ts:99:
+17)
+
+    console.log
+      тХС     SCOPE DEPRECATION SCAN 
+тАФ REMAINING REFS     тХС
+
+      at Object.<anonymous> (tests/un
+it/scope-deprecation-scan.test.ts:100
+:17)
+
+    console.log
+      тХатХРтХРтХРтХРтХРтХРтХРтХРтХРт
+ХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХ
+РтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРт
+ХРтХРтХРтХРтХг
+
+      at Object.<anonymous> (tests/un
+it/scope-deprecation-scan.test.ts:101
+:17)
+
+    console.log
+      тХС  ЁЯОЙ No scope references f
+ound! Migration done.  тХС
+
+      at Object.<anonymous> (tests/un
+it/scope-deprecation-scan.test.ts:104
+:21)
+
+    console.log
+      тХатХРтХРтХРтХРтХРтХРтХРтХРтХРт
+ХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХ
+РтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРт
+ХРтХРтХРтХРтХг
+
+      at Object.<anonymous> (tests/un
+it/scope-deprecation-scan.test.ts:114
+:17)
+
+    console.log
+      тХС  Total:    0 references in 
+ 0 categories     тХС
+
+      at Object.<anonymous> (tests/un
+it/scope-deprecation-scan.test.ts:115
+:17)
+
+    console.log
+      тХС  Files scanned:  280       
+                   тХС
+
+      at Object.<anonymous> (tests/un
+it/scope-deprecation-scan.test.ts:116
+:17)
+
+    console.log
+      тХЪтХРтХРтХРтХРтХРтХРтХРтХРтХРт
+ХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХ
+РтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХР
+тХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРтХРт
+ХРтХРтХРтХРтХЭ
+
+      at Object.<anonymous> (tests/un
+it/scope-deprecation-scan.test.ts:117
+:17)
+
+PASS tests/unit/framework-hardening.t
+est.ts
+PASS tests/integration/vendor-managem
+ent.test.ts
+PASS tests/unit/framework-templates.t
+est.ts
+PASS tests/integration/vendor-enhance
+ments.test.ts
+PASS tests/unit/control-applicability
+.test.ts
+PASS tests/unit/security-headers.test
+.ts
+PASS tests/integration/api-errors.tes
+t.ts
+PASS tests/unit/validation.test.ts
+PASS tests/unit/issue-routes-structur
+al.test.ts
+PASS tests/unit/cors.test.ts
+PASS tests/integration/tenant-isolati
+on.test.ts
+PASS tests/unit/policy-routes-guardra
+il.test.ts
+PASS tests/unit/no-fallbacks.test.ts
+PASS tests/unit/issue-schemas.test.ts
+PASS tests/unit/issue-policies.test.t
+s
+PASS tests/unit/rbac.test.ts
+PASS tests/unit/vendor-enrichment-ren
+ewals.test.ts
+PASS tests/integration/evidence-bundl
+e.test.ts
+PASS tests/integration/issue-bulk.tes
+t.ts
+PASS tests/unit/refresh.test.ts
+  тЧП Console
+
+    console.log
+      [auth:refresh] Refreshing Googl
+e access token
+
+      at refreshGoogleToken (src/lib/
+auth/refresh.ts:33:13)
+
+    console.log
+      [auth:refresh] Refreshing Googl
+e access token
+
+      at refreshGoogleToken (src/lib/
+auth/refresh.ts:33:13)
+
+    console.log
+      [auth:refresh] Refreshing Googl
+e access token
+
+      at refreshGoogleToken (src/lib/
+auth/refresh.ts:33:13)
+
+    console.error
+      [auth:refresh] Google token ref
+resh failed: 401
+
+    [0m [90m 46 |[39m     [36mif
+[39m ([33m![39mresponse[33m.[39mo
+k) {
+     [90m 47 |[39m         [36mcon
+st[39m errorText [33m=[39m [36maw
+ait[39m response[33m.[39mtext()[3
+3m;[39m
+    [31m[1m>[22m[39m[90m 48 |[3
+9m         console[33m.[39merror([
+32m'[auth:refresh] Google token refre
+sh failed:'[39m[33m,[39m response
+[33m.[39mstatus)[33m;[39m
+     [90m    |[39m                 
+[31m[1m^[22m[39m
+     [90m 49 |[39m         [36mthr
+ow[39m [36mnew[39m [33mError[39m
+([32m`Google token refresh failed: $
+{response.status}`[39m)[33m;[39m
+     [90m 50 |[39m     }
+     [90m 51 |[39m[0m
+
+      at refreshGoogleToken (src/lib/
+auth/refresh.ts:48:17)
+      at Object.<anonymous> (tests/un
+it/refresh.test.ts:87:9)
+
+    console.log
+      [auth:refresh] Refreshing Micro
+soft access token
+
+      at refreshMicrosoftToken (src/l
+ib/auth/refresh.ts:73:13)
+
+    console.log
+      [auth:refresh] Refreshing Micro
+soft access token
+
+      at refreshMicrosoftToken (src/l
+ib/auth/refresh.ts:73:13)
+
+    console.log
+      [auth:refresh] Refreshing Micro
+soft access token
+
+      at refreshMicrosoftToken (src/l
+ib/auth/refresh.ts:73:13)
+
+    console.error
+      [auth:refresh] Microsoft token 
+refresh failed: 400
+
+    [0m [90m 90 |[39m     [36mif
+[39m ([33m![39mresponse[33m.[39mo
+k) {
+     [90m 91 |[39m         [36mcon
+st[39m errorText [33m=[39m [36maw
+ait[39m response[33m.[39mtext()[3
+3m;[39m
+    [31m[1m>[22m[39m[90m 92 |[3
+9m         console[33m.[39merror([
+32m'[auth:refresh] Microsoft token re
+fresh failed:'[39m[33m,[39m respon
+se[33m.[39mstatus)[33m;[39m
+     [90m    |[39m                 
+[31m[1m^[22m[39m
+     [90m 93 |[39m         [36mthr
+ow[39m [36mnew[39m [33mError[39m
+([32m`Microsoft token refresh failed
+: ${response.status}`[39m)[33m;[39
+m
+     [90m 94 |[39m     }
+     [90m 95 |[39m[0m
+
+      at refreshMicrosoftToken (src/l
+ib/auth/refresh.ts:92:17)
+      at Object.<anonymous> (tests/un
+it/refresh.test.ts:136:9)
+
+    console.log
+      [auth:refresh] Refreshing Googl
+e access token
+
+      at refreshGoogleToken (src/lib/
+auth/refresh.ts:33:13)
+
+    console.log
+      [auth:refresh] Refreshing Micro
+soft access token
+
+      at refreshMicrosoftToken (src/l
+ib/auth/refresh.ts:73:13)
+
+PASS tests/unit/no-prisma-in-routes.t
+est.ts
+PASS tests/unit/audit-issue-schemas.t
+est.ts
+PASS tests/unit/bulk-schemas.test.ts
+PASS tests/unit/risk.usecases.test.ts
+PASS tests/unit/tenant-context.test.t
+s
+PASS tests/unit/golden-path.test.ts
+PASS tests/unit/vendor-schemas.test.t
+s
+PASS tests/unit/risk.policies.test.ts
+PASS tests/integration/auth-routes.te
+st.ts
+  тЧП Console
+
+    console.warn
+      [test:integration] Server at ht
+tp://localhost:3000 not reachable тАФ
+ auth route tests will be skipped
+
+    [0m [90m 30 |[39m         }
+     [90m 31 |[39m         [36mif
+[39m ([33m![39mserverAvailable) {
+    [31m[1m>[22m[39m[90m 32 |[3
+9m             console[33m.[39mwarn
+([32m`[test:integration] Server at $
+{BASE_URL} not reachable тАФ auth rou
+te tests will be skipped`[39m)[33m;
+[39m
+     [90m    |[39m                 
+    [31m[1m^[22m[39m
+     [90m 33 |[39m         }
+     [90m 34 |[39m     }[33m,[39m
+ [35m30000[39m)[33m;[39m
+     [90m 35 |[39m[0m
+
+      at Object.<anonymous> (tests/in
+tegration/auth-routes.test.ts:32:21)
+
+    console.log
+      [skipped] returns a response (2
+00 or valid JSON) тАФ server not avai
+lable
+
+      at Object.<anonymous> (tests/in
+tegration/auth-routes.test.ts:40:25)
+
+    console.log
+      [skipped] does NOT expose acces
+s_token in session response тАФ serve
+r not available
+
+      at Object.<anonymous> (tests/in
+tegration/auth-routes.test.ts:40:25)
+
+    console.log
+      [skipped] does NOT expose refre
+sh_token in session response тАФ serv
+er not available
+
+      at Object.<anonymous> (tests/in
+tegration/auth-routes.test.ts:40:25)
+
+    console.log
+      [skipped] returns a CSRF token 
+тАФ server not available
+
+      at Object.<anonymous> (tests/in
+tegration/auth-routes.test.ts:40:25)
+
+    console.log
+      [skipped] returns different CSR
+F tokens for different sessions тАФ s
+erver not available
+
+      at Object.<anonymous> (tests/in
+tegration/auth-routes.test.ts:40:25)
+
+    console.log
+      [skipped] returns configured pr
+oviders тАФ server not available
+
+      at Object.<anonymous> (tests/in
+tegration/auth-routes.test.ts:40:25)
+
+    console.log
+      [skipped] includes credentials 
+provider in test mode тАФ server not 
+available
+
+      at Object.<anonymous> (tests/in
+tegration/auth-routes.test.ts:40:25)
+
+    console.log
+      [skipped] session response as o
+bject contains no token fields тАФ se
+rver not available
+
+      at Object.<anonymous> (tests/in
+tegration/auth-routes.test.ts:40:25)
+
+PASS tests/unit/vendor-policies.test.
+ts
+PASS tests/unit/errors.test.ts
+PASS tests/unit/policies.test.ts
+PASS tests/unit/sla.test.ts
+PASS tests/unit/vendor-scoring.test.t
+s
+PASS tests/unit/guard.test.ts
+PASS tests/unit/storage.test.ts
+PASS src/app-layer/utils/__tests__/ca
+dence.test.ts
+PASS tests/unit/policyReview.test.ts
+PASS tests/unit/env.test.ts (9.727 s)
+
+Test Suites: 51 passed, 51 total
+Tests:       1631 passed, 1631 total
+Snapshots:   0 total
+Time:        11.094 s
+Ran all test suites.
+
+Running 67 tests using 1 worker
+
+  тЬУ   1 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:39:9 тА║ Audit Readiness тА║ cycles page loads (5.3s)
+  тЬУ   2 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:45:9 тА║ Audit Readiness тА║ create ISO27001 cycle (3.8s)
+  тЬУ   3 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:64:9 тА║ Audit Readiness тА║ cycle detail shows default pack preview (33ms)
+  тЬУ   4 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:74:9 тА║ Audit Readiness тА║ create pack from default selection (3.8s)
+  тЬУ   5 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:89:9 тА║ Audit Readiness тА║ pack is in DRAFT status (21ms)
+  тЬУ   6 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:93:9 тА║ Audit Readiness тА║ freeze the pack (3.2s)
+  тЬУ   7 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:103:9 тА║ Audit Readiness тА║ generate share link (161ms)
+  тЬУ   8 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:120:9 тА║ Audit Readiness тА║ auditor can view shared pack (2.8s)
+  тЬУ   9 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:132:9 тА║ Audit Readiness тА║ create NIS2 cycle (3.8s)
+  тЬУ  10 [chromium] тА║ tests\e2e\audit-readiness.spec.ts:147:9 тА║ Audit Readiness тА║ NIS2 cycle shows preview and can create pack (1.6s)
+  тЬУ  11 [chromium] тА║ tests\e2e\auth.spec.ts:30:9 тА║ Authentication Flow тА║ login page loads and shows sign-in options (942ms)
+  тЬУ  12 [chromium] тА║ tests\e2e\auth.spec.ts:42:9 тА║ Authentication Flow тА║ credentials login тЖТ redirect to dashboard (1.4s)
+  тЬУ  13 [chromium] тА║ tests\e2e\auth.spec.ts:47:9 тА║ Authentication Flow тА║ protected dashboard page shows user identity after login (1.9s)
+  тЬУ  14 [chromium] тА║ tests\e2e\auth.spec.ts:52:9 тА║ Authentication Flow тА║ session cookie is httpOnly (1.4s)
+  тЬУ  15 [chromium] тА║ tests\e2e\auth.spec.ts:67:9 тА║ Authentication Flow тА║ logout works and blocks access to dashboard (2.0s)
+  тЬУ  16 [chromium] тА║ tests\e2e\auth.spec.ts:79:9 тА║ Authentication Flow тА║ unauthenticated access to /dashboard redirects to /login with next param (770ms)
+  тЬУ  17 [chromium] тА║ tests\e2e\auth.spec.ts:87:9 тА║ Authentication Flow тА║ session API does not expose tokens (1.5s)
+  тЬУ  18 [chromium] тА║ tests\e2e\auth.spec.ts:106:9 тА║ Authentication Flow тА║ CSRF token endpoint works (91ms)
+  тЬУ  19 [chromium] тА║ tests\e2e\auth.spec.ts:116:9 тА║ Middleware Auth Guard тА║ unauthenticated API request returns 401 JSON (not redirect) (25ms)
+  тЬУ  20 [chromium] тА║ tests\e2e\auth.spec.ts:125:9 тА║ Middleware Auth Guard тА║ authenticated API request returns 200 (2.0s)
+  тЬУ  21 [chromium] тА║ tests\e2e\auth.spec.ts:136:9 тА║ Middleware Auth Guard тА║ /api/auth/session is always accessible (public route) (47ms)
+  тЬУ  22 [chromium] тА║ tests\e2e\auth.spec.ts:141:9 тА║ Middleware Auth Guard тА║ /api/auth/providers is always accessible (42ms)
+  тЬУ  23 [chromium] тА║ tests\e2e\auth.spec.ts:146:9 тА║ Middleware Auth Guard тА║ redirect includes next param for return navigation (870ms)
+  тЬУ  24 [chromium] тА║ tests\e2e\auth.spec.ts:153:9 тА║ Middleware Auth Guard тА║ static assets are not blocked by middleware (11ms)
+  тЬУ  25 [chromium] тА║ tests\e2e\controls-enhanced.spec.ts:23:9 тА║ Controls Enhanced тА║ dashboard loads and shows metrics (5.5s)
+  тЬУ  26 [chromium] тА║ tests\e2e\controls-enhanced.spec.ts:32:9 тА║ Controls Enhanced тА║ mark test completed updates last tested (11.1s)
+  тЬУ  27 [chromium] тА║ tests\e2e\controls-enhanced.spec.ts:55:9 тА║ Controls Enhanced тА║ activity tab shows events (3.9s)
+  тЬУ  28 [chromium] тА║ tests\e2e\controls-enhanced.spec.ts:77:9 тА║ Controls Enhanced тА║ automation section is visible on detail page (2.9s)
+  тЬУ  29 [chromium] тА║ tests\e2e\controls.spec.ts:24:9 тА║ Controls Center тА║ controls list page loads with filters and CTAs (2.8s)
+  тЬУ  30 [chromium] тА║ tests\e2e\controls.spec.ts:34:9 тА║ Controls Center тА║ create a new control and see detail (3.8s)
+  тЬУ  31 [chromium] тА║ tests\e2e\controls.spec.ts:49:9 тА║ Controls Center тА║ open control тЖТ create task тЖТ mark done (8.9s)
+  тЬУ  32 [chromium] тА║ tests\e2e\controls.spec.ts:77:9 тА║ Controls Center тА║ attach evidence тЖТ see it listed (6.0s)
+  тЬУ  33 [chromium] тА║ tests\e2e\controls.spec.ts:100:9 тА║ Controls Center тА║ mark NOT_APPLICABLE requires justification (6.0s)
+  тЬУ  34 [chromium] тА║ tests\e2e\controls.spec.ts:129:9 тА║ Controls Center тА║ reader user sees view-only controls (2.4s)
+  тЬУ  35 [chromium] тА║ tests\e2e\frameworks.spec.ts:35:9 тА║ Framework Coverage UI тА║ frameworks page loads (6.6s)
+  тЬУ  36 [chromium] тА║ tests\e2e\frameworks.spec.ts:41:9 тА║ Framework Coverage UI тА║ framework cards are visible (3.0s)
+  тЬУ  37 [chromium] тА║ tests\e2e\frameworks.spec.ts:50:9 тА║ Framework Coverage UI тА║ can navigate to framework detail (2.9s)
+  тЬУ  38 [chromium] тА║ tests\e2e\frameworks.spec.ts:62:9 тА║ Framework Coverage UI тА║ detail page shows tabs (15ms)
+  тЬУ  39 [chromium] тА║ tests\e2e\frameworks.spec.ts:78:9 тА║ Framework Coverage UI тА║ requirements tab works (44ms)
+  тЬУ  40 [chromium] тА║ tests\e2e\frameworks.spec.ts:89:9 тА║ Framework Coverage UI тА║ packs tab works (68ms)
+  тЬУ  41 [chromium] тА║ tests\e2e\frameworks.spec.ts:97:9 тА║ Framework Coverage UI тА║ coverage tab works (56ms)
+  тЬУ  42 [chromium] тА║ tests\e2e\frameworks.spec.ts:104:9 тА║ Framework Coverage UI тА║ install wizard loads (2.1s)
+  тЬУ  43 [chromium] тА║ tests\e2e\frameworks.spec.ts:112:9 тА║ Framework Coverage UI тА║ install wizard shows preview (129ms)
+  тЬУ  44 [chromium] тА║ tests\e2e\frameworks.spec.ts:124:9 тА║ Framework Coverage UI тА║ can install pack (9ms)
+  тЬУ  45 [chromium] тА║ tests\e2e\frameworks.spec.ts:140:9 тА║ Framework Coverage UI тА║ coverage report page loads (2.1s)
+  тЬУ  46 [chromium] тА║ tests\e2e\frameworks.spec.ts:148:9 тА║ Framework Coverage UI тА║ coverage report has metrics (20ms)
+  тЬУ  47 [chromium] тА║ tests\e2e\frameworks.spec.ts:155:9 тА║ Framework Coverage UI тА║ coverage report has export and filter buttons (34ms)
+  тЬУ  48 [chromium] тА║ tests\e2e\issues.spec.ts:24:9 тА║ Issue Management тА║ issues list page loads with filters and CTA (4.4s)
+  тЬУ  49 [chromium] тА║ tests\e2e\issues.spec.ts:35:9 тА║ Issue Management тА║ create a new issue and see detail (8.8s)
+  тЬУ  50 [chromium] тА║ tests\e2e\issues.spec.ts:53:9 тА║ Issue Management тА║ change issue status (6.7s)
+  тЬУ  51 [chromium] тА║ tests\e2e\issues.spec.ts:71:9 тА║ Issue Management тА║ assign issue (7.0s)
+  тЬУ  52 [chromium] тА║ tests\e2e\issues.spec.ts:99:9 тА║ Issue Management тА║ add link to issue (7.3s)
+  тЬУ  53 [chromium] тА║ tests\e2e\issues.spec.ts:124:9 тА║ Issue Management тА║ add comment to issue (6.9s)
+  тЬУ  54 [chromium] тА║ tests\e2e\issues.spec.ts:145:9 тА║ Issue Management тА║ dashboard page renders metrics (6.6s)
+  тЬУ  55 [chromium] тА║ tests\e2e\issues.spec.ts:155:9 тА║ Issue Management тА║ bulk action toolbar appears when issues selected (2.6s)
+  тЬУ  56 [chromium] тА║ tests\e2e\issues.spec.ts:174:9 тА║ Issue Management тА║ reader user sees view-only issues (3.0s)
+  тЬУ  57 [chromium] тА║ tests\e2e\policies.spec.ts:25:9 тА║ Policy Center тА║ policies list page loads with controls (4.5s)
+  тЬУ  58 [chromium] тА║ tests\e2e\policies.spec.ts:35:9 тА║ Policy Center тА║ template library page loads (5.5s)
+  тЬУ  59 [chromium] тА║ tests\e2e\policies.spec.ts:43:9 тА║ Policy Center тА║ create a blank policy and see detail (9.6s)
+  тЬУ  60 [chromium] тА║ tests\e2e\policies.spec.ts:58:9 тА║ Policy Center тА║ create version via editor and view history (5.7s)
+  тЬУ  61 [chromium] тА║ tests\e2e\policies.spec.ts:76:9 тА║ Policy Center тА║ create external link version (4.5s)
+  тЬУ  62 [chromium] тА║ tests\e2e\policies.spec.ts:100:9 тА║ Policy Center тА║ activity feed tab loads (5.6s)
+  тЬУ  63 [chromium] тА║ tests\e2e\policies.spec.ts:114:9 тА║ Policy Center тА║ policy detail shows role-gated action buttons (3.3s)
+  тЬУ  64 [chromium] тА║ tests\e2e\vendors.spec.ts:23:9 тА║ Vendor Management тА║ vendor register page loads (5.2s)
+  тЬУ  65 [chromium] тА║ tests\e2e\vendors.spec.ts:31:9 тА║ Vendor Management тА║ create vendor and navigate to detail (10.3s)
+  тЬУ  66 [chromium] тА║ tests\e2e\vendors.spec.ts:45:9 тА║ Vendor Management тА║ vendor detail tabs work (4.0s)
+  тЬУ  67 [chromium] тА║ tests\e2e\vendors.spec.ts:58:9 тА║ Vendor Management тА║ add document to vendor (7.5s)
+[2m[WebServer] [22m[API Error 400] 
+[ID: 2901c7b4-ad2a-4fba-9a26-9a8c7b4f
+9cc4] POST http://localhost:3006/api/
+t/acme-corp/vendors/cmmjbel5g005e101h
+0z3lbtcp/documents -  AppError: Inval
+id JSON payload
+[2m[WebServer] [22m    at badReques
+t (webpack-internal:///(rsc)/./src/li
+b/errors/types.ts:35:40)
+[2m[WebServer] [22m    at eval (web
+pack-internal:///(rsc)/./src/lib/vali
+dation/route.ts:18:80)
+[2m[WebServer] [22m    at async eva
+l (webpack-internal:///(rsc)/./src/li
+b/errors/api.ts:31:30)
+[2m[WebServer] [22m    at async [9
+0mC:\Users\Lenovo\.gemini\antigravity
+\scratch\inflect-compliance\[39mnode
+_modules\[4mnext[24m\dist\compiled\
+next-server\app-route.runtime.dev.js:
+6:57228
+[2m[WebServer] [22m    at async eT.
+execute [90m(C:\Users\Lenovo\.gemini
+\antigravity\scratch\inflect-complian
+ce\[39mnode_modules\[4mnext[24m\di
+st\compiled\next-server\app-route.run
+time.dev.js:6:46851[90m)[39m
+[2m[WebServer] [22m    at async eT.
+handle [90m(C:\Users\Lenovo\.gemini\
+antigravity\scratch\inflect-complianc
+e\[39mnode_modules\[4mnext[24m\dis
+t\compiled\next-server\app-route.runt
+ime.dev.js:6:58760[90m)[39m
+[2m[WebServer] [22m    at async doR
+ender [90m(C:\Users\Lenovo\.gemini\a
+ntigravity\scratch\inflect-compliance
+\[39mnode_modules\[4mnext[24m\dist
+\server\base-server.js:1366:42[90m)
+[39m
+[2m[WebServer] [22m    at async cac
+heEntry.responseCache.get.routeKind 
+[90m(C:\Users\Lenovo\.gemini\antigrav
+ity\scratch\inflect-compliance\[39mn
+ode_modules\[4mnext[24m\dist\server
+\base-server.js:1576:40[90m)[39m {
+[2m[WebServer] [22m  code: [32m'BA
+D_REQUEST'[39m,
+[2m[WebServer] [22m  status: [33m4
+00[39m,
+[2m[WebServer] [22m  expose: [33mt
+rue[39m,
+[2m[WebServer] [22m  details: [90m
+undefined[39m
+[2m[WebServer] [22m}
+
+  67 passed (4.1m)

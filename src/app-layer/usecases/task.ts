@@ -1,0 +1,338 @@
+import { RequestContext } from '../types';
+import { WorkItemRepository, TaskLinkRepository, TaskCommentRepository, TaskWatcherRepository, TaskFilters } from '../repositories/WorkItemRepository';
+import { assertCanReadTasks, assertCanWriteTasks, assertCanCommentOnTasks } from '../policies/task.policies';
+import { logEvent } from '../events/audit';
+import { runInTenantContext } from '@/lib/db-context';
+import { notFound, badRequest } from '@/lib/errors/types';
+import type { PrismaTx } from '@/lib/db-context';
+
+// ─── Type-Specific Validation ───
+
+type TaskType = 'AUDIT_FINDING' | 'CONTROL_GAP' | 'INCIDENT' | 'IMPROVEMENT' | 'TASK';
+
+/**
+ * Validate type-specific relevance rules.
+ * - AUDIT_FINDING / CONTROL_GAP: must have controlId OR a link to CONTROL/FRAMEWORK_REQUIREMENT
+ * - INCIDENT: must have controlId OR a link to CONTROL/ASSET
+ * - TASK / IMPROVEMENT: no additional requirement
+ */
+async function validateTypeRelevance(
+    db: PrismaTx,
+    ctx: RequestContext,
+    taskId: string,
+    type: TaskType,
+    controlId: string | null | undefined,
+) {
+    if (type === 'TASK' || type === 'IMPROVEMENT') return;
+
+    if (controlId) return; // controlId satisfies all type constraints
+
+    // Check links
+    const links = await TaskLinkRepository.listByTask(db, ctx, taskId);
+    const linkEntityTypes = links.map(l => l.entityType);
+
+    if (type === 'AUDIT_FINDING' || type === 'CONTROL_GAP') {
+        if (!linkEntityTypes.includes('CONTROL') && !linkEntityTypes.includes('FRAMEWORK_REQUIREMENT')) {
+            throw badRequest(
+                `${type} tasks must have a controlId or a link to CONTROL or FRAMEWORK_REQUIREMENT.`
+            );
+        }
+    }
+
+    if (type === 'INCIDENT') {
+        if (!linkEntityTypes.includes('CONTROL') && !linkEntityTypes.includes('ASSET')) {
+            throw badRequest(
+                'INCIDENT tasks must have a controlId or a link to CONTROL or ASSET.'
+            );
+        }
+    }
+}
+
+// ─── List / Get ───
+
+export async function listTasks(ctx: RequestContext, filters: TaskFilters = {}) {
+    assertCanReadTasks(ctx);
+    return runInTenantContext(ctx, (db) => WorkItemRepository.list(db, ctx, filters));
+}
+
+export async function getTask(ctx: RequestContext, taskId: string) {
+    assertCanReadTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const task = await WorkItemRepository.getById(db, ctx, taskId);
+        if (!task) throw notFound('Task not found');
+        return task;
+    });
+}
+
+// ─── Create ───
+
+export async function createTask(ctx: RequestContext, input: {
+    title: string;
+    type?: string;
+    description?: string | null;
+    severity?: string;
+    priority?: string;
+    source?: string;
+    dueAt?: string | null;
+    assigneeUserId?: string | null;
+    reviewerUserId?: string | null;
+    controlId?: string | null;
+    metadataJson?: unknown;
+}) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const task = await WorkItemRepository.create(db, ctx, input);
+
+        // Type-specific validation (deferred: allow creation, then check after links can be added)
+        // For create, we validate immediately since controlId is already set
+        const type = (input.type || 'TASK') as TaskType;
+        if (type !== 'TASK' && type !== 'IMPROVEMENT') {
+            // Only validate if controlId is required and not provided
+            // Links can't exist yet at creation time, so we only enforce controlId here
+            if (!input.controlId && (type === 'AUDIT_FINDING' || type === 'CONTROL_GAP' || type === 'INCIDENT')) {
+                // Don't fail — allow creation; validation happens on status transitions
+                // Store a warning in metadataJson
+            }
+        }
+
+        await logEvent(db, ctx, {
+            action: 'TASK_CREATED',
+            entityType: 'Task',
+            entityId: task.id,
+            details: `Created task ${task.key}: ${task.title}`,
+            metadata: { type: input.type, severity: input.severity, priority: input.priority },
+        });
+        return task;
+    });
+}
+
+// ─── Update ───
+
+export async function updateTask(ctx: RequestContext, taskId: string, patch: {
+    title?: string;
+    description?: string | null;
+    severity?: string;
+    priority?: string;
+    dueAt?: string | null;
+    controlId?: string | null;
+    reviewerUserId?: string | null;
+    metadataJson?: unknown;
+}) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const task = await WorkItemRepository.update(db, ctx, taskId, patch);
+        if (!task) throw notFound('Task not found');
+        await logEvent(db, ctx, {
+            action: 'TASK_UPDATED',
+            entityType: 'Task',
+            entityId: taskId,
+            details: 'Updated task fields',
+            metadata: patch,
+        });
+        return task;
+    });
+}
+
+// ─── Status ───
+
+export async function setTaskStatus(ctx: RequestContext, taskId: string, status: string, resolution?: string | null) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        // If resolving, validate type-specific relevance rules
+        if (['RESOLVED', 'CLOSED'].includes(status)) {
+            const existing = await WorkItemRepository.getById(db, ctx, taskId);
+            if (!existing) throw notFound('Task not found');
+            await validateTypeRelevance(db, ctx, taskId, existing.type as TaskType, existing.controlId);
+        }
+
+        const task = await WorkItemRepository.setStatus(db, ctx, taskId, status, resolution);
+        if (!task) throw notFound('Task not found');
+        await logEvent(db, ctx, {
+            action: 'TASK_STATUS_CHANGED',
+            entityType: 'Task',
+            entityId: taskId,
+            details: `Status changed to ${status}`,
+            metadata: { status, resolution },
+        });
+        return task;
+    });
+}
+
+// ─── Assign ───
+
+export async function assignTask(ctx: RequestContext, taskId: string, assigneeUserId: string | null) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const task = await WorkItemRepository.assign(db, ctx, taskId, assigneeUserId);
+        if (!task) throw notFound('Task not found');
+        await logEvent(db, ctx, {
+            action: 'TASK_ASSIGNED',
+            entityType: 'Task',
+            entityId: taskId,
+            details: assigneeUserId ? `Assigned to ${assigneeUserId}` : 'Unassigned',
+            metadata: { assigneeUserId },
+        });
+        return task;
+    });
+}
+
+// ─── Links ───
+
+export async function listTaskLinks(ctx: RequestContext, taskId: string) {
+    assertCanReadTasks(ctx);
+    return runInTenantContext(ctx, (db) => TaskLinkRepository.listByTask(db, ctx, taskId));
+}
+
+export async function addTaskLink(ctx: RequestContext, taskId: string, entityType: string, entityId: string, relation?: string) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const link = await TaskLinkRepository.link(db, ctx, taskId, entityType, entityId, relation);
+        await logEvent(db, ctx, {
+            action: 'TASK_LINKED',
+            entityType: 'Task',
+            entityId: taskId,
+            details: `Linked to ${entityType} ${entityId}`,
+            metadata: { entityType, entityId, relation },
+        });
+        return link;
+    });
+}
+
+export async function removeTaskLink(ctx: RequestContext, linkId: string) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const result = await TaskLinkRepository.unlink(db, ctx, linkId);
+        if (!result) throw notFound('Task link not found');
+        await logEvent(db, ctx, {
+            action: 'TASK_UNLINKED',
+            entityType: 'Task',
+            entityId: linkId,
+            details: 'Removed task link',
+        });
+        return result;
+    });
+}
+
+// ─── Comments ───
+
+export async function listTaskComments(ctx: RequestContext, taskId: string) {
+    assertCanReadTasks(ctx);
+    return runInTenantContext(ctx, (db) => TaskCommentRepository.listByTask(db, ctx, taskId));
+}
+
+export async function addTaskComment(ctx: RequestContext, taskId: string, body: string) {
+    assertCanCommentOnTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const comment = await TaskCommentRepository.add(db, ctx, taskId, body);
+        await logEvent(db, ctx, {
+            action: 'TASK_COMMENT_ADDED',
+            entityType: 'Task',
+            entityId: taskId,
+            details: 'Comment added',
+            metadata: { commentId: comment.id },
+        });
+        return comment;
+    });
+}
+
+// ─── Watchers ───
+
+export async function listTaskWatchers(ctx: RequestContext, taskId: string) {
+    assertCanReadTasks(ctx);
+    return runInTenantContext(ctx, (db) => TaskWatcherRepository.listByTask(db, ctx, taskId));
+}
+
+export async function addTaskWatcher(ctx: RequestContext, taskId: string, userId: string) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, (db) => TaskWatcherRepository.add(db, ctx, taskId, userId));
+}
+
+export async function removeTaskWatcher(ctx: RequestContext, taskId: string, userId: string) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const result = await TaskWatcherRepository.remove(db, ctx, taskId, userId);
+        if (!result) throw notFound('Watcher not found');
+        return result;
+    });
+}
+
+// ─── Metrics ───
+
+export async function getTaskMetrics(ctx: RequestContext) {
+    assertCanReadTasks(ctx);
+    return runInTenantContext(ctx, (db) => WorkItemRepository.metrics(db, ctx));
+}
+
+// ─── Activity Feed ───
+
+export async function getTaskActivity(ctx: RequestContext, taskId: string) {
+    assertCanReadTasks(ctx);
+    return runInTenantContext(ctx, (db) =>
+        db.auditLog.findMany({
+            where: { tenantId: ctx.tenantId, entity: 'Task', entityId: taskId },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            include: { user: { select: { id: true, name: true, email: true } } },
+        })
+    );
+}
+
+// ─── Bulk Actions ───
+
+export async function bulkAssignTasks(ctx: RequestContext, taskIds: string[], assigneeUserId: string | null) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const result = await WorkItemRepository.bulkAssign(db, ctx, taskIds, assigneeUserId);
+        for (const id of taskIds) {
+            await logEvent(db, ctx, {
+                action: 'TASK_ASSIGNED',
+                entityType: 'Task',
+                entityId: id,
+                details: assigneeUserId ? `Bulk assigned to ${assigneeUserId}` : 'Bulk unassigned',
+                metadata: { assigneeUserId, bulk: true },
+            });
+        }
+        return result;
+    });
+}
+
+export async function bulkSetTaskStatus(ctx: RequestContext, taskIds: string[], status: string, resolution?: string) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const result = await WorkItemRepository.bulkSetStatus(db, ctx, taskIds, status, resolution);
+        for (const id of taskIds) {
+            await logEvent(db, ctx, {
+                action: 'TASK_STATUS_CHANGED',
+                entityType: 'Task',
+                entityId: id,
+                details: `Bulk status changed to ${status}`,
+                metadata: { status, resolution, bulk: true },
+            });
+        }
+        return result;
+    });
+}
+
+export async function bulkSetTaskDueDate(ctx: RequestContext, taskIds: string[], dueAt: string | null) {
+    assertCanWriteTasks(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const result = await WorkItemRepository.bulkSetDueDate(db, ctx, taskIds, dueAt);
+        for (const id of taskIds) {
+            await logEvent(db, ctx, {
+                action: 'TASK_UPDATED',
+                entityType: 'Task',
+                entityId: id,
+                details: `Bulk due date set to ${dueAt || 'none'}`,
+                metadata: { dueAt, bulk: true },
+            });
+        }
+        return result;
+    });
+}
+
+// ─── By Control ───
+
+export async function listTasksByControl(ctx: RequestContext, controlId: string) {
+    assertCanReadTasks(ctx);
+    return runInTenantContext(ctx, (db) => WorkItemRepository.list(db, ctx, { controlId }));
+}

@@ -1,0 +1,15 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { withApiErrorHandling } from '@/lib/errors/api';
+import { withValidatedBody } from '@/lib/validation/route';
+import { getTenantCtx } from '@/app-layer/context';
+import { RequestApprovalSchema } from '@/lib/schemas';
+import * as policyUsecases from '@/app-layer/usecases/policy';
+
+// POST /api/t/[tenantSlug]/policies/[id]/approval — request approval
+export const POST = withApiErrorHandling(
+    withValidatedBody(RequestApprovalSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }, body) => {
+        const ctx = await getTenantCtx(params, req);
+        const approval = await policyUsecases.requestPolicyApproval(ctx, params.id, body.versionId);
+        return NextResponse.json(approval, { status: 201 });
+    })
+);

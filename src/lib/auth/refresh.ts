@@ -1,0 +1,121 @@
+/**
+ * Token refresh module for OAuth providers.
+ * Handles automatic token refresh for Google and Microsoft Entra ID.
+ * NEVER logs secrets or tokens.
+ */
+import { env } from '@/env';
+
+export interface TokenRefreshResult {
+    accessToken: string;
+    refreshToken?: string; // Only present if rotated
+    expiresAt: number;     // Unix timestamp in seconds
+}
+
+const SKEW_SECONDS = 60; // Refresh 60s before actual expiry
+
+/**
+ * Check if a token is expired or about to expire.
+ */
+export function isTokenExpired(expiresAt: number): boolean {
+    return Date.now() / 1000 >= expiresAt - SKEW_SECONDS;
+}
+
+/**
+ * Refresh a Google OAuth access token.
+ * @see https://developers.google.com/identity/protocols/oauth2/web-server#offline
+ */
+export async function refreshGoogleToken(
+    refreshToken: string
+): Promise<TokenRefreshResult> {
+    const clientId = env.GOOGLE_CLIENT_ID;
+    const clientSecret = env.GOOGLE_CLIENT_SECRET;
+
+    console.log('[auth:refresh] Refreshing Google access token');
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+        }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[auth:refresh] Google token refresh failed:', response.status);
+        throw new Error(`Google token refresh failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return {
+        accessToken: data.access_token,
+        // Google does not always rotate refresh tokens
+        refreshToken: data.refresh_token ?? undefined,
+        expiresAt: Math.floor(Date.now() / 1000) + (data.expires_in as number),
+    };
+}
+
+/**
+ * Refresh a Microsoft Entra ID access token.
+ * @see https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow#refresh-the-access-token
+ */
+export async function refreshMicrosoftToken(
+    refreshToken: string
+): Promise<TokenRefreshResult> {
+    const clientId = env.MICROSOFT_CLIENT_ID;
+    const clientSecret = env.MICROSOFT_CLIENT_SECRET;
+    const tenantId = env.MICROSOFT_TENANT_ID;
+
+    console.log('[auth:refresh] Refreshing Microsoft access token');
+
+    const response = await fetch(
+        `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: clientId,
+                client_secret: clientSecret,
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken,
+                scope: 'openid profile email offline_access',
+            }),
+        }
+    );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[auth:refresh] Microsoft token refresh failed:', response.status);
+        throw new Error(`Microsoft token refresh failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    return {
+        accessToken: data.access_token,
+        // Microsoft MAY rotate refresh tokens
+        refreshToken: data.refresh_token ?? undefined,
+        expiresAt: Math.floor(Date.now() / 1000) + (data.expires_in as number),
+    };
+}
+
+/**
+ * Refresh an access token based on the provider.
+ */
+export async function refreshAccessToken(
+    provider: string,
+    refreshToken: string
+): Promise<TokenRefreshResult> {
+    switch (provider) {
+        case 'google':
+            return refreshGoogleToken(refreshToken);
+        case 'microsoft-entra-id':
+            return refreshMicrosoftToken(refreshToken);
+        default:
+            throw new Error(`Token refresh not supported for provider: ${provider}`);
+    }
+}

@@ -1,0 +1,82 @@
+﻿
+Running 4 tests using 1 worker
+
+  тЬУ  1 [chromium] тА║ tests\e2e\vendors.spec.ts:23:9 тА║ Vendor Management тА║ vendor register page loads (16.3s)
+  тЬУ  2 [chromium] тА║ tests\e2e\vendors.spec.ts:31:9 тА║ Vendor Management тА║ create vendor and navigate to detail (9.9s)
+  тЬУ  3 [chromium] тА║ tests\e2e\vendors.spec.ts:45:9 тА║ Vendor Management тА║ vendor detail tabs work (5.4s)
+  тЬУ  4 [chromium] тА║ tests\e2e\vendors.spec.ts:58:9 тА║ Vendor Management тА║ add document to vendor (7.3s)
+node.exe : [2m[WebServer] [22m
+[API Error 400] [ID: 280f1c21-68
+13-407b-82da-abf10d119176] POST 
+http://localhost:3006/api/t/acme
+-corp/vendors/cmmjbel5g005e101h0
+z3lbtcp/documents -  AppError: I
+nvalid JSON payload
+At line:1 char:1
++ & "C:\Program Files\nodejs/nod
+e.exe" "C:\Users\Lenovo\AppData\
+Roaming ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~
+    + CategoryInfo          : N 
+   otSpecified: ([2m[WebServe  
+  r]...id JSON payload:String   
+ ) [], RemoteException
+    + FullyQualifiedErrorId : N 
+   ativeCommandError
+ 
+[2m[WebServer] [22m    at badR
+equest (webpack-internal:///(rsc
+)/./src/lib/errors/types.ts:35:4
+0)
+[2m[WebServer] [22m    at eval
+ (webpack-internal:///(rsc)/./sr
+c/lib/validation/route.ts:18:80)
+[2m[WebServer] [22m    at asyn
+c eval (webpack-internal:///(rsc
+)/./src/lib/errors/api.ts:31:30)
+[2m[WebServer] [22m    at asyn
+c [90mC:\Users\Lenovo\.gemini\a
+ntigravity\scratch\inflect-compl
+iance\[39mnode_modules\[4mnext
+[24m\dist\compiled\next-server\
+app-route.runtime.dev.js:6:57228
+[2m[WebServer] [22m    at asyn
+c eT.execute [90m(C:\Users\Leno
+vo\.gemini\antigravity\scratch\i
+nflect-compliance\[39mnode_modu
+les\[4mnext[24m\dist\compiled\
+next-server\app-route.runtime.de
+v.js:6:46851[90m)[39m
+[2m[WebServer] [22m    at asyn
+c eT.handle [90m(C:\Users\Lenov
+o\.gemini\antigravity\scratch\in
+flect-compliance\[39mnode_modul
+es\[4mnext[24m\dist\compiled\n
+ext-server\app-route.runtime.dev
+.js:6:58760[90m)[39m
+[2m[WebServer] [22m    at asyn
+c doRender [90m(C:\Users\Lenovo
+\.gemini\antigravity\scratch\inf
+lect-compliance\[39mnode_module
+s\[4mnext[24m\dist\server\base
+-server.js:1366:42[90m)[39m
+[2m[WebServer] [22m    at asyn
+c cacheEntry.responseCache.get.r
+outeKind [90m(C:\Users\Lenovo\.
+gemini\antigravity\scratch\infle
+ct-compliance\[39mnode_modules\
+[4mnext[24m\dist\server\base-s
+erver.js:1576:40[90m)[39m {
+[2m[WebServer] [22m  code: [3
+2m'BAD_REQUEST'[39m,
+[2m[WebServer] [22m  status: 
+[33m400[39m,
+[2m[WebServer] [22m  expose: 
+[33mtrue[39m,
+[2m[WebServer] [22m  details: 
+[90mundefined[39m
+[2m[WebServer] [22m}
+
+  4 passed (47.1s)

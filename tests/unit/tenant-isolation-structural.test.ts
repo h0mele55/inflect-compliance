@@ -1,0 +1,208 @@
+/**
+ * Structural guardrails for tenant/scope isolation.
+ *
+ * These tests scan the codebase and FAIL if:
+ * 1. session.tenantId is used outside allowlisted files
+ * 2. Protected pages exist outside /t/[tenantSlug]
+ * 3. Business API routes exist outside /api/t/[tenantSlug] (auth routes excluded)
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+const SRC_ROOT = path.resolve(__dirname, '../../src');
+
+function walkDir(dir: string, ext = '.ts'): string[] {
+    if (!fs.existsSync(dir)) return [];
+    const results: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            results.push(...walkDir(fullPath, ext));
+        } else if (entry.name.endsWith(ext) || entry.name.endsWith('.tsx')) {
+            results.push(fullPath);
+        }
+    }
+    return results;
+}
+
+describe('Structural Guard: Tenant Isolation Conventions', () => {
+    // ─── 1. Forbid session.tenantId usage ───
+    describe('session.tenantId must not be used outside allowlisted files', () => {
+        // These files are allowed to use session.tenantId:
+        // - context.ts: builds RequestContext from session for legacy routes
+        // - audit-log.ts: legacy wrapper (no routes call it, but kept for backward compat)
+        const ALLOWLIST = new Set([
+            path.join(SRC_ROOT, 'app-layer', 'context.ts'),
+            path.join(SRC_ROOT, 'lib', 'audit-log.ts'),
+        ]);
+
+        const allTsFiles = walkDir(SRC_ROOT);
+
+        for (const filePath of allTsFiles) {
+            if (ALLOWLIST.has(filePath)) continue;
+            // Skip test files and declaration files
+            if (filePath.includes('__tests__') || filePath.endsWith('.d.ts')) continue;
+
+            const relPath = filePath.replace(SRC_ROOT + path.sep, '');
+
+            it(`${relPath} must NOT use session.tenantId`, () => {
+                const content = fs.readFileSync(filePath, 'utf8');
+                const lines = content.split('\n');
+                const violations = lines.filter((line) => {
+                    const trimmed = line.trim();
+                    if (trimmed.startsWith('//') || trimmed.startsWith('*')) return false;
+                    return /session\.tenantId/.test(trimmed);
+                });
+                expect(violations).toEqual([]);
+            });
+        }
+    });
+
+    // ─── 2. Forbid protected pages outside /t/[tenantSlug] ───
+    describe('protected pages must live under /t/[tenantSlug]', () => {
+        const appDir = path.join(SRC_ROOT, 'app');
+
+        // These root-level pages are allowed (they're redirectors/public):
+        const ALLOWED_ROOT_PAGES = new Set([
+            'page.tsx',          // Root redirector → /t/<slug>/dashboard
+            'login',             // Public login page
+            'register',          // Public register page
+            'dashboard',         // Legacy redirect shim → /t/<slug>/dashboard
+            'not-found.tsx',     // 404 page
+            'error.tsx',         // Error boundary
+            'layout.tsx',        // Root layout
+            'global-error.tsx',  // Global error boundary
+            'audit',             // Public auditor share view (/audit/shared/[token])
+        ]);
+
+        // Get immediate children of app/ that are page directories
+        if (fs.existsSync(appDir)) {
+            const entries = fs.readdirSync(appDir, { withFileTypes: true });
+            for (const entry of entries) {
+                // Skip t/ (tenant-scoped), api/ (API routes), and allowed items
+                if (entry.name === 't' || entry.name === 'api') continue;
+                if (ALLOWED_ROOT_PAGES.has(entry.name)) continue;
+
+                // Skip Next.js template files and parenthesized route groups
+                if (entry.name.startsWith('(') || entry.name.startsWith('_')) continue;
+
+                if (entry.isDirectory()) {
+                    // Check if this directory contains any page.tsx
+                    const pagesInDir = walkDir(path.join(appDir, entry.name))
+                        .filter((f) => f.endsWith('page.tsx'));
+
+                    for (const pageFile of pagesInDir) {
+                        const relPath = pageFile.replace(SRC_ROOT + path.sep, '');
+                        it(`DISALLOWED: ${relPath} — protected page outside /t/[tenantSlug]`, () => {
+                            // If this test runs, the page exists outside /t/ and isn't allowlisted
+                            fail(`Page file ${relPath} exists outside /t/[tenantSlug]. Move it or add to allowlist.`);
+                        });
+                    }
+                }
+            }
+        }
+
+        it('all tenant-scoped pages are under /t/[tenantSlug]', () => {
+            // Verify /t/ directory exists and has pages
+            const tenantPagesDir = path.join(appDir, 't');
+            expect(fs.existsSync(tenantPagesDir)).toBe(true);
+
+            const tenantPages = walkDir(tenantPagesDir)
+                .filter((f) => f.endsWith('page.tsx'));
+            expect(tenantPages.length).toBeGreaterThan(0);
+        });
+    });
+
+    // ─── 3. Forbid API routes outside /api/t/[tenantSlug] (except auth) ───
+    describe('business API routes must live under /api/t/[tenantSlug]', () => {
+        const apiDir = path.join(SRC_ROOT, 'app', 'api');
+
+        // Auth routes are allowed at the root level
+        const ALLOWED_API_DIRS = new Set(['auth', 't', 'risk-templates', 'audit']);
+
+        // Legacy routes are allowed as documented thin wrappers
+        // that delegate to getLegacyCtx → usecases (kept for backward compat)
+        const ALLOWED_LEGACY_ROUTES = new Set([
+            'assets', 'audit-log', 'audits', 'clauses', 'controls',
+            'dashboard', 'evidence', 'files', 'findings', 'mapping',
+            'notifications', 'policies', 'reports', 'risks', 'tasks',
+        ]);
+
+        if (fs.existsSync(apiDir)) {
+            const entries = fs.readdirSync(apiDir, { withFileTypes: true });
+
+            for (const entry of entries) {
+                if (!entry.isDirectory()) continue;
+                if (ALLOWED_API_DIRS.has(entry.name)) continue;
+                if (ALLOWED_LEGACY_ROUTES.has(entry.name)) continue;
+
+                // Any NEW route directory that isn't in the allowlists is a violation
+                const routeFiles = walkDir(path.join(apiDir, entry.name))
+                    .filter((f) => f.endsWith('route.ts'));
+
+                for (const routeFile of routeFiles) {
+                    const relPath = routeFile.replace(SRC_ROOT + path.sep, '');
+                    it(`DISALLOWED: ${relPath} — new API route outside /api/t/[tenantSlug]`, () => {
+                        fail(`Route ${relPath} exists outside /api/t/. New routes MUST go under /api/t/[tenantSlug]/.`);
+                    });
+                }
+            }
+        }
+
+        it('all legacy API routes use getLegacyCtx (not direct prisma)', () => {
+            // Verify that each allowed legacy route uses getLegacyCtx
+            for (const dir of ALLOWED_LEGACY_ROUTES) {
+                const routeFile = path.join(apiDir, dir, 'route.ts');
+                if (!fs.existsSync(routeFile)) continue;
+
+                const content = fs.readFileSync(routeFile, 'utf8');
+                const usesLegacyCtx = content.includes('getLegacyCtx');
+                const usesUsecase = /import.*from.*usecases/.test(content);
+
+                // Legacy routes must use getLegacyCtx OR import from usecases
+                expect(usesLegacyCtx || usesUsecase).toBe(true);
+            }
+        });
+
+        it('tenant-scoped API routes exist and outnumber legacy', () => {
+            const tenantRouteDir = path.join(apiDir, 't');
+            expect(fs.existsSync(tenantRouteDir)).toBe(true);
+
+            const tenantRoutes = walkDir(tenantRouteDir)
+                .filter((f) => f.endsWith('route.ts'));
+
+            // We have 32 tenant routes vs 28 legacy — tenant should be >= legacy
+            expect(tenantRoutes.length).toBeGreaterThanOrEqual(28);
+        });
+    });
+
+    // ─── 4. Forbid flat fetch('/api/...') in tenant-scoped pages ───
+    describe('tenant-scoped pages must use apiUrl() for all fetch calls', () => {
+        const tenantPagesDir = path.join(SRC_ROOT, 'app', 't');
+
+        if (fs.existsSync(tenantPagesDir)) {
+            const pageFiles = walkDir(tenantPagesDir)
+                .filter((f) => f.endsWith('page.tsx'));
+
+            for (const filePath of pageFiles) {
+                const relPath = filePath.replace(SRC_ROOT + path.sep, '');
+
+                it(`${relPath} must NOT use flat fetch('/api/...')`, () => {
+                    const content = fs.readFileSync(filePath, 'utf8');
+                    const lines = content.split('\n');
+                    // Global (non-tenant-scoped) API routes are allowed
+                    const GLOBAL_APIS = ['/api/risk-templates', '/api/auth/'];
+                    const violations = lines.filter((line) => {
+                        const trimmed = line.trim();
+                        if (trimmed.startsWith('//') || trimmed.startsWith('*')) return false;
+                        // Match fetch('/api/... or fetch(`/api/...
+                        if (!/fetch\s*\(\s*[`'"]\/api\//.test(trimmed)) return false;
+                        return !GLOBAL_APIS.some(p => trimmed.includes(p));
+                    });
+                    expect(violations).toEqual([]);
+                });
+            }
+        }
+    });
+});

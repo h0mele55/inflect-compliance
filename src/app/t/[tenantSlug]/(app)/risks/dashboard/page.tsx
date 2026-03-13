@@ -1,0 +1,177 @@
+'use client';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+
+type Risk = {
+    id: string;
+    title: string;
+    category: string | null;
+    status: string;
+    treatmentOwner: string | null;
+    score: number;
+    inherentScore: number;
+    likelihood: number;
+    impact: number;
+    nextReviewAt: string | null;
+};
+
+const HEATMAP_COLOR = (s: number) => {
+    if (s <= 5) return 'bg-emerald-900/60 text-emerald-300';
+    if (s <= 12) return 'bg-amber-900/60 text-amber-300';
+    if (s <= 18) return 'bg-orange-900/60 text-orange-300';
+    return 'bg-red-900/60 text-red-300';
+};
+
+export default function RiskDashboardPage() {
+    const apiUrl = useTenantApiUrl();
+    const href = useTenantHref();
+    const tenant = useTenantContext();
+    const t = useTranslations('riskManager');
+
+    const [risks, setRisks] = useState<Risk[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetch(apiUrl('/risks'))
+            .then(r => r.json())
+            .then(setRisks)
+            .catch(() => setRisks([]))
+            .finally(() => setLoading(false));
+    }, [apiUrl]);
+
+    // KPIs
+    const total = risks.length;
+    const avgScore = total ? (risks.reduce((s, r) => s + r.inherentScore, 0) / total).toFixed(1) : '0.0';
+    const openCount = risks.filter(r => r.status === 'OPEN' || r.status === 'MITIGATING').length;
+    const now = new Date();
+    const overdueRisks = risks.filter(r => r.nextReviewAt && new Date(r.nextReviewAt) < now);
+
+    // Status breakdown
+    const statusCounts = risks.reduce<Record<string, number>>((acc, r) => {
+        acc[r.status] = (acc[r.status] || 0) + 1;
+        return acc;
+    }, {});
+
+    // Heatmap
+    const heatmapCounts: Record<string, number> = {};
+    risks.forEach(r => {
+        const key = `${r.likelihood}-${r.impact}`;
+        heatmapCounts[key] = (heatmapCounts[key] || 0) + 1;
+    });
+
+    if (loading) {
+        return <div className="glass-card p-12 text-center animate-pulse text-slate-500">{t('loading')}</div>;
+    }
+
+    return (
+        <div className="space-y-6 animate-fadeIn">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold">{t('dashboardTitle')}</h1>
+                    <p className="text-slate-400 text-sm">{tenant.tenantName} — {t('riskCount', { count: total })}</p>
+                </div>
+                <Link href={href('/risks')} className="btn btn-secondary" id="back-to-register">
+                    {t('riskRegister')}
+                </Link>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="glass-card p-5 text-center">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t('totalRisks')}</p>
+                    <p className="text-3xl font-bold mt-2">{total}</p>
+                </div>
+                <div className="glass-card p-5 text-center">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t('avgScore')}</p>
+                    <p className="text-3xl font-bold mt-2 text-amber-400">{avgScore}</p>
+                </div>
+                <div className="glass-card p-5 text-center">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t('openRisks')}</p>
+                    <p className="text-3xl font-bold mt-2 text-emerald-400">{openCount}</p>
+                </div>
+                <div className="glass-card p-5 text-center">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t('overdueReviews')}</p>
+                    <p className="text-3xl font-bold mt-2 text-red-400">{overdueRisks.length}</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Status Breakdown */}
+                <div className="glass-card p-5">
+                    <h2 className="font-semibold mb-4">{t('statusBreakdown')}</h2>
+                    {total === 0 ? (
+                        <p className="text-slate-500 text-sm">{t('noRisksYet')}</p>
+                    ) : (
+                        <div className="space-y-3">
+                            {Object.entries(statusCounts).sort(([, a], [, b]) => b - a).map(([status, count]) => (
+                                <div key={status}>
+                                    <div className="flex justify-between text-sm mb-1">
+                                        <span className="text-slate-300">{status}</span>
+                                        <span className="text-slate-400">{count} ({Math.round(count / total * 100)}%)</span>
+                                    </div>
+                                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-500 transition-all"
+                                            style={{ width: `${(count / total) * 100}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Heatmap */}
+                <div className="glass-card p-5">
+                    <h2 className="font-semibold mb-4">{t('heatmapTitle')}</h2>
+                    <div className="grid grid-cols-[auto_repeat(5,1fr)] gap-1 text-xs">
+                        <div></div>
+                        {[1, 2, 3, 4, 5].map(i => (
+                            <div key={i} className="text-center text-slate-500 font-medium pb-1">{i}</div>
+                        ))}
+                        {[5, 4, 3, 2, 1].map(l => (
+                            <>
+                                <div key={`l-${l}`} className="flex items-center text-slate-500 font-medium pr-2">{l}</div>
+                                {[1, 2, 3, 4, 5].map(i => {
+                                    const count = heatmapCounts[`${l}-${i}`] || 0;
+                                    const s = l * i;
+                                    return (
+                                        <div
+                                            key={`${l}-${i}`}
+                                            className={`h-10 rounded flex items-center justify-center font-medium transition hover:scale-105 cursor-default ${HEATMAP_COLOR(s)}`}
+                                            title={`L${l}×I${i} = ${s} (${count})`}
+                                        >
+                                            {count > 0 ? count : ''}
+                                        </div>
+                                    );
+                                })}
+                            </>
+                        ))}
+                        <div className="text-slate-600 text-[10px] mt-1">L↑</div>
+                        <div className="col-span-5 text-center text-slate-600 text-[10px] mt-1">Impact →</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Overdue */}
+            {overdueRisks.length > 0 && (
+                <div className="glass-card p-5 border-red-500/30">
+                    <h2 className="font-semibold mb-3 text-red-400">{t('overdueReviewsTitle')}</h2>
+                    <div className="space-y-2">
+                        {overdueRisks.map(r => {
+                            const daysOverdue = Math.floor((now.getTime() - new Date(r.nextReviewAt!).getTime()) / 86400000);
+                            return (
+                                <Link key={r.id} href={href(`/risks/${r.id}`)} className="flex justify-between items-center p-2 rounded hover:bg-red-900/20 transition">
+                                    <span className="text-sm text-white">{r.title}</span>
+                                    <span className="text-xs text-red-400">{t('daysOverdue', { days: daysOverdue })} · {r.treatmentOwner || t('noOwner')}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

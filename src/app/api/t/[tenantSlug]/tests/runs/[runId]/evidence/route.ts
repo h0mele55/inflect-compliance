@@ -1,0 +1,22 @@
+/**
+ * GET  /api/t/[tenantSlug]/tests/runs/[runId]/evidence — List evidence linked to a test run
+ * POST /api/t/[tenantSlug]/tests/runs/[runId]/evidence — Link evidence to a test run
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { getTenantCtx } from '@/app-layer/context';
+import { listRunEvidence, linkEvidenceToRun } from '@/app-layer/usecases/control-test';
+import { withValidatedBody } from '@/lib/validation/route';
+import { LinkTestEvidenceSchema } from '@/lib/schemas';
+import { withApiErrorHandling } from '@/lib/errors/api';
+
+export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; runId: string } }) => {
+    const ctx = await getTenantCtx(params, req);
+    const evidence = await listRunEvidence(ctx, params.runId);
+    return NextResponse.json(evidence);
+});
+
+export const POST = withApiErrorHandling(withValidatedBody(LinkTestEvidenceSchema, async (req, { params }: { params: { tenantSlug: string; runId: string } }, body) => {
+    const ctx = await getTenantCtx(params, req);
+    const link = await linkEvidenceToRun(ctx, params.runId, body);
+    return NextResponse.json(link, { status: 201 });
+}));

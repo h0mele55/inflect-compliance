@@ -1,0 +1,15 @@
+/**
+ * GET /api/t/[tenantSlug]/evidence/retention/expiring?days=30
+ * Lists evidence expiring within N days.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { getTenantCtx } from '@/app-layer/context';
+import { withApiErrorHandling } from '@/lib/errors/api';
+import { listExpiringEvidence } from '@/app-layer/usecases/evidence-retention';
+
+export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
+    const ctx = await getTenantCtx(params, req);
+    const days = parseInt(req.nextUrl.searchParams.get('days') || '30', 10);
+    const result = await listExpiringEvidence(ctx, isNaN(days) ? 30 : days);
+    return NextResponse.json(result);
+});

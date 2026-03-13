@@ -1,0 +1,183 @@
+'use client';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import TraceabilityPanel from '@/components/TraceabilityPanel';
+import LinkedTasksPanel from '@/components/LinkedTasksPanel';
+
+export default function AssetDetailPage() {
+    const params = useParams();
+    const apiUrl = useTenantApiUrl();
+    const tenantHref = useTenantHref();
+    const { permissions } = useTenantContext();
+    const assetId = params.id as string;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [asset, setAsset] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [editing, setEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [form, setForm] = useState<any>({});
+
+    const fetchAsset = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(apiUrl(`/assets/${assetId}`));
+            if (!res.ok) throw new Error(`Failed to load (${res.status})`);
+            const data = await res.json();
+            setAsset(data);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [apiUrl, assetId]);
+
+    useEffect(() => { fetchAsset(); }, [fetchAsset]);
+
+    const startEdit = () => {
+        if (!asset) return;
+        setForm({
+            name: asset.name || '',
+            type: asset.type || 'SYSTEM',
+            classification: asset.classification || '',
+            owner: asset.owner || '',
+            location: asset.location || '',
+            criticality: asset.criticality || '',
+            status: asset.status || 'ACTIVE',
+            externalRef: asset.externalRef || '',
+            confidentiality: asset.confidentiality ?? 3,
+            integrity: asset.integrity ?? 3,
+            availability: asset.availability ?? 3,
+        });
+        setEditing(true);
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            const res = await fetch(apiUrl(`/assets/${assetId}`), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(form),
+            });
+            if (!res.ok) throw new Error(`Failed to save (${res.status})`);
+            const data = await res.json();
+            setAsset(data);
+            setEditing(false);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading asset…</div>;
+    if (error && !asset) return <div className="glass-card p-8 text-center text-red-400">{error}<div className="mt-4"><Link href={tenantHref('/assets')} className="btn btn-secondary">← Back</Link></div></div>;
+    if (!asset) return null;
+
+    const TYPES = ['INFORMATION', 'APPLICATION', 'SYSTEM', 'SERVICE', 'DATA_STORE', 'INFRASTRUCTURE', 'VENDOR', 'PROCESS', 'PEOPLE_PROCESS', 'OTHER'];
+    const CRITICALITIES = ['LOW', 'MEDIUM', 'HIGH'];
+    const critColor = (c: string) => c === 'HIGH' ? 'badge-danger' : c === 'MEDIUM' ? 'badge-warning' : 'badge-success';
+
+    return (
+        <div className="space-y-6 animate-fadeIn max-w-4xl">
+            {/* Header */}
+            <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                    <Link href={tenantHref('/assets')} className="text-slate-400 hover:text-white transition text-lg">←</Link>
+                    <div>
+                        <h1 className="text-2xl font-bold" id="asset-title-heading">{asset.name}</h1>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="badge badge-info">{asset.type?.replace(/_/g, ' ')}</span>
+                            {asset.criticality && <span className={`badge ${critColor(asset.criticality)}`}>{asset.criticality}</span>}
+                            <span className={`badge ${asset.status === 'RETIRED' ? 'badge-neutral' : 'badge-success'}`}>{asset.status || 'ACTIVE'}</span>
+                        </div>
+                    </div>
+                </div>
+                {permissions.canWrite && !editing && (
+                    <button onClick={startEdit} className="btn btn-secondary" id="edit-asset-btn">Edit</button>
+                )}
+            </div>
+
+            {error && <div className="glass-card p-4 border-red-500/50 text-red-400 text-sm">{error}</div>}
+
+            {/* Detail card */}
+            <div className="glass-card p-6 space-y-5" id="asset-detail">
+                {editing ? (
+                    <>
+                        <div className="grid grid-cols-2 gap-4">
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            <div><label className="input-label">Name *</label><input className="input" value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} /></div>
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            <div><label className="input-label">Type</label><select className="input" value={form.type} onChange={e => setForm((f: any) => ({ ...f, type: e.target.value }))}>{TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}</select></div>
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            <div><label className="input-label">Criticality</label><select className="input" value={form.criticality} onChange={e => setForm((f: any) => ({ ...f, criticality: e.target.value || null }))}><option value="">—</option>{CRITICALITIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            <div><label className="input-label">Status</label><select className="input" value={form.status} onChange={e => setForm((f: any) => ({ ...f, status: e.target.value }))}><option value="ACTIVE">Active</option><option value="RETIRED">Retired</option></select></div>
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            <div><label className="input-label">Owner</label><input className="input" value={form.owner} onChange={e => setForm((f: any) => ({ ...f, owner: e.target.value }))} /></div>
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            <div><label className="input-label">External Ref</label><input className="input" value={form.externalRef} onChange={e => setForm((f: any) => ({ ...f, externalRef: e.target.value }))} /></div>
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            <div><label className="input-label">Classification</label><input className="input" value={form.classification} onChange={e => setForm((f: any) => ({ ...f, classification: e.target.value }))} /></div>
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            <div><label className="input-label">Location</label><input className="input" value={form.location} onChange={e => setForm((f: any) => ({ ...f, location: e.target.value }))} /></div>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button onClick={handleSave} disabled={saving} className="btn btn-primary" id="save-asset-btn">{saving ? 'Saving…' : 'Save'}</button>
+                            <button onClick={() => setEditing(false)} className="btn btn-secondary">Cancel</button>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        {asset.classification && <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Classification</h3><p className="text-sm">{asset.classification}</p></div>}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Owner</h3><p className="text-sm">{asset.owner || '—'}</p></div>
+                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Location</h3><p className="text-sm">{asset.location || '—'}</p></div>
+                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">External Ref</h3><p className="text-sm">{asset.externalRef || '—'}</p></div>
+                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Data Residency</h3><p className="text-sm">{asset.dataResidency || '—'}</p></div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="glass-card p-4 text-center"><p className="text-xs text-slate-400 uppercase">Confidentiality</p><p className="text-2xl font-bold mt-1">{asset.confidentiality ?? '—'}</p></div>
+                            <div className="glass-card p-4 text-center"><p className="text-xs text-slate-400 uppercase">Integrity</p><p className="text-2xl font-bold mt-1">{asset.integrity ?? '—'}</p></div>
+                            <div className="glass-card p-4 text-center"><p className="text-xs text-slate-400 uppercase">Availability</p><p className="text-2xl font-bold mt-1">{asset.availability ?? '—'}</p></div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 border-t border-slate-700/50 pt-4">
+                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Created</h3><p className="text-sm text-slate-400">{new Date(asset.createdAt).toLocaleDateString()}</p></div>
+                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Updated</h3><p className="text-sm text-slate-400">{new Date(asset.updatedAt).toLocaleDateString()}</p></div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {/* Linked Tasks */}
+            <div className="glass-card p-6" id="linked-tasks-section">
+                <h2 className="text-lg font-semibold text-white mb-4">✅ Linked Tasks</h2>
+                <LinkedTasksPanel
+                    apiBase={apiUrl('')}
+                    entityType="ASSET"
+                    entityId={assetId}
+                    tenantHref={tenantHref}
+                />
+            </div>
+
+            {/* Traceability */}
+            <div className="glass-card p-6">
+                <h2 className="text-lg font-semibold text-white mb-4">🔗 Traceability</h2>
+                <TraceabilityPanel
+                    apiBase={apiUrl('')}
+                    entityType="asset"
+                    entityId={assetId}
+                    canWrite={permissions.canWrite}
+                    tenantHref={tenantHref}
+                />
+            </div>
+        </div>
+    );
+}

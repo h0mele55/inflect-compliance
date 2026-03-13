@@ -1,0 +1,100 @@
+/**
+ * Evidence retention sweep job.
+ * Finds evidence with retentionUntil < now and not archived,
+ * flags expiredAt if null, sets isArchived=true, emits events.
+ * Idempotent: re-running does not re-update already archived items.
+ *
+ * Usage (cron):
+ *   import { runEvidenceRetentionSweep } from '@/app-layer/jobs/retention';
+ *   await runEvidenceRetentionSweep({ tenantId: 'xxx' });          // single tenant
+ *   await runEvidenceRetentionSweep({ now: new Date() });          // all tenants
+ *   await runEvidenceRetentionSweep({ dryRun: true });             // preview
+ */
+import { prisma } from '@/lib/prisma';
+
+export interface RetentionSweepOptions {
+    tenantId?: string;
+    now?: Date;
+    dryRun?: boolean;
+}
+
+export interface RetentionSweepResult {
+    scanned: number;
+    expired: number;
+    archived: number;
+    dryRun: boolean;
+}
+
+export async function runEvidenceRetentionSweep(
+    options: RetentionSweepOptions = {},
+): Promise<RetentionSweepResult> {
+    const now = options.now ?? new Date();
+    const dryRun = options.dryRun ?? false;
+
+    // Find evidence with retentionUntil < now AND not already archived AND not soft-deleted
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {
+        retentionUntil: { not: null, lt: now },
+        isArchived: false,
+        deletedAt: null,
+    };
+    if (options.tenantId) {
+        where.tenantId = options.tenantId;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const candidates = await (prisma.evidence as any).findMany({
+        where,
+        select: { id: true, tenantId: true, title: true, expiredAt: true },
+    });
+
+    const scanned = candidates.length;
+    let expired = 0;
+    let archived = 0;
+
+    if (dryRun) {
+        return { scanned, expired: scanned, archived: scanned, dryRun: true };
+    }
+
+    for (const ev of candidates) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updateData: any = {
+            isArchived: true,
+        };
+
+        // Only set expiredAt if not already set (idempotent)
+        if (!ev.expiredAt) {
+            updateData.expiredAt = now;
+            expired++;
+        }
+
+        archived++;
+
+        await prisma.evidence.update({
+            where: { id: ev.id },
+            data: updateData,
+        });
+
+        // Emit audit events
+        await prisma.auditLog.createMany({
+            data: [
+                ...(!ev.expiredAt ? [{
+                    tenantId: ev.tenantId,
+                    entity: 'Evidence',
+                    entityId: ev.id,
+                    action: 'EVIDENCE_EXPIRED',
+                    details: JSON.stringify({ title: ev.title, expiredAt: now.toISOString() }),
+                }] : []),
+                {
+                    tenantId: ev.tenantId,
+                    entity: 'Evidence',
+                    entityId: ev.id,
+                    action: 'EVIDENCE_ARCHIVED',
+                    details: JSON.stringify({ title: ev.title, archivedAt: now.toISOString(), reason: 'retention_expired' }),
+                },
+            ],
+        });
+    }
+
+    return { scanned, expired, archived, dryRun: false };
+}

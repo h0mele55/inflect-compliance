@@ -1,0 +1,15 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getLegacyCtx } from '@/app-layer/context';
+import { downloadFile } from '@/app-layer/usecases/file';
+import { withApiErrorHandling } from '@/lib/errors/api';
+
+export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { fileName: string } }) => {
+    const ctx = await getLegacyCtx(req);
+    const result = await downloadFile(ctx, params.fileName);
+    return new NextResponse(result.buffer as unknown as BodyInit, {
+        headers: {
+            'Content-Type': result.mimeType,
+            'Content-Disposition': `attachment; filename="${result.name}"`,
+        },
+    });
+});

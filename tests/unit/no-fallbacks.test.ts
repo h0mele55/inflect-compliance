@@ -1,0 +1,49 @@
+import fs from 'fs';
+import path from 'path';
+
+function walkDir(dir: string, fileList: string[] = []) {
+    const files = fs.readdirSync(dir);
+
+    for (const file of files) {
+        const filePath = path.join(dir, file);
+        if (fs.statSync(filePath).isDirectory()) {
+            if (file !== 'node_modules' && file !== '.next') {
+                walkDir(filePath, fileList);
+            }
+        } else if (file.endsWith('.ts') || file.endsWith('.tsx')) {
+            fileList.push(filePath);
+        }
+    }
+
+    return fileList;
+}
+
+describe('Static Analysis: No process.env fallbacks', () => {
+    it('should not contain forbidden process.env or secret fallback patterns in src', () => {
+        const srcDir = path.resolve(__dirname, '../../src');
+        const files = walkDir(srcDir);
+
+        let foundErrors = false;
+
+        for (const file of files) {
+            // Ignore the env definition itself since it maps process.env
+            if (file.endsWith('env.ts')) continue;
+
+            const content = fs.readFileSync(file, 'utf8');
+
+            // Look for `process.env.Something`
+            if (content.includes('process.env.')) {
+                console.error(`Forbidden 'process.env' usage found in ${file}`);
+                foundErrors = true;
+            }
+
+            // Look for `|| "secret"` or `|| 'secret'` pattern (simplistic regex but effective)
+            if (/\|\|\s*["'].*secret.*["']/i.test(content)) {
+                console.error(`Forbidden hardcoded secret fallback found in ${file}`);
+                foundErrors = true;
+            }
+        }
+
+        expect(foundErrors).toBe(false);
+    });
+});

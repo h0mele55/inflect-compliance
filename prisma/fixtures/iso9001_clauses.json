@@ -1,0 +1,206 @@
+[
+    {
+        "key": "4.1",
+        "section": "Clause 4 - Context of the organization",
+        "sortOrder": 1,
+        "title": "Understanding the organization and its context"
+    },
+    {
+        "key": "4.2",
+        "section": "Clause 4 - Context of the organization",
+        "sortOrder": 2,
+        "title": "Understanding the needs and expectations of interested parties"
+    },
+    {
+        "key": "4.3",
+        "section": "Clause 4 - Context of the organization",
+        "sortOrder": 3,
+        "title": "Determining the scope of the QMS"
+    },
+    {
+        "key": "4.4",
+        "section": "Clause 4 - Context of the organization",
+        "sortOrder": 4,
+        "title": "QMS and its processes"
+    },
+    {
+        "key": "5.1",
+        "section": "Clause 5 - Leadership",
+        "sortOrder": 5,
+        "title": "Leadership and commitment"
+    },
+    {
+        "key": "5.1.2",
+        "section": "Clause 5 - Leadership",
+        "sortOrder": 6,
+        "title": "Customer focus"
+    },
+    {
+        "key": "5.2",
+        "section": "Clause 5 - Leadership",
+        "sortOrder": 7,
+        "title": "Quality policy"
+    },
+    {
+        "key": "5.3",
+        "section": "Clause 5 - Leadership",
+        "sortOrder": 8,
+        "title": "Organizational roles, responsibilities and authorities"
+    },
+    {
+        "key": "6.1",
+        "section": "Clause 6 - Planning",
+        "sortOrder": 9,
+        "title": "Actions to address risks and opportunities"
+    },
+    {
+        "key": "6.2",
+        "section": "Clause 6 - Planning",
+        "sortOrder": 10,
+        "title": "Quality objectives and planning to achieve them"
+    },
+    {
+        "key": "6.3",
+        "section": "Clause 6 - Planning",
+        "sortOrder": 11,
+        "title": "Planning of changes"
+    },
+    {
+        "key": "7.1",
+        "section": "Clause 7 - Support",
+        "sortOrder": 12,
+        "title": "Resources"
+    },
+    {
+        "key": "7.1.5",
+        "section": "Clause 7 - Support",
+        "sortOrder": 13,
+        "title": "Monitoring and measuring resources"
+    },
+    {
+        "key": "7.1.6",
+        "section": "Clause 7 - Support",
+        "sortOrder": 14,
+        "title": "Organizational knowledge"
+    },
+    {
+        "key": "7.2",
+        "section": "Clause 7 - Support",
+        "sortOrder": 15,
+        "title": "Competence"
+    },
+    {
+        "key": "7.3",
+        "section": "Clause 7 - Support",
+        "sortOrder": 16,
+        "title": "Awareness"
+    },
+    {
+        "key": "7.4",
+        "section": "Clause 7 - Support",
+        "sortOrder": 17,
+        "title": "Communication"
+    },
+    {
+        "key": "7.5",
+        "section": "Clause 7 - Support",
+        "sortOrder": 18,
+        "title": "Documented information"
+    },
+    {
+        "key": "8.1",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 19,
+        "title": "Operational planning and control"
+    },
+    {
+        "key": "8.2",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 20,
+        "title": "Requirements for products and services"
+    },
+    {
+        "key": "8.3",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 21,
+        "title": "Design and development of products and services"
+    },
+    {
+        "key": "8.4",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 22,
+        "title": "Control of externally provided processes, products and services"
+    },
+    {
+        "key": "8.5",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 23,
+        "title": "Production and service provision"
+    },
+    {
+        "key": "8.5.1",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 24,
+        "title": "Control of production and service provision"
+    },
+    {
+        "key": "8.6",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 25,
+        "title": "Release of products and services"
+    },
+    {
+        "key": "8.7",
+        "section": "Clause 8 - Operation",
+        "sortOrder": 26,
+        "title": "Control of nonconforming outputs"
+    },
+    {
+        "key": "9.1",
+        "section": "Clause 9 - Performance evaluation",
+        "sortOrder": 27,
+        "title": "Monitoring, measurement, analysis and evaluation"
+    },
+    {
+        "key": "9.1.2",
+        "section": "Clause 9 - Performance evaluation",
+        "sortOrder": 28,
+        "title": "Customer satisfaction"
+    },
+    {
+        "key": "9.1.3",
+        "section": "Clause 9 - Performance evaluation",
+        "sortOrder": 29,
+        "title": "Analysis and evaluation"
+    },
+    {
+        "key": "9.2",
+        "section": "Clause 9 - Performance evaluation",
+        "sortOrder": 30,
+        "title": "Internal audit"
+    },
+    {
+        "key": "9.3",
+        "section": "Clause 9 - Performance evaluation",
+        "sortOrder": 31,
+        "title": "Management review"
+    },
+    {
+        "key": "10.1",
+        "section": "Clause 10 - Improvement",
+        "sortOrder": 32,
+        "title": "General improvement"
+    },
+    {
+        "key": "10.2",
+        "section": "Clause 10 - Improvement",
+        "sortOrder": 33,
+        "title": "Nonconformity and corrective action"
+    },
+    {
+        "key": "10.3",
+        "section": "Clause 10 - Improvement",
+        "sortOrder": 34,
+        "title": "Continual improvement"
+    }
+]

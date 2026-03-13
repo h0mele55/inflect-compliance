@@ -1,0 +1,196 @@
+Route: /api/t/[tenantSlug]/assets
+  Methods: GET, POST
+  Models Accessed: asset
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/assets/[id]
+  Methods: GET, PUT, DELETE
+  Models Accessed: asset
+  Required Roles: EDITOR, ADMIN
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/audit-log
+  Methods: GET
+  Models Accessed: auditLog
+  Required Roles: None (or implicitly handled)
+  Validation: No
+  Has logAudit: No
+
+Route: /api/t/[tenantSlug]/audits
+  Methods: GET, POST
+  Models Accessed: audit, control, auditChecklistItem
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/audits/[id]
+  Methods: GET, PUT
+  Models Accessed: audit, auditChecklistItem
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/clauses
+  Methods: GET
+  Models Accessed: clause, clauseProgress
+  Required Roles: None (or implicitly handled)
+  Validation: No
+  Has logAudit: No
+
+Route: /api/t/[tenantSlug]/clauses/[id]
+  Methods: PUT
+  Models Accessed: clauseProgress
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/controls
+  Methods: GET, POST
+  Models Accessed: control
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/controls/[id]
+  Methods: GET, PUT
+  Models Accessed: control
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/dashboard
+  Methods: GET
+  Models Accessed: asset, risk, control, evidence, task, finding, clauseProgress, auditLog, notification
+  Required Roles: None (or implicitly handled)
+  Validation: No
+  Has logAudit: No
+
+Route: /api/t/[tenantSlug]/evidence
+  Methods: GET, POST
+  Models Accessed: evidence
+  Required Roles: EDITOR
+  Validation: No
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/evidence/[id]/review
+  Methods: POST
+  Models Accessed: evidence, evidenceReview, user, notification
+  Required Roles: EDITOR, ADMIN
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/evidence/[id]
+  Methods: GET, PUT
+  Models Accessed: evidence
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/files/[fileName]
+  Methods: GET
+  Models Accessed: 
+  Required Roles: None (or implicitly handled)
+  Validation: No
+  Has logAudit: No
+
+Route: /api/t/[tenantSlug]/findings
+  Methods: GET, POST
+  Models Accessed: finding
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/findings/[id]
+  Methods: GET, PUT
+  Models Accessed: finding
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/mapping
+  Methods: GET
+  Models Accessed: control
+  Required Roles: None (or implicitly handled)
+  Validation: No
+  Has logAudit: No
+
+Route: /api/t/[tenantSlug]/notifications
+  Methods: GET
+  Models Accessed: notification
+  Required Roles: None (or implicitly handled)
+  Validation: No
+  Has logAudit: No
+
+Route: /api/t/[tenantSlug]/notifications/[id]
+  Methods: PUT
+  Models Accessed: notification
+  Required Roles: None (or implicitly handled)
+  Validation: Yes
+  Has logAudit: No
+
+Route: /api/t/[tenantSlug]/policies
+  Methods: GET, POST
+  Models Accessed: policy, policyVersion
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/policies/[id]/acknowledge
+  Methods: POST
+  Models Accessed: policyVersion, policyAcknowledgement
+  Required Roles: None (or implicitly handled)
+  Validation: Yes
+  Has logAudit: No
+
+Route: /api/t/[tenantSlug]/policies/[id]/approve
+  Methods: POST
+  Models Accessed: policyVersion, policyApproval, policy
+  Required Roles: ADMIN
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/policies/[id]
+  Methods: GET, PUT
+  Models Accessed: policy, policyVersion
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/reports
+  Methods: GET
+  Models Accessed: control, risk
+  Required Roles: None (or implicitly handled)
+  Validation: No
+  Has logAudit: No
+
+Route: /api/t/[tenantSlug]/risks
+  Methods: GET, POST
+  Models Accessed: risk, tenant
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/risks/[id]/controls
+  Methods: POST
+  Models Accessed: risk, riskControl
+  Required Roles: EDITOR
+  Validation: No
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/risks/[id]
+  Methods: GET, PUT, DELETE
+  Models Accessed: risk, tenant
+  Required Roles: EDITOR, ADMIN
+  Validation: Yes
+  Has logAudit: Yes
+
+Route: /api/t/[tenantSlug]/tasks
+  Methods: GET, POST
+  Models Accessed: task
+  Required Roles: EDITOR
+  Validation: Yes
+  Has logAudit: Yes
+

@@ -1,0 +1,219 @@
+'use client';
+import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
+import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+
+const CRIT_BADGE: Record<string, string> = { LOW: 'badge-neutral', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
+const STATUS_BADGE: Record<string, string> = {
+    DRAFT: 'badge-neutral', IN_REVIEW: 'badge-warning', APPROVED: 'badge-success', REJECTED: 'badge-danger',
+};
+
+export default function AssessmentPage({ params }: { params: { tenantSlug: string; vendorId: string; assessmentId: string } }) {
+    const apiUrl = useTenantApiUrl();
+    const tenantHref = useTenantHref();
+    const { permissions, role } = useTenantContext();
+    const canWrite = permissions?.canWrite;
+    const isAdmin = role === 'ADMIN';
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [assessment, setAssessment] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [answers, setAnswers] = useState<Record<string, any>>({});
+    const [saving, setSaving] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [deciding, setDeciding] = useState(false);
+    const [decideNotes, setDecideNotes] = useState('');
+    const [savedMessage, setSavedMessage] = useState('');
+
+    const fetchAssessment = useCallback(async () => {
+        setLoading(true);
+        const res = await fetch(apiUrl(`/vendors/${params.vendorId}/assessments/${params.assessmentId}`));
+        if (res.ok) {
+            const a = await res.json();
+            setAssessment(a);
+            // Populate answers from existing
+            const ansMap: Record<string, any> = {};
+            for (const ans of (a.answers || [])) {
+                ansMap[ans.questionId] = ans.answerJson;
+            }
+            setAnswers(ansMap);
+        }
+        setLoading(false);
+    }, [apiUrl, params.vendorId, params.assessmentId]);
+
+    useEffect(() => { fetchAssessment(); }, [fetchAssessment]);
+
+    const saveAnswers = async () => {
+        const answersArr = Object.entries(answers)
+            .filter(([, v]) => v !== undefined && v !== '')
+            .map(([questionId, answerJson]) => ({ questionId, answerJson }));
+        if (answersArr.length === 0) return;
+        setSaving(true);
+        const res = await fetch(apiUrl(`/vendors/${params.vendorId}/assessments/${params.assessmentId}/answers`), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answers: answersArr }),
+        });
+        if (res.ok) {
+            const result = await res.json();
+            setSavedMessage(`Saved ${result.saved} answers · Score: ${result.score} (${result.riskRating})`);
+            setTimeout(() => setSavedMessage(''), 4000);
+            fetchAssessment(); // refresh score
+        }
+        setSaving(false);
+    };
+
+    const submitAssessment = async () => {
+        if (!confirm('Submit this assessment for review? Answers will be locked.')) return;
+        setSubmitting(true);
+        const res = await fetch(apiUrl(`/vendors/${params.vendorId}/assessments/${params.assessmentId}/submit`), { method: 'POST' });
+        if (res.ok) fetchAssessment();
+        setSubmitting(false);
+    };
+
+    const decideAssessment = async (decision: string) => {
+        setDeciding(true);
+        const res = await fetch(apiUrl(`/vendors/${params.vendorId}/assessments/${params.assessmentId}/decide`), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ decision, notes: decideNotes || undefined }),
+        });
+        if (res.ok) fetchAssessment();
+        setDeciding(false);
+    };
+
+    if (loading) return <div className="text-slate-400 py-8 text-center">Loading…</div>;
+    if (!assessment) return <div className="text-red-400 py-8 text-center">Assessment not found</div>;
+
+    const isDraft = assessment.status === 'DRAFT';
+    const isInReview = assessment.status === 'IN_REVIEW';
+    const isDecided = assessment.status === 'APPROVED' || assessment.status === 'REJECTED';
+    const questions = assessment.template?.questions || [];
+
+    // Group questions by section
+    const sections: Record<string, any[]> = {};
+    for (const q of questions) {
+        if (!sections[q.section]) sections[q.section] = [];
+        sections[q.section].push(q);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const renderInput = (q: any) => {
+        const value = answers[q.id];
+        const disabled = !isDraft || !canWrite;
+
+        if (q.answerType === 'YES_NO') {
+            return (
+                <div className="flex gap-3">
+                    <label className="flex items-center gap-1.5 text-sm">
+                        <input type="radio" name={`q-${q.id}`} checked={value === true || value === 'YES'}
+                            onChange={() => setAnswers(p => ({ ...p, [q.id]: true }))} disabled={disabled} />
+                        Yes
+                    </label>
+                    <label className="flex items-center gap-1.5 text-sm">
+                        <input type="radio" name={`q-${q.id}`} checked={value === false || value === 'NO'}
+                            onChange={() => setAnswers(p => ({ ...p, [q.id]: false }))} disabled={disabled} />
+                        No
+                    </label>
+                </div>
+            );
+        }
+
+        if (q.answerType === 'SINGLE_SELECT' && q.optionsJson) {
+            const options = Array.isArray(q.optionsJson) ? q.optionsJson : [];
+            return (
+                <select className="input w-full max-w-xs" value={value || ''} disabled={disabled}
+                    onChange={e => setAnswers(p => ({ ...p, [q.id]: e.target.value }))}>
+                    <option value="">— Select —</option>
+                    {options.map((o: string) => <option key={o} value={o}>{o}</option>)}
+                </select>
+            );
+        }
+
+        if (q.answerType === 'NUMBER') {
+            return <input type="number" className="input w-24" value={value ?? ''} disabled={disabled}
+                onChange={e => setAnswers(p => ({ ...p, [q.id]: Number(e.target.value) }))} />;
+        }
+
+        // TEXT / MULTI_SELECT fallback
+        return <input className="input w-full max-w-md" value={value || ''} disabled={disabled}
+            onChange={e => setAnswers(p => ({ ...p, [q.id]: e.target.value }))} />;
+    };
+
+    return (
+        <div className="space-y-6 max-w-3xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <Link href={tenantHref(`/vendors/${params.vendorId}`)} className="text-slate-400 hover:text-white">← Back to Vendor</Link>
+                </div>
+            </div>
+
+            <div className="card p-5 space-y-2">
+                <div className="flex items-center justify-between">
+                    <h1 className="text-xl font-bold" id="assessment-title">{assessment.template?.name || 'Assessment'}</h1>
+                    <span className={`badge ${STATUS_BADGE[assessment.status]}`} id="assessment-status">{assessment.status}</span>
+                </div>
+                <div className="flex gap-4 text-sm text-slate-400">
+                    <span>Score: <strong className="text-white" id="assessment-score">{assessment.score != null ? assessment.score.toFixed(1) : '—'}</strong></span>
+                    <span>Rating: {assessment.riskRating ? <span className={`badge ${CRIT_BADGE[assessment.riskRating]}`} id="assessment-rating">{assessment.riskRating}</span> : '—'}</span>
+                    <span>Requested by: {assessment.requestedBy?.name || '—'}</span>
+                </div>
+                {assessment.decidedBy && <p className="text-sm text-slate-400">Decided by: {assessment.decidedBy.name} on {new Date(assessment.decidedAt).toLocaleDateString()}</p>}
+                {assessment.notes && <p className="text-sm text-slate-300 bg-slate-800/50 p-2 rounded">{assessment.notes}</p>}
+            </div>
+
+            {/* Saved message */}
+            {savedMessage && <div className="bg-green-500/20 text-green-300 p-2 rounded text-sm" id="save-success">{savedMessage}</div>}
+
+            {/* Questions by section */}
+            {Object.entries(sections).map(([section, sQuestions]) => (
+                <div key={section} className="card p-5 space-y-4">
+                    <h2 className="text-lg font-semibold border-b border-slate-700 pb-2">{section}</h2>
+                    {sQuestions.map((q, idx) => (
+                        <div key={q.id} className="space-y-1.5">
+                            <div className="flex items-start gap-2">
+                                <span className="text-xs text-slate-500 font-mono mt-0.5">{q.sortOrder}.</span>
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium">{q.prompt}{q.required && <span className="text-red-400 ml-1">*</span>}</p>
+                                    <div className="mt-1.5">{renderInput(q)}</div>
+                                </div>
+                                <span className="text-xs text-slate-500" title="Weight">w:{q.weight}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ))}
+
+            {/* Actions */}
+            <div className="flex gap-3 items-center flex-wrap">
+                {isDraft && canWrite && (
+                    <>
+                        <button className="btn btn-primary" onClick={saveAnswers} disabled={saving} id="save-answers-btn">
+                            {saving ? 'Saving…' : '💾 Save Answers'}
+                        </button>
+                        <button className="btn btn-secondary" onClick={submitAssessment} disabled={submitting} id="submit-assessment-btn">
+                            {submitting ? 'Submitting…' : '📤 Submit for Review'}
+                        </button>
+                    </>
+                )}
+                {isInReview && isAdmin && (
+                    <div className="flex items-center gap-2 w-full">
+                        <input className="input flex-1" placeholder="Decision notes (optional)…" value={decideNotes}
+                            onChange={e => setDecideNotes(e.target.value)} id="decide-notes-input" />
+                        <button className="btn btn-primary" onClick={() => decideAssessment('APPROVED')} disabled={deciding} id="approve-assessment-btn">
+                            ✅ Approve
+                        </button>
+                        <button className="btn btn-danger" onClick={() => decideAssessment('REJECTED')} disabled={deciding} id="reject-assessment-btn">
+                            ❌ Reject
+                        </button>
+                    </div>
+                )}
+                {isDecided && (
+                    <div className="text-sm text-slate-400">
+                        Assessment is <strong className={assessment.status === 'APPROVED' ? 'text-green-400' : 'text-red-400'}>{assessment.status}</strong>.
+                        {assessment.riskRating && <span className="ml-2">Risk Rating: <span className={`badge ${CRIT_BADGE[assessment.riskRating]}`}>{assessment.riskRating}</span></span>}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

@@ -1,0 +1,1697 @@
+﻿{
+  "config": {
+    "configFile": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\playwright.config.ts",
+    "rootDir": "C:/Users/Lenovo/.gemini/antigravity/scratch/inflect-compliance/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Lenovo/.gemini/antigravity/scratch/inflect-compliance/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/Users/Lenovo/.gemini/antigravity/scratch/inflect-compliance/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 1,
+    "webServer": {
+      "command": "npx cross-env AUTH_TEST_MODE=1 npx next dev -p 3006",
+      "port": 3006,
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "auth.spec.ts",
+      "file": "auth.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Authentication Flow",
+          "file": "auth.spec.ts",
+          "line": 29,
+          "column": 6,
+          "specs": [
+            {
+              "title": "login page loads and shows sign-in options",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30043,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts",
+                            "column": 16,
+                            "line": 18
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n  16 | async function gotoLoginReady(page: Page) {\n  17 |     await page.goto('/login');\n> 18 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n  19 | }\n  20 |\n  21 | async function doLogin(page: Page) {\n    at gotoLoginReady (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:18:16)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:31:9"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:22:25.792Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\auth-Authentication-Flow-l-76c57-s-and-shows-sign-in-options-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-dd662fa18ada4a330717",
+              "file": "auth.spec.ts",
+              "line": 30,
+              "column": 9
+            },
+            {
+              "title": "credentials login тЖТ redirect to dashboard",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30029,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts",
+                            "column": 16,
+                            "line": 18
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n  16 | async function gotoLoginReady(page: Page) {\n  17 |     await page.goto('/login');\n> 18 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n  19 | }\n  20 |\n  21 | async function doLogin(page: Page) {\n    at gotoLoginReady (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:18:16)\n    at doLogin (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:22:5)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:43:9"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:22:57.561Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\auth-Authentication-Flow-c-177d8-gin-тЖТ-redirect-to-dashboard-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-241e5844464364b6ec84",
+              "file": "auth.spec.ts",
+              "line": 42,
+              "column": 9
+            },
+            {
+              "title": "protected dashboard page shows user identity after login",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30037,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts",
+                            "column": 16,
+                            "line": 18
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n  16 | async function gotoLoginReady(page: Page) {\n  17 |     await page.goto('/login');\n> 18 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n  19 | }\n  20 |\n  21 | async function doLogin(page: Page) {\n    at gotoLoginReady (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:18:16)\n    at doLogin (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:22:5)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:48:9"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:23:29.404Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\auth-Authentication-Flow-p-a9301-s-user-identity-after-login-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-8b7fe8ca67d05cc05826",
+              "file": "auth.spec.ts",
+              "line": 47,
+              "column": 9
+            },
+            {
+              "title": "session cookie is httpOnly",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30039,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts",
+                            "column": 16,
+                            "line": 18
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n  16 | async function gotoLoginReady(page: Page) {\n  17 |     await page.goto('/login');\n> 18 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n  19 | }\n  20 |\n  21 | async function doLogin(page: Page) {\n    at gotoLoginReady (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:18:16)\n    at doLogin (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:22:5)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:53:9"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:24:01.222Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\auth-Authentication-Flow-session-cookie-is-httpOnly-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-11e50ebcdc14724549fb",
+              "file": "auth.spec.ts",
+              "line": 52,
+              "column": 9
+            },
+            {
+              "title": "logout works and blocks access to dashboard",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30048,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts",
+                            "column": 16,
+                            "line": 18
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n  16 | async function gotoLoginReady(page: Page) {\n  17 |     await page.goto('/login');\n> 18 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n  19 | }\n  20 |\n  21 | async function doLogin(page: Page) {\n    at gotoLoginReady (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:18:16)\n    at doLogin (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:22:5)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:68:9"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:24:32.983Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\auth-Authentication-Flow-l-854f5--blocks-access-to-dashboard-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-6c2b1cea2157b65ed85e",
+              "file": "auth.spec.ts",
+              "line": 67,
+              "column": 9
+            },
+            {
+              "title": "unauthenticated access to /dashboard redirects to /login with next param",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 432,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:25:04.883Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-6e6920d2315884065d0e",
+              "file": "auth.spec.ts",
+              "line": 79,
+              "column": 9
+            },
+            {
+              "title": "session API does not expose tokens",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30044,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts",
+                            "column": 16,
+                            "line": 18
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n  16 | async function gotoLoginReady(page: Page) {\n  17 |     await page.goto('/login');\n> 18 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n  19 | }\n  20 |\n  21 | async function doLogin(page: Page) {\n    at gotoLoginReady (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:18:16)\n    at doLogin (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:22:5)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:88:9"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:25:05.478Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\auth-Authentication-Flow-session-API-does-not-expose-tokens-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-ca10dba5a922fffb4f89",
+              "file": "auth.spec.ts",
+              "line": 87,
+              "column": 9
+            },
+            {
+              "title": "CSRF token endpoint works",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 78,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:25:37.152Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-5cee8866208efcd67c54",
+              "file": "auth.spec.ts",
+              "line": 106,
+              "column": 9
+            }
+          ]
+        },
+        {
+          "title": "Middleware Auth Guard",
+          "file": "auth.spec.ts",
+          "line": 115,
+          "column": 6,
+          "specs": [
+            {
+              "title": "unauthenticated API request returns 401 JSON (not redirect)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 23,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:25:37.257Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-0e8427b40750dd2136d6",
+              "file": "auth.spec.ts",
+              "line": 116,
+              "column": 9
+            },
+            {
+              "title": "authenticated API request returns 200",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30052,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts",
+                            "column": 16,
+                            "line": 18
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n  16 | async function gotoLoginReady(page: Page) {\n  17 |     await page.goto('/login');\n> 18 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n  19 | }\n  20 |\n  21 | async function doLogin(page: Page) {\n    at gotoLoginReady (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:18:16)\n    at doLogin (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:22:5)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\auth.spec.ts:126:9"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:25:37.295Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\auth-Middleware-Auth-Guard-bd63d-ted-API-request-returns-200-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-334dbdf8c724a49ea2db",
+              "file": "auth.spec.ts",
+              "line": 125,
+              "column": 9
+            },
+            {
+              "title": "/api/auth/session is always accessible (public route)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 73,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:26:09.183Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-fe5e23ecd96b5db0d0fd",
+              "file": "auth.spec.ts",
+              "line": 136,
+              "column": 9
+            },
+            {
+              "title": "/api/auth/providers is always accessible",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 37,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:26:09.280Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-27ba5c05f2ad67f50f52",
+              "file": "auth.spec.ts",
+              "line": 141,
+              "column": 9
+            },
+            {
+              "title": "redirect includes next param for return navigation",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 434,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:26:09.330Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-0e260dfd45c4cec5871c",
+              "file": "auth.spec.ts",
+              "line": 146,
+              "column": 9
+            },
+            {
+              "title": "static assets are not blocked by middleware",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 12,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:26:09.928Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d748ac400d08b85935ef-542184c78a9d514d944d",
+              "file": "auth.spec.ts",
+              "line": 153,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "controls-enhanced.spec.ts",
+      "file": "controls-enhanced.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Controls Enhanced",
+          "file": "controls-enhanced.spec.ts",
+          "line": 18,
+          "column": 6,
+          "specs": [
+            {
+              "title": "dashboard loads and shows metrics",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30039,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\controls-enhanced.spec.ts",
+                            "column": 16,
+                            "line": 7
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n   5 | async function loginAndGetTenant(page: Page): Promise<string> {\n   6 |     await page.goto('/login');\n>  7 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n   8 |     await page.fill('input[type=\"email\"]', TEST_USER.email);\n   9 |     await page.fill('input[type=\"password\"]', TEST_USER.password);\n  10 |     await page.click('button[type=\"submit\"]');\n    at loginAndGetTenant (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\controls-enhanced.spec.ts:7:16)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\controls-enhanced.spec.ts:24:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:26:09.958Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\controls-enhanced-Controls-1dc3e-ard-loads-and-shows-metrics-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "12298167b3afedf97b99-63772f502f8ab2f7b035",
+              "file": "controls-enhanced.spec.ts",
+              "line": 23,
+              "column": 9
+            },
+            {
+              "title": "mark test completed updates last tested",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:26:40.103Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "12298167b3afedf97b99-dde1e7ae62d5f7203d0e",
+              "file": "controls-enhanced.spec.ts",
+              "line": 32,
+              "column": 9
+            },
+            {
+              "title": "activity tab shows events",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:26:40.103Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "12298167b3afedf97b99-46b50a7737d6758f0d45",
+              "file": "controls-enhanced.spec.ts",
+              "line": 54,
+              "column": 9
+            },
+            {
+              "title": "automation section is visible on detail page",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:26:40.103Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "12298167b3afedf97b99-13c1fdc9ab27fb25723a",
+              "file": "controls-enhanced.spec.ts",
+              "line": 76,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "controls.spec.ts",
+      "file": "controls.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Controls Center",
+          "file": "controls.spec.ts",
+          "line": 18,
+          "column": 6,
+          "specs": [
+            {
+              "title": "controls list page loads with filters and CTAs",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 8,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30036,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\controls.spec.ts",
+                            "column": 16,
+                            "line": 7
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n   5 | async function loginAndGetTenant(page: Page): Promise<string> {\n   6 |     await page.goto('/login');\n>  7 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n   8 |     await page.fill('input[type=\"email\"]', TEST_USER.email);\n   9 |     await page.fill('input[type=\"password\"]', TEST_USER.password);\n  10 |     await page.click('button[type=\"submit\"]');\n    at loginAndGetTenant (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\controls.spec.ts:7:16)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\controls.spec.ts:25:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:26:41.596Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\controls-Controls-Center-c-28213-loads-with-filters-and-CTAs-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "b018fb422dd9cd1fd1e5-903c47718d978d1fe54e",
+              "file": "controls.spec.ts",
+              "line": 24,
+              "column": 9
+            },
+            {
+              "title": "create a new control and see detail",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:11.871Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b018fb422dd9cd1fd1e5-6b0c0718791b0136b15e",
+              "file": "controls.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "open control тЖТ create task тЖТ mark done",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:11.871Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b018fb422dd9cd1fd1e5-eead8d6e6e23a67e4926",
+              "file": "controls.spec.ts",
+              "line": 49,
+              "column": 9
+            },
+            {
+              "title": "attach evidence тЖТ see it listed",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:11.871Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b018fb422dd9cd1fd1e5-a6cf1bf26ecad04d15b5",
+              "file": "controls.spec.ts",
+              "line": 77,
+              "column": 9
+            },
+            {
+              "title": "mark NOT_APPLICABLE requires justification",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:11.871Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b018fb422dd9cd1fd1e5-3709c367cd07d6beff49",
+              "file": "controls.spec.ts",
+              "line": 100,
+              "column": 9
+            },
+            {
+              "title": "reader user sees view-only controls",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:11.871Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b018fb422dd9cd1fd1e5-55c652a46925e1d6b921",
+              "file": "controls.spec.ts",
+              "line": 129,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "issues.spec.ts",
+      "file": "issues.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Issue Management",
+          "file": "issues.spec.ts",
+          "line": 18,
+          "column": 6,
+          "specs": [
+            {
+              "title": "issues list page loads with filters and CTA",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30063,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\issues.spec.ts",
+                            "column": 16,
+                            "line": 7
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n   5 | async function loginAndGetTenant(page: Page): Promise<string> {\n   6 |     await page.goto('/login');\n>  7 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n   8 |     await page.fill('input[type=\"email\"]', TEST_USER.email);\n   9 |     await page.fill('input[type=\"password\"]', TEST_USER.password);\n  10 |     await page.click('button[type=\"submit\"]');\n    at loginAndGetTenant (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\issues.spec.ts:7:16)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\issues.spec.ts:25:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:13.367Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\issues-Issue-Management-is-db995--loads-with-filters-and-CTA-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "b59fb33cc1a89aa161ca-58533b0183ef9f864a0f",
+              "file": "issues.spec.ts",
+              "line": 24,
+              "column": 9
+            },
+            {
+              "title": "create a new issue and see detail",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:43.669Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b59fb33cc1a89aa161ca-65e452760f05607959b1",
+              "file": "issues.spec.ts",
+              "line": 35,
+              "column": 9
+            },
+            {
+              "title": "change issue status",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:43.669Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b59fb33cc1a89aa161ca-934e5860d64b11274c68",
+              "file": "issues.spec.ts",
+              "line": 52,
+              "column": 9
+            },
+            {
+              "title": "assign issue",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:43.669Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b59fb33cc1a89aa161ca-306fb29e792492c5e3d0",
+              "file": "issues.spec.ts",
+              "line": 70,
+              "column": 9
+            },
+            {
+              "title": "add link to issue",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:43.669Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b59fb33cc1a89aa161ca-80178891e2dafea3b4b1",
+              "file": "issues.spec.ts",
+              "line": 101,
+              "column": 9
+            },
+            {
+              "title": "add comment to issue",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:43.669Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b59fb33cc1a89aa161ca-52d424d0a2195e9ac18f",
+              "file": "issues.spec.ts",
+              "line": 126,
+              "column": 9
+            },
+            {
+              "title": "reader user sees view-only issues",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:43.669Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b59fb33cc1a89aa161ca-723565cebc6cbf5e2001",
+              "file": "issues.spec.ts",
+              "line": 147,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "policies.spec.ts",
+      "file": "policies.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Policy Center",
+          "file": "policies.spec.ts",
+          "line": 18,
+          "column": 6,
+          "specs": [
+            {
+              "title": "policies list page loads with controls",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 10,
+                      "parallelIndex": 0,
+                      "status": "timedOut",
+                      "duration": 30036,
+                      "error": {
+                        "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+                        "stack": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "message": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+                        },
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\policies.spec.ts",
+                            "column": 16,
+                            "line": 7
+                          },
+                          "message": "Error: page.waitForSelector: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('input[type=\"email\"]') to be visible\u001b[22m\n\n\n   5 | async function loginAndGetTenant(page: Page): Promise<string> {\n   6 |     await page.goto('/login');\n>  7 |     await page.waitForSelector('input[type=\"email\"]', { timeout: 30000 });\n     |                ^\n   8 |     await page.fill('input[type=\"email\"]', TEST_USER.email);\n   9 |     await page.fill('input[type=\"password\"]', TEST_USER.password);\n  10 |     await page.click('button[type=\"submit\"]');\n    at loginAndGetTenant (C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\policies.spec.ts:7:16)\n    at C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\tests\\e2e\\policies.spec.ts:26:22"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:27:45.254Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Lenovo\\.gemini\\antigravity\\scratch\\inflect-compliance\\test-results\\policies-Policy-Center-pol-5622c-st-page-loads-with-controls-chromium\\error-context.md"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "b074270cade4da53ff13-5bcbaca95f5ce0b8a5cc",
+              "file": "policies.spec.ts",
+              "line": 25,
+              "column": 9
+            },
+            {
+              "title": "template library page loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:28:15.519Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b074270cade4da53ff13-5b025f38696372d0616d",
+              "file": "policies.spec.ts",
+              "line": 35,
+              "column": 9
+            },
+            {
+              "title": "create a blank policy and see detail",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:28:15.519Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b074270cade4da53ff13-d5ad752c077457bd12cf",
+              "file": "policies.spec.ts",
+              "line": 43,
+              "column": 9
+            },
+            {
+              "title": "create version via editor and view history",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:28:15.519Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b074270cade4da53ff13-880f09cacbdd09e815ab",
+              "file": "policies.spec.ts",
+              "line": 58,
+              "column": 9
+            },
+            {
+              "title": "create external link version",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:28:15.519Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b074270cade4da53ff13-d092e703d28915fb96c8",
+              "file": "policies.spec.ts",
+              "line": 76,
+              "column": 9
+            },
+            {
+              "title": "activity feed tab loads",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:28:15.519Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b074270cade4da53ff13-eccb4a61c3dbbc60a35e",
+              "file": "policies.spec.ts",
+              "line": 100,
+              "column": 9
+            },
+            {
+              "title": "policy detail shows role-gated action buttons",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-09T09:28:15.519Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "b074270cade4da53ff13-c20f4a144f21a3b884ed",
+              "file": "policies.spec.ts",
+              "line": 114,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-03-09T09:22:24.201Z",
+    "duration": 351341.872,
+    "expected": 7,
+    "skipped": 20,
+    "unexpected": 11,
+    "flaky": 0
+  }
+}

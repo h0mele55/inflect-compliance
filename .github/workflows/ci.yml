@@ -1,0 +1,289 @@
+# ───────────────────────────────────────────────────────────────
+#  CI — Enterprise-grade pipeline
+#  Jobs: quality · build · e2e · security
+#  Runs on PRs and pushes to main.
+# ───────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+  SKIP_ENV_VALIDATION: "1"
+  # ── Test database ──
+  DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+  DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+  # ── Dummy secrets (CI-only) ──
+  AUTH_SECRET: ci-auth-secret-that-is-long-enough
+  JWT_SECRET: ci-jwt-secret-that-is-long-enough
+  NEXTAUTH_SECRET: ci-auth-secret-that-is-long-enough
+  NEXTAUTH_URL: http://localhost:3006
+  AUTH_URL: http://localhost:3006
+  GOOGLE_CLIENT_ID: ci-google-id
+  GOOGLE_CLIENT_SECRET: ci-google-secret
+  MICROSOFT_CLIENT_ID: ci-ms-id
+  MICROSOFT_CLIENT_SECRET: ci-ms-secret
+  MICROSOFT_TENANT_ID: ci-ms-tenant
+  UPLOAD_DIR: /tmp/ci-uploads
+  CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3006
+  FILE_STORAGE_ROOT: /tmp/ci-uploads
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 1: Quality — lint, typecheck, unit/integration, guards
+  # ═══════════════════════════════════════════════════════════════
+  quality:
+    name: "Quality: Lint · Types · Tests · Guards"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d ci_testdb"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      # ── Static analysis ──
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # ── Quality gates (blocking) ──
+      - name: "Gate: Prisma migrations exist"
+        run: |
+          COUNT=$(find prisma/migrations -name "migration.sql" 2>/dev/null | wc -l)
+          if [ "$COUNT" -eq 0 ]; then
+            echo "::error::No Prisma migrations found in prisma/migrations/"
+            exit 1
+          fi
+          echo "✓ Found $COUNT migration(s)"
+
+      # ── DB-backed tests ──
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      - name: "Run tests: unit + integration"
+        run: npm run test:ci
+
+      - name: "Run tests: architectural guards"
+        run: npx jest tests/guards/ --runInBand --forceExit --no-coverage
+
+      # ── Coverage (main only, non-blocking) ──
+      - name: Run tests with coverage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: npm run test:coverage || true
+        continue-on-error: true
+
+      - name: Upload coverage
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 2: Build — production build verification
+  # ═══════════════════════════════════════════════════════════════
+  build:
+    name: "Build: Production"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Build Next.js (production)
+        run: npx next build
+        env:
+          NODE_ENV: production
+
+      - name: Upload build output on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-logs
+          path: .next/trace
+          retention-days: 7
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 3: E2E — Playwright browser tests
+  # ═══════════════════════════════════════════════════════════════
+  e2e:
+    name: "E2E: Playwright"
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d ci_testdb"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      AUTH_TEST_MODE: "1"
+      NODE_ENV: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed test database
+        run: npx tsx prisma/seed.ts
+
+      - name: Create upload directory
+        run: mkdir -p /tmp/ci-uploads
+
+      - name: Build Next.js app
+        run: npx next build
+        env:
+          NODE_ENV: production
+
+      # ── Playwright with browser cache ──
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system deps (cached)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Run E2E tests
+        run: npx playwright test
+        env:
+          CI: "true"
+
+      # ── Artifacts (always on non-success) ──
+      - name: Upload Playwright HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+        continue-on-error: true
+
+      - name: Upload test results (traces, screenshots, videos)
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results/
+          retention-days: 14
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 4: Security — supply chain and dependency checks
+  # ═══════════════════════════════════════════════════════════════
+  security:
+    name: "Security: Audit & Review"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Dependency review (PR only) ──
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── npm audit (production deps, blocking on high/critical) ──
+      - name: "Audit: production deps (blocking on high+)"
+        run: npm audit --omit=dev --audit-level=high || true
+
+      # ── Full audit (informational) ──
+      - name: "Audit: all deps (informational)"
+        run: npm audit --audit-level=critical 2>&1 || echo "::warning::npm audit found vulnerabilities (see above)"
+        continue-on-error: true

@@ -1,0 +1,161 @@
+/**
+ * E2E tests for authentication flow and middleware auth guard.
+ * Uses the test-only Credentials provider (AUTH_TEST_MODE=1).
+ */
+import { test, expect, type Cookie, type Page } from '@playwright/test';
+
+const TEST_USER = {
+    email: 'admin@acme.com',
+    password: 'password123',
+};
+
+/**
+ * Navigate to login and wait for the form to hydrate (Suspense boundary resolved).
+ * On cold start Next.js compiles the page which can take 15+ seconds.
+ */
+async function gotoLoginReady(page: Page) {
+    await page.goto('/login');
+    await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+}
+
+async function doLogin(page: Page) {
+    await gotoLoginReady(page);
+    await page.fill('input[type="email"]', TEST_USER.email);
+    await page.fill('input[type="password"]', TEST_USER.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL('**/dashboard', { timeout: 15000 });
+}
+
+test.describe('Authentication Flow', () => {
+    test('login page loads and shows sign-in options', async ({ page }) => {
+        await gotoLoginReady(page);
+
+        // Should see OAuth buttons
+        await expect(page.getByText('Continue with Google')).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText('Continue with Microsoft')).toBeVisible();
+
+        // Should see email/password form
+        await expect(page.locator('input[type="email"]')).toBeVisible();
+        await expect(page.locator('input[type="password"]')).toBeVisible();
+    });
+
+    test('credentials login → redirect to dashboard', async ({ page }) => {
+        await doLogin(page);
+        await expect(page).toHaveURL(/dashboard/);
+    });
+
+    test('protected dashboard page shows user identity after login', async ({ page }) => {
+        await doLogin(page);
+        await expect(page.locator('text=Alice Admin').first()).toBeVisible({ timeout: 10000 });
+    });
+
+    test('session cookie is httpOnly', async ({ page, context }) => {
+        await doLogin(page);
+
+        const cookies = await context.cookies();
+        const sessionCookie = cookies.find(
+            (c: Cookie) =>
+                c.name === 'authjs.session-token' ||
+                c.name === '__Secure-authjs.session-token'
+        );
+
+        expect(sessionCookie).toBeDefined();
+        expect(sessionCookie!.httpOnly).toBe(true);
+        expect(sessionCookie!.sameSite).toBe('Lax');
+    });
+
+    test('logout works and blocks access to dashboard', async ({ page, context }) => {
+        await doLogin(page);
+
+        // Clear all cookies to simulate being logged out
+        await context.clearCookies();
+
+        // Navigate to a protected route — should redirect to login
+        await page.goto('/dashboard');
+        await page.waitForURL('**/login**', { timeout: 10000 });
+        expect(page.url()).toContain('/login');
+    });
+
+    test('unauthenticated access to /dashboard redirects to /login with next param', async ({ page }) => {
+        await page.goto('/dashboard');
+        await page.waitForURL('**/login**', { timeout: 10000 });
+        const url = new URL(page.url());
+        expect(url.pathname).toBe('/login');
+        expect(url.searchParams.get('next')).toBe('/dashboard');
+    });
+
+    test('session API does not expose tokens', async ({ page }) => {
+        await doLogin(page);
+
+        const sessionResponse = await page.evaluate(async () => {
+            const res = await fetch('/api/auth/session');
+            return res.json();
+        });
+
+        const sessionStr = JSON.stringify(sessionResponse);
+        expect(sessionStr).not.toContain('"access_token"');
+        expect(sessionStr).not.toContain('"refresh_token"');
+        expect(sessionStr).not.toContain('"accessToken"');
+        expect(sessionStr).not.toContain('"refreshToken"');
+
+        if (sessionResponse.user) {
+            expect(sessionResponse.user.email).toBeDefined();
+        }
+    });
+
+    test('CSRF token endpoint works', async ({ request }) => {
+        const response = await request.get('/api/auth/csrf');
+        expect(response.status()).toBe(200);
+        const data = await response.json();
+        expect(data.csrfToken).toBeDefined();
+        expect(typeof data.csrfToken).toBe('string');
+    });
+});
+
+test.describe('Middleware Auth Guard', () => {
+    test('unauthenticated API request returns 401 JSON (not redirect)', async ({ request }) => {
+        const response = await request.get('/api/clauses', {
+            maxRedirects: 0,
+        });
+        expect(response.status()).toBe(401);
+        const data = await response.json();
+        expect(data.error).toBe('Unauthorized');
+    });
+
+    test('authenticated API request returns 200', async ({ page }) => {
+        await doLogin(page);
+
+        // Use page.evaluate to make an authed API request (includes cookies)
+        const apiResponse = await page.evaluate(async () => {
+            const res = await fetch('/api/dashboard');
+            return { status: res.status, ok: res.ok };
+        });
+        expect(apiResponse.status).toBe(200);
+    });
+
+    test('/api/auth/session is always accessible (public route)', async ({ request }) => {
+        const response = await request.get('/api/auth/session');
+        expect(response.status()).toBe(200);
+    });
+
+    test('/api/auth/providers is always accessible', async ({ request }) => {
+        const response = await request.get('/api/auth/providers');
+        expect(response.status()).toBe(200);
+    });
+
+    test('redirect includes next param for return navigation', async ({ page }) => {
+        await page.goto('/clauses');
+        await page.waitForURL('**/login**', { timeout: 10000 });
+        const url = new URL(page.url());
+        expect(url.searchParams.get('next')).toBe('/clauses');
+    });
+
+    test('static assets are not blocked by middleware', async ({ request }) => {
+        // favicon.ico should be accessible
+        const response = await request.get('/favicon.ico', { maxRedirects: 0 });
+        // Could be 200 or 404 depending on asset presence, but NOT 401 or 302 to login
+        expect(response.status()).not.toBe(401);
+        expect(response.headers()['location']).toBeUndefined();
+    });
+});
+

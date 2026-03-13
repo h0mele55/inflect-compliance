@@ -1,0 +1,12 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getTenantCtx } from '@/app-layer/context';
+import { bulkAssign } from '@/app-layer/usecases/issue';
+import { withValidatedBody } from '@/lib/validation/route';
+import { BulkAssignSchema } from '@/lib/schemas';
+import { withApiErrorHandling } from '@/lib/errors/api';
+
+export const POST = withApiErrorHandling(withValidatedBody(BulkAssignSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string } }, body) => {
+    const ctx = await getTenantCtx(params, req);
+    const result = await bulkAssign(ctx, body.taskIds, body.assigneeUserId);
+    return NextResponse.json({ updated: result.count });
+}));

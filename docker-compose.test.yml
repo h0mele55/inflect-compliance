@@ -1,0 +1,20 @@
+# Test-only Postgres instance for local CI.
+# Port 5434 avoids collision with dev DB (5433).
+# Usage: docker compose -f docker-compose.test.yml up -d
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: inflect-test-db
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: inflect_test
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d inflect_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    tmpfs:
+      - /var/lib/postgresql/data  # RAM disk — fast, wiped on stop

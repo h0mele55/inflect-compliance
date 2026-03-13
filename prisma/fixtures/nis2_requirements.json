@@ -1,0 +1,122 @@
+[
+    {
+        "key": "Art.21(2)(a)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 1,
+        "title": "Policies on risk analysis and information system security"
+    },
+    {
+        "key": "Art.21(2)(b)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 2,
+        "title": "Incident handling"
+    },
+    {
+        "key": "Art.21(2)(c)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 3,
+        "title": "Business continuity and crisis management"
+    },
+    {
+        "key": "Art.21(2)(d)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 4,
+        "title": "Supply chain security"
+    },
+    {
+        "key": "Art.21(2)(e)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 5,
+        "title": "Security in network and information systems acquisition, development and maintenance"
+    },
+    {
+        "key": "Art.21(2)(f)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 6,
+        "title": "Policies and procedures to assess effectiveness of cybersecurity risk-management measures"
+    },
+    {
+        "key": "Art.21(2)(g)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 7,
+        "title": "Basic cyber hygiene practices and cybersecurity training"
+    },
+    {
+        "key": "Art.21(2)(h)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 8,
+        "title": "Policies and procedures regarding use of cryptography and encryption"
+    },
+    {
+        "key": "Art.21(2)(i)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 9,
+        "title": "Human resources security, access control policies and asset management"
+    },
+    {
+        "key": "Art.21(2)(j)",
+        "section": "Article 21 - Cybersecurity risk-management measures",
+        "sortOrder": 10,
+        "title": "Multi-factor authentication, secured communications and emergency communication systems"
+    },
+    {
+        "key": "Art.23(1)",
+        "section": "Article 23 - Reporting obligations",
+        "sortOrder": 11,
+        "title": "Early warning notification to CSIRT within 24 hours"
+    },
+    {
+        "key": "Art.23(2)",
+        "section": "Article 23 - Reporting obligations",
+        "sortOrder": 12,
+        "title": "Incident notification within 72 hours"
+    },
+    {
+        "key": "Art.23(3)",
+        "section": "Article 23 - Reporting obligations",
+        "sortOrder": 13,
+        "title": "Final incident report within one month"
+    },
+    {
+        "key": "Art.20(1)",
+        "section": "Article 20 - Governance",
+        "sortOrder": 14,
+        "title": "Management body approval and oversight of cybersecurity measures"
+    },
+    {
+        "key": "Art.20(2)",
+        "section": "Article 20 - Governance",
+        "sortOrder": 15,
+        "title": "Cybersecurity training for management bodies"
+    },
+    {
+        "key": "Art.24(1)",
+        "section": "Article 24 - Use of certification schemes",
+        "sortOrder": 16,
+        "title": "Use of European cybersecurity certification schemes"
+    },
+    {
+        "key": "Art.25",
+        "section": "Article 25 - Standardisation",
+        "sortOrder": 17,
+        "title": "Use of European or international standards and technical specifications"
+    },
+    {
+        "key": "Art.28(1)",
+        "section": "Article 28 - Database of domain name registrations",
+        "sortOrder": 18,
+        "title": "Domain name registration database accuracy"
+    },
+    {
+        "key": "Art.29(1)",
+        "section": "Article 29 - Information sharing arrangements",
+        "sortOrder": 19,
+        "title": "Voluntary cybersecurity information sharing"
+    },
+    {
+        "key": "Art.7(1)",
+        "section": "Article 7 - National cybersecurity strategy",
+        "sortOrder": 20,
+        "title": "National cybersecurity strategy adoption"
+    }
+]
