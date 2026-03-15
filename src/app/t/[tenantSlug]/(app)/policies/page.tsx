@@ -7,6 +7,8 @@ import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-c
 import { queryKeys } from '@/lib/queryKeys';
 import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
+import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
+import { policiesFilterConfig } from '@/components/filters/configs';
 
 const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral',
@@ -65,47 +67,7 @@ export default function PoliciesPage() {
             </div>
 
             {/* Filters */}
-            <div className="glass-card p-4">
-                <div className="flex flex-wrap gap-3 items-center">
-                    <div className="flex-1 min-w-[200px]">
-                        <input
-                            type="text"
-                            className="input w-full"
-                            placeholder="Search policies..."
-                            value={filters.q || ''}
-                            onChange={e => setFilter('q', e.target.value)}
-                            id="policy-search"
-                        />
-                    </div>
-                    <select
-                        className="input w-40"
-                        value={filters.status || ''}
-                        onChange={e => setFilter('status', e.target.value)}
-                        id="policy-status-filter"
-                    >
-                        <option value="">All Status</option>
-                        {STATUS_OPTIONS.map(s => (
-                            <option key={s} value={s}>{statusLabel(s)}</option>
-                        ))}
-                    </select>
-                    <select
-                        className="input w-48"
-                        value={filters.category || ''}
-                        onChange={e => setFilter('category', e.target.value)}
-                        id="policy-category-filter"
-                    >
-                        <option value="">All Categories</option>
-                        {CATEGORY_OPTIONS.map(c => (
-                            <option key={c} value={c}>{c}</option>
-                        ))}
-                    </select>
-                    {hasActiveFilters && (
-                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
-                            ✕ Clear filters
-                        </button>
-                    )}
-                </div>
-            </div>
+            <CompactFilterBar config={policiesFilterConfig} />
 
             {/* Table */}
             <div className="glass-card overflow-hidden">

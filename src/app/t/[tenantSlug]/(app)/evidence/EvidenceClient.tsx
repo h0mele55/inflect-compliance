@@ -3,6 +3,8 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
+import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
+import { evidenceFilterConfig } from '@/components/filters/configs';
 
 interface Permissions {
     canRead: boolean;
@@ -520,31 +522,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                     </button>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <input
-                        type="text"
-                        className="input w-48 text-sm"
-                        placeholder="Search evidence..."
-                        value={filters.q || ''}
-                        onChange={e => setFilter('q', e.target.value)}
-                        id="evidence-search"
-                    />
-                    <label className="text-xs text-slate-500">Control:</label>
-                    <select
-                        className="input w-48 text-sm"
-                        value={filters.controlId || ''}
-                        onChange={e => setFilter('controlId', e.target.value)}
-                        id="evidence-control-filter"
-                    >
-                        <option value="">All</option>
-                        {controls.map(c => (
-                            <option key={c.id} value={c.id}>{c.annexId || c.code || 'Custom'}: {c.name}</option>
-                        ))}
-                    </select>
-                    {hasActiveFilters && (
-                        <button className="text-xs text-brand-400 hover:underline" onClick={clearFilters} id="filter-clear">Clear all</button>
-                    )}
-                </div>
+                <CompactFilterBar config={evidenceFilterConfig} />
             </div>
 
             {/* Archived warning */}

@@ -6,6 +6,8 @@ import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-c
 import { queryKeys } from '@/lib/queryKeys';
 import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
+import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
+import { controlsFilterConfig } from '@/components/filters/configs';
 
 // ─── Constants ───
 
@@ -238,46 +240,7 @@ export default function ControlsPage() {
             </div>
 
             {/* Filters */}
-            <div className="glass-card p-4">
-                <div className="flex flex-wrap gap-3 items-center">
-                    <div className="flex-1 min-w-[200px]">
-                        <input
-                            type="text"
-                            className="input w-full"
-                            placeholder="Search controls..."
-                            value={filters.q || ''}
-                            onChange={e => setFilter('q', e.target.value)}
-                            id="control-search"
-                        />
-                    </div>
-                    <select
-                        className="input w-40"
-                        value={filters.status || ''}
-                        onChange={e => setFilter('status', e.target.value)}
-                        id="control-status-filter"
-                    >
-                        <option value="">All Status</option>
-                        {STATUS_OPTIONS.map(s => (
-                            <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                        ))}
-                    </select>
-                    <select
-                        className="input w-48"
-                        value={filters.applicability || ''}
-                        onChange={e => setFilter('applicability', e.target.value)}
-                        id="control-applicability-filter"
-                    >
-                        <option value="">All Applicability</option>
-                        <option value="APPLICABLE">Applicable</option>
-                        <option value="NOT_APPLICABLE">Not Applicable</option>
-                    </select>
-                    {hasActiveFilters && (
-                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
-                            ✕ Clear filters
-                        </button>
-                    )}
-                </div>
-            </div>
+            <CompactFilterBar config={controlsFilterConfig} />
 
             {/* Table */}
             <div className="glass-card overflow-hidden">

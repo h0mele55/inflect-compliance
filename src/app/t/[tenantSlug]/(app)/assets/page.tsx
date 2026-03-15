@@ -6,6 +6,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
+import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
+import { assetsFilterConfig } from '@/components/filters/configs';
 
 const ASSET_TYPES = ['INFORMATION', 'APPLICATION', 'SYSTEM', 'SERVICE', 'DATA_STORE', 'INFRASTRUCTURE', 'VENDOR', 'PROCESS', 'PEOPLE_PROCESS', 'OTHER'];
 
@@ -60,29 +62,7 @@ export default function AssetsPage() {
             </div>
 
             {/* Filters */}
-            <div className="glass-card p-4">
-                <div className="flex flex-wrap gap-3 items-center">
-                    <div className="flex-1 min-w-[200px]">
-                        <input
-                            type="text"
-                            className="input w-full"
-                            placeholder="Search assets..."
-                            value={filters.q || ''}
-                            onChange={e => setFilter('q', e.target.value)}
-                            id="asset-search"
-                        />
-                    </div>
-                    <select className="input w-44" value={filters.type || ''} onChange={e => setFilter('type', e.target.value)} id="asset-type-filter">
-                        <option value="">All Types</option>
-                        {ASSET_TYPES.map(tp => <option key={tp} value={tp}>{tp.replace(/_/g, ' ')}</option>)}
-                    </select>
-                    {hasActiveFilters && (
-                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
-                            ✕ Clear filters
-                        </button>
-                    )}
-                </div>
-            </div>
+            <CompactFilterBar config={assetsFilterConfig} />
 
             {showForm && (
                 <form onSubmit={createAsset} className="glass-card p-6 space-y-4 animate-fadeIn">

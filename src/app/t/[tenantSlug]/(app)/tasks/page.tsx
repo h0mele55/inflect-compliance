@@ -6,6 +6,8 @@ import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-c
 import { queryKeys } from '@/lib/queryKeys';
 import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
+import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
+import { tasksFilterConfig } from '@/components/filters/configs';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -176,41 +178,7 @@ export default function TasksPage() {
             </div>
 
             {/* Filters */}
-            <div className="glass-card p-4">
-                <div className="flex flex-wrap gap-3 items-center">
-                    <div className="flex-1 min-w-[200px]">
-                        <input
-                            type="text"
-                            className="input w-full"
-                            placeholder="Search tasks..."
-                            value={filters.q || ''}
-                            onChange={e => setFilter('q', e.target.value)}
-                            id="task-search"
-                        />
-                    </div>
-                    <select className="input w-36" value={filters.status || ''} onChange={e => setFilter('status', e.target.value)} id="task-status-filter">
-                        <option value="">All Status</option>
-                        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-                    </select>
-                    <select className="input w-36" value={filters.type || ''} onChange={e => setFilter('type', e.target.value)} id="task-type-filter">
-                        <option value="">All Types</option>
-                        {TYPE_OPTIONS.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
-                    </select>
-                    <select className="input w-36" value={filters.severity || ''} onChange={e => setFilter('severity', e.target.value)} id="task-severity-filter">
-                        <option value="">All Severity</option>
-                        {SEVERITY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                        <input type="checkbox" checked={filters.due === 'overdue'} onChange={e => setFilter('due', e.target.checked ? 'overdue' : '')} />
-                        Overdue only
-                    </label>
-                    {hasActiveFilters && (
-                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
-                            ✕ Clear filters
-                        </button>
-                    )}
-                </div>
-            </div>
+            <CompactFilterBar config={tasksFilterConfig} />
 
             {/* Bulk Actions Toolbar */}
             {permissions.canWrite && selected.size > 0 && (

@@ -6,6 +6,8 @@ import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
+import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
+import { risksFilterConfig } from '@/components/filters/configs';
 
 const RISK_COLORS = ['', '#22c55e', '#84cc16', '#f59e0b', '#ef4444', '#dc2626'];
 
@@ -78,39 +80,7 @@ export default function RisksPage() {
             </div>
 
             {/* Filters */}
-            <div className="glass-card p-4">
-                <div className="flex flex-wrap gap-3 items-center">
-                    <div className="flex-1 min-w-[200px]">
-                        <input
-                            type="text"
-                            className="input w-full"
-                            placeholder="Search risks..."
-                            value={filters.q || ''}
-                            onChange={e => setFilter('q', e.target.value)}
-                            id="risk-search"
-                        />
-                    </div>
-                    <select className="input w-36" value={filters.status || ''} onChange={e => setFilter('status', e.target.value)} id="risk-status-filter">
-                        <option value="">All Status</option>
-                        <option value="OPEN">Open</option>
-                        <option value="MITIGATING">Mitigating</option>
-                        <option value="ACCEPTED">Accepted</option>
-                        <option value="CLOSED">Closed</option>
-                    </select>
-                    <select className="input w-44" value={filters.category || ''} onChange={e => setFilter('category', e.target.value)} id="risk-category-filter">
-                        <option value="">All Categories</option>
-                        <option value="Technical">Technical</option>
-                        <option value="Operational">Operational</option>
-                        <option value="Compliance">Compliance</option>
-                        <option value="Strategic">Strategic</option>
-                    </select>
-                    {hasActiveFilters && (
-                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
-                            ✕ Clear filters
-                        </button>
-                    )}
-                </div>
-            </div>
+            <CompactFilterBar config={risksFilterConfig} />
 
             {view === 'heatmap' ? (
                 <div className="glass-card p-6">

@@ -5,6 +5,8 @@ import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-c
 import { queryKeys } from '@/lib/queryKeys';
 import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
+import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
+import { vendorsFilterConfig } from '@/components/filters/configs';
 
 const STATUS_BADGE: Record<string, string> = {
     ACTIVE: 'badge-success', ONBOARDING: 'badge-info',
@@ -69,30 +71,7 @@ export default function VendorRegisterPage() {
             </div>
 
             {/* Filters */}
-            <div className="glass-card p-4">
-                <div className="flex flex-wrap gap-3 items-center">
-                    <input type="search" placeholder="Search vendors…" className="input w-48" value={filters.q || ''}
-                        onChange={e => setFilter('q', e.target.value)} id="vendor-search" />
-                    <select className="input w-36" value={filters.status || ''} onChange={e => setFilter('status', e.target.value)} id="vendor-status-filter">
-                        <option value="">All Status</option>
-                        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <select className="input w-36" value={filters.criticality || ''} onChange={e => setFilter('criticality', e.target.value)} id="vendor-crit-filter">
-                        <option value="">All Criticality</option>
-                        {CRIT_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <select className="input w-40" value={filters.reviewDue || ''} onChange={e => setFilter('reviewDue', e.target.value)} id="vendor-review-filter">
-                        <option value="">All Review</option>
-                        <option value="overdue">Overdue</option>
-                        <option value="next30d">Due in 30 days</option>
-                    </select>
-                    {hasActiveFilters && (
-                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
-                            ✕ Clear filters
-                        </button>
-                    )}
-                </div>
-            </div>
+            <CompactFilterBar config={vendorsFilterConfig} />
 
             {/* Table */}
             <div className="card overflow-x-auto">
