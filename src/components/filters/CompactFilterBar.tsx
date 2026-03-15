@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Search, X, ChevronDown, Check, FilterX } from 'lucide-react';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 
@@ -137,6 +137,19 @@ export function CompactFilterBar({ config }: { config: CompactFilterBarConfig })
     const [searchInput, setSearchInput] = useState(filters.q || '');
     const searchRef = useRef<HTMLInputElement>(null);
 
+    // Count of active filters (for badge)
+    const activeCount = useMemo(() => {
+        let count = 0;
+        if (filters.q) count++;
+        for (const dd of config.dropdowns ?? []) {
+            if (filters[dd.key]) count++;
+        }
+        for (const chip of config.chips ?? []) {
+            if (filters[chip.paramKey] === chip.value) count++;
+        }
+        return count;
+    }, [filters, config.dropdowns, config.chips]);
+
     // Sync search input when URL changes (back/forward)
     useEffect(() => {
         setSearchInput(filters.q || '');
@@ -160,9 +173,9 @@ export function CompactFilterBar({ config }: { config: CompactFilterBarConfig })
     }, [handleSearchSubmit]);
 
     return (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2" data-testid="compact-filter-bar">
             {/* Search */}
-            <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <div className="relative flex-1 min-w-[180px] max-w-sm">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
                 <input
                     ref={searchRef}
@@ -220,16 +233,21 @@ export function CompactFilterBar({ config }: { config: CompactFilterBarConfig })
                 );
             })}
 
-            {/* Clear all */}
+            {/* Clear all with count badge */}
             {hasActiveFilters && (
                 <button
                     type="button"
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs text-slate-400 hover:text-white border border-transparent hover:border-slate-600/50 transition-all"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs text-slate-400 hover:text-white border border-slate-600/30 hover:border-red-500/40 hover:bg-red-500/10 transition-all"
                     onClick={() => { clearFilters(); setSearchInput(''); }}
                     data-testid="filter-clear-all"
                 >
                     <FilterX className="w-3 h-3" />
                     Clear
+                    {activeCount > 1 && (
+                        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-slate-600/60 text-[10px] font-semibold text-slate-200">
+                            {activeCount}
+                        </span>
+                    )}
                 </button>
             )}
         </div>

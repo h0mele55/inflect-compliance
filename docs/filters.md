@@ -1,70 +1,110 @@
-# Filter Query Parameters — Standard Conventions
+# Filters: How to Add & Maintain
 
-All list endpoints follow a consistent URL query parameter contract for server-side filtering. This document specifies the standard param names, semantics, and defaults.
+> All list pages use `<CompactFilterBar>` — a compact, horizontal filter bar
+> that manages state through URL search params. **Never use stacked `<select>`
+> or `<input>` elements for filters.** Guardrail tests enforce this.
 
-## Universal Params
+## Architecture
 
-| Param     | Type     | Default  | Description |
-|-----------|----------|----------|-------------|
-| `q`       | string   | —        | Free-text search. Matches title/name/description (case insensitive). Max 200 chars, trimmed. |
-| `status`  | string   | —        | Exact match on status enum (case sensitive to match Prisma enum). |
-| `limit`   | integer  | 25       | Page size. Clamped to 1–100. |
-| `cursor`  | string   | —        | Opaque cursor for keyset pagination (createdAt-based). |
+```
+URL params  ←→  useUrlFilters()  ←→  CompactFilterBar  ←→  User
+                     ↓
+              React Query fetch  →  Backend (Zod schema + Prisma)
+```
 
-## Domain-Specific Params
+- **URL is source of truth** — filters are bookmarkable and survive refresh.
+- **Enter-to-search** — the `q` param only updates on Enter, not per-keystroke.
+- **Server-side only** — no `.filter()` on the client after `useQuery`.
+- **Cursor reset** — `useUrlFilters` deletes `cursor` on every filter change.
 
-| Param            | Endpoints              | Type    | Description |
-|------------------|------------------------|---------|-------------|
-| `type`           | tasks, assets, evidence| string  | Entity sub-type filter |
-| `severity`       | tasks                  | string  | Task severity (LOW, MEDIUM, HIGH, CRITICAL) |
-| `priority`       | tasks                  | string  | Task priority (P1–P4) |
-| `assigneeUserId` | tasks                  | string  | Filter by assignee user ID |
-| `controlId`      | tasks, tests/plans     | string  | Filter by linked control |
-| `due`            | tasks, tests/plans, vendors | enum | Date range: `overdue`, `next7d`, `next30d` |
-| `ownerUserId`    | controls, risks        | string  | Filter by owner user ID |
-| `applicability`  | controls               | enum    | `APPLICABLE` or `NOT_APPLICABLE` |
-| `category`       | controls, risks, policies | string | Category filter |
-| `criticality`    | assets, vendors        | string  | Criticality level (LOW–CRITICAL) |
-| `scoreMin`       | risks                  | integer | Minimum risk score (inclusive) |
-| `scoreMax`       | risks                  | integer | Maximum risk score (inclusive) |
-| `riskRating`     | vendors                | string  | Filter by assessment risk rating |
-| `reviewDue`      | vendors                | enum    | `overdue` or `next30d` |
-| `language`       | policies               | string  | Policy language code (e.g., `en`, `bg`) |
-| `includeDeleted` | controls, risks, policies, assets | enum | `true` to include soft-deleted (admin only) |
+## Adding a New Filter
 
-## Endpoint Reference
+### 1. Backend: Add to Zod Schema
 
-### Controls `/api/t/[tenantSlug]/controls`
-`q`, `status`, `applicability`, `ownerUserId`, `category`, `includeDeleted`, `limit`, `cursor`
+In `src/app/api/t/[tenantSlug]/<entity>/route.ts`:
 
-### Evidence `/api/t/[tenantSlug]/evidence`
-`q`, `status`, `type`, `controlId`, `limit`, `cursor`
+```typescript
+const MyQuerySchema = z.object({
+    // existing params...
+    myNewParam: z.string().optional(),    // dropdown/chip
+    q: z.string().optional().transform(normalizeQ),  // always use normalizeQ
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().optional(),
+}).strip();
+```
 
-### Tasks `/api/t/[tenantSlug]/tasks`
-`q`, `status`, `type`, `severity`, `priority`, `assigneeUserId`, `controlId`, `due`, `linkedEntityType`, `linkedEntityId`, `limit`, `cursor`
+### 2. Backend: Apply in Prisma Query
 
-### Risks `/api/t/[tenantSlug]/risks`
-`q`, `status`, `scoreMin`, `scoreMax`, `category`, `ownerUserId`, `includeDeleted`, `limit`, `cursor`
+Pass the param through to the Prisma `where` clause:
 
-### Policies `/api/t/[tenantSlug]/policies`
-`q`, `status`, `category`, `language`, `includeDeleted`, `limit`, `cursor`
+```typescript
+const filters = {
+    ...existingFilters,
+    myNewParam: query.myNewParam,
+};
+```
 
-### Assets `/api/t/[tenantSlug]/assets`
-`q`, `status`, `type`, `criticality`, `includeDeleted`, `limit`, `cursor`
+### 3. Frontend: Update Config
 
-### Vendors `/api/t/[tenantSlug]/vendors`
-`q`, `status`, `criticality`, `riskRating`, `reviewDue`, `limit`, `cursor`
+In `src/components/filters/configs.ts`:
 
-### Test Plans `/api/t/[tenantSlug]/tests/plans`
-`q`, `status`, `controlId`, `due`
+```typescript
+export const myPageFilterConfig: CompactFilterBarConfig = {
+    searchPlaceholder: 'Search… (Enter)',
+    filterKeys: ['q', 'status', 'myNewParam'],  // ← add here
+    dropdowns: [
+        // existing...
+        {
+            key: 'myNewParam',
+            label: 'My Filter',
+            options: [
+                { value: 'VALUE_A', label: 'Value A' },
+                { value: 'VALUE_B', label: 'Value B' },
+            ],
+        },
+    ],
+};
+```
 
-## Design Rules
+### 4. Frontend: Update Page's useUrlFilters
 
-1. **URL is source of truth** — filters always reflected in query string
-2. **Server-side only** — no client-side `.filter()` on fetched list data
-3. **Tenant isolation** — every query includes `tenantId` in `where` clause
-4. **Zod validation** — all params validated and normalized before use
-5. **`q` length capped** at 200 characters via `normalizeQ()`
-6. **Cursor pagination** — keyset-based, not offset-based
-7. **Empty filters = no filter** — omitting a param returns all records
-8. **Indexes** — composite indexes on `(tenantId, filterField)` for performance
+Ensure the page's `useUrlFilters` call includes the new key:
+
+```typescript
+const { filters } = useUrlFilters(['q', 'status', 'myNewParam']);
+```
+
+## Standard Param Names
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `q` | string | Text search (normalizeQ: trim, 200 char max) |
+| `status` | enum | Status filter |
+| `type` | enum | Type/category of entity |
+| `severity` | enum | Severity level |
+| `category` | string | Category name |
+| `criticality` | enum | Criticality level |
+| `due` | enum | Due date filter (`overdue`, `next7d`) |
+| `reviewDue` | enum | Review due filter (`overdue`, `next30d`) |
+| `controlId` | uuid | Filter by linked control |
+| `ownerUserId` | uuid | Filter by owner |
+| `assigneeUserId` | uuid | Filter by assignee |
+| `limit` | int | Page size (1–100, default varies) |
+| `cursor` | string | Pagination cursor (auto-managed) |
+
+## CompactFilterBar Features
+
+| Feature | Behavior |
+|---------|----------|
+| Search | Enter-to-search, clear X button |
+| Pill Dropdowns | Click → popover, shows check mark, auto-closes |
+| Chip Toggles | Click to toggle, amber when active |
+| Clear button | Shows when any filter active, displays count badge when >1 |
+| Mobile | Wraps cleanly with `flex-wrap` and `gap-2` |
+
+## Guardrails (enforced by Jest)
+
+- `tests/guardrails/no-client-side-filtering.test.ts`:
+  - Fails if list pages contain `.filter()` on query data
+  - Fails if list pages use stacked `<select className="input">` elements
+  - Fails if list pages don't import `CompactFilterBar`
