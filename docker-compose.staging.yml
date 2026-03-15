@@ -1,0 +1,58 @@
+# ─── Staging Environment ────────────────────────────────────
+# Usage: docker compose -f docker-compose.staging.yml up -d --build
+#
+# Requires: .env.staging (copy from .env.staging.example)
+# ────────────────────────────────────────────────────────────
+services:
+  # ── Postgres ──
+  postgres:
+    image: postgres:16-alpine
+    container_name: inflect-staging-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-inflect}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-staging_password_change_me}
+      POSTGRES_DB: ${POSTGRES_DB:-inflect_staging}
+    ports:
+      - "${DB_PORT:-5435}:5432"
+    volumes:
+      - staging-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inflect} -d ${POSTGRES_DB:-inflect_staging}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Next.js App ──
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inflect-staging-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file:
+      - .env.staging
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-inflect}:${POSTGRES_PASSWORD:-staging_password_change_me}@postgres:5432/${POSTGRES_DB:-inflect_staging}?schema=public
+      FILE_STORAGE_ROOT: /data/uploads
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - staging-uploads:/data/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/auth/session || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  staging-pgdata:
+    name: inflect-staging-pgdata
+  staging-uploads:
+    name: inflect-staging-uploads

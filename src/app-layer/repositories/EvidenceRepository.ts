@@ -1,17 +1,100 @@
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
+import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
+import type { PaginatedResponse } from '@/lib/dto/pagination';
+
+export interface EvidenceListFilters {
+    type?: string;
+    controlId?: string;
+    q?: string;
+    archived?: boolean;
+    expiring?: boolean;
+}
+
+export interface EvidenceListParams {
+    limit?: number;
+    cursor?: string;
+    filters?: EvidenceListFilters;
+}
 
 export class EvidenceRepository {
-    static async list(db: PrismaTx, ctx: RequestContext) {
+    static async list(db: PrismaTx, ctx: RequestContext, filters?: EvidenceListFilters) {
+        const where = EvidenceRepository._buildWhere(ctx, filters);
         return db.evidence.findMany({
-            where: { tenantId: ctx.tenantId },
+            where,
             orderBy: { createdAt: 'desc' },
             include: {
                 control: { select: { id: true, name: true, annexId: true } },
                 reviews: { orderBy: { createdAt: 'desc' }, take: 1 },
             },
         });
+    }
+
+    static async listPaginated(db: PrismaTx, ctx: RequestContext, params: EvidenceListParams): Promise<PaginatedResponse<unknown>> {
+        const limit = clampLimit(params.limit);
+        const where = EvidenceRepository._buildWhere(ctx, params.filters);
+
+        // Apply cursor
+        const cursorWhere = buildCursorWhere(params.cursor);
+        if (cursorWhere) {
+            if (where.AND) {
+                (where.AND as Prisma.EvidenceWhereInput[]).push(cursorWhere as Prisma.EvidenceWhereInput);
+            } else {
+                where.AND = [cursorWhere as Prisma.EvidenceWhereInput];
+            }
+        }
+
+        const items = await db.evidence.findMany({
+            where,
+            orderBy: CURSOR_ORDER_BY,
+            take: limit + 1,
+            include: {
+                control: { select: { id: true, name: true, annexId: true } },
+                reviews: { orderBy: { createdAt: 'desc' }, take: 1 },
+            },
+        });
+
+        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
+    }
+
+    private static _buildWhere(ctx: RequestContext, filters?: EvidenceListFilters): Prisma.EvidenceWhereInput {
+        const where: Prisma.EvidenceWhereInput = { tenantId: ctx.tenantId };
+        const andConditions: Prisma.EvidenceWhereInput[] = [];
+
+        if (filters?.type) {
+            where.type = filters.type as Prisma.EnumEvidenceTypeFilter;
+        }
+        if (filters?.controlId) {
+            where.controlId = filters.controlId;
+        }
+        if (filters?.archived !== undefined) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma generated types may lag schema
+            (where as any).isArchived = filters.archived;
+        }
+        if (filters?.expiring) {
+            // Evidence expiring within 30 days
+            const soon = new Date();
+            soon.setDate(soon.getDate() + 30);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma generated types may lag schema
+            (where as any).retentionUntil = { lte: soon };
+        }
+        if (filters?.q) {
+            andConditions.push({
+                OR: [
+                    { title: { contains: filters.q, mode: 'insensitive' } },
+                    { content: { contains: filters.q, mode: 'insensitive' } },
+                    { fileName: { contains: filters.q, mode: 'insensitive' } },
+                ],
+            });
+        }
+
+        if (andConditions.length > 0) {
+            where.AND = andConditions;
+        }
+
+        return where;
     }
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {

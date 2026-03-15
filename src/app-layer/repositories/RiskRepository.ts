@@ -1,6 +1,8 @@
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
+import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
+import type { PaginatedResponse } from '@/lib/dto/pagination';
 
 export interface RiskFilters {
     status?: string;
@@ -9,30 +11,65 @@ export interface RiskFilters {
     q?: string;
 }
 
+export interface RiskListParams {
+    limit?: number;
+    cursor?: string;
+    filters?: RiskFilters;
+}
+
+const riskIncludes = {
+    controls: { include: { control: { select: { id: true, name: true, annexId: true, status: true } } } },
+};
+
 export class RiskRepository {
     /**
-     * List risks scoped to tenant.
+     * List risks scoped to tenant (unpaginated — backward compat).
      */
     static async list(db: PrismaTx, ctx: RequestContext, filters: RiskFilters = {}) {
-        const where: Prisma.RiskWhereInput = {
-            tenantId: ctx.tenantId,
-        };
+        const where = RiskRepository._buildWhere(ctx, filters);
+        return db.risk.findMany({
+            where,
+            orderBy: { inherentScore: 'desc' },
+            include: riskIncludes,
+        });
+    }
+
+    static async listPaginated(db: PrismaTx, ctx: RequestContext, params: RiskListParams): Promise<PaginatedResponse<unknown>> {
+        const limit = clampLimit(params.limit);
+        const where = RiskRepository._buildWhere(ctx, params.filters);
+
+        const cursorWhere = buildCursorWhere(params.cursor);
+        if (cursorWhere) {
+            where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), cursorWhere as Prisma.RiskWhereInput];
+        }
+
+        const items = await db.risk.findMany({
+            where,
+            orderBy: CURSOR_ORDER_BY,
+            take: limit + 1,
+            include: riskIncludes,
+        });
+
+        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
+    }
+
+    private static _buildWhere(ctx: RequestContext, filters: RiskFilters = {}): Prisma.RiskWhereInput {
+        const where: Prisma.RiskWhereInput = { tenantId: ctx.tenantId };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (filters.status) where.status = filters.status as any;
         if (filters.category) where.category = filters.category;
         if (filters.ownerUserId) where.ownerUserId = filters.ownerUserId;
         if (filters.q) {
-            where.title = { contains: filters.q, mode: 'insensitive' };
+            where.OR = [
+                { title: { contains: filters.q, mode: 'insensitive' } },
+                { description: { contains: filters.q, mode: 'insensitive' } },
+                { category: { contains: filters.q, mode: 'insensitive' } },
+            ];
         }
 
-        return db.risk.findMany({
-            where,
-            orderBy: { inherentScore: 'desc' },
-            include: {
-                controls: { include: { control: { select: { id: true, name: true, annexId: true, status: true } } } },
-            },
-        });
+        return where;
     }
 
     /**
@@ -111,4 +148,3 @@ export class RiskRepository {
         return true;
     }
 }
-

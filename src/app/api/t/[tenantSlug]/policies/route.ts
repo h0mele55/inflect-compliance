@@ -4,22 +4,49 @@ import { withValidatedBody } from '@/lib/validation/route';
 import { getTenantCtx } from '@/app-layer/context';
 import { CreatePolicySchema } from '@/lib/schemas';
 import * as policyUsecases from '@/app-layer/usecases/policy';
+import { z } from 'zod';
+import { normalizeQ } from '@/lib/filters/query-helpers';
 
-// GET /api/t/[tenantSlug]/policies — list with filters
+const PolicyQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().optional(),
+    status: z.string().optional(),
+    category: z.string().optional(),
+    q: z.string().optional().transform(normalizeQ),
+    includeDeleted: z.enum(['true', 'false']).optional(),
+}).strip();
+
+// GET /api/t/[tenantSlug]/policies — list with filters + pagination
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
   const ctx = await getTenantCtx(params, req);
-  const url = req.nextUrl;
-  const includeDeleted = url.searchParams.get('includeDeleted') === 'true';
-  if (includeDeleted) {
+  const sp = Object.fromEntries(req.nextUrl.searchParams.entries());
+  const query = PolicyQuerySchema.parse(sp);
+
+  if (query.includeDeleted === 'true') {
     const policies = await policyUsecases.listPoliciesWithDeleted(ctx);
     return NextResponse.json(policies);
   }
-  const filters = {
-    status: url.searchParams.get('status') || undefined,
-    category: url.searchParams.get('category') || undefined,
-    q: url.searchParams.get('q') || undefined,
-  };
-  const policies = await policyUsecases.listPolicies(ctx, filters);
+
+  const hasPagination = query.limit || query.cursor;
+  if (hasPagination) {
+    const result = await policyUsecases.listPoliciesPaginated(ctx, {
+      limit: query.limit,
+      cursor: query.cursor,
+      filters: {
+        status: query.status,
+        category: query.category,
+        q: query.q,
+      },
+    });
+    return NextResponse.json(result);
+  }
+
+  // Backward compat: return flat array
+  const policies = await policyUsecases.listPolicies(ctx, {
+    status: query.status,
+    category: query.category,
+    q: query.q,
+  });
   return NextResponse.json(policies);
 });
 

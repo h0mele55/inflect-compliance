@@ -1,14 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
-import { listRisks, createRisk, listRisksWithDeleted } from '@/app-layer/usecases/risk';
+import { listRisks, listRisksPaginated, createRisk, listRisksWithDeleted } from '@/app-layer/usecases/risk';
 import { withValidatedBody } from '@/lib/validation/route';
 import { CreateRiskSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { z } from 'zod';
+import { normalizeQ } from '@/lib/filters/query-helpers';
+
+const RiskQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().optional(),
+    status: z.string().optional(),
+    category: z.string().optional(),
+    ownerUserId: z.string().optional(),
+    q: z.string().optional().transform(normalizeQ),
+    includeDeleted: z.enum(['true', 'false']).optional(),
+}).strip();
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    const includeDeleted = req.nextUrl.searchParams.get('includeDeleted') === 'true';
-    const risks = includeDeleted ? await listRisksWithDeleted(ctx) : await listRisks(ctx);
+    const sp = Object.fromEntries(req.nextUrl.searchParams.entries());
+    const query = RiskQuerySchema.parse(sp);
+
+    if (query.includeDeleted === 'true') {
+        const risks = await listRisksWithDeleted(ctx);
+        return NextResponse.json(risks);
+    }
+
+    const hasPagination = query.limit || query.cursor;
+    if (hasPagination) {
+        const result = await listRisksPaginated(ctx, {
+            limit: query.limit,
+            cursor: query.cursor,
+            filters: {
+                status: query.status,
+                category: query.category,
+                ownerUserId: query.ownerUserId,
+                q: query.q,
+            },
+        });
+        return NextResponse.json(result);
+    }
+
+    // Backward compat: return flat array
+    const risks = await listRisks(ctx, {
+        status: query.status,
+        category: query.category,
+        ownerUserId: query.ownerUserId,
+        q: query.q,
+    });
     return NextResponse.json(risks);
 });
 

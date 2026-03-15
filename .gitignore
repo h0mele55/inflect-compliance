@@ -9,6 +9,7 @@ out/
 .env
 .env.local
 .env.production
+.env.staging
 .env.test
 .env.e2e
 

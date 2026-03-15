@@ -23,6 +23,16 @@ export async function listControls(ctx: RequestContext, filters?: {
     );
 }
 
+export async function listControlsPaginated(ctx: RequestContext, params: {
+    limit?: number; cursor?: string;
+    filters?: { status?: string; applicability?: string; ownerUserId?: string; q?: string; category?: string };
+}) {
+    assertCanReadControls(ctx);
+    return runInTenantContext(ctx, (db) =>
+        ControlRepository.listPaginated(db, ctx, params)
+    );
+}
+
 export async function getControl(ctx: RequestContext, id: string) {
     assertCanReadControls(ctx);
     return runInTenantContext(ctx, async (db) => {
@@ -182,6 +192,15 @@ export async function setControlApplicability(
 export async function setControlOwner(ctx: RequestContext, id: string, ownerUserId: string | null) {
     assertCanUpdateControl(ctx);
     return runInTenantContext(ctx, async (db) => {
+        // Validate the user exists before updating
+        if (ownerUserId) {
+            const userExists = await db.$queryRawUnsafe<Array<{ id: string }>>(
+                `SELECT id FROM "User" WHERE id = $1 LIMIT 1`, ownerUserId
+            );
+            if (!userExists || userExists.length === 0) {
+                throw badRequest(`User "${ownerUserId}" not found. Please enter a valid user ID.`);
+            }
+        }
         const control = await ControlRepository.setOwner(db, ctx, id, ownerUserId);
         if (!control) throw notFound('Control not found');
 

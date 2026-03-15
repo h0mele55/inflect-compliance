@@ -95,7 +95,7 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
 
     // ─── ALL route handlers (tenant-scoped + legacy) ───
     // Auth routes are explicitly excluded — they handle registration/login with global tables
-    const ROUTE_DIR_ALLOWLIST = ['auth'];
+    const ROUTE_DIR_ALLOWLIST = ['auth', 'health', 'staging'];
 
     const apiDir = path.join(SRC_ROOT, 'app/api');
     const allRouteFiles = walkDir(apiDir).filter((f) => f.endsWith('route.ts'));

@@ -1,5 +1,5 @@
 import { RequestContext } from '../types';
-import { VendorRepository, VendorDocumentRepository, VendorLinkRepository, VendorFilters } from '../repositories/VendorRepository';
+import { VendorRepository, VendorDocumentRepository, VendorLinkRepository, VendorFilters, VendorListParams } from '../repositories/VendorRepository';
 import { QuestionnaireRepository, VendorAssessmentRepository, VendorAnswerRepository } from '../repositories/AssessmentRepository';
 import { assertCanReadVendors, assertCanManageVendors, assertCanManageVendorDocs, assertCanRunAssessment, assertCanApproveAssessment } from '../policies/vendor.policies';
 import { logEvent } from '../events/audit';
@@ -12,6 +12,11 @@ import { computeAnswerPoints, computeAssessmentScore, scoreToRiskRating } from '
 export async function listVendors(ctx: RequestContext, filters: VendorFilters = {}) {
     assertCanReadVendors(ctx);
     return runInTenantContext(ctx, (db) => VendorRepository.list(db, ctx, filters));
+}
+
+export async function listVendorsPaginated(ctx: RequestContext, params: VendorListParams) {
+    assertCanReadVendors(ctx);
+    return runInTenantContext(ctx, (db) => VendorRepository.listPaginated(db, ctx, params));
 }
 
 export async function getVendor(ctx: RequestContext, vendorId: string) {

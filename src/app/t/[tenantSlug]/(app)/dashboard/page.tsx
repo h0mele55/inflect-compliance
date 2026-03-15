@@ -1,23 +1,29 @@
-'use client';
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
-import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { getTranslations } from 'next-intl/server';
+import { getTenantCtx } from '@/app-layer/context';
+import { getDashboardData } from '@/app-layer/usecases/dashboard';
 
-export default function DashboardPage() {
-    const apiUrl = useTenantApiUrl();
-    const tenantHref = useTenantHref();
-    const t = useTranslations('dashboard');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [data, setData] = useState<any>(null);
+export const dynamic = 'force-dynamic';
 
-    useEffect(() => {
-        fetch(apiUrl('/dashboard')).then((r) => r.json()).then(setData);
-    }, [apiUrl]);
+/**
+ * Dashboard — React Server Component.
+ *
+ * Data is fetched server-side via app-layer usecases.
+ * No client JS is shipped for this page.
+ */
+export default async function DashboardPage({
+    params,
+}: {
+    params: Promise<{ tenantSlug: string }>;
+}) {
+    const { tenantSlug } = await params;
+    const t = await getTranslations('dashboard');
 
-    if (!data) return <div className="animate-pulse text-slate-400 p-8">{t('loading')}</div>;
+    // Build tenant context server-side (uses session cookies, no req needed)
+    const ctx = await getTenantCtx({ tenantSlug });
+    const { stats, recentActivity } = await getDashboardData(ctx);
 
-    const { stats, recentActivity } = data;
+    const href = (path: string) => `/t/${tenantSlug}${path}`;
 
     const statCards = [
         { label: t('assets'), value: stats.assets, icon: '🏢', color: 'from-blue-500 to-cyan-500' },
@@ -37,7 +43,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-center gap-2">
                     {stats.unreadNotifications > 0 && (
-                        <Link href={tenantHref('/notifications')} className="btn btn-ghost btn-sm">
+                        <Link href={href('/notifications')} className="btn btn-ghost btn-sm">
                             🔔 <span className="badge badge-danger">{stats.unreadNotifications}</span>
                         </Link>
                     )}
@@ -67,12 +73,12 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3">
                         <div className="flex-1 bg-slate-800 rounded-full h-3 overflow-hidden">
                             <div className="h-full bg-gradient-to-r from-brand-500 to-emerald-500 rounded-full transition-all"
-                                style={{ width: `${(stats.clausesReady / stats.totalClauses) * 100}%` }} />
+                                style={{ width: `${stats.totalClauses > 0 ? (stats.clausesReady / stats.totalClauses) * 100 : 0}%` }} />
                         </div>
                         <span className="text-sm font-medium text-slate-300">{stats.clausesReady}/{stats.totalClauses}</span>
                     </div>
                     <div className="mt-3 flex items-center gap-4 text-xs text-slate-400">
-                        <Link href={tenantHref('/clauses')} className="text-brand-400 hover:text-brand-300">{t('viewAllClauses')}</Link>
+                        <Link href={href('/clauses')} className="text-brand-400 hover:text-brand-300">{t('viewAllClauses')}</Link>
                     </div>
                 </div>
 
@@ -115,19 +121,19 @@ export default function DashboardPage() {
                 <div className="glass-card p-5">
                     <h3 className="text-sm font-semibold text-slate-300 mb-3">{t('quickActions')}</h3>
                     <div className="grid grid-cols-2 gap-2">
-                        <Link href={tenantHref('/assets')} className="btn btn-secondary btn-sm text-xs">{t('addAsset')}</Link>
-                        <Link href={tenantHref('/risks')} className="btn btn-secondary btn-sm text-xs">{t('addRisk')}</Link>
-                        <Link href={tenantHref('/evidence')} className="btn btn-secondary btn-sm text-xs">{t('addEvidence')}</Link>
-                        <Link href={tenantHref('/audits')} className="btn btn-secondary btn-sm text-xs">{t('newAudit')}</Link>
-                        <Link href={tenantHref('/policies')} className="btn btn-secondary btn-sm text-xs">{t('newPolicy')}</Link>
-                        <Link href={tenantHref('/reports')} className="btn btn-secondary btn-sm text-xs">{t('exportReports')}</Link>
+                        <Link href={href('/assets')} className="btn btn-secondary btn-sm text-xs">{t('addAsset')}</Link>
+                        <Link href={href('/risks')} className="btn btn-secondary btn-sm text-xs">{t('addRisk')}</Link>
+                        <Link href={href('/evidence')} className="btn btn-secondary btn-sm text-xs">{t('addEvidence')}</Link>
+                        <Link href={href('/audits')} className="btn btn-secondary btn-sm text-xs">{t('newAudit')}</Link>
+                        <Link href={href('/policies')} className="btn btn-secondary btn-sm text-xs">{t('newPolicy')}</Link>
+                        <Link href={href('/reports')} className="btn btn-secondary btn-sm text-xs">{t('exportReports')}</Link>
                     </div>
                 </div>
 
                 <div className="glass-card p-5">
                     <h3 className="text-sm font-semibold text-slate-300 mb-3">{t('recentActivity')}</h3>
                     <div className="space-y-2 max-h-40 overflow-y-auto">
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {recentActivity.map((log: any) => (
                             <div key={log.id} className="flex items-start gap-2 text-xs">
                                 <span className="text-slate-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</span>

@@ -84,7 +84,8 @@ const authMiddleware = auth(async (req) => {
 export default async function middleware(req: any, ctx: any) {
     const { pathname } = req.nextUrl;
 
-
+    // ── Request ID (reuse from upstream or generate) ──
+    const requestId = req.headers.get('x-request-id') || crypto.randomUUID();
 
     const origin = req.headers.get('origin') ?? '';
 
@@ -104,13 +105,17 @@ export default async function middleware(req: any, ctx: any) {
             preflightHeaders.set('Access-Control-Allow-Credentials', 'true');
         }
         preflightHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-        preflightHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-forwarded-for, user-agent');
+        preflightHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-forwarded-for, x-request-id, user-agent');
         preflightHeaders.set('Access-Control-Max-Age', '86400');
+        preflightHeaders.set('x-request-id', requestId);
         return new NextResponse(null, { status: 204, headers: preflightHeaders });
     }
 
     // Process through auth middleware
     const res = await authMiddleware(req, ctx) || NextResponse.next();
+
+    // ── Inject request ID on every response ──
+    res.headers.set('x-request-id', requestId);
 
     // ── Apply CORS Headers to API responses ──
     if (pathname.startsWith('/api/') && isAllowedOrigin && origin) {

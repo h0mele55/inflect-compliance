@@ -28,6 +28,9 @@ describe('Static Analysis: No process.env fallbacks', () => {
         for (const file of files) {
             // Ignore the env definition itself since it maps process.env
             if (file.endsWith('env.ts')) continue;
+            // Infrastructure routes intentionally use process.env for env gating / build info
+            if (file.includes('health') && file.includes('route.ts')) continue;
+            if (file.includes('staging') && file.includes('route.ts')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 

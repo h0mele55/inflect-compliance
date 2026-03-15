@@ -11,6 +11,9 @@ const PUBLIC_PATH_PREFIXES = [
     '/login',
     '/register',
     '/api/auth',         // Auth.js callbacks, session, csrf, providers
+    '/api/health',       // Health check (no auth)
+    '/api/readyz',       // Readiness probe (no auth)
+    '/api/staging/seed', // Staging seed endpoint (token-gated internally)
     '/audit/shared',     // Shared audit pack read-only view (token-gated, no login)
     '/api/audit/shared', // Shared audit pack API endpoint (token-gated)
     '/_next',            // Next.js internals

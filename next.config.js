@@ -65,6 +65,10 @@ const defaultOptions = {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    ...defaultOptions
+    ...defaultOptions,
+    eslint: {
+        // Lint runs separately in CI (npm run lint). Don't block builds.
+        ignoreDuringBuilds: true,
+    },
 };
 module.exports = withNextIntl(nextConfig);

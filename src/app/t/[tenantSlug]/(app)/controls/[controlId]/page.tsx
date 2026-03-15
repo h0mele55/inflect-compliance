@@ -1,8 +1,15 @@
 'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+// Inline pencil icon to avoid lucide-react barrel import issue with Next.js 14
+const PencilIcon = ({ size = 14 }: { size?: number }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+);
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { extractMutationError } from '@/lib/mutations';
 import TraceabilityPanel from '@/components/TraceabilityPanel';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 import TestPlansPanel from '@/components/TestPlansPanel';
@@ -14,11 +21,11 @@ import type { FrameworkDTO, RequirementDTO } from '@/lib/dto';
 
 const STATUS_BADGE: Record<string, string> = {
     NOT_STARTED: 'badge-neutral', IN_PROGRESS: 'badge-info', IMPLEMENTED: 'badge-success',
-    NEEDS_REVIEW: 'badge-warning', PLANNED: 'badge-neutral', IMPLEMENTING: 'badge-info',
+    NEEDS_REVIEW: 'badge-warning',
 };
 const STATUS_LABELS: Record<string, string> = {
     NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress', IMPLEMENTED: 'Implemented',
-    NEEDS_REVIEW: 'Needs Review', PLANNED: 'Planned', IMPLEMENTING: 'Implementing',
+    NEEDS_REVIEW: 'Needs Review',
 };
 const TASK_STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', IN_PROGRESS: 'badge-info', DONE: 'badge-success', BLOCKED: 'badge-danger',
@@ -26,6 +33,11 @@ const TASK_STATUS_BADGE: Record<string, string> = {
 const FREQ_LABELS: Record<string, string> = {
     AD_HOC: 'Ad Hoc', DAILY: 'Daily', WEEKLY: 'Weekly',
     MONTHLY: 'Monthly', QUARTERLY: 'Quarterly', ANNUALLY: 'Annually',
+};
+const FREQ_OPTIONS = ['', 'AD_HOC', 'DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY'];
+const CATEGORY_OPTIONS = ['', 'ORGANIZATIONAL', 'PEOPLE', 'PHYSICAL', 'TECHNOLOGICAL'];
+const CATEGORY_LABELS: Record<string, string> = {
+    ORGANIZATIONAL: 'Organizational', PEOPLE: 'People', PHYSICAL: 'Physical', TECHNOLOGICAL: 'Technological',
 };
 
 type Tab = 'overview' | 'tasks' | 'evidence' | 'mappings' | 'traceability' | 'activity' | 'tests';
@@ -44,12 +56,24 @@ export default function ControlDetailPage() {
     const params = useParams();
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
-    const { permissions } = useTenantContext();
+    const { permissions, tenantSlug } = useTenantContext();
     const controlId = params?.controlId as string;
+    const queryClient = useQueryClient();
 
-    const [control, setControl] = useState<ControlDetailDTO | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    // ─── Query: control detail ───
+    const controlQuery = useQuery<ControlDetailDTO>({
+        queryKey: queryKeys.controls.detail(tenantSlug, controlId),
+        queryFn: async () => {
+            const res = await fetch(apiUrl(`/controls/${controlId}`));
+            if (!res.ok) throw new Error('Control not found');
+            return res.json();
+        },
+        enabled: !!controlId,
+    });
+    const control = controlQuery.data ?? null;
+    const loading = controlQuery.isLoading;
+    const error = controlQuery.error?.message ?? '';
+    const refetch = controlQuery.refetch;
     const [tab, setTab] = useState<Tab>('overview');
 
     // Status change
@@ -103,20 +127,116 @@ export default function ControlDetailPage() {
     const [autoKey, setAutoKey] = useState('');
     const [savingAutomation, setSavingAutomation] = useState(false);
 
-    const fetchControl = useCallback(async () => {
-        setLoading(true);
-        try {
-            const res = await fetch(apiUrl(`/controls/${controlId}`));
-            if (!res.ok) throw new Error('Control not found');
-            setControl(await res.json());
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : 'Unknown error');
-        } finally {
-            setLoading(false);
-        }
-    }, [apiUrl, controlId]);
+    // Edit modal state
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editForm, setEditForm] = useState({ name: '', description: '', intent: '', category: '', frequency: '', owner: '' });
+    const [savingEdit, setSavingEdit] = useState(false);
+    const [editError, setEditError] = useState('');
+    const [editSuccess, setEditSuccess] = useState(false);
 
-    useEffect(() => { fetchControl(); }, [fetchControl]);
+    // (fetchControl replaced by useQuery above — use refetch() below)
+
+    // ─── Edit modal handlers ───
+
+    const openEditModal = () => {
+        if (!control) return;
+        setEditForm({
+            name: control.name || '',
+            description: control.description || '',
+            intent: control.intent || '',
+            category: control.category || '',
+            frequency: control.frequency || '',
+            owner: control.ownerUserId || '',
+        });
+        setEditError('');
+        setEditSuccess(false);
+        setShowEditModal(true);
+    };
+
+
+    // ─── Mutation: edit control ───
+    const editMutation = useMutation({
+        mutationFn: async (form: typeof editForm) => {
+            const res = await fetch(apiUrl(`/controls/${controlId}`), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: form.name.trim(),
+                    description: form.description.trim() || null,
+                    intent: form.intent.trim() || null,
+                    category: form.category.trim() || null,
+                    frequency: form.frequency || null,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Update failed' }));
+                throw new Error(extractMutationError(err, 'Update failed'));
+            }
+            // If owner changed, call the separate owner endpoint
+            const originalOwner = control?.ownerUserId || '';
+            if (form.owner.trim() !== originalOwner) {
+                const ownerRes = await fetch(apiUrl(`/controls/${controlId}/owner`), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ownerUserId: form.owner.trim() || null }),
+                });
+                if (!ownerRes.ok) {
+                    const ownerErr = await ownerRes.json().catch(() => ({ error: 'Owner update failed' }));
+                    throw new Error(extractMutationError(ownerErr, 'Owner update failed'));
+                }
+            }
+            return form;
+        },
+        onMutate: async (form) => {
+            await queryClient.cancelQueries({ queryKey: queryKeys.controls.detail(tenantSlug, controlId) });
+            const previous = queryClient.getQueryData<ControlDetailDTO>(queryKeys.controls.detail(tenantSlug, controlId));
+            if (previous) {
+                queryClient.setQueryData<ControlDetailDTO>(queryKeys.controls.detail(tenantSlug, controlId), {
+                    ...previous,
+                    name: form.name.trim(),
+                    description: form.description.trim() || null,
+                    intent: form.intent.trim() || null,
+                    category: form.category.trim() || null,
+                    frequency: form.frequency || null,
+                });
+            }
+            return { previous };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previous) {
+                queryClient.setQueryData(queryKeys.controls.detail(tenantSlug, controlId), context.previous);
+            }
+        },
+        onSuccess: () => {
+            setShowEditModal(false);
+            setEditSuccess(true);
+            setTimeout(() => setEditSuccess(false), 3000);
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
+            setSavingEdit(false);
+        },
+    });
+
+    const handleEditSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editForm.name || editForm.name.trim().length < 3) {
+            setEditError('Title must be at least 3 characters.');
+            return;
+        }
+        setSavingEdit(true);
+        setEditError('');
+        editMutation.mutate(editForm, {
+            onError: (err) => {
+                setEditError(err instanceof Error ? err.message : 'Update failed');
+            },
+        });
+    };
+
+    const handleEditCancel = () => {
+        setShowEditModal(false);
+        setEditError('');
+    };
 
     // Fetch frameworks when mapping tab opens
     useEffect(() => {
@@ -141,7 +261,7 @@ export default function ControlDetailPage() {
     const handleMarkTestCompleted = async () => {
         setMarkingTest(true);
         await fetch(apiUrl(`/controls/${controlId}/test-completed`), { method: 'POST' });
-        await fetchControl();
+        await refetch();
         setMarkingTest(false);
     };
 
@@ -151,7 +271,7 @@ export default function ControlDetailPage() {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ evidenceSource: autoEvidenceSource || null, automationKey: autoKey || null }),
         });
-        await fetchControl();
+        await refetch();
         setSavingAutomation(false);
         setEditingAutomation(false);
     };
@@ -162,7 +282,8 @@ export default function ControlDetailPage() {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status }),
         });
-        await fetchControl();
+        await refetch();
+        queryClient.invalidateQueries({ queryKey: queryKeys.controls.list(tenantSlug) });
         setChangingStatus(false);
     };
 
@@ -173,7 +294,7 @@ export default function ControlDetailPage() {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ applicability: appChoice, justification: appChoice === 'NOT_APPLICABLE' ? appJustification : null }),
         });
-        await fetchControl();
+        await refetch();
         setSavingApp(false);
         setShowApplicability(false);
     };
@@ -187,7 +308,7 @@ export default function ControlDetailPage() {
         });
         setTaskTitle(''); setTaskDesc(''); setTaskDue('');
         setShowTaskForm(false);
-        await fetchControl();
+        await refetch();
         setSavingTask(false);
     };
 
@@ -196,7 +317,7 @@ export default function ControlDetailPage() {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status }),
         });
-        await fetchControl();
+        await refetch();
     };
 
     const linkEvidence = async (e: React.FormEvent) => {
@@ -208,13 +329,13 @@ export default function ControlDetailPage() {
         });
         setEvidenceUrl(''); setEvidenceNote('');
         setShowEvidenceForm(false);
-        await fetchControl();
+        await refetch();
         setSavingEvidence(false);
     };
 
     const unlinkEvidence = async (linkId: string) => {
         await fetch(apiUrl(`/controls/${controlId}/evidence/${linkId}`), { method: 'DELETE' });
-        await fetchControl();
+        await refetch();
     };
 
     const handleFileUpload = async (e: React.FormEvent) => {
@@ -236,7 +357,7 @@ export default function ControlDetailPage() {
             setFileUploadTitle('');
             setShowFileUpload(false);
             if (fileUploadRef.current) fileUploadRef.current.value = '';
-            await fetchControl();
+            await refetch();
         } catch (err: unknown) {
             setFileUploadError(err instanceof Error ? err.message : 'Upload failed');
         } finally {
@@ -253,7 +374,7 @@ export default function ControlDetailPage() {
         });
         setSelectedReq('');
         setShowMapForm(false);
-        await fetchControl();
+        await refetch();
         setSavingMap(false);
     };
 
@@ -262,10 +383,34 @@ export default function ControlDetailPage() {
             method: 'DELETE', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requirementId: reqId }),
         });
-        await fetchControl();
+        await refetch();
     };
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading...</div>;
+    if (loading) return (
+        <div className="space-y-6 animate-fadeIn" aria-busy="true">
+            <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                    <div className="animate-pulse rounded bg-slate-700/60 h-4 w-24" />
+                    <div className="animate-pulse rounded bg-slate-700/60 h-7 w-64" />
+                </div>
+            </div>
+            <div className="flex gap-1 border-b border-slate-700">
+                {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="animate-pulse rounded bg-slate-700/60 h-8 w-20 mx-1" />
+                ))}
+            </div>
+            <div className="glass-card p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-6">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} className="space-y-1">
+                            <div className="animate-pulse rounded bg-slate-700/60 h-3 w-16" />
+                            <div className="animate-pulse rounded bg-slate-700/60 h-4 w-full" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
     if (!control) return <div className="p-12 text-center text-slate-500">Control not found.</div>;
 
@@ -363,6 +508,21 @@ export default function ControlDetailPage() {
             {/* Tab content */}
             {tab === 'overview' && (
                 <div className="glass-card p-6 space-y-4">
+                    {/* Overview header with Edit button */}
+                    {permissions.canWrite && (
+                        <div className="flex justify-end -mt-1 -mb-2">
+                            <button
+                                type="button"
+                                className="btn btn-secondary text-sm inline-flex items-center gap-1.5"
+                                onClick={openEditModal}
+                                data-testid="control-edit-button"
+                                id="control-edit-button"
+                            >
+                                <PencilIcon size={14} />
+                                Edit
+                            </button>
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 gap-6">
                         <div>
                             <span className="text-xs text-slate-500 uppercase">Description</span>
@@ -448,6 +608,118 @@ export default function ControlDetailPage() {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* Edit Control Modal */}
+            {showEditModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={handleEditCancel} data-testid="control-edit-dialog" id="control-edit-dialog">
+                    <form onSubmit={handleEditSave} className="glass-card p-6 w-full max-w-lg space-y-4 animate-fadeIn" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-semibold text-white">Edit Control</h3>
+
+                        {editError && (
+                            <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2">❌ {editError}</div>
+                        )}
+
+                        <div className="space-y-3">
+                            <div>
+                                <label htmlFor="edit-name" className="text-xs text-slate-400 uppercase block mb-1">Title *</label>
+                                <input
+                                    id="edit-name"
+                                    type="text"
+                                    className="input w-full"
+                                    value={editForm.name}
+                                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                                    required
+                                    minLength={3}
+                                    data-testid="edit-name-input"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="edit-description" className="text-xs text-slate-400 uppercase block mb-1">Description</label>
+                                <textarea
+                                    id="edit-description"
+                                    className="input w-full"
+                                    rows={3}
+                                    value={editForm.description}
+                                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                                    data-testid="edit-description-input"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="edit-intent" className="text-xs text-slate-400 uppercase block mb-1">Intent</label>
+                                <textarea
+                                    id="edit-intent"
+                                    className="input w-full"
+                                    rows={2}
+                                    value={editForm.intent}
+                                    onChange={e => setEditForm(f => ({ ...f, intent: e.target.value }))}
+                                    data-testid="edit-intent-input"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="edit-category" className="text-xs text-slate-400 uppercase block mb-1">Category</label>
+                                    <select
+                                        id="edit-category"
+                                        className="input w-full"
+                                        value={editForm.category}
+                                        onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                                        data-testid="edit-category-input"
+                                    >
+                                        {CATEGORY_OPTIONS.map(c => (
+                                            <option key={c} value={c}>{c ? CATEGORY_LABELS[c] || c : '— None —'}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label htmlFor="edit-frequency" className="text-xs text-slate-400 uppercase block mb-1">Frequency</label>
+                                    <select
+                                        id="edit-frequency"
+                                        className="input w-full"
+                                        value={editForm.frequency}
+                                        onChange={e => setEditForm(f => ({ ...f, frequency: e.target.value }))}
+                                        data-testid="edit-frequency-select"
+                                    >
+                                        {FREQ_OPTIONS.map(f => (
+                                            <option key={f} value={f}>{f ? FREQ_LABELS[f] || f : '— None —'}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label htmlFor="edit-owner" className="text-xs text-slate-400 uppercase block mb-1">Owner</label>
+                                <input
+                                    id="edit-owner"
+                                    type="text"
+                                    className="input w-full"
+                                    placeholder="User ID (leave empty to clear)"
+                                    value={editForm.owner}
+                                    onChange={e => setEditForm(f => ({ ...f, owner: e.target.value }))}
+                                    data-testid="edit-owner-input"
+                                />
+                                {control?.owner?.name && (
+                                    <p className="text-xs text-slate-500 mt-1">Current: {control.owner.name}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button type="button" className="btn btn-secondary text-sm" onClick={handleEditCancel} data-testid="edit-cancel-button">
+                                Cancel
+                            </button>
+                            <button type="submit" className="btn btn-primary text-sm" disabled={savingEdit || editForm.name.trim().length < 3} data-testid="edit-save-button">
+                                {savingEdit ? '⏳ Saving...' : '💾 Save'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* Success toast */}
+            {editSuccess && (
+                <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg animate-fadeIn text-sm" id="edit-success-toast">
+                    ✅ Control updated
                 </div>
             )}
 

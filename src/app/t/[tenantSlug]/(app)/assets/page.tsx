@@ -1,30 +1,48 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
-import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { useQuery } from '@tanstack/react-query';
+import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { queryKeys } from '@/lib/queryKeys';
+import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 
 const ASSET_TYPES = ['INFORMATION', 'APPLICATION', 'SYSTEM', 'SERVICE', 'DATA_STORE', 'INFRASTRUCTURE', 'VENDOR', 'PROCESS', 'PEOPLE_PROCESS', 'OTHER'];
 
 export default function AssetsPage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
+    const { tenantSlug } = useTenantContext();
     const t = useTranslations('assets');
     const tc = useTranslations('common');
-    const [assets, setAssets] = useState<any[]>([]);
+
+    // URL-driven filter state
+    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'type', 'status']);
+
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ name: '', type: 'SYSTEM', classification: '', owner: '', location: '', confidentiality: 3, integrity: 3, availability: 3, dataResidency: '', retention: '' });
 
-    useEffect(() => { fetch(apiUrl('/assets')).then(r => r.json()).then(setAssets); }, [apiUrl]);
+    // React Query replaces useEffect+fetch
+    const assetsQuery = useQuery<any[]>({
+        queryKey: queryKeys.assets.list(tenantSlug, filters),
+        queryFn: async () => {
+            const params = new URLSearchParams(filters);
+            const qs = params.toString();
+            const res = await fetch(apiUrl(`/assets${qs ? `?${qs}` : ''}`));
+            if (!res.ok) throw new Error('Failed to fetch assets');
+            return res.json();
+        },
+    });
+
+    const assets = assetsQuery.data ?? [];
 
     const createAsset = async (e: React.FormEvent) => {
         e.preventDefault();
         const res = await fetch(apiUrl('/assets'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
         if (res.ok) {
-            const asset = await res.json();
-            setAssets(prev => [asset, ...prev]);
             setShowForm(false);
             setForm({ name: '', type: 'SYSTEM', classification: '', owner: '', location: '', confidentiality: 3, integrity: 3, availability: 3, dataResidency: '', retention: '' });
+            assetsQuery.refetch();
         }
     };
 
@@ -38,6 +56,31 @@ export default function AssetsPage() {
                 <div className="flex gap-2">
                     <Link href={tenantHref('/coverage')} className="btn btn-secondary">📊 Coverage</Link>
                     <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t('addAsset')}</button>
+                </div>
+            </div>
+
+            {/* Filters */}
+            <div className="glass-card p-4">
+                <div className="flex flex-wrap gap-3 items-center">
+                    <div className="flex-1 min-w-[200px]">
+                        <input
+                            type="text"
+                            className="input w-full"
+                            placeholder="Search assets..."
+                            value={filters.q || ''}
+                            onChange={e => setFilter('q', e.target.value)}
+                            id="asset-search"
+                        />
+                    </div>
+                    <select className="input w-44" value={filters.type || ''} onChange={e => setFilter('type', e.target.value)} id="asset-type-filter">
+                        <option value="">All Types</option>
+                        {ASSET_TYPES.map(tp => <option key={tp} value={tp}>{tp.replace(/_/g, ' ')}</option>)}
+                    </select>
+                    {hasActiveFilters && (
+                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
+                            ✕ Clear filters
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -62,7 +105,7 @@ export default function AssetsPage() {
                 <table className="data-table">
                     <thead><tr><th>{t('name')}</th><th>{t('type')}</th><th>{t('classification')}</th><th>{t('owner')}</th><th>{t('cia')}</th><th>{t('controlsCol')}</th></tr></thead>
                     <tbody>
-                        {assets.map(a => (
+                        {assets.map((a: any) => (
                             <tr key={a.id} className="cursor-pointer hover:bg-slate-700/30" onClick={() => window.location.href = tenantHref(`/assets/${a.id}`)}>
                                 <td className="font-medium text-white">{a.name}</td>
                                 <td><span className="badge badge-info">{a.type.replace(/_/g, ' ')}</span></td>
@@ -72,7 +115,11 @@ export default function AssetsPage() {
                                 <td className="text-xs">{a._count?.controls || 0}</td>
                             </tr>
                         ))}
-                        {assets.length === 0 && <tr><td colSpan={6} className="text-center text-slate-500 py-8">{t('noAssets')}</td></tr>}
+                        {assets.length === 0 && (
+                            <tr><td colSpan={6} className="text-center text-slate-500 py-8">
+                                {hasActiveFilters ? 'No assets match your filters' : t('noAssets')}
+                            </td></tr>
+                        )}
                     </tbody>
                 </table>
             </div>

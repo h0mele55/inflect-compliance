@@ -1,7 +1,8 @@
-'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { getTenantCtx } from '@/app-layer/context';
+import { listFrameworks, computeCoverage } from '@/app-layer/usecases/framework';
+
+export const dynamic = 'force-dynamic';
 
 const FW_META: Record<string, { icon: string; color: string }> = {
     ISO27001: { icon: '🛡️', color: 'from-indigo-500 to-purple-600' },
@@ -11,44 +12,27 @@ const FW_META: Record<string, { icon: string; color: string }> = {
     ISO39001: { icon: '🚗', color: 'from-rose-500 to-pink-600' },
 };
 
-export default function FrameworksPage() {
-    const params = useParams();
-    const tenantSlug = params.tenantSlug as string;
-    const apiUrl = useCallback((path: string) => `/api/t/${tenantSlug}${path}`, [tenantSlug]);
-    const tenantHref = useCallback((path: string) => `/t/${tenantSlug}${path}`, [tenantSlug]);
+export default async function FrameworksPage({
+    params,
+}: {
+    params: Promise<{ tenantSlug: string }>;
+}) {
+    const { tenantSlug } = await params;
+    const ctx = await getTenantCtx({ tenantSlug });
+    const href = (path: string) => `/t/${tenantSlug}${path}`;
 
-    const [frameworks, setFrameworks] = useState<any[]>([]);
-    const [coverages, setCoverages] = useState<Record<string, any>>({});
-    const [loading, setLoading] = useState(true);
+    const frameworks = await listFrameworks(ctx);
 
-    useEffect(() => {
-        fetch(apiUrl('/frameworks'))
-            .then(r => r.ok ? r.json() : [])
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .then(async (fws: any[]) => {
-                setFrameworks(fws);
-                // Fetch coverage for each framework
-                const covMap: Record<string, any> = {};
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                await Promise.all(fws.map(async (fw: any) => {
-                    try {
-                        const r = await fetch(apiUrl(`/frameworks/${fw.key}?action=coverage`));
-                        if (r.ok) covMap[fw.key] = await r.json();
-                    } catch { /* ignore */ }
-                }));
-                setCoverages(covMap);
-            })
-            .finally(() => setLoading(false));
-    }, [apiUrl]);
-
-    if (loading) return (
-        <div className="p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3, 4, 5].map(i => (
-                    <div key={i} className="glass-card animate-pulse h-56" />
-                ))}
-            </div>
-        </div>
+    // Fetch coverage for each framework in parallel
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const coverages: Record<string, any> = {};
+    await Promise.all(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        frameworks.map(async (fw: any) => {
+            try {
+                coverages[fw.key] = await computeCoverage(ctx, fw.key);
+            } catch { /* framework may not have requirements */ }
+        })
     );
 
     return (
@@ -61,7 +45,7 @@ export default function FrameworksPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {frameworks.map((fw: any) => {
                     const meta = FW_META[fw.key] || { icon: '📋', color: 'from-slate-500 to-slate-600' };
                     const cov = coverages[fw.key];
@@ -123,11 +107,11 @@ export default function FrameworksPage() {
 
                             {/* Actions */}
                             <div className="flex gap-2 mt-4">
-                                <Link href={tenantHref(`/frameworks/${fw.key}`)} className="btn btn-primary flex-1 text-center text-sm" id={`view-framework-${fw.key}`}>
+                                <Link href={href(`/frameworks/${fw.key}`)} className="btn btn-primary flex-1 text-center text-sm" id={`view-framework-${fw.key}`}>
                                     View Details
                                 </Link>
                                 {!isInstalled && (
-                                    <Link href={tenantHref(`/frameworks/${fw.key}/install`)} className="btn btn-secondary text-sm" id={`install-framework-${fw.key}`}>
+                                    <Link href={href(`/frameworks/${fw.key}/install`)} className="btn btn-secondary text-sm" id={`install-framework-${fw.key}`}>
                                         Install
                                     </Link>
                                 )}

@@ -1,7 +1,10 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { queryKeys } from '@/lib/queryKeys';
+import { SkeletonTableRow } from '@/components/ui/skeleton';
+import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 
 const STATUS_BADGE: Record<string, string> = {
     ACTIVE: 'badge-success', ONBOARDING: 'badge-info',
@@ -26,29 +29,25 @@ function isOverdue(d: string | null) {
 export default function VendorRegisterPage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
-    const { permissions } = useTenantContext();
+    const { permissions, tenantSlug } = useTenantContext();
 
-    const [vendors, setVendors] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState('');
-    const [critFilter, setCritFilter] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [reviewDue, setReviewDue] = useState('');
+    // URL-driven filter state
+    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'criticality', 'reviewDue']);
 
-    const fetchVendors = useCallback(async () => {
-        setLoading(true);
-        const params = new URLSearchParams();
-        if (statusFilter) params.set('status', statusFilter);
-        if (critFilter) params.set('criticality', critFilter);
-        if (reviewDue) params.set('reviewDue', reviewDue);
-        if (searchQuery) params.set('q', searchQuery);
-        const qs = params.toString();
-        const res = await fetch(apiUrl(`/vendors${qs ? '?' + qs : ''}`));
-        if (res.ok) setVendors(await res.json());
-        setLoading(false);
-    }, [apiUrl, statusFilter, critFilter, searchQuery, reviewDue]);
+    // React Query replaces useEffect+fetch
+    const vendorsQuery = useQuery<any[]>({
+        queryKey: queryKeys.vendors.list(tenantSlug, filters),
+        queryFn: async () => {
+            const params = new URLSearchParams(filters);
+            const qs = params.toString();
+            const res = await fetch(apiUrl(`/vendors${qs ? '?' + qs : ''}`));
+            if (!res.ok) throw new Error('Failed to fetch vendors');
+            return res.json();
+        },
+    });
 
-    useEffect(() => { fetchVendors(); }, [fetchVendors]);
+    const vendors = vendorsQuery.data ?? [];
+    const loading = vendorsQuery.isLoading;
 
     return (
         <div className="space-y-6">
@@ -70,22 +69,29 @@ export default function VendorRegisterPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap gap-3 items-center">
-                <input type="search" placeholder="Search vendors…" className="input w-48" value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)} id="vendor-search" />
-                <select className="input w-36" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} id="vendor-status-filter">
-                    <option value="">All Status</option>
-                    {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-                <select className="input w-36" value={critFilter} onChange={e => setCritFilter(e.target.value)} id="vendor-crit-filter">
-                    <option value="">All Criticality</option>
-                    {CRIT_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <select className="input w-40" value={reviewDue} onChange={e => setReviewDue(e.target.value)} id="vendor-review-filter">
-                    <option value="">All Review</option>
-                    <option value="overdue">Overdue</option>
-                    <option value="next30d">Due in 30 days</option>
-                </select>
+            <div className="glass-card p-4">
+                <div className="flex flex-wrap gap-3 items-center">
+                    <input type="search" placeholder="Search vendors…" className="input w-48" value={filters.q || ''}
+                        onChange={e => setFilter('q', e.target.value)} id="vendor-search" />
+                    <select className="input w-36" value={filters.status || ''} onChange={e => setFilter('status', e.target.value)} id="vendor-status-filter">
+                        <option value="">All Status</option>
+                        {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <select className="input w-36" value={filters.criticality || ''} onChange={e => setFilter('criticality', e.target.value)} id="vendor-crit-filter">
+                        <option value="">All Criticality</option>
+                        {CRIT_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select className="input w-40" value={filters.reviewDue || ''} onChange={e => setFilter('reviewDue', e.target.value)} id="vendor-review-filter">
+                        <option value="">All Review</option>
+                        <option value="overdue">Overdue</option>
+                        <option value="next30d">Due in 30 days</option>
+                    </select>
+                    {hasActiveFilters && (
+                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
+                            ✕ Clear filters
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Table */}
@@ -103,8 +109,10 @@ export default function VendorRegisterPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {loading && <tr><td colSpan={7} className="text-center text-slate-500 py-8">Loading…</td></tr>}
-                        {!loading && vendors.map(v => (
+                        {loading && Array.from({ length: 8 }).map((_, i) => (
+                            <SkeletonTableRow key={`skel-${i}`} cols={7} />
+                        ))}
+                        {!loading && vendors.map((v: any) => (
                             <tr key={v.id} className="border-b border-slate-800 hover:bg-slate-800/50 cursor-pointer"
                                 onClick={() => window.location.href = tenantHref(`/vendors/${v.id}`)}>
                                 <td className="p-3 font-medium">
@@ -130,7 +138,9 @@ export default function VendorRegisterPage() {
                             </tr>
                         ))}
                         {!loading && vendors.length === 0 && (
-                            <tr><td colSpan={7} className="text-center text-slate-500 py-8">No vendors found</td></tr>
+                            <tr><td colSpan={7} className="text-center text-slate-500 py-8">
+                                {hasActiveFilters ? 'No vendors match your filters' : 'No vendors found'}
+                            </td></tr>
                         )}
                     </tbody>
                 </table>

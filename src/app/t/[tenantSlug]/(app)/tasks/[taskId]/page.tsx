@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { SkeletonLine, SkeletonCard } from '@/components/ui/skeleton';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -219,7 +220,20 @@ export default function TaskDetailPage() {
         setSavingComment(false);
     };
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading...</div>;
+    if (loading) return (
+        <div className="space-y-6 animate-fadeIn" aria-busy="true">
+            <div className="space-y-2">
+                <SkeletonLine className="w-12" />
+                <SkeletonLine className="w-64 h-7" />
+                <div className="flex gap-2">
+                    <SkeletonLine className="w-16 h-5 rounded-full" />
+                    <SkeletonLine className="w-16 h-5 rounded-full" />
+                    <SkeletonLine className="w-16 h-5 rounded-full" />
+                </div>
+            </div>
+            <SkeletonCard lines={4} />
+        </div>
+    );
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
     if (!task) return <div className="p-12 text-center text-slate-500">Task not found.</div>;
 
@@ -421,7 +435,11 @@ export default function TaskDetailPage() {
                     )}
                     <div className="glass-card overflow-hidden">
                         {linksLoading ? (
-                            <div className="p-8 text-center text-slate-500 animate-pulse">Loading links...</div>
+                            <div className="p-4 space-y-2">
+                                {Array.from({ length: 3 }).map((_, i) => (
+                                    <SkeletonLine key={i} className="w-full" />
+                                ))}
+                            </div>
                         ) : links.length === 0 ? (
                             <div className="p-8 text-center text-slate-500 text-sm">No links yet</div>
                         ) : (
@@ -474,7 +492,14 @@ export default function TaskDetailPage() {
                     )}
                     <div className="glass-card overflow-hidden" id="comments-list">
                         {commentsLoading ? (
-                            <div className="p-8 text-center text-slate-500 animate-pulse">Loading comments...</div>
+                            <div className="p-4 space-y-3">
+                                {Array.from({ length: 3 }).map((_, i) => (
+                                    <div key={i} className="space-y-1">
+                                        <SkeletonLine className="w-32" />
+                                        <SkeletonLine className="w-full" />
+                                    </div>
+                                ))}
+                            </div>
                         ) : comments.length === 0 ? (
                             <div className="p-8 text-center text-slate-500 text-sm">No comments yet</div>
                         ) : (
@@ -499,7 +524,17 @@ export default function TaskDetailPage() {
             {tab === 'activity' && (
                 <div className="glass-card overflow-hidden" id="activity-list">
                     {activityLoading ? (
-                        <div className="p-8 text-center text-slate-500 animate-pulse">Loading activity...</div>
+                        <div className="p-4 space-y-3">
+                            {Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="flex items-start gap-3">
+                                    <div className="animate-pulse rounded-full bg-slate-700/60 w-2 h-2 mt-2" />
+                                    <div className="flex-1 space-y-1">
+                                        <SkeletonLine className="w-48" />
+                                        <SkeletonLine className="w-full" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     ) : activity.length === 0 ? (
                         <div className="p-8 text-center text-slate-500 text-sm">No activity yet</div>
                     ) : (

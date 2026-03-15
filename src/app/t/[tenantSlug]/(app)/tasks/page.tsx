@@ -1,7 +1,11 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { queryKeys } from '@/lib/queryKeys';
+import { SkeletonTableRow } from '@/components/ui/skeleton';
+import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -34,44 +38,51 @@ function getSlaLabel(severity: string, createdAt: string, status: string): strin
     return new Date() > deadline ? 'SLA Breached' : '';
 }
 
+interface TaskListItem {
+    id: string;
+    key: string | null;
+    title: string;
+    type: string;
+    severity: string;
+    status: string;
+    dueAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+    assignee: { name: string } | null;
+    assigneeUserId: string | null;
+}
+
 export default function TasksPage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
-    const { permissions } = useTenantContext();
+    const { permissions, tenantSlug } = useTenantContext();
+    const queryClient = useQueryClient();
 
-    const [tasks, setTasks] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState('');
-    const [typeFilter, setTypeFilter] = useState('');
-    const [severityFilter, setSeverityFilter] = useState('');
-    const [overdueOnly, setOverdueOnly] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
+    // URL-driven filter state
+    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'type', 'severity', 'due']);
 
     // Bulk selection
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [bulkAction, setBulkAction] = useState('');
     const [bulkValue, setBulkValue] = useState('');
-    const [bulkLoading, setBulkLoading] = useState(false);
 
-    const fetchTasks = useCallback(async () => {
-        setLoading(true);
-        const params = new URLSearchParams();
-        if (statusFilter) params.set('status', statusFilter);
-        if (typeFilter) params.set('type', typeFilter);
-        if (severityFilter) params.set('severity', severityFilter);
-        if (overdueOnly) params.set('due', 'overdue');
-        if (searchQuery) params.set('q', searchQuery);
-        const qs = params.toString();
-        const res = await fetch(apiUrl(`/tasks${qs ? `?${qs}` : ''}`));
-        if (res.ok) setTasks(await res.json());
-        setLoading(false);
-        setSelected(new Set());
-    }, [apiUrl, statusFilter, typeFilter, severityFilter, overdueOnly, searchQuery]);
+    // ─── Query: tasks list ───
 
-    useEffect(() => { fetchTasks(); }, [fetchTasks]);
+    const tasksQuery = useQuery<TaskListItem[]>({
+        queryKey: queryKeys.tasks.list(tenantSlug, filters),
+        queryFn: async () => {
+            const params = new URLSearchParams(filters);
+            const qs = params.toString();
+            const res = await fetch(apiUrl(`/tasks${qs ? `?${qs}` : ''}`));
+            if (!res.ok) throw new Error('Failed to fetch tasks');
+            return res.json();
+        },
+    });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isOverdue = (task: any) => task.dueAt && new Date(task.dueAt) < new Date() && !['RESOLVED', 'CLOSED', 'CANCELED'].includes(task.status);
+    const tasks = tasksQuery.data ?? [];
+    const loading = tasksQuery.isLoading;
+
+    const isOverdue = (task: TaskListItem) => task.dueAt && new Date(task.dueAt) < new Date() && !['RESOLVED', 'CLOSED', 'CANCELED'].includes(task.status);
 
     const toggleSelect = (id: string) => {
         setSelected(prev => {
@@ -85,30 +96,65 @@ export default function TasksPage() {
         else setSelected(new Set(tasks.map(i => i.id)));
     };
 
-    const handleBulkSubmit = async () => {
+    // ─── Mutation: bulk actions ───
+
+    const bulkMutation = useMutation({
+        mutationFn: async ({ action, value, ids }: { action: string; value: string; ids: string[] }) => {
+            let url = '';
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const body: any = { taskIds: ids };
+
+            if (action === 'assign') {
+                url = apiUrl('/tasks/bulk/assign');
+                body.assigneeUserId = value || null;
+            } else if (action === 'status') {
+                url = apiUrl('/tasks/bulk/status');
+                body.status = value;
+            } else if (action === 'due') {
+                url = apiUrl('/tasks/bulk/due');
+                body.dueAt = value || null;
+            }
+
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (!res.ok) throw new Error('Bulk action failed');
+            return res.json();
+        },
+        onMutate: async ({ action, value, ids }) => {
+            await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all(tenantSlug) });
+
+            const listKey = queryKeys.tasks.list(tenantSlug, filters);
+            const previousList = queryClient.getQueryData<TaskListItem[]>(listKey);
+
+            if (previousList) {
+                queryClient.setQueryData<TaskListItem[]>(listKey, old =>
+                    old?.map(task => {
+                        if (!ids.includes(task.id)) return task;
+                        if (action === 'status') return { ...task, status: value };
+                        if (action === 'assign') return { ...task, assigneeUserId: value || null, assignee: value ? { name: value } : null };
+                        if (action === 'due') return { ...task, dueAt: value || null };
+                        return task;
+                    })
+                );
+            }
+
+            return { previousList, listKey };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.previousList) {
+                queryClient.setQueryData(context.listKey, context.previousList);
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(tenantSlug) });
+            setSelected(new Set());
+            setBulkAction('');
+            setBulkValue('');
+        },
+    });
+
+    const handleBulkSubmit = () => {
         if (!bulkAction || selected.size === 0) return;
-        setBulkLoading(true);
-        const ids = Array.from(selected);
-        let url = '';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let body: any = { taskIds: ids };
-
-        if (bulkAction === 'assign') {
-            url = apiUrl('/tasks/bulk/assign');
-            body.assigneeUserId = bulkValue || null;
-        } else if (bulkAction === 'status') {
-            url = apiUrl('/tasks/bulk/status');
-            body.status = bulkValue;
-        } else if (bulkAction === 'due') {
-            url = apiUrl('/tasks/bulk/due');
-            body.dueAt = bulkValue || null;
-        }
-
-        await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        setBulkLoading(false);
-        setBulkAction('');
-        setBulkValue('');
-        fetchTasks();
+        bulkMutation.mutate({ action: bulkAction, value: bulkValue, ids: Array.from(selected) });
     };
 
     return (
@@ -137,27 +183,32 @@ export default function TasksPage() {
                             type="text"
                             className="input w-full"
                             placeholder="Search tasks..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
+                            value={filters.q || ''}
+                            onChange={e => setFilter('q', e.target.value)}
                             id="task-search"
                         />
                     </div>
-                    <select className="input w-36" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} id="task-status-filter">
+                    <select className="input w-36" value={filters.status || ''} onChange={e => setFilter('status', e.target.value)} id="task-status-filter">
                         <option value="">All Status</option>
                         {STATUS_OPTIONS.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
                     </select>
-                    <select className="input w-36" value={typeFilter} onChange={e => setTypeFilter(e.target.value)} id="task-type-filter">
+                    <select className="input w-36" value={filters.type || ''} onChange={e => setFilter('type', e.target.value)} id="task-type-filter">
                         <option value="">All Types</option>
                         {TYPE_OPTIONS.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
                     </select>
-                    <select className="input w-36" value={severityFilter} onChange={e => setSeverityFilter(e.target.value)} id="task-severity-filter">
+                    <select className="input w-36" value={filters.severity || ''} onChange={e => setFilter('severity', e.target.value)} id="task-severity-filter">
                         <option value="">All Severity</option>
                         {SEVERITY_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                        <input type="checkbox" checked={overdueOnly} onChange={e => setOverdueOnly(e.target.checked)} />
+                        <input type="checkbox" checked={filters.due === 'overdue'} onChange={e => setFilter('due', e.target.checked ? 'overdue' : '')} />
                         Overdue only
                     </label>
+                    {hasActiveFilters && (
+                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
+                            ✕ Clear filters
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -185,11 +236,11 @@ export default function TasksPage() {
                     )}
                     <button
                         className="btn btn-primary text-sm"
-                        disabled={!bulkAction || (bulkAction === 'status' && !bulkValue) || bulkLoading}
+                        disabled={!bulkAction || (bulkAction === 'status' && !bulkValue) || bulkMutation.isPending}
                         onClick={handleBulkSubmit}
                         id="bulk-apply-btn"
                     >
-                        {bulkLoading ? 'Applying...' : 'Apply'}
+                        {bulkMutation.isPending ? 'Applying...' : 'Apply'}
                     </button>
                     <button className="text-xs text-slate-400 hover:text-white" onClick={() => setSelected(new Set())}>Clear</button>
                 </div>
@@ -198,7 +249,24 @@ export default function TasksPage() {
             {/* Table */}
             <div className="glass-card overflow-hidden">
                 {loading ? (
-                    <div className="p-12 text-center text-slate-500 animate-pulse">Loading tasks...</div>
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Key / Title</th>
+                                <th>Type</th>
+                                <th>Severity</th>
+                                <th>Status</th>
+                                <th>Assignee</th>
+                                <th>Due Date</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Array.from({ length: 10 }).map((_, i) => (
+                                <SkeletonTableRow key={i} cols={7} />
+                            ))}
+                        </tbody>
+                    </table>
                 ) : tasks.length === 0 ? (
                     <div className="p-12 text-center text-slate-500">
                         <p className="text-lg mb-2">No tasks found</p>

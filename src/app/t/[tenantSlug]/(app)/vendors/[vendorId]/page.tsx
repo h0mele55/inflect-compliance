@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { SkeletonDetailPage } from '@/components/ui/skeleton';
 
 const STATUS_BADGE: Record<string, string> = {
     ACTIVE: 'badge-success', ONBOARDING: 'badge-info', OFFBOARDING: 'badge-warning', OFFBOARDED: 'badge-neutral',
@@ -149,7 +150,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
         setEnriching(false);
     };
 
-    if (loading) return <div className="text-slate-400 py-8 text-center">Loading…</div>;
+    if (loading) return <SkeletonDetailPage />;
     if (!vendor) return <div className="text-red-400 py-8 text-center">Vendor not found</div>;
 
     const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString() : '—';

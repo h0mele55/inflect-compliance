@@ -1,24 +1,49 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { queryKeys } from '@/lib/queryKeys';
+import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 
 const RISK_COLORS = ['', '#22c55e', '#84cc16', '#f59e0b', '#ef4444', '#dc2626'];
+
+interface RiskListItem {
+    id: string;
+    title: string;
+    threat: string;
+    likelihood: number;
+    impact: number;
+    inherentScore: number;
+    treatment: string | null;
+    asset: { name: string } | null;
+    controls: unknown[];
+}
 
 export default function RisksPage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
+    const { tenantSlug } = useTenantContext();
     const t = useTranslations('risks');
     const tc = useTranslations('common');
-    const [risks, setRisks] = useState<any[]>([]);
-    const [assets, setAssets] = useState<any[]>([]);
     const [view, setView] = useState<'register' | 'heatmap'>('register');
 
-    useEffect(() => {
-        fetch(apiUrl('/risks')).then(r => r.json()).then(setRisks);
-        fetch(apiUrl('/assets')).then(r => r.json()).then(setAssets);
-    }, [apiUrl]);
+    // URL-driven filter state
+    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'category']);
+
+    const risksQuery = useQuery<RiskListItem[]>({
+        queryKey: queryKeys.risks.list(tenantSlug, filters),
+        queryFn: async () => {
+            const params = new URLSearchParams(filters);
+            const qs = params.toString();
+            const res = await fetch(apiUrl(`/risks${qs ? `?${qs}` : ''}`));
+            if (!res.ok) throw new Error('Failed to fetch risks');
+            return res.json();
+        },
+    });
+
+    const risks = risksQuery.data ?? [];
 
     const heatmap: number[][] = Array.from({ length: 5 }, (_, l) =>
         Array.from({ length: 5 }, (_, i) => risks.filter(r => r.likelihood === (5 - l) && r.impact === (i + 1)).length)
@@ -49,6 +74,41 @@ export default function RisksPage() {
                         Import
                     </Link>
                     <Link href={tenantHref('/risks/new')} className="btn btn-primary" id="new-risk-btn">{t('addRisk')}</Link>
+                </div>
+            </div>
+
+            {/* Filters */}
+            <div className="glass-card p-4">
+                <div className="flex flex-wrap gap-3 items-center">
+                    <div className="flex-1 min-w-[200px]">
+                        <input
+                            type="text"
+                            className="input w-full"
+                            placeholder="Search risks..."
+                            value={filters.q || ''}
+                            onChange={e => setFilter('q', e.target.value)}
+                            id="risk-search"
+                        />
+                    </div>
+                    <select className="input w-36" value={filters.status || ''} onChange={e => setFilter('status', e.target.value)} id="risk-status-filter">
+                        <option value="">All Status</option>
+                        <option value="OPEN">Open</option>
+                        <option value="MITIGATING">Mitigating</option>
+                        <option value="ACCEPTED">Accepted</option>
+                        <option value="CLOSED">Closed</option>
+                    </select>
+                    <select className="input w-44" value={filters.category || ''} onChange={e => setFilter('category', e.target.value)} id="risk-category-filter">
+                        <option value="">All Categories</option>
+                        <option value="Technical">Technical</option>
+                        <option value="Operational">Operational</option>
+                        <option value="Compliance">Compliance</option>
+                        <option value="Strategic">Strategic</option>
+                    </select>
+                    {hasActiveFilters && (
+                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
+                            ✕ Clear filters
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -103,7 +163,11 @@ export default function RisksPage() {
                                     </tr>
                                 );
                             })}
-                            {risks.length === 0 && <tr><td colSpan={8} className="text-center text-slate-500 py-8">{t('noRisks')}</td></tr>}
+                            {risks.length === 0 && (
+                                <tr><td colSpan={8} className="text-center text-slate-500 py-8">
+                                    {hasActiveFilters ? 'No risks match your filters' : t('noRisks')}
+                                </td></tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { SkeletonDetailPage } from '@/components/ui/skeleton';
 
 const CRIT_BADGE: Record<string, string> = { LOW: 'badge-neutral', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
 const STATUS_BADGE: Record<string, string> = {
@@ -80,7 +81,7 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
         setDeciding(false);
     };
 
-    if (loading) return <div className="text-slate-400 py-8 text-center">Loading…</div>;
+    if (loading) return <SkeletonDetailPage />;
     if (!assessment) return <div className="text-red-400 py-8 text-center">Assessment not found</div>;
 
     const isDraft = assessment.status === 'DRAFT';

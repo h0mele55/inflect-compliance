@@ -66,9 +66,7 @@ enum TreatmentDecision {
 
 enum ControlStatus {
   NOT_STARTED
-  PLANNED    // @deprecated — use NOT_STARTED
   IN_PROGRESS
-  IMPLEMENTING // @deprecated — use IN_PROGRESS
   IMPLEMENTED
   NEEDS_REVIEW
   NOT_APPLICABLE // @deprecated — use Control.applicability instead
@@ -550,6 +548,7 @@ model Task {
 
   @@unique([tenantId, key])
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([tenantId, status])
   @@index([tenantId, type])
   @@index([tenantId, severity])
@@ -638,6 +637,7 @@ model Asset {
 
   @@index([tenantId, name])
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([tenantId, type])
   @@index([tenantId, criticality])
   @@index([tenantId, status])
@@ -676,6 +676,7 @@ model Risk {
   assetLinks AssetRiskLink[]
 
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([tenantId, status])
   @@index([tenantId, deletedAt])
 }
@@ -751,6 +752,7 @@ model Control {
 
   @@index([tenantId, code])
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([tenantId, status])
   @@index([tenantId, applicability])
   @@index([ownerUserId])
@@ -955,6 +957,7 @@ model Evidence {
   testEvidenceLinks ControlTestEvidenceLink[]
 
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([tenantId, deletedAt])
   @@index([tenantId, retentionUntil])
   @@index([tenantId, isArchived])
@@ -1083,6 +1086,7 @@ model Policy {
 
   @@index([tenantId, slug])
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([tenantId, status])
   @@index([nextReviewAt])
   @@index([tenantId, deletedAt])
@@ -1446,6 +1450,7 @@ model Vendor {
 
   @@unique([tenantId, name])
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([tenantId, status])
   @@index([tenantId, criticality])
   @@index([tenantId, nextReviewAt])

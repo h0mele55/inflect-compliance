@@ -1,6 +1,8 @@
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
+import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
+import type { PaginatedResponse } from '@/lib/dto/pagination';
 
 export interface VendorFilters {
     status?: string;
@@ -10,6 +12,12 @@ export interface VendorFilters {
     q?: string;
 }
 
+export interface VendorListParams {
+    limit?: number;
+    cursor?: string;
+    filters?: VendorFilters;
+}
+
 const vendorIncludes = {
     owner: { select: { id: true, name: true, email: true } },
     _count: { select: { documents: true, assessments: true, contacts: true, links: true } },
@@ -17,6 +25,39 @@ const vendorIncludes = {
 
 export class VendorRepository {
     static async list(db: PrismaTx, ctx: RequestContext, filters: VendorFilters = {}) {
+        const where = VendorRepository._buildWhere(ctx, filters);
+        return db.vendor.findMany({
+            where,
+            orderBy: [{ criticality: 'desc' }, { name: 'asc' }],
+            include: vendorIncludes,
+        });
+    }
+
+    static async listPaginated(db: PrismaTx, ctx: RequestContext, params: VendorListParams): Promise<PaginatedResponse<unknown>> {
+        const limit = clampLimit(params.limit);
+        const where = VendorRepository._buildWhere(ctx, params.filters);
+
+        const cursorWhere = buildCursorWhere(params.cursor);
+        if (cursorWhere) {
+            if (where.AND) {
+                (where.AND as Prisma.VendorWhereInput[]).push(cursorWhere as Prisma.VendorWhereInput);
+            } else {
+                where.AND = [cursorWhere as Prisma.VendorWhereInput];
+            }
+        }
+
+        const items = await db.vendor.findMany({
+            where,
+            orderBy: CURSOR_ORDER_BY,
+            take: limit + 1,
+            include: vendorIncludes,
+        });
+
+        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
+    }
+
+    private static _buildWhere(ctx: RequestContext, filters: VendorFilters = {}): Prisma.VendorWhereInput {
         const where: Prisma.VendorWhereInput = { tenantId: ctx.tenantId };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,11 +79,7 @@ export class VendorRepository {
             where.nextReviewAt = { gte: now, lte: in30 };
         }
 
-        return db.vendor.findMany({
-            where,
-            orderBy: [{ criticality: 'desc' }, { name: 'asc' }],
-            include: vendorIncludes,
-        });
+        return where;
     }
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {

@@ -1,5 +1,5 @@
 import { RequestContext } from '../types';
-import { PolicyRepository } from '../repositories/PolicyRepository';
+import { PolicyRepository, PolicyFilters, PolicyListParams } from '../repositories/PolicyRepository';
 import { PolicyVersionRepository } from '../repositories/PolicyVersionRepository';
 import { PolicyApprovalRepository } from '../repositories/PolicyApprovalRepository';
 import { PolicyTemplateRepository } from '../repositories/PolicyTemplateRepository';
@@ -20,10 +20,17 @@ function slugify(text: string): string {
 
 // ─── Queries ───
 
-export async function listPolicies(ctx: RequestContext, filters?: { status?: string; category?: string; q?: string }) {
+export async function listPolicies(ctx: RequestContext, filters?: PolicyFilters) {
     assertCanRead(ctx);
     return runInTenantContext(ctx, (db) =>
         PolicyRepository.list(db, ctx, filters)
+    );
+}
+
+export async function listPoliciesPaginated(ctx: RequestContext, params: PolicyListParams) {
+    assertCanRead(ctx);
+    return runInTenantContext(ctx, (db) =>
+        PolicyRepository.listPaginated(db, ctx, params)
     );
 }
 

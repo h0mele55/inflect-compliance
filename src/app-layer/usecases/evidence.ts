@@ -1,5 +1,5 @@
 import { RequestContext } from '../types';
-import { EvidenceRepository } from '../repositories/EvidenceRepository';
+import { EvidenceRepository, EvidenceListFilters } from '../repositories/EvidenceRepository';
 import { assertCanRead, assertCanWrite, assertCanAdmin } from '../policies/common';
 import { logEvent } from '../events/audit';
 import { validateFile, uploadFile } from '@/lib/storage';
@@ -8,10 +8,20 @@ import { notFound, badRequest, forbidden } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
 import type { EvidenceType, ReviewCadence } from '@prisma/client';
 
-export async function listEvidence(ctx: RequestContext) {
+export async function listEvidence(ctx: RequestContext, filters?: EvidenceListFilters) {
     assertCanRead(ctx);
     return runInTenantContext(ctx, (db) =>
-        EvidenceRepository.list(db, ctx)
+        EvidenceRepository.list(db, ctx, filters)
+    );
+}
+
+export async function listEvidencePaginated(ctx: RequestContext, params: {
+    limit?: number; cursor?: string;
+    filters?: { type?: string; controlId?: string; q?: string; archived?: boolean; expiring?: boolean };
+}) {
+    assertCanRead(ctx);
+    return runInTenantContext(ctx, (db) =>
+        EvidenceRepository.listPaginated(db, ctx, params)
     );
 }
 

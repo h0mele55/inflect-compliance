@@ -1,8 +1,12 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
-import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { queryKeys } from '@/lib/queryKeys';
+import { SkeletonTableRow } from '@/components/ui/skeleton';
+import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 
 const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral',
@@ -10,33 +14,32 @@ const STATUS_BADGE: Record<string, string> = {
     ARCHIVED: 'badge-warning',
 };
 
-const STATUS_OPTIONS = ['', 'DRAFT', 'PUBLISHED', 'ARCHIVED'];
-const CATEGORY_OPTIONS = ['', 'Information Security', 'Access Control', 'HR', 'Physical', 'Compliance', 'Operations', 'Risk Management', 'Business Continuity', 'Supplier', 'Other'];
+const STATUS_OPTIONS = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
+const CATEGORY_OPTIONS = ['Information Security', 'Access Control', 'HR', 'Physical', 'Compliance', 'Operations', 'Risk Management', 'Business Continuity', 'Supplier', 'Other'];
 
 export default function PoliciesPage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
+    const { tenantSlug } = useTenantContext();
     const t = useTranslations('policies');
 
-    const [policies, setPolicies] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState('');
-    const [searchQuery, setSearchQuery] = useState('');
+    // URL-driven filter state
+    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'category']);
 
-    const fetchPolicies = useCallback(async () => {
-        setLoading(true);
-        const params = new URLSearchParams();
-        if (statusFilter) params.set('status', statusFilter);
-        if (categoryFilter) params.set('category', categoryFilter);
-        if (searchQuery) params.set('q', searchQuery);
-        const qs = params.toString();
-        const res = await fetch(apiUrl(`/policies${qs ? `?${qs}` : ''}`));
-        if (res.ok) setPolicies(await res.json());
-        setLoading(false);
-    }, [apiUrl, statusFilter, categoryFilter, searchQuery]);
+    // React Query replaces useEffect+fetch
+    const policiesQuery = useQuery<any[]>({
+        queryKey: queryKeys.policies.list(tenantSlug, filters),
+        queryFn: async () => {
+            const params = new URLSearchParams(filters);
+            const qs = params.toString();
+            const res = await fetch(apiUrl(`/policies${qs ? `?${qs}` : ''}`));
+            if (!res.ok) throw new Error('Failed to fetch policies');
+            return res.json();
+        },
+    });
 
-    useEffect(() => { fetchPolicies(); }, [fetchPolicies]);
+    const policies = policiesQuery.data ?? [];
+    const loading = policiesQuery.isLoading;
 
     const statusLabel = (s: string) => {
         const map: Record<string, string> = { DRAFT: 'Draft', PUBLISHED: 'Published', ARCHIVED: 'Archived' };
@@ -69,44 +72,68 @@ export default function PoliciesPage() {
                             type="text"
                             className="input w-full"
                             placeholder="Search policies..."
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
+                            value={filters.q || ''}
+                            onChange={e => setFilter('q', e.target.value)}
                             id="policy-search"
                         />
                     </div>
                     <select
                         className="input w-40"
-                        value={statusFilter}
-                        onChange={e => setStatusFilter(e.target.value)}
+                        value={filters.status || ''}
+                        onChange={e => setFilter('status', e.target.value)}
                         id="policy-status-filter"
                     >
                         <option value="">All Status</option>
-                        {STATUS_OPTIONS.filter(Boolean).map(s => (
+                        {STATUS_OPTIONS.map(s => (
                             <option key={s} value={s}>{statusLabel(s)}</option>
                         ))}
                     </select>
                     <select
                         className="input w-48"
-                        value={categoryFilter}
-                        onChange={e => setCategoryFilter(e.target.value)}
+                        value={filters.category || ''}
+                        onChange={e => setFilter('category', e.target.value)}
                         id="policy-category-filter"
                     >
                         <option value="">All Categories</option>
-                        {CATEGORY_OPTIONS.filter(Boolean).map(c => (
+                        {CATEGORY_OPTIONS.map(c => (
                             <option key={c} value={c}>{c}</option>
                         ))}
                     </select>
+                    {hasActiveFilters && (
+                        <button type="button" className="btn btn-sm btn-secondary text-xs" onClick={clearFilters} id="filter-clear">
+                            ✕ Clear filters
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Table */}
             <div className="glass-card overflow-hidden">
                 {loading ? (
-                    <div className="p-12 text-center text-slate-500 animate-pulse">Loading...</div>
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Status</th>
+                                <th>Category</th>
+                                <th>Owner</th>
+                                <th>Next Review</th>
+                                <th>Updated</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Array.from({ length: 8 }).map((_, i) => (
+                                <SkeletonTableRow key={i} cols={6} />
+                            ))}
+                        </tbody>
+                    </table>
                 ) : policies.length === 0 ? (
                     <div className="p-12 text-center text-slate-500">
-                        <p className="text-lg mb-2">No policies found</p>
-                        <p className="text-sm">Create your first policy to get started.</p>
+                        <p className="text-lg mb-2">{hasActiveFilters ? 'No policies match your filters' : 'No policies found'}</p>
+                        <p className="text-sm">{hasActiveFilters ? 'Try adjusting your search or filters.' : 'Create your first policy to get started.'}</p>
+                        {hasActiveFilters && (
+                            <button type="button" className="btn btn-sm btn-secondary mt-3" onClick={clearFilters}>Clear filters</button>
+                        )}
                     </div>
                 ) : (
                     <table className="data-table" id="policies-table">
@@ -121,7 +148,7 @@ export default function PoliciesPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {policies.map(p => (
+                            {policies.map((p: any) => (
                                 <tr key={p.id} className="cursor-pointer hover:bg-slate-700/30 transition">
                                     <td>
                                         <Link href={tenantHref(`/policies/${p.id}`)} className="font-medium text-white hover:text-brand-400 transition">

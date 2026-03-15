@@ -97,6 +97,10 @@ describe('Audit Guardrails — No Raw PrismaClient Without Middleware', () => {
         const allFiles = collectTsFiles(SRC_DIR);
         const ALLOWED_FILES = [
             path.resolve(SRC_DIR, 'lib', 'prisma.ts'),
+            // Infrastructure routes create standalone PrismaClient for health/seed checks
+            path.resolve(SRC_DIR, 'app', 'api', 'health', 'route.ts'),
+            path.resolve(SRC_DIR, 'app', 'api', 'readyz', 'route.ts'),
+            path.resolve(SRC_DIR, 'app', 'api', 'staging', 'seed', 'route.ts'),
         ];
 
         const violations: string[] = [];

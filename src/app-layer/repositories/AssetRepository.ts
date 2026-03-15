@@ -1,14 +1,74 @@
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
+import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
+import type { PaginatedResponse } from '@/lib/dto/pagination';
+
+export interface AssetFilters {
+    type?: string;
+    status?: string;
+    criticality?: string;
+    q?: string;
+}
+
+export interface AssetListParams {
+    limit?: number;
+    cursor?: string;
+    filters?: AssetFilters;
+}
 
 export class AssetRepository {
-    static async list(db: PrismaTx, ctx: RequestContext) {
+    static async list(db: PrismaTx, ctx: RequestContext, filters?: AssetFilters) {
+        const where = AssetRepository._buildWhere(ctx, filters);
         return db.asset.findMany({
-            where: { tenantId: ctx.tenantId },
+            where,
             orderBy: { createdAt: 'desc' },
             include: { _count: { select: { controls: true } } },
         });
+    }
+
+    static async listPaginated(db: PrismaTx, ctx: RequestContext, params: AssetListParams): Promise<PaginatedResponse<unknown>> {
+        const limit = clampLimit(params.limit);
+        const where = AssetRepository._buildWhere(ctx, params.filters);
+
+        const cursorWhere = buildCursorWhere(params.cursor);
+        if (cursorWhere) {
+            if (where.AND) {
+                (where.AND as Prisma.AssetWhereInput[]).push(cursorWhere as Prisma.AssetWhereInput);
+            } else {
+                where.AND = [cursorWhere as Prisma.AssetWhereInput];
+            }
+        }
+
+        const items = await db.asset.findMany({
+            where,
+            orderBy: CURSOR_ORDER_BY,
+            take: limit + 1,
+            include: { _count: { select: { controls: true } } },
+        });
+
+        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
+    }
+
+    private static _buildWhere(ctx: RequestContext, filters?: AssetFilters): Prisma.AssetWhereInput {
+        const where: Prisma.AssetWhereInput = { tenantId: ctx.tenantId };
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (filters?.type) where.type = filters.type as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (filters?.status) where.status = filters.status as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (filters?.criticality) where.criticality = filters.criticality as any;
+        if (filters?.q) {
+            where.OR = [
+                { name: { contains: filters.q, mode: 'insensitive' } },
+                { classification: { contains: filters.q, mode: 'insensitive' } },
+                { owner: { contains: filters.q, mode: 'insensitive' } },
+            ];
+        }
+
+        return where;
     }
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {

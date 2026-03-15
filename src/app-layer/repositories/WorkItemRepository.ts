@@ -1,6 +1,8 @@
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
+import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
+import type { PaginatedResponse } from '@/lib/dto/pagination';
 
 // ─── Filters ───
 
@@ -17,10 +19,55 @@ export interface TaskFilters {
     linkedEntityId?: string;
 }
 
+export interface TaskListParams {
+    limit?: number;
+    cursor?: string;
+    filters?: TaskFilters;
+}
+
+const taskListIncludes = {
+    assignee: { select: { id: true, name: true, email: true } },
+    createdBy: { select: { id: true, name: true, email: true } },
+    _count: { select: { links: true, comments: true, watchers: true } },
+};
+
 // ─── Task Repository ───
 
 export class WorkItemRepository {
     static async list(db: PrismaTx, ctx: RequestContext, filters: TaskFilters = {}) {
+        const where = WorkItemRepository._buildWhere(ctx, filters);
+        return db.task.findMany({
+            where,
+            orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
+            include: taskListIncludes,
+        });
+    }
+
+    static async listPaginated(db: PrismaTx, ctx: RequestContext, params: TaskListParams): Promise<PaginatedResponse<unknown>> {
+        const limit = clampLimit(params.limit);
+        const where = WorkItemRepository._buildWhere(ctx, params.filters);
+
+        const cursorWhere = buildCursorWhere(params.cursor);
+        if (cursorWhere) {
+            if (where.AND) {
+                (where.AND as Prisma.TaskWhereInput[]).push(cursorWhere as Prisma.TaskWhereInput);
+            } else {
+                where.AND = [cursorWhere as Prisma.TaskWhereInput];
+            }
+        }
+
+        const items = await db.task.findMany({
+            where,
+            orderBy: CURSOR_ORDER_BY,
+            take: limit + 1,
+            include: taskListIncludes,
+        });
+
+        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
+    }
+
+    private static _buildWhere(ctx: RequestContext, filters: TaskFilters = {}): Prisma.TaskWhereInput {
         const where: Prisma.TaskWhereInput = { tenantId: ctx.tenantId };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,15 +105,7 @@ export class WorkItemRepository {
             };
         }
 
-        return db.task.findMany({
-            where,
-            orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
-            include: {
-                assignee: { select: { id: true, name: true, email: true } },
-                createdBy: { select: { id: true, name: true, email: true } },
-                _count: { select: { links: true, comments: true, watchers: true } },
-            },
-        });
+        return where;
     }
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {

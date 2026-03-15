@@ -1,22 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
-import { listVendors, createVendor } from '@/app-layer/usecases/vendor';
+import { listVendors, listVendorsPaginated, createVendor } from '@/app-layer/usecases/vendor';
 import { withValidatedBody } from '@/lib/validation/route';
 import { CreateVendorSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { z } from 'zod';
+import { normalizeQ } from '@/lib/filters/query-helpers';
+
+const VendorQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().optional(),
+    status: z.string().optional(),
+    criticality: z.string().optional(),
+    riskRating: z.string().optional(),
+    reviewDue: z.enum(['overdue', 'next30d']).optional(),
+    q: z.string().optional().transform(normalizeQ),
+}).strip();
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    const url = req.nextUrl;
-    const filters = {
-        status: url.searchParams.get('status') || undefined,
-        criticality: url.searchParams.get('criticality') || undefined,
-        riskRating: url.searchParams.get('riskRating') || undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        reviewDue: (url.searchParams.get('reviewDue') as any) || undefined,
-        q: url.searchParams.get('q') || undefined,
-    };
-    const vendors = await listVendors(ctx, filters);
+    const sp = Object.fromEntries(req.nextUrl.searchParams.entries());
+    const query = VendorQuerySchema.parse(sp);
+
+    const hasPagination = query.limit || query.cursor;
+    if (hasPagination) {
+        const result = await listVendorsPaginated(ctx, {
+            limit: query.limit,
+            cursor: query.cursor,
+            filters: {
+                status: query.status,
+                criticality: query.criticality,
+                riskRating: query.riskRating,
+                reviewDue: query.reviewDue,
+                q: query.q,
+            },
+        });
+        return NextResponse.json(result);
+    }
+
+    // Backward compat: return flat array
+    const vendors = await listVendors(ctx, {
+        status: query.status,
+        criticality: query.criticality,
+        riskRating: query.riskRating,
+        reviewDue: query.reviewDue,
+        q: query.q,
+    });
     return NextResponse.json(vendors);
 });
 

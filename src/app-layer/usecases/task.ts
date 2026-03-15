@@ -1,5 +1,5 @@
 import { RequestContext } from '../types';
-import { WorkItemRepository, TaskLinkRepository, TaskCommentRepository, TaskWatcherRepository, TaskFilters } from '../repositories/WorkItemRepository';
+import { WorkItemRepository, TaskLinkRepository, TaskCommentRepository, TaskWatcherRepository, TaskFilters, TaskListParams } from '../repositories/WorkItemRepository';
 import { assertCanReadTasks, assertCanWriteTasks, assertCanCommentOnTasks } from '../policies/task.policies';
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
@@ -53,6 +53,11 @@ async function validateTypeRelevance(
 export async function listTasks(ctx: RequestContext, filters: TaskFilters = {}) {
     assertCanReadTasks(ctx);
     return runInTenantContext(ctx, (db) => WorkItemRepository.list(db, ctx, filters));
+}
+
+export async function listTasksPaginated(ctx: RequestContext, params: TaskListParams) {
+    assertCanReadTasks(ctx);
+    return runInTenantContext(ctx, (db) => WorkItemRepository.listPaginated(db, ctx, params));
 }
 
 export async function getTask(ctx: RequestContext, taskId: string) {

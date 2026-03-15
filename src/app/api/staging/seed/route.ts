@@ -1,0 +1,96 @@
+/**
+ * POST /api/staging/seed
+ *
+ * Token-gated staging seed endpoint.
+ * Only works when NODE_ENV !== 'production'.
+ *
+ * Requires header: x-seed-token: <STAGING_SEED_TOKEN env var>
+ *
+ * This endpoint is intentionally NOT in the tenant-scoped route tree.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+
+export async function POST(req: NextRequest) {
+    // ── Gate 1: Environment check ──
+    if (process.env.NODE_ENV === 'production') {
+        return NextResponse.json(
+            { error: 'Seed endpoint is disabled in production' },
+            { status: 403 }
+        );
+    }
+
+    // ── Gate 2: Token check ──
+    const seedToken = process.env.STAGING_SEED_TOKEN;
+    if (!seedToken) {
+        return NextResponse.json(
+            { error: 'STAGING_SEED_TOKEN env var not set' },
+            { status: 503 }
+        );
+    }
+
+    const providedToken = req.headers.get('x-seed-token');
+    if (providedToken !== seedToken) {
+        console.warn(`[staging-seed] Unauthorized attempt from ${req.headers.get('x-forwarded-for') || 'unknown'}`);
+        return NextResponse.json(
+            { error: 'Invalid seed token' },
+            { status: 401 }
+        );
+    }
+
+    // ── Gate 3: Execute seed ──
+    console.log('[staging-seed] Seed triggered via API');
+    const prisma = new PrismaClient();
+
+    try {
+        // Run the base seed inline (simplified version — core entities only)
+        const bcrypt = await import('bcryptjs');
+        const pwd = await bcrypt.hash('password123', 10);
+
+        const tenant = await prisma.tenant.upsert({
+            where: { slug: 'acme-corp' },
+            update: {},
+            create: { name: 'Acme Corp', slug: 'acme-corp', industry: 'Technology', maxRiskScale: 5 },
+        });
+
+        await prisma.user.upsert({
+            where: { email: 'admin@acme.com' },
+            update: {},
+            create: { tenantId: tenant.id, email: 'admin@acme.com', passwordHash: pwd, name: 'Alice Admin', role: 'ADMIN' },
+        });
+
+        const admin = await prisma.user.findUnique({ where: { email: 'admin@acme.com' } });
+        if (admin) {
+            await prisma.tenantMembership.upsert({
+                where: { tenantId_userId: { tenantId: tenant.id, userId: admin.id } },
+                update: {},
+                create: { tenantId: tenant.id, userId: admin.id, role: 'ADMIN' },
+            });
+        }
+
+        const counts = {
+            tenants: await prisma.tenant.count(),
+            users: await prisma.user.count(),
+            controls: await prisma.control.count({ where: { tenantId: tenant.id } }),
+            risks: await prisma.risk.count({ where: { tenantId: tenant.id } }),
+            frameworks: await prisma.framework.count(),
+        };
+
+        console.log('[staging-seed] Seed completed:', counts);
+
+        return NextResponse.json({
+            success: true,
+            message: 'Staging seed completed',
+            counts,
+            login: { email: 'admin@acme.com', password: 'password123' },
+        });
+    } catch (err) {
+        console.error('[staging-seed] Seed failed:', err);
+        return NextResponse.json(
+            { error: 'Seed failed', details: String(err) },
+            { status: 500 }
+        );
+    } finally {
+        await prisma.$disconnect();
+    }
+}

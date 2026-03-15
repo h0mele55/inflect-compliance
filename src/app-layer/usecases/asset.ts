@@ -1,14 +1,21 @@
 import { RequestContext } from '../types';
-import { AssetRepository } from '../repositories/AssetRepository';
+import { AssetRepository, AssetListParams, AssetFilters } from '../repositories/AssetRepository';
 import { assertCanRead, assertCanWrite, assertCanAdmin } from '../policies/common';
 import { logEvent } from '../events/audit';
 import { notFound } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
 
-export async function listAssets(ctx: RequestContext) {
+export async function listAssets(ctx: RequestContext, filters?: AssetFilters) {
     assertCanRead(ctx);
     return runInTenantContext(ctx, (db) =>
-        AssetRepository.list(db, ctx)
+        AssetRepository.list(db, ctx, filters)
+    );
+}
+
+export async function listAssetsPaginated(ctx: RequestContext, params: AssetListParams) {
+    assertCanRead(ctx);
+    return runInTenantContext(ctx, (db) =>
+        AssetRepository.listPaginated(db, ctx, params)
     );
 }
 

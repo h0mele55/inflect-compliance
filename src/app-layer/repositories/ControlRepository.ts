@@ -1,15 +1,62 @@
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
+import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
+import type { PaginatedResponse } from '@/lib/dto/pagination';
+
+export interface ControlListFilters {
+    status?: string;
+    applicability?: string;
+    ownerUserId?: string;
+    q?: string;
+    category?: string;
+}
+
+export interface ControlListParams {
+    limit?: number;
+    cursor?: string;
+    filters?: ControlListFilters;
+}
 
 export class ControlRepository {
-    static async list(db: PrismaTx, ctx: RequestContext, filters?: {
-        status?: string;
-        applicability?: string;
-        ownerUserId?: string;
-        q?: string;
-        category?: string;
-    }) {
+    static async list(db: PrismaTx, ctx: RequestContext, filters?: ControlListFilters) {
+        const where = ControlRepository._buildWhere(ctx, filters);
+
+        return db.control.findMany({
+            where,
+            orderBy: [{ code: 'asc' }, { annexId: 'asc' }],
+            include: {
+                owner: { select: { id: true, name: true, email: true } },
+                _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
+            },
+        });
+    }
+
+    static async listPaginated(db: PrismaTx, ctx: RequestContext, params: ControlListParams): Promise<PaginatedResponse<unknown>> {
+        const limit = clampLimit(params.limit);
+        const where = ControlRepository._buildWhere(ctx, params.filters);
+
+        // Apply cursor
+        const cursorWhere = buildCursorWhere(params.cursor);
+        if (cursorWhere) {
+            where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), cursorWhere];
+        }
+
+        const items = await db.control.findMany({
+            where,
+            orderBy: CURSOR_ORDER_BY,
+            take: limit + 1,
+            include: {
+                owner: { select: { id: true, name: true, email: true } },
+                _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
+            },
+        });
+
+        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
+    }
+
+    private static _buildWhere(ctx: RequestContext, filters?: ControlListFilters): Prisma.ControlWhereInput {
         const where: Prisma.ControlWhereInput = {
             OR: [{ tenantId: ctx.tenantId }, { tenantId: null }],
         };
@@ -30,14 +77,7 @@ export class ControlRepository {
             }];
         }
 
-        return db.control.findMany({
-            where,
-            orderBy: [{ code: 'asc' }, { annexId: 'asc' }],
-            include: {
-                owner: { select: { id: true, name: true, email: true } },
-                _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
-            },
-        });
+        return where;
     }
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {

@@ -51,6 +51,7 @@ test.describe('Policy Center', () => {
         await page.click('#create-policy-btn');
 
         await page.waitForURL('**/policies/**', { timeout: 10000 });
+        await page.waitForSelector('#policy-title', { timeout: 15000 });
         await expect(page.locator('#policy-title')).toContainText(createdPolicyTitle);
         await expect(page.locator('#policy-status')).toContainText('DRAFT');
     });

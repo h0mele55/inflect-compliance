@@ -1,0 +1,1260 @@
+﻿  тЦ▓ Next.js 14.2.35
+  - Environments: .env.local, .env
+
+   Creating an optimized production build ...
+ тЬУ Compiled successfully
+   Linting and checking validity of types ...
+node.exe : 
+At line:1 char:1
++ & "C:\Program Files\
+nodejs/node.exe" "C:\U
+sers\Lenovo\AppData\Ro
+aming ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (:String) [   
+ ], RemoteExceptio    
+n
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+Failed to compile.
+
+./src/app/api/t/[tenan
+tSlug]/vendors/exports
+/route.ts
+6:37  Error: Unexpecte
+d any. Specify a diffe
+rent type.  @typescrip
+t-eslint/no-explicit-a
+ny
+22:41  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+22:76  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+23:34  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+41:30  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+46:67  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+50:70  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+54:71  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/audit/shared
+/[token]/page.tsx
+53:35  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+98:82  Error: Comments
+ inside children secti
+on of tag should be pl
+aced inside braces  re
+act/jsx-no-comment-tex
+tnodes
+100:51  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/admin/page.ts
+x
+10:46  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/assets/page.t
+sx
+14:42  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/assets/[id]/p
+age.tsx
+114:65  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+116:149  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+116:200  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+118:148  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+118:281  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+120:162  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+120:326  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+122:152  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+122:290  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+124:149  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+124:201  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+126:162  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+126:220  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+128:167  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+128:228  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+130:155  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+
+./src/app/t/[tenantSlu
+g]/(app)/audits/audito
+r/page.tsx
+16:40  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+90:67  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+99:129  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+101:67  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/audits/cycles
+/page.tsx
+21:42  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/audits/cycles
+/[cycleId]/page.tsx
+130:69  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+132:42  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/audits/cycles
+/[cycleId]/readiness/p
+age.tsx
+120:78  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+122:46  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/audits/packs/
+[packId]/page.tsx
+70:35  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+156:82  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+158:47  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/audits/page.t
+sx
+17:42  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+106:60  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+108:69  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+127:147  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+129:64  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/audits/readin
+ess/page.tsx
+35:42  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+36:57  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+45:48  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/clauses/page.
+tsx
+13:44  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/controls/page
+.tsx
+26:46  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/controls/temp
+lates/page.tsx
+13:48  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/coverage/page
+.tsx
+82:32  Error: Comments
+ inside children secti
+on of tag should be pl
+aced inside braces  re
+act/jsx-no-comment-tex
+tnodes
+84:57  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+103:32  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+105:67  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+124:32  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+126:55  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/dashboard/pag
+e.tsx
+129:73  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+131:51  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/findings/page
+.tsx
+13:46  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/frameworks/pa
+ge.tsx
+20:50  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+21:63  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+31:46  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+63:83  Error: Comments
+ inside children secti
+on of tag should be pl
+aced inside braces  re
+act/jsx-no-comment-tex
+tnodes
+65:38  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/frameworks/[f
+rameworkKey]/coverage/
+page.tsx
+172:76  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+174:53  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+238:79  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+240:65  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/frameworks/[f
+rameworkKey]/diff/page
+.tsx
+111:66  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+113:70  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+120:28  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+123:74  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+130:28  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+133:74  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/frameworks/[f
+rameworkKey]/install/p
+age.tsx
+18:40  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+172:111  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+174:57  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/frameworks/[f
+rameworkKey]/page.tsx
+18:54  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+19:40  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+58:41  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+64:84  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+140:56  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+142:43  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+142:58  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+164:116  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+166:74  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+188:61  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+190:36  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+256:56  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+258:61  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+282:81  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+284:72  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/frameworks/[f
+rameworkKey]/templates
+/page.tsx
+14:48  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+216:76  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+218:77  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+231:76  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+233:73  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/mapping/page.
+tsx
+31:40  Error: Comments
+ inside children secti
+on of tag should be pl
+aced inside braces  re
+act/jsx-no-comment-tex
+tnodes
+33:35  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/notifications
+/page.tsx
+9:56  Error: Unexpecte
+d any. Specify a diffe
+rent type.  @typescrip
+t-eslint/no-explicit-a
+ny
+
+./src/app/t/[tenantSlu
+g]/(app)/policies/new/
+page.tsx
+22:48  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/policies/page
+.tsx
+21:46  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/policies/temp
+lates/page.tsx
+13:48  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/reports/page.
+tsx
+47:32  Error: Comments
+ inside children secti
+on of tag should be pl
+aced inside braces  re
+act/jsx-no-comment-tex
+tnodes
+49:47  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+66:32  Error: Comments
+ inside children secti
+on of tag should be pl
+aced inside braces  re
+act/jsx-no-comment-tex
+tnodes
+68:56  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/risks/import/
+page.tsx
+84:47  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/risks/new/pag
+e.tsx
+123:43  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/risks/page.ts
+x
+14:40  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+15:42  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/risks/[riskId
+]/page.tsx
+101:43  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/tasks/dashboa
+rd/page.tsx
+42:54  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+43:44  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+109:48  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+111:45  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+255:48  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+257:63  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/tasks/page.ts
+x
+42:40  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/tasks/[taskId
+]/page.tsx
+95:40  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+104:46  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+110:46  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+432:40  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+434:52  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+481:75  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+483:51  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+506:71  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+508:49  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app/t/[tenantSlu
+g]/(app)/vendors/page.
+tsx
+31:44  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/vendors/[vend
+orId]/assessment/[asse
+ssmentId]/page.tsx
+21:59  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+35:42  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+92:36  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app/t/[tenantSlu
+g]/(app)/vendors/[vend
+orId]/page.tsx
+31:38  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+32:52  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+33:48  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+47:40  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+51:44  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+54:38  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+228:94  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+230:114  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+233:100  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+235:119  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+238:96  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+240:117  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+245:101  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+247:122  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+253:97  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+255:125  Error: Unexpe
+cted any. Specify a di
+fferent type.  @typesc
+ript-eslint/no-explici
+t-any
+364:36  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+366:54  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+432:119  Error: Commen
+ts inside children sec
+tion of tag should be 
+placed inside braces  
+react/jsx-no-comment-t
+extnodes
+434:52  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+464:23  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+466:38  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+521:36  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+523:47  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app-layer/events
+/audit.ts
+9:31  Error: Unexpecte
+d any. Specify a diffe
+rent type.  @typescrip
+t-eslint/no-explicit-a
+ny
+
+./src/app-layer/jobs/r
+etention-notifications
+.ts
+86:26  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app-layer/reposi
+tories/EvidenceBundleR
+epository.ts
+10:94  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+14:85  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+23:84  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+27:156  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+31:93  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/app-layer/usecas
+es/audit-hardening.ts
+224:77  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/app-layer/usecas
+es/framework.ts
+853:41  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/components/Linke
+dTasksPanel.tsx
+21:40  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+42:36  Error: Comments
+ inside children secti
+on of tag should be pl
+aced inside braces  re
+act/jsx-no-comment-tex
+tnodes
+44:31  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/components/Trace
+abilityPanel.tsx
+30:58  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+31:64  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+32:60  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+126:73  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+128:57  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+142:40  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+144:52  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+177:76  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+179:60  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+193:40  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+195:55  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+228:74  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+230:58  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+244:40  Error: Comment
+s inside children sect
+ion of tag should be p
+laced inside braces  r
+eact/jsx-no-comment-te
+xtnodes
+246:53  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/lib/audit-redact
+.ts
+84:26  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+86:19  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+91:34  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+149:59  Error: Unexpec
+ted any. Specify a dif
+ferent type.  @typescr
+ipt-eslint/no-explicit
+-any
+
+./src/lib/errors/api.t
+s
+24:48  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/lib/soft-delete.
+ts
+44:54  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+./src/lib/validation/r
+oute.ts
+9:48  Error: Unexpecte
+d any. Specify a diffe
+rent type.  @typescrip
+t-eslint/no-explicit-a
+ny
+33:48  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+70:49  Error: Unexpect
+ed any. Specify a diff
+erent type.  @typescri
+pt-eslint/no-explicit-
+any
+
+info  - Need to disabl
+e some ESLint rules? L
+earn more here: https:
+//nextjs.org/docs/basi
+c-features/eslint#disa
+bling-rules

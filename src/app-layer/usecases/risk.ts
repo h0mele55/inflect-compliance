@@ -1,5 +1,5 @@
 import { RequestContext } from '../types';
-import { RiskRepository, RiskFilters } from '../repositories/RiskRepository';
+import { RiskRepository, RiskFilters, RiskListParams } from '../repositories/RiskRepository';
 import { RiskTemplateRepository } from '../repositories/RiskTemplateRepository';
 import { assertCanRead, assertCanWrite, assertCanAdmin } from '../policies/common';
 import { logEvent } from '../events/audit';
@@ -15,6 +15,13 @@ export async function listRisks(ctx: RequestContext, filters: RiskFilters = {}) 
     assertCanRead(ctx);
     return runInTenantContext(ctx, (db) =>
         RiskRepository.list(db, ctx, filters)
+    );
+}
+
+export async function listRisksPaginated(ctx: RequestContext, params: RiskListParams) {
+    assertCanRead(ctx);
+    return runInTenantContext(ctx, (db) =>
+        RiskRepository.listPaginated(db, ctx, params)
     );
 }
 

@@ -31,6 +31,7 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await page.fill('#control-code-input', `TC-${uid}`);
         await page.click('#create-control-btn');
         await page.waitForURL('**/controls/**', { timeout: 10000 });
+        await page.waitForSelector('#control-title', { timeout: 15000 });
         await expect(page.locator('#control-title')).toContainText(`Test Ctrl ${uid}`, { timeout: 5000 });
 
         // Go to Tests tab

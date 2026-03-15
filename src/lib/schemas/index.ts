@@ -96,7 +96,7 @@ export const CreateControlSchema = z.object({
     description: z.string().optional().nullable(),
     intent: z.string().optional().nullable(),
     category: z.string().optional().nullable(),
-    status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'IMPLEMENTED', 'NEEDS_REVIEW', 'PLANNED', 'IMPLEMENTING']).optional().default('NOT_STARTED'),
+    status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'IMPLEMENTED', 'NEEDS_REVIEW']).optional().default('NOT_STARTED'),
     frequency: z.enum(['AD_HOC', 'DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY']).optional().nullable(),
     ownerUserId: z.string().optional().nullable(),
     evidenceSource: z.enum(['MANUAL', 'INTEGRATION']).optional().nullable(),

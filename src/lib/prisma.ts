@@ -48,9 +48,11 @@ function generateCuid(): string {
  */
 function buildDiffJson(
     action: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: Record<string, any> | null | undefined,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     result: any,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Record<string, any> | null {
     if (!DIFF_ACTIONS.has(action) || !data) return null;
 
@@ -58,6 +60,7 @@ function buildDiffJson(
     if (changedFields.length === 0) return null;
 
     // Build redacted "after" snapshot from result, limited to changed fields
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const afterRaw: Record<string, any> = {};
     for (const field of changedFields) {
         if (result && field in result) {
@@ -140,6 +143,7 @@ function registerAuditMiddleware(client: PrismaClient): void {
             }
 
             // Build safe metadata (no raw data payloads, no secrets)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const metadataJson: Record<string, any> = { source };
 
             // For *Many operations, include a safe summary of the filter

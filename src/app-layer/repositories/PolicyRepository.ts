@@ -1,8 +1,62 @@
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
+import { Prisma } from '@prisma/client';
+import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
+import type { PaginatedResponse } from '@/lib/dto/pagination';
+
+export interface PolicyFilters {
+    status?: string;
+    category?: string;
+    q?: string;
+}
+
+export interface PolicyListParams {
+    limit?: number;
+    cursor?: string;
+    filters?: PolicyFilters;
+}
+
+const policyListIncludes = {
+    currentVersion: true,
+    owner: { select: { id: true, name: true, email: true } },
+    _count: { select: { versions: true, controlLinks: true, approvals: true } },
+};
 
 export class PolicyRepository {
-    static async list(db: PrismaTx, ctx: RequestContext, filters?: { status?: string; category?: string; q?: string }) {
+    static async list(db: PrismaTx, ctx: RequestContext, filters?: PolicyFilters) {
+        const where = PolicyRepository._buildWhere(ctx, filters);
+        return db.policy.findMany({
+            where,
+            orderBy: { updatedAt: 'desc' },
+            include: policyListIncludes,
+        });
+    }
+
+    static async listPaginated(db: PrismaTx, ctx: RequestContext, params: PolicyListParams): Promise<PaginatedResponse<unknown>> {
+        const limit = clampLimit(params.limit);
+        const where = PolicyRepository._buildWhere(ctx, params.filters);
+
+        const cursorWhere = buildCursorWhere(params.cursor);
+        if (cursorWhere) {
+            if (where.AND) {
+                (where.AND as Prisma.PolicyWhereInput[]).push(cursorWhere as Prisma.PolicyWhereInput);
+            } else {
+                where.AND = [cursorWhere as Prisma.PolicyWhereInput];
+            }
+        }
+
+        const items = await db.policy.findMany({
+            where,
+            orderBy: CURSOR_ORDER_BY,
+            take: limit + 1,
+            include: policyListIncludes,
+        });
+
+        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
+    }
+
+    private static _buildWhere(ctx: RequestContext, filters?: PolicyFilters): Prisma.PolicyWhereInput {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const where: any = { tenantId: ctx.tenantId };
         if (filters?.status) where.status = filters.status;
@@ -13,16 +67,7 @@ export class PolicyRepository {
                 { description: { contains: filters.q, mode: 'insensitive' } },
             ];
         }
-
-        return db.policy.findMany({
-            where,
-            orderBy: { updatedAt: 'desc' },
-            include: {
-                currentVersion: true,
-                owner: { select: { id: true, name: true, email: true } },
-                _count: { select: { versions: true, controlLinks: true, approvals: true } },
-            },
-        });
+        return where;
     }
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {

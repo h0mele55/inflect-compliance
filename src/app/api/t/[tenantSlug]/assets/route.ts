@@ -1,14 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
-import { listAssets, createAsset, listAssetsWithDeleted } from '@/app-layer/usecases/asset';
+import { listAssets, listAssetsPaginated, createAsset, listAssetsWithDeleted } from '@/app-layer/usecases/asset';
 import { withValidatedBody } from '@/lib/validation/route';
 import { CreateAssetSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { z } from 'zod';
+import { normalizeQ } from '@/lib/filters/query-helpers';
+
+const AssetQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().optional(),
+    type: z.string().optional(),
+    status: z.string().optional(),
+    criticality: z.string().optional(),
+    q: z.string().optional().transform(normalizeQ),
+    includeDeleted: z.enum(['true', 'false']).optional(),
+}).strip();
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    const includeDeleted = req.nextUrl.searchParams.get('includeDeleted') === 'true';
-    const assets = includeDeleted ? await listAssetsWithDeleted(ctx) : await listAssets(ctx);
+    const sp = Object.fromEntries(req.nextUrl.searchParams.entries());
+    const query = AssetQuerySchema.parse(sp);
+
+    if (query.includeDeleted === 'true') {
+        const assets = await listAssetsWithDeleted(ctx);
+        return NextResponse.json(assets);
+    }
+
+    const hasPagination = query.limit || query.cursor;
+    if (hasPagination) {
+        const result = await listAssetsPaginated(ctx, {
+            limit: query.limit,
+            cursor: query.cursor,
+            filters: {
+                type: query.type,
+                status: query.status,
+                criticality: query.criticality,
+                q: query.q,
+            },
+        });
+        return NextResponse.json(result);
+    }
+
+    // Backward compat: return flat array
+    const assets = await listAssets(ctx, {
+        type: query.type,
+        status: query.status,
+        criticality: query.criticality,
+        q: query.q,
+    });
     return NextResponse.json(assets);
 });
 
