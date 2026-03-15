@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
@@ -98,7 +98,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <main className="flex-1 overflow-auto">
                 <QueryClientProvider client={getQueryClient()}>
                     <div className="p-6 max-w-7xl mx-auto">
-                        {children}
+                        <Suspense fallback={<div className="animate-pulse text-brand-400">Loading…</div>}>
+                            {children}
+                        </Suspense>
                     </div>
                 </QueryClientProvider>
             </main>
