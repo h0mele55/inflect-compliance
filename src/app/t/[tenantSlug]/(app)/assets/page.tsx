@@ -62,7 +62,7 @@ export default function AssetsPage() {
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={assetsFilterConfig} />
+            <CompactFilterBar config={assetsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
 
             {showForm && (
                 <form onSubmit={createAsset} className="glass-card p-6 space-y-4 animate-fadeIn">

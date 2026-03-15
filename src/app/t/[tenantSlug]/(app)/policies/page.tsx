@@ -67,7 +67,7 @@ export default function PoliciesPage() {
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={policiesFilterConfig} />
+            <CompactFilterBar config={policiesFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
 
             {/* Table */}
             <div className="glass-card overflow-hidden">

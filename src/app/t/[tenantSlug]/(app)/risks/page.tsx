@@ -80,7 +80,7 @@ export default function RisksPage() {
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={risksFilterConfig} />
+            <CompactFilterBar config={risksFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
 
             {view === 'heatmap' ? (
                 <div className="glass-card p-6">

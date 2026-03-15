@@ -522,7 +522,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                     </button>
                 </div>
 
-                <CompactFilterBar config={evidenceFilterConfig} />
+                <CompactFilterBar config={evidenceFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
             </div>
 
             {/* Archived warning */}

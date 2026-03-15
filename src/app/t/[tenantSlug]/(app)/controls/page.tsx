@@ -240,7 +240,7 @@ export default function ControlsPage() {
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={controlsFilterConfig} />
+            <CompactFilterBar config={controlsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
 
             {/* Table */}
             <div className="glass-card overflow-hidden">

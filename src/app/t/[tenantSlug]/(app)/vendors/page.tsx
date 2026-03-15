@@ -71,7 +71,7 @@ export default function VendorRegisterPage() {
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={vendorsFilterConfig} />
+            <CompactFilterBar config={vendorsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
 
             {/* Table */}
             <div className="card overflow-x-auto">

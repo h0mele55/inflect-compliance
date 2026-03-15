@@ -178,7 +178,7 @@ export default function TasksPage() {
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={tasksFilterConfig} />
+            <CompactFilterBar config={tasksFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
 
             {/* Bulk Actions Toolbar */}
             {permissions.canWrite && selected.size > 0 && (

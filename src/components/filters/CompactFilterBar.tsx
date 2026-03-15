@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Search, X, ChevronDown, Check, FilterX } from 'lucide-react';
-import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 
 // ─── Types ───
 
@@ -37,6 +36,19 @@ export interface CompactFilterBarConfig {
     chips?: ChipConfig[];
     /** All filter param keys managed by this bar (for useUrlFilters) */
     filterKeys: string[];
+}
+
+/** Props passed from the parent page's useUrlFilters hook */
+export interface CompactFilterBarProps {
+    config: CompactFilterBarConfig;
+    /** Current filter values from the parent's useUrlFilters */
+    filters: Record<string, string>;
+    /** setFilter from the parent's useUrlFilters */
+    setFilter: (key: string, value: string) => void;
+    /** clearFilters from the parent's useUrlFilters */
+    clearFilters: () => void;
+    /** hasActiveFilters from the parent's useUrlFilters */
+    hasActiveFilters: boolean;
 }
 
 // ─── Pill Dropdown ───
@@ -132,8 +144,7 @@ function PillDropdown({
 
 // ─── CompactFilterBar ───
 
-export function CompactFilterBar({ config }: { config: CompactFilterBarConfig }) {
-    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(config.filterKeys);
+export function CompactFilterBar({ config, filters, setFilter, clearFilters, hasActiveFilters }: CompactFilterBarProps) {
     const [searchInput, setSearchInput] = useState(filters.q || '');
     const searchRef = useRef<HTMLInputElement>(null);
 
