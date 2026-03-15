@@ -6,6 +6,8 @@ import type { PaginatedResponse } from '@/lib/dto/pagination';
 
 export interface RiskFilters {
     status?: string;
+    scoreMin?: number;
+    scoreMax?: number;
     category?: string;
     ownerUserId?: string;
     q?: string;
@@ -59,6 +61,11 @@ export class RiskRepository {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (filters.status) where.status = filters.status as any;
+        if (filters.scoreMin !== undefined || filters.scoreMax !== undefined) {
+            where.score = {};
+            if (filters.scoreMin !== undefined) where.score.gte = filters.scoreMin;
+            if (filters.scoreMax !== undefined) where.score.lte = filters.scoreMax;
+        }
         if (filters.category) where.category = filters.category;
         if (filters.ownerUserId) where.ownerUserId = filters.ownerUserId;
         if (filters.q) {

@@ -678,6 +678,7 @@ model Risk {
   @@index([tenantId])
   @@index([tenantId, createdAt])
   @@index([tenantId, status])
+  @@index([tenantId, category])
   @@index([tenantId, deletedAt])
 }
 
@@ -1088,6 +1089,7 @@ model Policy {
   @@index([tenantId])
   @@index([tenantId, createdAt])
   @@index([tenantId, status])
+  @@index([tenantId, category])
   @@index([nextReviewAt])
   @@index([tenantId, deletedAt])
 }

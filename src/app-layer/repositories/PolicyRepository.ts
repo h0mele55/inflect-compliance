@@ -7,6 +7,7 @@ import type { PaginatedResponse } from '@/lib/dto/pagination';
 export interface PolicyFilters {
     status?: string;
     category?: string;
+    language?: string;
     q?: string;
 }
 
@@ -61,6 +62,7 @@ export class PolicyRepository {
         const where: any = { tenantId: ctx.tenantId };
         if (filters?.status) where.status = filters.status;
         if (filters?.category) where.category = filters.category;
+        if (filters?.language) where.language = filters.language;
         if (filters?.q) {
             where.OR = [
                 { title: { contains: filters.q, mode: 'insensitive' } },

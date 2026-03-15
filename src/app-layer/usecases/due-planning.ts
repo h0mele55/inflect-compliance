@@ -223,13 +223,36 @@ export async function getTestDashboardMetrics(ctx: RequestContext, periodDays: n
 
 // ─── All Plans (fixes N+1) ───
 
-export async function listAllTestPlans(ctx: RequestContext) {
+export interface TestPlanFilters {
+    status?: string;
+    controlId?: string;
+    due?: 'overdue' | 'next7d';
+    q?: string;
+}
+
+export async function listAllTestPlans(ctx: RequestContext, filters: TestPlanFilters = {}) {
     assertCanReadTests(ctx);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return runInTenantContext(ctx, async (db: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const where: any = { tenantId: ctx.tenantId };
+
+        if (filters.status) where.status = filters.status;
+        if (filters.controlId) where.controlId = filters.controlId;
+        if (filters.due === 'overdue') {
+            where.nextDueAt = { lt: new Date() };
+        } else if (filters.due === 'next7d') {
+            const now = new Date();
+            const in7 = new Date(now.getTime() + 7 * 86400000);
+            where.nextDueAt = { gte: now, lte: in7 };
+        }
+        if (filters.q) {
+            where.name = { contains: filters.q, mode: 'insensitive' };
+        }
+
         return db.controlTestPlan.findMany({
-            where: { tenantId: ctx.tenantId },
+            where,
             include: {
                 control: { select: { id: true, name: true, code: true } },
                 owner: { select: { id: true, name: true, email: true } },

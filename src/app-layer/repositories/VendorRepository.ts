@@ -64,6 +64,10 @@ export class VendorRepository {
         if (filters.status) where.status = filters.status as any;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (filters.criticality) where.criticality = filters.criticality as any;
+        if (filters.riskRating) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            where.assessments = { some: { riskRating: filters.riskRating as any } };
+        }
         if (filters.q) {
             where.OR = [
                 { name: { contains: filters.q, mode: 'insensitive' } },

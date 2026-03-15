@@ -11,6 +11,8 @@ const RiskQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
     cursor: z.string().optional(),
     status: z.string().optional(),
+    scoreMin: z.coerce.number().int().min(0).optional(),
+    scoreMax: z.coerce.number().int().min(0).optional(),
     category: z.string().optional(),
     ownerUserId: z.string().optional(),
     q: z.string().optional().transform(normalizeQ),
@@ -34,6 +36,8 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
             cursor: query.cursor,
             filters: {
                 status: query.status,
+                scoreMin: query.scoreMin,
+                scoreMax: query.scoreMax,
                 category: query.category,
                 ownerUserId: query.ownerUserId,
                 q: query.q,
@@ -45,6 +49,8 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     // Backward compat: return flat array
     const risks = await listRisks(ctx, {
         status: query.status,
+        scoreMin: query.scoreMin,
+        scoreMax: query.scoreMax,
         category: query.category,
         ownerUserId: query.ownerUserId,
         q: query.q,

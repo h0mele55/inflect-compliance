@@ -12,6 +12,7 @@ const PolicyQuerySchema = z.object({
     cursor: z.string().optional(),
     status: z.string().optional(),
     category: z.string().optional(),
+    language: z.string().optional(),
     q: z.string().optional().transform(normalizeQ),
     includeDeleted: z.enum(['true', 'false']).optional(),
 }).strip();
@@ -35,6 +36,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
       filters: {
         status: query.status,
         category: query.category,
+        language: query.language,
         q: query.q,
       },
     });
@@ -45,6 +47,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
   const policies = await policyUsecases.listPolicies(ctx, {
     status: query.status,
     category: query.category,
+    language: query.language,
     q: query.q,
   });
   return NextResponse.json(policies);

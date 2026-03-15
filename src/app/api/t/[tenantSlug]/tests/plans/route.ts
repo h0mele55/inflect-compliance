@@ -1,13 +1,31 @@
 /**
  * GET /api/t/[tenantSlug]/tests/plans — List ALL test plans across all controls
+ * Supports filters: q, status, controlId, due (overdue/next7d)
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { listAllTestPlans } from '@/app-layer/usecases/due-planning';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { z } from 'zod';
+import { normalizeQ } from '@/lib/filters/query-helpers';
+
+const TestPlanQuerySchema = z.object({
+    status: z.string().optional(),
+    controlId: z.string().optional(),
+    due: z.enum(['overdue', 'next7d']).optional(),
+    q: z.string().optional().transform(normalizeQ),
+}).strip();
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    const plans = await listAllTestPlans(ctx);
+    const sp = Object.fromEntries(req.nextUrl.searchParams.entries());
+    const query = TestPlanQuerySchema.parse(sp);
+
+    const plans = await listAllTestPlans(ctx, {
+        status: query.status,
+        controlId: query.controlId,
+        due: query.due,
+        q: query.q,
+    });
     return NextResponse.json(plans);
 });
