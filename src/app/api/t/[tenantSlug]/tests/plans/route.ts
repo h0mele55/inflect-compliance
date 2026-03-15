@@ -10,6 +10,8 @@ import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
 
 const TestPlanQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().optional(),
     status: z.string().optional(),
     controlId: z.string().optional(),
     due: z.enum(['overdue', 'next7d']).optional(),
