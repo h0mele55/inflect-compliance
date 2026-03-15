@@ -1,41 +1,43 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 /**
  * URL-driven filter state hook.
  *
- * Reads initial values from URLSearchParams, syncs changes back via router.replace().
+ * Reads initial values from the browser URL, syncs changes back via router.replace().
  * Debounces `q` updates (400ms). Resets `cursor` when any filter changes.
  *
- * Usage:
- *   const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'applicability']);
+ * NOTE: Uses window.location instead of useSearchParams() to avoid requiring
+ * a Suspense boundary (which breaks Next.js client-side navigation in layouts).
  */
 export function useUrlFilters(keys: string[]) {
     const router = useRouter();
     const pathname = usePathname();
-    const searchParams = useSearchParams();
 
-    // Initialize filters from URL
-    const [filters, setFilters] = useState<Record<string, string>>(() => {
-        const initial: Record<string, string> = {};
+    // Read from browser URL (safe for client components)
+    const readFromUrl = useCallback((): Record<string, string> => {
+        if (typeof window === 'undefined') return {};
+        const params = new URLSearchParams(window.location.search);
+        const result: Record<string, string> = {};
         for (const key of keys) {
-            const v = searchParams.get(key);
-            if (v) initial[key] = v;
+            const v = params.get(key);
+            if (v) result[key] = v;
         }
-        return initial;
-    });
+        return result;
+    }, [keys]);
+
+    const [filters, setFilters] = useState<Record<string, string>>(readFromUrl);
 
     // Debounce timer ref for q
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Track whether this is initial mount (skip first URL push)
-    const isInitialMount = useRef(true);
 
     // Push filters to URL
     const pushToUrl = useCallback(
         (newFilters: Record<string, string>) => {
-            const params = new URLSearchParams(searchParams.toString());
+            if (typeof window === 'undefined') return;
+            const params = new URLSearchParams(window.location.search);
             // Remove cursor when filters change
             params.delete('cursor');
 
@@ -50,7 +52,7 @@ export function useUrlFilters(keys: string[]) {
             const qs = params.toString();
             router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
         },
-        [router, pathname, searchParams, keys],
+        [router, pathname, keys],
     );
 
     // Set a single filter value
@@ -83,26 +85,22 @@ export function useUrlFilters(keys: string[]) {
     // Clear all filters
     const clearFilters = useCallback(() => {
         setFilters({});
-        const params = new URLSearchParams(searchParams.toString());
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
         for (const key of keys) params.delete(key);
         params.delete('cursor');
         const qs = params.toString();
         router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false });
-    }, [router, pathname, searchParams, keys]);
+    }, [router, pathname, keys]);
 
-    // Sync from URL when browser back/forward
+    // Sync from URL on popstate (browser back/forward)
     useEffect(() => {
-        if (isInitialMount.current) {
-            isInitialMount.current = false;
-            return;
-        }
-        const updated: Record<string, string> = {};
-        for (const key of keys) {
-            const v = searchParams.get(key);
-            if (v) updated[key] = v;
-        }
-        setFilters(updated);
-    }, [searchParams, keys]);
+        const handlePopState = () => {
+            setFilters(readFromUrl());
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [readFromUrl]);
 
     // Clean up debounce on unmount
     useEffect(() => {
