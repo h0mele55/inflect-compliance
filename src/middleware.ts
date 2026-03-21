@@ -10,11 +10,17 @@ import {
     unauthorizedJson,
     forbiddenJson,
 } from '@/lib/auth/guard';
+import { generateNonce, buildCspHeader, CSP_NONCE_HEADER } from '@/lib/security/csp';
 
 /**
- * Edge middleware: centralized auth guard for ALL routes.
+ * Edge middleware: centralized auth guard + CSP for ALL routes.
  *
- * Behavior:
+ * CSP flow:
+ *   1. Generate cryptographic nonce per request
+ *   2. Pass nonce to server components via x-csp-nonce request header
+ *   3. Set Content-Security-Policy response header with nonce
+ *
+ * Auth behavior:
  *   ┌──────────────────┬───────────────┬──────────────────────────┐
  *   │ Route type       │ Unauthed      │ Authed but wrong role    │
  *   ├──────────────────┼───────────────┼──────────────────────────┤
@@ -37,10 +43,6 @@ const authMiddleware = auth(async (req) => {
         if (!rlResult.ok && rlResult.response) {
             return rlResult.response;
         }
-        // If authorized, we should append the rate limit headers to the final response
-        // but NextAuth wrapper makes it hard to mutate downstream headers directly here.
-        // Returning the response isn't possible yet (NextAuth handles it). 
-        // We'll let it pass through.
     }
 
     // ── 1. Allow public paths (login, auth callbacks, static, etc.) ──
@@ -53,7 +55,6 @@ const authMiddleware = auth(async (req) => {
         if (isApiRoute(pathname)) {
             return unauthorizedJson();
         }
-        // Browser page → redirect to login with safe 'next' param
         const proto = req.headers.get('x-forwarded-proto') || 'http';
         const host = req.headers.get('host') || req.nextUrl.host;
         const origin = `${proto}://${host}`;
@@ -71,7 +72,6 @@ const authMiddleware = auth(async (req) => {
             if (isApiRoute(pathname)) {
                 return forbiddenJson('Admin access required');
             }
-            // Page → redirect back to dashboard (they're authed but not admin)
             return NextResponse.redirect(new URL('/', req.nextUrl.origin));
         }
     }
@@ -84,8 +84,18 @@ const authMiddleware = auth(async (req) => {
 export default async function middleware(req: any, ctx: any) {
     const { pathname } = req.nextUrl;
 
+    // ── CSP Nonce — generated once per request ──
+    const nonce = generateNonce();
+    const isDev = process.env.NODE_ENV === 'development';
+    const cspHeader = buildCspHeader(nonce, isDev);
+
     // ── Request ID (reuse from upstream or generate) ──
     const requestId = req.headers.get('x-request-id') || crypto.randomUUID();
+
+    // ── Pass nonce to server components via request header ──
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set(CSP_NONCE_HEADER, nonce);
+    requestHeaders.set('x-request-id', requestId);
 
     const origin = req.headers.get('origin') ?? '';
 
@@ -94,7 +104,6 @@ export default async function middleware(req: any, ctx: any) {
         ? env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim())
         : [];
 
-    // Allow if in origin list or localhost in development
     const isAllowedOrigin = allowedOrigins.includes(origin) || origin.startsWith('http://localhost:');
 
     // ── CORS Preflight for APIs ──
@@ -108,13 +117,17 @@ export default async function middleware(req: any, ctx: any) {
         preflightHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-forwarded-for, x-request-id, user-agent');
         preflightHeaders.set('Access-Control-Max-Age', '86400');
         preflightHeaders.set('x-request-id', requestId);
+        preflightHeaders.set('Content-Security-Policy', cspHeader);
         return new NextResponse(null, { status: 204, headers: preflightHeaders });
     }
 
-    // Process through auth middleware
-    const res = await authMiddleware(req, ctx) || NextResponse.next();
+    // ── Process through auth middleware (with nonce on request headers) ──
+    const res = await authMiddleware(req, ctx) || NextResponse.next({
+        request: { headers: requestHeaders },
+    });
 
-    // ── Inject request ID on every response ──
+    // ── Inject CSP + request ID on every response ──
+    res.headers.set('Content-Security-Policy', cspHeader);
     res.headers.set('x-request-id', requestId);
 
     // ── Apply CORS Headers to API responses ──

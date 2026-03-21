@@ -175,3 +175,17 @@ textarea.input { @apply resize-y min-h-[80px]; }
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* SoA Print styles — moved from inline <style> for CSP compliance */
+@media print {
+  body { background: white !important; color: black !important; }
+  .no-print { display: none !important; }
+  .print-page { page-break-after: always; }
+  .print-table { page-break-inside: auto; }
+  .print-table tr { page-break-inside: avoid; }
+  @page { margin: 15mm 12mm; size: A4 landscape; }
+}
+@media screen {
+  .soa-print-body { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+}
+

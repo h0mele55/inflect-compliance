@@ -11,6 +11,8 @@ const defaultOptions = {
         return [
             {
                 // Apply these headers to all routes globally.
+                // NOTE: Content-Security-Policy is set dynamically in middleware.ts
+                // (per-request nonce) and is NOT included here.
                 source: '/(.*)',
                 headers: [
                     {
@@ -44,21 +46,6 @@ const defaultOptions = {
                             ? 'max-age=31536000; includeSubDomains; preload' 
                             : 'max-age=0',
                     },
-                    {
-                        // Phase 1 CSP: Conservative static CSP that supports Next.js app router safely
-                        key: 'Content-Security-Policy',
-                        value: `
-                            default-src 'self';
-                            base-uri 'self';
-                            object-src 'none';
-                            frame-ancestors 'none';
-                            img-src 'self' data: https:;
-                            font-src 'self' data: https:;
-                            style-src 'self' 'unsafe-inline';
-                            script-src 'self' 'unsafe-inline' 'unsafe-eval';
-                            connect-src 'self' https:;
-                        `.replace(/\s{2,}/g, ' ').trim()
-                    }
                 ],
             },
         ];

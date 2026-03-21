@@ -1,0 +1,114 @@
+import { generateNonce, buildCspHeader, CSP_NONCE_HEADER } from '../../src/lib/security/csp';
+
+describe('CSP Module', () => {
+    describe('generateNonce', () => {
+        it('returns a base64 string of expected length', () => {
+            const nonce = generateNonce();
+            // 16 bytes → 24 chars base64
+            expect(typeof nonce).toBe('string');
+            expect(nonce.length).toBe(24);
+            // Validate base64 charset
+            expect(nonce).toMatch(/^[A-Za-z0-9+/=]+$/);
+        });
+
+        it('produces unique values per call', () => {
+            const nonces = new Set(Array.from({ length: 100 }, () => generateNonce()));
+            // All 100 should be unique (collision probability is astronomically low)
+            expect(nonces.size).toBe(100);
+        });
+    });
+
+    describe('buildCspHeader', () => {
+        const nonce = generateNonce();
+
+        it('includes nonce in script-src', () => {
+            const csp = buildCspHeader(nonce);
+            expect(csp).toContain(`'nonce-${nonce}'`);
+            expect(csp).toContain('script-src');
+        });
+
+        it('includes nonce in style-src', () => {
+            const csp = buildCspHeader(nonce);
+            expect(csp).toContain(`style-src`);
+            expect(csp).toContain(`'nonce-${nonce}'`);
+        });
+
+        it('includes strict-dynamic for script-src', () => {
+            const csp = buildCspHeader(nonce);
+            expect(csp).toContain("'strict-dynamic'");
+        });
+
+        it('does NOT include unsafe-eval in production mode', () => {
+            const csp = buildCspHeader(nonce, false);
+            expect(csp).not.toContain("'unsafe-eval'");
+        });
+
+        it('does NOT include unsafe-inline in production mode', () => {
+            const csp = buildCspHeader(nonce, false);
+            expect(csp).not.toContain("'unsafe-inline'");
+        });
+
+        it('includes unsafe-eval in development mode for HMR', () => {
+            const csp = buildCspHeader(nonce, true);
+            expect(csp).toContain("'unsafe-eval'");
+        });
+
+        it('includes unsafe-inline for style-src in development mode', () => {
+            const csp = buildCspHeader(nonce, true);
+            // style-src should have unsafe-inline for dev
+            const styleSrc = csp.split(';').find(d => d.trim().startsWith('style-src'));
+            expect(styleSrc).toContain("'unsafe-inline'");
+        });
+
+        it('includes all required security directives', () => {
+            const csp = buildCspHeader(nonce);
+            expect(csp).toContain("default-src 'self'");
+            expect(csp).toContain("object-src 'none'");
+            expect(csp).toContain("base-uri 'self'");
+            expect(csp).toContain("frame-ancestors 'none'");
+            expect(csp).toContain("form-action 'self'");
+        });
+
+        it('allows Google Fonts in style-src', () => {
+            const csp = buildCspHeader(nonce);
+            expect(csp).toContain('https://fonts.googleapis.com');
+        });
+
+        it('allows Google Fonts static in font-src', () => {
+            const csp = buildCspHeader(nonce);
+            expect(csp).toContain('https://fonts.gstatic.com');
+        });
+
+        it('allows blob: in connect-src for PDF downloads', () => {
+            const csp = buildCspHeader(nonce);
+            expect(csp).toContain('blob:');
+        });
+
+        it('includes report-uri for violation reporting', () => {
+            const csp = buildCspHeader(nonce);
+            expect(csp).toContain('report-uri');
+            expect(csp).toContain('/api/csp-report');
+        });
+
+        it('includes upgrade-insecure-requests in production', () => {
+            const csp = buildCspHeader(nonce, false);
+            expect(csp).toContain('upgrade-insecure-requests');
+        });
+
+        it('omits upgrade-insecure-requests in development', () => {
+            const csp = buildCspHeader(nonce, true);
+            expect(csp).not.toContain('upgrade-insecure-requests');
+        });
+
+        it('allows WebSocket connections in development mode', () => {
+            const csp = buildCspHeader(nonce, true);
+            expect(csp).toContain('ws://localhost:*');
+        });
+    });
+
+    describe('CSP_NONCE_HEADER', () => {
+        it('is the expected header name', () => {
+            expect(CSP_NONCE_HEADER).toBe('x-csp-nonce');
+        });
+    });
+});
