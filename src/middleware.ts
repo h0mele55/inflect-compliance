@@ -10,7 +10,7 @@ import {
     unauthorizedJson,
     forbiddenJson,
 } from '@/lib/auth/guard';
-import { generateNonce, buildCspHeader, CSP_NONCE_HEADER } from '@/lib/security/csp';
+import { generateNonce, buildCspHeader, CSP_NONCE_HEADER, CSP_REPORT_PATH, CSP_REPORT_GROUP } from '@/lib/security/csp';
 
 /**
  * Edge middleware: centralized auth guard + CSP for ALL routes.
@@ -126,9 +126,19 @@ export default async function middleware(req: any, ctx: any) {
         request: { headers: requestHeaders },
     });
 
-    // ── Inject CSP + request ID on every response ──
+    // ── Inject CSP + Report-To + request ID on every response ──
     res.headers.set('Content-Security-Policy', cspHeader);
     res.headers.set('x-request-id', requestId);
+
+    // Report-To header for the modern Reporting API (report-to CSP directive)
+    res.headers.set('Report-To', JSON.stringify({
+        group: CSP_REPORT_GROUP,
+        max_age: 86400,
+        endpoints: [{ url: CSP_REPORT_PATH }],
+    }));
+
+    // Reporting-Endpoints header (newer alternative, Chrome 96+)
+    res.headers.set('Reporting-Endpoints', `${CSP_REPORT_GROUP}="${CSP_REPORT_PATH}"`);
 
     // ── Apply CORS Headers to API responses ──
     if (pathname.startsWith('/api/') && isAllowedOrigin && origin) {

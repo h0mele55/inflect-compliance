@@ -60,7 +60,12 @@ export const CSP_NONCE_HEADER = 'x-csp-nonce';
 /**
  * CSP report endpoint path within the app.
  */
-const CSP_REPORT_PATH = '/api/csp-report';
+export const CSP_REPORT_PATH = '/api/security/csp-report';
+
+/**
+ * Report-To group name for the Reporting API.
+ */
+export const CSP_REPORT_GROUP = 'csp-endpoint';
 
 /**
  * Build the full Content-Security-Policy header string.

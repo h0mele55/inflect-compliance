@@ -1,35 +1,28 @@
 import { NextResponse } from 'next/server';
 
 /**
- * CSP violation report collector.
+ * Legacy CSP report endpoint — redirects to the new hardened endpoint.
  *
- * Receives reports from the browser when Content-Security-Policy is violated.
- * Supports both legacy `application/csp-report` and modern `application/reports+json`.
- *
- * In production, wire this to your structured logging / SIEM pipeline.
- * For now, we log to console.warn for visibility during development.
+ * This redirect exists because the old CSP header pointed report-uri here.
+ * Browsers may still send reports to this path from cached CSP headers.
+ * After cache TTLs expire, this redirect can be removed.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+    // Forward the body to the new endpoint
+    const body = await request.text();
+    const newUrl = new URL('/api/security/csp-report', request.url);
+
     try {
-        const contentType = request.headers.get('content-type') ?? '';
-
-        let report: unknown;
-        if (
-            contentType.includes('application/csp-report') ||
-            contentType.includes('application/reports+json') ||
-            contentType.includes('application/json')
-        ) {
-            report = await request.json();
-        } else {
-            report = await request.text();
-        }
-
-        // Structured log — pipe to your SIEM in production
-        console.warn('[CSP-VIOLATION]', JSON.stringify(report, null, 2));
-
-        return new NextResponse(null, { status: 204 });
+        await fetch(newUrl.toString(), {
+            method: 'POST',
+            headers: {
+                'content-type': request.headers.get('content-type') ?? 'application/csp-report',
+            },
+            body,
+        });
     } catch {
-        // Malformed report — still return 204 to not leak info
-        return new NextResponse(null, { status: 204 });
+        // Ignore forwarding failures — best effort
     }
+
+    return new NextResponse(null, { status: 204 });
 }
