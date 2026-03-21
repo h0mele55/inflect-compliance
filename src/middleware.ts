@@ -86,7 +86,7 @@ export default async function middleware(req: any, ctx: any) {
 
     // ── CSP Nonce — generated once per request ──
     const nonce = generateNonce();
-    const isDev = process.env.NODE_ENV === 'development';
+    const isDev = env.NODE_ENV === 'development';
     const cspHeader = buildCspHeader(nonce, isDev);
 
     // ── Request ID (reuse from upstream or generate) ──
