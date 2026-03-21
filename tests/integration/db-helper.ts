@@ -2,7 +2,6 @@
  * Integration test helper: synchronous DB availability check.
  * Used to conditionally skip integration test suites that require PostgreSQL.
  */
-import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -16,27 +15,25 @@ try {
 } catch { /* no .env file */ }
 
 /**
- * Extract host and port from a PostgreSQL connection URL.
+ * Synchronous DB availability check.
+ *
+ * We do two checks:
+ * 1. TCP port check — fast, eliminates environments with no DB at all.
+ * 2. Actual Prisma `$connect()` + `$queryRaw` — eliminates environments where
+ *    the port is listening but the DB isn't properly configured (wrong credentials,
+ *    missing migrations, different service on the port, etc.).
+ *
+ * The Prisma connection check runs synchronously using execSync so it can gate
+ * `describe` / `describe.skip` at module scope.
  */
-function parseHostPort(url: string): { host: string; port: number } {
-    try {
-        const u = new URL(url);
-        return { host: u.hostname || '127.0.0.1', port: parseInt(u.port, 10) || 5432 };
-    } catch {
-        return { host: '127.0.0.1', port: 5432 };
-    }
-}
-
-/**
- * Synchronous TCP port check — returns true if the port is listening.
- * Uses a very short timeout (500ms) so it doesn't slow down test startup.
- */
-function isTcpPortOpen(host: string, port: number): boolean {
+function checkDbAvailable(url: string | undefined): boolean {
+    if (!url) return false;
     try {
         const { execSync } = require('child_process');
+        // Actually attempt a Prisma connection and simple query
         execSync(
-            `node -e "const s=require('net').connect(${port},'${host}');s.setTimeout(500);s.on('connect',()=>{s.end();process.exit(0)});s.on('error',()=>process.exit(1));s.on('timeout',()=>{s.destroy();process.exit(1)})"`,
-            { timeout: 2000, stdio: 'ignore' },
+            `node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient({datasources:{db:{url:'${url.replace(/'/g, "\\'")}'}}});p.$connect().then(()=>p.$queryRaw\`SELECT 1\`).then(()=>{p.$disconnect();process.exit(0)}).catch(()=>{p.$disconnect().catch(()=>{});process.exit(1)})"`,
+            { timeout: 5000, stdio: 'ignore', cwd: path.resolve(__dirname, '../..') },
         );
         return true;
     } catch {
@@ -45,6 +42,5 @@ function isTcpPortOpen(host: string, port: number): boolean {
 }
 
 export const DB_URL = dbUrl;
+export const DB_AVAILABLE = checkDbAvailable(dbUrl);
 
-const hp = dbUrl ? parseHostPort(dbUrl) : null;
-export const DB_AVAILABLE = hp ? isTcpPortOpen(hp.host, hp.port) : false;

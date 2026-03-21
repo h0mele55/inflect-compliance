@@ -66,7 +66,9 @@ enum TreatmentDecision {
 
 enum ControlStatus {
   NOT_STARTED
+  PLANNED
   IN_PROGRESS
+  IMPLEMENTING
   IMPLEMENTED
   NEEDS_REVIEW
   NOT_APPLICABLE // @deprecated — use Control.applicability instead
@@ -313,6 +315,47 @@ enum NotificationType {
   GENERAL
 }
 
+enum EmailNotificationType {
+  TASK_ASSIGNED
+  EVIDENCE_EXPIRING
+  POLICY_APPROVAL_REQUESTED
+  POLICY_APPROVED
+  POLICY_REJECTED
+}
+
+enum EmailOutboxStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationDelivery {
+  IMMEDIATE
+  DAILY_DIGEST
+  DISABLED
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum SuggestionSessionStatus {
+  DRAFT
+  GENERATED
+  APPLIED
+  DISMISSED
+}
+
+enum SuggestionItemStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EDITED
+}
+
 // ─── Core Multi-Tenant ───
 
 model Tenant {
@@ -373,6 +416,32 @@ model Tenant {
   controlTestEvidenceLinks ControlTestEvidenceLink[]
   controlTestSteps      ControlTestStep[]
   fileRecords           FileRecord[]
+  notificationOutbox    NotificationOutbox[]
+  notificationSettings  TenantNotificationSettings?
+  userNotificationPrefs UserNotificationPreference[]
+  billingAccount        BillingAccount?
+  billingEvents         BillingEvent[]
+  onboarding            TenantOnboarding?
+  riskSuggestionSessions RiskSuggestionSession[]
+  riskSuggestionItems    RiskSuggestionItem[]
+  policyVersions         PolicyVersion[]
+}
+
+// ─── Tenant Onboarding Wizard ───
+
+model TenantOnboarding {
+  id             String            @id @default(cuid())
+  tenantId       String            @unique
+  status         OnboardingStatus  @default(NOT_STARTED)
+  currentStep    String            @default("COMPANY_PROFILE")
+  completedSteps String[]          @default([])
+  stepData       Json              @default("{}")
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 }
 
 // ─── Tenant Membership (user <-> tenant join with role) ───
@@ -444,6 +513,8 @@ model User {
   createdTestRuns                 ControlTestRun[]       @relation("TestRunCreator")
   testEvidenceLinksCreated        ControlTestEvidenceLink[] @relation("TestEvidenceCreator")
   uploadedFiles                   FileRecord[]              @relation("FileUploader")
+  notificationPreferences         UserNotificationPreference[]
+  riskSuggestionSessions          RiskSuggestionSession[]    @relation("SuggestionSessionCreator")
 }
 
 // ─── Auth.js Models ───
@@ -634,6 +705,7 @@ model Asset {
   ownerUser   User?           @relation("AssetOwner", fields: [ownerUserId], references: [id])
   controls    ControlAsset[]
   risks       AssetRiskLink[]
+  riskSuggestionItems RiskSuggestionItem[]
 
   @@index([tenantId, name])
   @@index([tenantId])
@@ -692,6 +764,58 @@ model RiskTemplate {
   frameworkTag      String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+// ─── AI Risk Suggestions ───
+
+model RiskSuggestionSession {
+  id              String                  @id @default(cuid())
+  tenantId        String
+  createdByUserId String
+  status          SuggestionSessionStatus @default(DRAFT)
+  inputJson       String                  @db.Text // JSON: assets, frameworks, context
+  modelName       String?                 // e.g., "gpt-4o", "claude-3.5-sonnet"
+  provider        String                  @default("stub") // stub | openrouter
+  errorMessage    String?                 @db.Text
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id])
+  createdBy User                   @relation("SuggestionSessionCreator", fields: [createdByUserId], references: [id])
+  items     RiskSuggestionItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+}
+
+model RiskSuggestionItem {
+  id                    String                @id @default(cuid())
+  sessionId             String
+  tenantId              String
+  assetId               String?
+  title                 String
+  description           String?               @db.Text
+  category              String?
+  threat                String?
+  vulnerability         String?               @db.Text
+  likelihoodSuggested   Int?
+  impactSuggested       Int?
+  rationale             String?               @db.Text
+  suggestedControlsJson String?               @db.Text // JSON array of control themes
+  status                SuggestionItemStatus  @default(PENDING)
+  editedJson            String?               @db.Text // user edits before accepting
+  createdRiskId         String?               // populated after ACCEPTED → Risk created
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  session Tenant                   @relation(fields: [tenantId], references: [id])
+  suggestionSession RiskSuggestionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  asset   Asset?                   @relation(fields: [assetId], references: [id])
+
+  @@index([sessionId])
+  @@index([tenantId])
+  @@index([tenantId, sessionId])
 }
 
 // ─── Controls ───
@@ -1096,6 +1220,7 @@ model Policy {
 
 model PolicyVersion {
   id            String            @id @default(cuid())
+  tenantId      String
   policyId      String
   versionNumber Int
   contentType   PolicyContentType @default(MARKDOWN)
@@ -1105,6 +1230,7 @@ model PolicyVersion {
   createdById   String
   createdAt     DateTime          @default(now())
 
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id])
   policy           Policy                  @relation("PolicyVersions", fields: [policyId], references: [id], onDelete: Cascade)
   currentOfPolicy  Policy?                 @relation("CurrentVersion")
   createdBy        User                    @relation("PolicyVersionCreator", fields: [createdById], references: [id])
@@ -1112,6 +1238,7 @@ model PolicyVersion {
   acknowledgements PolicyAcknowledgement[]
 
   @@unique([policyId, versionNumber])
+  @@index([tenantId])
 }
 
 model PolicyApproval {
@@ -1884,4 +2011,103 @@ model ControlTestStep {
   testPlan ControlTestPlan @relation(fields: [testPlanId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, testPlanId])
+}
+
+// ─── Email Notification Outbox ───
+
+model NotificationOutbox {
+  id         String                 @id @default(cuid())
+  tenantId   String
+  type       EmailNotificationType
+  toEmail    String
+  subject    String
+  bodyText   String                 @db.Text
+  bodyHtml   String?                @db.Text
+  status     EmailOutboxStatus      @default(PENDING)
+  attempts   Int                    @default(0)
+  lastError  String?                @db.Text
+  sendAfter  DateTime               @default(now())
+  createdAt  DateTime               @default(now())
+  sentAt     DateTime?
+  dedupeKey  String                 @unique  // tenantId:type:email:entityId:YYYY-MM-DD
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([status, sendAfter])
+  @@index([tenantId])
+}
+
+// ─── Notification Settings ───
+
+model TenantNotificationSettings {
+  id                String   @id @default(cuid())
+  tenantId          String   @unique
+  enabled           Boolean  @default(true)
+  defaultFromName   String   @default("Inflect Compliance")
+  defaultFromEmail  String   @default("noreply@inflect.app")
+  complianceMailbox String?              // BCC for compliance team
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model UserNotificationPreference {
+  id        String               @id @default(cuid())
+  userId    String
+  tenantId  String
+  delivery  NotificationDelivery @default(IMMEDIATE)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  user      User   @relation(fields: [userId], references: [id])
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+// ─── Billing ───
+
+enum BillingPlan {
+  FREE
+  TRIAL
+  PRO
+  ENTERPRISE
+}
+
+enum BillingStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  TRIALING
+}
+
+model BillingAccount {
+  id                    String        @id @default(cuid())
+  tenantId              String        @unique
+  stripeCustomerId      String        @unique
+  stripeSubscriptionId  String?
+  plan                  BillingPlan   @default(FREE)
+  status                BillingStatus @default(ACTIVE)
+  currentPeriodEnd      DateTime?
+  trialEndsAt           DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model BillingEvent {
+  id            String   @id @default(cuid())
+  tenantId      String
+  type          String
+  stripeEventId String   @unique
+  payloadJson   Json
+  createdAt     DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
 }
