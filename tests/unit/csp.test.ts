@@ -87,7 +87,7 @@ describe('CSP Module', () => {
         it('includes report-uri for violation reporting', () => {
             const csp = buildCspHeader(nonce);
             expect(csp).toContain('report-uri');
-            expect(csp).toContain('/api/csp-report');
+            expect(csp).toContain('/api/security/csp-report');
         });
 
         it('includes upgrade-insecure-requests in production', () => {
