@@ -1,0 +1,17 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getTenantCtx } from '@/app-layer/context';
+import { generateRiskSuggestions } from '@/app-layer/usecases/risk-suggestions';
+import { withApiErrorHandling } from '@/lib/errors/api';
+import { withValidatedBody } from '@/lib/validation/route';
+import { RiskAssessmentInputSchema } from '@/app-layer/ai/risk-assessment/schemas';
+
+export const POST = withApiErrorHandling(withValidatedBody(RiskAssessmentInputSchema, async (
+    req: NextRequest,
+    { params }: { params: { tenantSlug: string } },
+    body,
+) => {
+    const ctx = await getTenantCtx(params, req);
+    const input = { frameworks: body.frameworks ?? [], assetIds: body.assetIds ?? [], context: body.context };
+    const result = await generateRiskSuggestions(ctx, input);
+    return NextResponse.json(result, { status: 201 });
+}));

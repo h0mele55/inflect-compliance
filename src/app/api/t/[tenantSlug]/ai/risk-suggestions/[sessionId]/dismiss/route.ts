@@ -1,0 +1,13 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getTenantCtx } from '@/app-layer/context';
+import { dismissSession } from '@/app-layer/usecases/risk-suggestions';
+import { withApiErrorHandling } from '@/lib/errors/api';
+
+export const POST = withApiErrorHandling(async (
+    req: NextRequest,
+    { params }: { params: { tenantSlug: string; sessionId: string } },
+) => {
+    const ctx = await getTenantCtx(params, req);
+    const result = await dismissSession(ctx, params.sessionId);
+    return NextResponse.json(result);
+});
