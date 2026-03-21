@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
+const port = isCI ? 3006 : 3000;
 
 export default defineConfig({
     testDir: './tests/e2e',
@@ -11,10 +12,10 @@ export default defineConfig({
     workers: 1,
     reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
     use: {
-        baseURL: 'http://localhost:3006',
+        baseURL: `http://localhost:${port}`,
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
-        video: 'retain-on-failure',
+        video: 'on',
     },
     projects: [
         {
@@ -24,10 +25,12 @@ export default defineConfig({
     ],
     webServer: {
         command: isCI
-            ? 'npx cross-env AUTH_TEST_MODE=1 PORT=3006 npx next start -p 3006'
-            : 'npx cross-env AUTH_TEST_MODE=1 npx next dev -p 3006',
-        port: 3006,
+            ? `npx cross-env AUTH_TEST_MODE=1 PORT=${port} npx next start -p ${port}`
+            : `npx cross-env AUTH_TEST_MODE=1 npx next dev -p ${port}`,
+        port,
         reuseExistingServer: !isCI,
         timeout: 120_000,
+        stdout: 'pipe',
+        stderr: 'pipe',
     },
 });

@@ -4,7 +4,9 @@ const withNextIntl = createNextIntlPlugin('./src/i18n.ts');
 
 const defaultOptions = {
     // Other experimental or default options
-    experimental: {},
+    experimental: {
+        serverComponentsExternalPackages: ['pdfkit'],
+    },
     async headers() {
         return [
             {

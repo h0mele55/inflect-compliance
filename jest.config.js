@@ -23,7 +23,7 @@ module.exports = {
         '/.next/',
         '/tests/',
     ],
-    coverageThresholds: {
+    coverageThreshold: {
         global: {
             branches: 25,
             functions: 30,

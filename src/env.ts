@@ -46,6 +46,29 @@ export const env = createEnv({
 
         // Security / CORS
         CORS_ALLOWED_ORIGINS: z.string().default(""),
+
+        // SMTP / Email (all optional — when SMTP_HOST is absent, console sink is used)
+        SMTP_HOST: z.string().optional(),
+        SMTP_PORT: z.coerce.number().optional(),
+        SMTP_USER: z.string().optional(),
+        SMTP_PASS: z.string().optional(),
+        SMTP_FROM: z.string().default("noreply@inflect.app"),
+
+        // Stripe Billing
+        STRIPE_SECRET_KEY: z.string().optional(),
+        STRIPE_WEBHOOK_SECRET: z.string().optional(),
+        STRIPE_PRICE_ID_PRO: z.string().optional(),
+        STRIPE_PRICE_ID_ENTERPRISE: z.string().optional(),
+        APP_URL: z.string().url().optional(),
+
+        // AI Risk Assessment
+        AI_RISK_PROVIDER: z.string().default('stub'),
+        OPENROUTER_API_KEY: z.string().optional(),
+        OPENROUTER_MODEL: z.string().optional(),
+        AI_RISK_DAILY_QUOTA: z.string().optional(),
+        AI_RISK_USER_RPM: z.string().optional(),
+        AI_RISK_ENABLED: z.string().default('true'),
+        AI_RISK_PLAN_REQUIRED: z.string().default(''),
     },
 
     /**
@@ -86,6 +109,25 @@ export const env = createEnv({
         FILE_MAX_SIZE_BYTES: process.env.FILE_MAX_SIZE_BYTES,
         FILE_ALLOWED_MIME: process.env.FILE_ALLOWED_MIME,
         CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
+        SMTP_HOST: process.env.SMTP_HOST,
+        SMTP_PORT: process.env.SMTP_PORT,
+        SMTP_USER: process.env.SMTP_USER,
+        SMTP_PASS: process.env.SMTP_PASS,
+        SMTP_FROM: process.env.SMTP_FROM,
+
+        STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+        STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+        STRIPE_PRICE_ID_PRO: process.env.STRIPE_PRICE_ID_PRO,
+        STRIPE_PRICE_ID_ENTERPRISE: process.env.STRIPE_PRICE_ID_ENTERPRISE,
+        APP_URL: process.env.APP_URL,
+
+        AI_RISK_PROVIDER: process.env.AI_RISK_PROVIDER,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL,
+        AI_RISK_DAILY_QUOTA: process.env.AI_RISK_DAILY_QUOTA,
+        AI_RISK_USER_RPM: process.env.AI_RISK_USER_RPM,
+        AI_RISK_ENABLED: process.env.AI_RISK_ENABLED,
+        AI_RISK_PLAN_REQUIRED: process.env.AI_RISK_PLAN_REQUIRED,
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

@@ -43,3 +43,18 @@ tmp/
 # Logs
 *.log
 npm-debug.log*
+
+# Debug / scratch output
+ct_detail.txt
+ct_full.txt
+ct_list.txt
+e2e_out.txt
+log.txt
+out.json
+prisma-status.txt
+playwright-errors.txt
+playwright-filters-errors.txt
+playwright-final.txt
+responsive-log.txt
+apply-rls.js
+test-db.js
