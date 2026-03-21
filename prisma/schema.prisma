@@ -356,6 +356,11 @@ enum SuggestionItemStatus {
   EDITED
 }
 
+enum IdentityProviderType {
+  SAML
+  OIDC
+}
+
 // ─── Core Multi-Tenant ───
 
 model Tenant {
@@ -425,6 +430,8 @@ model Tenant {
   riskSuggestionSessions RiskSuggestionSession[]
   riskSuggestionItems    RiskSuggestionItem[]
   policyVersions         PolicyVersion[]
+  identityProviders      TenantIdentityProvider[]
+  identityLinks          UserIdentityLink[]
 }
 
 // ─── Tenant Onboarding Wizard ───
@@ -515,6 +522,7 @@ model User {
   uploadedFiles                   FileRecord[]              @relation("FileUploader")
   notificationPreferences         UserNotificationPreference[]
   riskSuggestionSessions          RiskSuggestionSession[]    @relation("SuggestionSessionCreator")
+  identityLinks                   UserIdentityLink[]
 }
 
 // ─── Auth.js Models ───
@@ -2110,4 +2118,48 @@ model BillingEvent {
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId, createdAt])
+}
+
+// ─── Enterprise SSO: Tenant Identity Providers ───
+
+model TenantIdentityProvider {
+  id           String                @id @default(cuid())
+  tenantId     String
+  type         IdentityProviderType
+  name         String                // Human-readable name: "Okta", "Azure AD", etc.
+  isEnabled    Boolean               @default(false)
+  isEnforced   Boolean               @default(false) // When true, local login is disabled for this tenant
+  emailDomains String[]              @default([])
+  configJson   Json                  @default("{}") // IdP-specific config (metadata URL, client ID, etc.)
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  identityLinks UserIdentityLink[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+// ─── Enterprise SSO: External Identity Links ───
+
+model UserIdentityLink {
+  id              String    @id @default(cuid())
+  userId          String
+  tenantId        String
+  providerId      String
+  externalSubject String    // IdP's unique subject identifier (SAML NameID / OIDC sub claim)
+  emailAtLinkTime String    // Email address at time of first SSO login
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant   Tenant                 @relation(fields: [tenantId], references: [id])
+  provider TenantIdentityProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, externalSubject])
+  @@unique([userId, providerId])
+  @@index([tenantId])
+  @@index([userId])
 }
