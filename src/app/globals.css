@@ -49,16 +49,44 @@ body {
 .badge-info { @apply bg-blue-500/20 text-blue-400; }
 .badge-neutral { @apply bg-slate-500/20 text-slate-400; }
 
-/* Buttons */
+/* Buttons — pill style, matching filter pill spec */
+/*
+ * Button tokens:
+ *   height:  ~34px (default), ~28px (xs), ~32px (sm), ~42px (lg)
+ *   radius:  rounded-full (pill)
+ *   font:    text-xs 12px (default), text-[11px] (xs), text-sm 14px (lg)
+ *   icon:    14px default, 12px xs, 16px lg
+ *   border:  always visible (transparent when not needed)
+ */
 .btn {
-  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-1.5
+    px-3.5 py-1.5 rounded-full
+    text-xs font-medium
+    border border-transparent
+    transition-all duration-150
+    disabled:opacity-50 disabled:pointer-events-none
+    whitespace-nowrap;
 }
-.btn-primary { @apply bg-brand-600 hover:bg-brand-500 text-white shadow-lg shadow-brand-600/20; }
-.btn-secondary { @apply bg-slate-700 hover:bg-slate-600 text-slate-200 border border-slate-600; }
-.btn-danger { @apply bg-red-600 hover:bg-red-500 text-white; }
-.btn-success { @apply bg-emerald-600 hover:bg-emerald-500 text-white; }
-.btn-ghost { @apply hover:bg-slate-700/50 text-slate-300; }
+.btn-primary {
+  @apply bg-brand-600 border-brand-600 hover:bg-brand-500 hover:border-brand-500
+    text-white shadow-sm shadow-brand-600/20;
+}
+.btn-secondary {
+  @apply bg-slate-800/60 border-slate-600/50 text-slate-200
+    hover:bg-slate-700/60 hover:border-slate-500/50;
+}
+.btn-danger {
+  @apply bg-red-600/80 border-red-600 hover:bg-red-500 text-white;
+}
+.btn-success {
+  @apply bg-emerald-600/80 border-emerald-600 hover:bg-emerald-500 text-white;
+}
+.btn-ghost {
+  @apply border-transparent text-slate-300 hover:bg-slate-700/50;
+}
+.btn-xs { @apply px-2.5 py-1 text-[11px] gap-1; }
 .btn-sm { @apply px-3 py-1.5 text-xs; }
+.btn-lg { @apply px-5 py-2.5 text-sm gap-2; }
 
 /* Inputs */
 .input {
@@ -85,8 +113,65 @@ textarea.input { @apply resize-y min-h-[80px]; }
 
 /* Sidebar nav */
 .nav-link {
-  @apply flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-all duration-200 text-sm;
+  @apply flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-slate-400
+    hover:text-slate-200 hover:bg-slate-700/50 transition-all duration-200 text-sm;
 }
 .nav-link.active {
-  @apply text-white bg-brand-600/20 border-l-2 border-brand-500;
+  @apply text-white bg-brand-600/20 border-l-[3px] border-brand-500 font-medium;
+}
+.nav-link-label {
+  @apply truncate;
+}
+
+/* Page header — sticky on mobile, wraps actions */
+.page-header {
+  @apply flex flex-wrap items-center justify-between gap-3
+    sticky top-0 z-20
+    -mx-4 md:-mx-6 px-4 md:px-6
+    py-3 bg-slate-900/80 backdrop-blur-sm;
+}
+
+/* Responsive card padding */
+.glass-card {
+  @apply p-4 md:p-5;
+}
+
+/* Focus-visible — accessible keyboard focus rings */
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Icon color tokens */
+:root {
+  --icon-muted: #94a3b8;   /* slate-400 */
+  --icon-active: #f1f5f9;  /* slate-100 */
+  --icon-brand: #818cf8;   /* brand-hover / indigo-400 */
+}
+
+/* Icon-only button utility — enforces touch target + accessible focus */
+.icon-btn {
+  @apply inline-flex items-center justify-center rounded-lg
+    min-w-[36px] min-h-[36px]
+    text-slate-400 hover:text-slate-200 hover:bg-slate-700/50
+    transition-colors duration-150
+    disabled:opacity-40 disabled:pointer-events-none;
+}
+.icon-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.icon-btn-danger {
+  @apply text-red-400 hover:text-red-300 hover:bg-red-500/10;
+}
+.icon-btn-sm {
+  @apply min-w-[28px] min-h-[28px];
+}
+
+/* Safe-area support for notched devices */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
