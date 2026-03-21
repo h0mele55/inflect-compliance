@@ -1,0 +1,75 @@
+/* global-error.module.css — self-contained styles for the root error boundary.
+ *
+ * CSP NOTE: This CSS module is bundled with the error boundary component.
+ * It is loaded as a separate chunk, ensuring the error page renders correctly
+ * even if the main app CSS fails. This avoids inline style attributes that
+ * would require 'unsafe-inline' in style-src.
+ */
+
+.body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    background-color: #0f172a;
+    color: #e2e8f0;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+}
+
+.card {
+    max-width: 28rem;
+    width: 100%;
+    text-align: center;
+    padding: 32px;
+    border-radius: 12px;
+    background: #1e293b;
+    border: 1px solid #334155;
+}
+
+.iconWrap {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.message {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    margin-bottom: 24px;
+}
+
+.digest {
+    display: block;
+    margin-top: 8px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    background: #0f172a;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.retryBtn {
+    padding: 8px 24px;
+    border-radius: 6px;
+    border: none;
+    background: #3b82f6;
+    color: #fff;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.retryBtn:hover {
+    background: #2563eb;
+}

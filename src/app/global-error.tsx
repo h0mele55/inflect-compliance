@@ -1,9 +1,15 @@
 'use client';
 
+import styles from './global-error.module.css';
+
 /**
  * Root-level global error boundary for Next.js App Router.
  * This file is REQUIRED by the App Router to handle errors at the root layout level.
  * It must include its own <html> and <body> tags since it replaces the root layout.
+ *
+ * CSP NOTE: All styles are in global-error.module.css (a CSS module bundled with this
+ * component). No inline style attributes are used, so style-src does not need
+ * 'unsafe-inline'.
  */
 export default function GlobalError({
     error,
@@ -14,26 +20,26 @@ export default function GlobalError({
 }) {
     return (
         <html lang="en">
-            <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif', backgroundColor: '#0f172a', color: '#e2e8f0' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px' }}>
-                    <div style={{ maxWidth: '28rem', width: '100%', textAlign: 'center', padding: '32px', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+            <body className={styles.body}>
+                <div className={styles.container}>
+                    <div className={styles.card}>
+                        <div className={styles.iconWrap}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
                         </div>
-                        <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '8px' }}>
+                        <h2 className={styles.heading}>
                             Something went wrong
                         </h2>
-                        <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginBottom: '24px' }}>
+                        <p className={styles.message}>
                             An unexpected error occurred. Our team has been notified.
                             {error.digest && (
-                                <span style={{ display: 'block', marginTop: '8px', fontSize: '0.75rem', fontFamily: 'monospace', background: '#0f172a', padding: '4px 8px', borderRadius: '4px' }}>
+                                <span className={styles.digest}>
                                     Error ID: {error.digest}
                                 </span>
                             )}
                         </p>
                         <button
                             onClick={() => reset()}
-                            style={{ padding: '8px 24px', borderRadius: '6px', border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500 }}
+                            className={styles.retryBtn}
                         >
                             Try again
                         </button>
