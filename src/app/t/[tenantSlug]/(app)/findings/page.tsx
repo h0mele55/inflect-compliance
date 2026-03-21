@@ -10,6 +10,7 @@ export default function FindingsPage() {
     const apiUrl = useTenantApiUrl();
     const t = useTranslations('findings');
     const tc = useTranslations('common');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [findings, setFindings] = useState<any[]>([]);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ title: '', description: '', severity: 'MEDIUM', type: 'OBSERVATION', owner: '', dueDate: '' });

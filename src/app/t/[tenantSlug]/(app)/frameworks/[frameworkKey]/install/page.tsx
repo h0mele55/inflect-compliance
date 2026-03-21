@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export default function InstallWizardPage() {
     const params = useParams();
     const searchParams = useSearchParams();
@@ -13,15 +14,12 @@ export default function InstallWizardPage() {
     const apiUrl = useCallback((path: string) => `/api/t/${tenantSlug}${path}`, [tenantSlug]);
     const tenantHref = useCallback((path: string) => `/t/${tenantSlug}${path}`, [tenantSlug]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [framework, setFramework] = useState<any>(null);
     const [packs, setPacks] = useState<any[]>([]);
     const [selectedPack, setSelectedPack] = useState<string>('');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [preview, setPreview] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [installing, setInstalling] = useState(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [result, setResult] = useState<any>(null);
     const [error, setError] = useState('');
 
@@ -76,7 +74,6 @@ export default function InstallWizardPage() {
             const data = await res.json();
             setResult(data);
             setStep('done');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
             setError(e.message || 'Network error');
         } finally {
@@ -170,7 +167,6 @@ export default function InstallWizardPage() {
 
                         {/* Template list */}
                         <div className="max-h-64 overflow-y-auto space-y-1 border-t border-slate-700/50 pt-3">
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             {preview.templates?.map((t: any) => (
                                 <div key={t.code} className="flex items-center gap-3 px-3 py-1.5 rounded-md text-sm">
                                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.alreadyInstalled ? 'bg-emerald-500' : 'bg-brand-500'}`} />
@@ -199,7 +195,7 @@ export default function InstallWizardPage() {
                         >
                             {installing ? (
                                 <span className="flex items-center gap-2">
-                                    <span className="animate-spin">⏳</span> Installing...
+                                    Installing...
                                 </span>
                             ) : preview.newControls === 0 ? (
                                 'All controls already installed'
@@ -214,7 +210,7 @@ export default function InstallWizardPage() {
             {/* Step 3: Done */}
             {step === 'done' && result && (
                 <div className="glass-card text-center space-y-4" id="install-result">
-                    <div className="text-4xl">✅</div>
+                    <div className="text-4xl"></div>
                     <h2 className="text-xl font-bold text-white">Pack Installed Successfully!</h2>
                     <div className="grid grid-cols-3 gap-4">
                         <div className="p-3 rounded-lg bg-emerald-500/10">

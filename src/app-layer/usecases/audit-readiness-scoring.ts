@@ -25,7 +25,7 @@ import { assertCanViewPack } from '../policies/audit-readiness.policies';
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound } from '@/lib/errors/types';
-import prisma from '@/lib/prisma';
+
 
 // ─── Types ───
 
@@ -111,17 +111,17 @@ async function computeISO27001Readiness(ctx: RequestContext, cycle: any): Promis
     const gaps: ReadinessGap[] = [];
 
     // 1) Requirement coverage
-    const fw = await prisma.framework.findFirst({ where: { key: 'ISO27001' } });
+    const fw = await runInTenantContext(ctx, (tdb) => tdb.framework.findFirst({ where: { key: 'ISO27001' } }));
     let totalReqs = 0;
     let mappedReqs = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let unmappedReqs: any[] = [];
 
     if (fw) {
-        const reqs = await prisma.frameworkRequirement.findMany({
+        const reqs = await runInTenantContext(ctx, (tdb) => tdb.frameworkRequirement.findMany({
             where: { frameworkId: fw.id, deprecatedAt: null },
             select: { id: true, code: true, title: true },
-        });
+        })) as any[];
         totalReqs = reqs.length;
 
         const mappedReqIds = await runInTenantContext(ctx, (tdb) =>
@@ -134,13 +134,13 @@ async function computeISO27001Readiness(ctx: RequestContext, cycle: any): Promis
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mappedSet = new Set(mappedReqIds.map((l: any) => l.requirementId));
         mappedReqs = mappedSet.size;
-        unmappedReqs = reqs.filter(r => !mappedSet.has(r.id));
+        unmappedReqs = reqs.filter((r: any) => !mappedSet.has(r.id));
     }
 
     const coverageScore = totalReqs > 0 ? (mappedReqs / totalReqs) * 100 : 0;
 
     // Add unmapped requirement gaps (top 10)
-    unmappedReqs.slice(0, 10).forEach(r => gaps.push({
+    unmappedReqs.slice(0, 10).forEach((r: any) => gaps.push({
         type: 'UNMAPPED_REQUIREMENT', severity: 'HIGH',
         title: `${r.code}: ${r.title}`, details: 'Not mapped to any control', entityId: r.id,
     }));
@@ -261,17 +261,17 @@ async function computeNIS2Readiness(ctx: RequestContext, cycle: any): Promise<Re
     const gaps: ReadinessGap[] = [];
 
     // 1) Requirement coverage
-    const fw = await prisma.framework.findFirst({ where: { key: 'NIS2' } });
+    const fw = await runInTenantContext(ctx, (tdb) => tdb.framework.findFirst({ where: { key: 'NIS2' } }));
     let totalReqs = 0;
     let mappedReqs = 0;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let unmappedReqs: any[] = [];
 
     if (fw) {
-        const reqs = await prisma.frameworkRequirement.findMany({
+        const reqs = await runInTenantContext(ctx, (tdb) => tdb.frameworkRequirement.findMany({
             where: { frameworkId: fw.id, deprecatedAt: null },
             select: { id: true, code: true, title: true },
-        });
+        })) as any[];
         totalReqs = reqs.length;
 
         const mappedReqIds = await runInTenantContext(ctx, (tdb) =>
@@ -284,12 +284,12 @@ async function computeNIS2Readiness(ctx: RequestContext, cycle: any): Promise<Re
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mappedSet = new Set(mappedReqIds.map((l: any) => l.requirementId));
         mappedReqs = mappedSet.size;
-        unmappedReqs = reqs.filter(r => !mappedSet.has(r.id));
+        unmappedReqs = reqs.filter((r: any) => !mappedSet.has(r.id));
     }
 
     const coverageScore = totalReqs > 0 ? (mappedReqs / totalReqs) * 100 : 0;
 
-    unmappedReqs.slice(0, 10).forEach(r => gaps.push({
+    unmappedReqs.slice(0, 10).forEach((r: any) => gaps.push({
         type: 'UNMAPPED_REQUIREMENT', severity: 'HIGH',
         title: `${r.code}: ${r.title}`, details: 'Not mapped to any measure', entityId: r.id,
     }));
@@ -352,7 +352,7 @@ async function computeNIS2Readiness(ctx: RequestContext, cycle: any): Promise<Re
     ) as any[];
 
     const foundPolicies: string[] = [];
-    const expectedPolicies = NIS2_KEY_POLICIES.map(p => p.label);
+    const expectedPolicies = NIS2_KEY_POLICIES.map((p: any) => p.label);
 
     for (const kp of NIS2_KEY_POLICIES) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -458,12 +458,12 @@ export async function exportReadinessJson(ctx: RequestContext, cycleId: string):
 
 export async function exportUnmappedCsv(ctx: RequestContext, cycleId: string): Promise<{ csv: string; filename: string }> {
     const result = await computeReadiness(ctx, cycleId);
-    const unmapped = result.gaps.filter(g => g.type === 'UNMAPPED_REQUIREMENT');
+    const unmapped = result.gaps.filter((g: any) => g.type === 'UNMAPPED_REQUIREMENT');
 
     const rows = [['Requirement', 'Details', 'Severity']];
-    unmapped.forEach(g => rows.push([g.title, g.details, g.severity]));
+    unmapped.forEach((g: any) => rows.push([g.title, g.details, g.severity]));
 
-    const csv = rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map((r: any) => r.map((c: any) => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
 
     await runInTenantContext(ctx, (tdb) =>
         logEvent(tdb, ctx, {
@@ -479,12 +479,12 @@ export async function exportUnmappedCsv(ctx: RequestContext, cycleId: string): P
 
 export async function exportControlGapsCsv(ctx: RequestContext, cycleId: string): Promise<{ csv: string; filename: string }> {
     const result = await computeReadiness(ctx, cycleId);
-    const gapItems = result.gaps.filter(g => g.type === 'MISSING_EVIDENCE' || g.type === 'OVERDUE_TASK' || g.type === 'OPEN_ISSUE');
+    const gapItems = result.gaps.filter((g: any) => g.type === 'MISSING_EVIDENCE' || g.type === 'OVERDUE_TASK' || g.type === 'OPEN_ISSUE');
 
     const rows = [['Type', 'Title', 'Details', 'Severity']];
-    gapItems.forEach(g => rows.push([g.type, g.title, g.details, g.severity]));
+    gapItems.forEach((g: any) => rows.push([g.type, g.title, g.details, g.severity]));
 
-    const csv = rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map((r: any) => r.map((c: any) => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
 
     await runInTenantContext(ctx, (tdb) =>
         logEvent(tdb, ctx, {

@@ -3,11 +3,14 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { usePermissions } from '@/lib/tenant-context-provider';
+import { RequirePermission } from '@/components/require-permission';
 import { queryKeys } from '@/lib/queryKeys';
 import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { controlsFilterConfig } from '@/components/filters/configs';
+import { AppIcon } from '@/components/icons/AppIcon';
 
 // ─── Constants ───
 
@@ -53,6 +56,7 @@ export default function ControlsPage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
     const { permissions, tenantSlug } = useTenantContext();
+    const appPerms = usePermissions();
     const queryClient = useQueryClient();
 
     // URL-driven filter state
@@ -218,19 +222,19 @@ export default function ControlsPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">🛡️ Controls</h1>
+                    <h1 className="text-2xl font-bold"><AppIcon name="controls" className="inline-block mr-2 align-text-bottom" /> Controls</h1>
                     <p className="text-slate-400 text-sm">{controls.length} controls in register</p>
                 </div>
-                {permissions.canWrite && (
+                {appPerms.controls.create && (
                     <div className="flex gap-2">
                         <Link href={tenantHref('/controls/dashboard')} className="btn btn-secondary" id="controls-dashboard-btn">
-                            📊 Dashboard
+                            <AppIcon name="dashboard" size={14} /> Dashboard
                         </Link>
                         <Link href={tenantHref('/frameworks')} className="btn btn-secondary" id="frameworks-btn">
-                            🗺️ Frameworks
+                            <AppIcon name="frameworks" size={14} /> Frameworks
                         </Link>
                         <Link href={tenantHref('/controls/templates')} className="btn btn-secondary" id="install-templates-btn">
-                            📋 Install from Templates
+                            <AppIcon name="templates" size={14} /> Install from Templates
                         </Link>
                         <Link href={tenantHref('/controls/new')} className="btn btn-primary" id="new-control-btn">
                             + New Control
@@ -240,7 +244,7 @@ export default function ControlsPage() {
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={controlsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
+            <CompactFilterBar config={controlsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="control" />
 
             {/* Table */}
             <div className="glass-card overflow-hidden">
@@ -303,7 +307,7 @@ export default function ControlsPage() {
                                         </td>
                                         {/* Status pill */}
                                         <td>
-                                            {permissions.canWrite ? (
+                                            {appPerms.controls.edit ? (
                                                 <button
                                                     type="button"
                                                     className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
@@ -322,7 +326,7 @@ export default function ControlsPage() {
                                         </td>
                                         {/* Applicability pill */}
                                         <td>
-                                            {permissions.canWrite ? (
+                                            {appPerms.controls.edit ? (
                                                 <button
                                                     type="button"
                                                     className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
@@ -375,7 +379,7 @@ export default function ControlsPage() {
                         <div className="flex justify-end gap-2">
                             <button
                                 type="button"
-                                className="btn btn-secondary text-sm"
+                                className="btn btn-secondary"
                                 onClick={handleJustificationCancel}
                                 id="justification-cancel-btn"
                             >
@@ -383,7 +387,7 @@ export default function ControlsPage() {
                             </button>
                             <button
                                 type="button"
-                                className="btn btn-primary text-sm"
+                                className="btn btn-primary"
                                 onClick={handleJustificationSave}
                                 disabled={!justification.trim()}
                                 id="justification-save-btn"

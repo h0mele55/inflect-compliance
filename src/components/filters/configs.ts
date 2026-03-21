@@ -68,8 +68,8 @@ export const tasksFilterConfig: CompactFilterBarConfig = {
         },
     ],
     chips: [
-        { key: 'overdue', label: 'Overdue', paramKey: 'due', value: 'overdue', icon: '⏰' },
-        { key: 'due-soon', label: 'Due in 7d', paramKey: 'due', value: 'next7d', icon: '📅' },
+        { key: 'overdue', label: 'Overdue', paramKey: 'due', value: 'overdue' },
+        { key: 'due-soon', label: 'Due in 7d', paramKey: 'due', value: 'next7d' },
     ],
 };
 
@@ -83,12 +83,9 @@ export const evidenceFilterConfig: CompactFilterBarConfig = {
             key: 'type',
             label: 'Type',
             options: [
-                { value: 'DOCUMENT', label: 'Document' },
-                { value: 'SCREENSHOT', label: 'Screenshot' },
-                { value: 'LOG', label: 'Log' },
-                { value: 'CONFIG', label: 'Config' },
-                { value: 'REPORT', label: 'Report' },
-                { value: 'OTHER', label: 'Other' },
+                { value: 'FILE', label: 'File' },
+                { value: 'LINK', label: 'Link' },
+                { value: 'TEXT', label: 'Text' },
             ],
         },
     ],
@@ -219,7 +216,7 @@ export const vendorsFilterConfig: CompactFilterBarConfig = {
         },
     ],
     chips: [
-        { key: 'review-overdue', label: 'Review Overdue', paramKey: 'reviewDue', value: 'overdue', icon: '⏰' },
-        { key: 'review-soon', label: 'Due in 30d', paramKey: 'reviewDue', value: 'next30d', icon: '📅' },
+        { key: 'review-overdue', label: 'Review Overdue', paramKey: 'reviewDue', value: 'overdue' },
+        { key: 'review-soon', label: 'Due in 30d', paramKey: 'reviewDue', value: 'next30d' },
     ],
 };

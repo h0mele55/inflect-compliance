@@ -1,8 +1,10 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import { AppIcon } from '@/components/icons/AppIcon';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { usePermissions } from '@/lib/tenant-context-provider';
 import { queryKeys } from '@/lib/queryKeys';
 import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
@@ -58,6 +60,7 @@ export default function TasksPage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
     const { permissions, tenantSlug } = useTenantContext();
+    const appPerms = usePermissions();
     const queryClient = useQueryClient();
 
     // URL-driven filter state
@@ -164,12 +167,12 @@ export default function TasksPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">📋 Tasks</h1>
+                    <h1 className="text-2xl font-bold">Tasks</h1>
                     <p className="text-slate-400 text-sm">{tasks.length} tasks in register</p>
                 </div>
                 <div className="flex gap-2">
-                    <Link href={tenantHref('/tasks/dashboard')} className="btn btn-secondary" id="dashboard-btn">📊 Dashboard</Link>
-                    {permissions.canWrite && (
+                    <Link href={tenantHref('/tasks/dashboard')} className="btn btn-secondary inline-flex items-center gap-2" id="dashboard-btn"><AppIcon name="dashboard" size={16} /> Dashboard</Link>
+                    {appPerms.tasks.create && (
                         <Link href={tenantHref('/tasks/new')} className="btn btn-primary" id="new-task-btn">
                             + New Task
                         </Link>
@@ -178,10 +181,10 @@ export default function TasksPage() {
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={tasksFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
+            <CompactFilterBar config={tasksFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="task" />
 
             {/* Bulk Actions Toolbar */}
-            {permissions.canWrite && selected.size > 0 && (
+            {appPerms.tasks.edit && selected.size > 0 && (
                 <div className="glass-card p-3 flex items-center gap-3 border border-brand-500/30" id="bulk-toolbar">
                     <span className="text-sm text-brand-400 font-medium">{selected.size} selected</span>
                     <select className="input w-40 text-sm" value={bulkAction} onChange={e => { setBulkAction(e.target.value); setBulkValue(''); }} id="bulk-action-select">
@@ -203,7 +206,7 @@ export default function TasksPage() {
                         <input type="date" className="input w-40 text-sm" value={bulkValue} onChange={e => setBulkValue(e.target.value)} id="bulk-value-input" />
                     )}
                     <button
-                        className="btn btn-primary text-sm"
+                        className="btn btn-primary"
                         disabled={!bulkAction || (bulkAction === 'status' && !bulkValue) || bulkMutation.isPending}
                         onClick={handleBulkSubmit}
                         id="bulk-apply-btn"
@@ -244,7 +247,7 @@ export default function TasksPage() {
                     <table className="data-table" id="tasks-table">
                         <thead>
                             <tr>
-                                {permissions.canWrite && (
+                                {appPerms.tasks.edit && (
                                     <th className="w-8">
                                         <input type="checkbox" checked={selected.size === tasks.length && tasks.length > 0} onChange={toggleSelectAll} id="select-all-checkbox" />
                                     </th>
@@ -263,7 +266,7 @@ export default function TasksPage() {
                                 const slaLabel = getSlaLabel(task.severity, task.createdAt, task.status);
                                 return (
                                     <tr key={task.id} className="cursor-pointer hover:bg-slate-700/30 transition">
-                                        {permissions.canWrite && (
+                                        {appPerms.tasks.edit && (
                                             <td>
                                                 <input
                                                     type="checkbox"
@@ -279,7 +282,7 @@ export default function TasksPage() {
                                                 {task.title}
                                             </Link>
                                             {isOverdue(task) && <span className="badge badge-danger text-xs ml-2">Overdue</span>}
-                                            {slaLabel && <span className="badge badge-danger text-xs ml-1" title="SLA Breached">⚠ SLA</span>}
+                                            {slaLabel && <span className="badge badge-danger text-xs ml-1" title="SLA Breached">SLA</span>}
                                         </td>
                                         <td className="text-xs text-slate-400">{TYPE_LABELS[task.type] || task.type}</td>
                                         <td>

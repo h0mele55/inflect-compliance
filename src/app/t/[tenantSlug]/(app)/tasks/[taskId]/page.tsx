@@ -1,7 +1,9 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonLine, SkeletonCard } from '@/components/ui/skeleton';
 
@@ -52,15 +54,11 @@ function getSlaStatus(severity: string, createdAt: string, status: string) {
 }
 
 // Relevance check: AUDIT_FINDING/CONTROL_GAP needs control/framework link; INCIDENT needs asset/control
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getRelevanceStatus(task: any, links: any[]) {
     const type = task?.type;
     if (!type) return { satisfied: true, message: '' };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const hasControl = !!task.controlId || links.some((l: any) => l.entityType === 'CONTROL');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const hasFramework = links.some((l: any) => l.entityType === 'FRAMEWORK_REQUIREMENT');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const hasAsset = links.some((l: any) => l.entityType === 'ASSET');
 
     if (['AUDIT_FINDING', 'CONTROL_GAP'].includes(type) && !hasControl && !hasFramework) {
@@ -79,7 +77,6 @@ export default function TaskDetailPage() {
     const { permissions, role } = useTenantContext();
     const taskId = params?.taskId as string;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [task, setTask] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -121,7 +118,6 @@ export default function TaskDetailPage() {
             const data = await res.json();
             setTask(data);
             setAssigneeInput(data.assigneeUserId || '');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
             setError(e.message);
         } finally {
@@ -237,11 +233,11 @@ export default function TaskDetailPage() {
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
     if (!task) return <div className="p-12 text-center text-slate-500">Task not found.</div>;
 
-    const tabs: { key: Tab; label: string; count?: number }[] = [
-        { key: 'overview', label: '📋 Overview' },
-        { key: 'links', label: '🔗 Links', count: task._count?.links ?? links.length },
-        { key: 'comments', label: '💬 Comments', count: task._count?.comments ?? comments.length },
-        { key: 'activity', label: '📜 Activity' },
+    const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+        { key: 'overview', label: 'Overview', icon: <AppIcon name="overview" size={14} /> },
+        { key: 'links', label: `Links${(task._count?.links ?? links.length) ? ` (${task._count?.links ?? links.length})` : ''}`, icon: <AppIcon name="link" size={14} /> },
+        { key: 'comments', label: `Comments${(task._count?.comments ?? comments.length) ? ` (${task._count?.comments ?? comments.length})` : ''}`, icon: <AppIcon name="comments" size={14} /> },
+        { key: 'activity', label: 'Activity', icon: <AppIcon name="activity" size={14} /> },
     ];
 
     const isOverdue = task.dueAt && new Date(task.dueAt) < new Date() && !['RESOLVED', 'CLOSED', 'CANCELED'].includes(task.status);
@@ -266,11 +262,11 @@ export default function TaskDetailPage() {
                         </span>
                         <span className="badge badge-info text-xs">{TYPE_LABELS[task.type] || task.type}</span>
                         {isOverdue && <span className="badge badge-danger">Overdue</span>}
-                        {sla.breach && <span className="badge badge-danger" id="sla-badge">⚠ {sla.label}</span>}
+                        {sla.breach && <span className="badge badge-danger" id="sla-badge">{sla.label}</span>}
                         {relevance.satisfied ? (
-                            <span className="badge badge-success text-xs" id="relevance-badge">✓ Relevance satisfied</span>
+                            <span className="badge badge-success text-xs" id="relevance-badge">Relevance satisfied</span>
                         ) : (
-                            <span className="badge badge-warning text-xs" id="relevance-badge">⚠ {relevance.message}</span>
+                            <span className="badge badge-warning text-xs" id="relevance-badge">{relevance.message}</span>
                         )}
                     </div>
                 </div>
@@ -307,7 +303,7 @@ export default function TaskDetailPage() {
                             onChange={e => setAssigneeInput(e.target.value)}
                             id="task-assignee-input"
                         />
-                        <button className="btn btn-secondary text-sm" onClick={handleAssign} disabled={assigning} id="assign-task-btn">
+                        <button className="btn btn-secondary" onClick={handleAssign} disabled={assigning} id="assign-task-btn">
                             {assigning ? 'Saving...' : 'Assign'}
                         </button>
                     </div>
@@ -323,7 +319,7 @@ export default function TaskDetailPage() {
                         onClick={() => setTab(t.key)}
                         id={`tab-${t.key}`}
                     >
-                        {t.label} {t.count !== undefined && <span className="ml-1 text-xs opacity-60">({t.count})</span>}
+                        {t.icon} {t.label}
                     </button>
                 ))}
             </div>
@@ -387,7 +383,7 @@ export default function TaskDetailPage() {
                     {/* Audit / Finding Fields from metadataJson */}
                     {(task.type === 'AUDIT_FINDING' || task.type === 'CONTROL_GAP') && (metadata.findingSource || metadata.controlGapType) && (
                         <div className="border-t border-slate-700 pt-4 mt-4">
-                            <h3 className="text-sm font-semibold text-slate-300 mb-3">🔍 Audit Details</h3>
+                            <h3 className="text-sm font-semibold text-slate-300 mb-3">Audit Details</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 {metadata.findingSource && (
                                     <div>
@@ -412,7 +408,7 @@ export default function TaskDetailPage() {
                 <div className="space-y-4">
                     {permissions.canWrite && (
                         <div className="flex justify-end">
-                            <button className="btn btn-primary text-sm" onClick={() => setShowLinkForm(!showLinkForm)} id="add-link-btn">
+                            <button className="btn btn-primary" onClick={() => setShowLinkForm(!showLinkForm)} id="add-link-btn">
                                 + Add Link
                             </button>
                         </div>
@@ -428,7 +424,7 @@ export default function TaskDetailPage() {
                                     {RELATION_OPTIONS.map(r => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
                                 </select>
                             </div>
-                            <button type="submit" disabled={savingLink} className="btn btn-primary text-sm" id="submit-link-btn">
+                            <button type="submit" disabled={savingLink} className="btn btn-primary" id="submit-link-btn">
                                 {savingLink ? 'Linking...' : 'Add Link'}
                             </button>
                         </form>
@@ -448,7 +444,6 @@ export default function TaskDetailPage() {
                                     <tr><th>Type</th><th>Entity ID</th><th>Relation</th><th>Created</th>{permissions.canWrite && <th>Actions</th>}</tr>
                                 </thead>
                                 <tbody>
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     {links.map((l: any) => (
                                         <tr key={l.id}>
                                             <td><span className="badge badge-info text-xs">{l.entityType}</span></td>
@@ -458,7 +453,7 @@ export default function TaskDetailPage() {
                                             {permissions.canWrite && (
                                                 <td>
                                                     <button className="text-red-400 text-xs hover:text-red-300" onClick={() => removeLink(l.id)}>
-                                                        ✕ Remove
+                                                        × Remove
                                                     </button>
                                                 </td>
                                             )}
@@ -485,7 +480,7 @@ export default function TaskDetailPage() {
                                 required
                                 id="comment-body"
                             />
-                            <button type="submit" disabled={savingComment} className="btn btn-primary text-sm" id="submit-comment-btn">
+                            <button type="submit" disabled={savingComment} className="btn btn-primary" id="submit-comment-btn">
                                 {savingComment ? 'Posting...' : 'Add Comment'}
                             </button>
                         </form>
@@ -504,7 +499,6 @@ export default function TaskDetailPage() {
                             <div className="p-8 text-center text-slate-500 text-sm">No comments yet</div>
                         ) : (
                             <div className="divide-y divide-slate-700/50">
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 {comments.map((c: any) => (
                                     <div key={c.id} className="px-5 py-3">
                                         <div className="flex items-center gap-2 mb-1">
@@ -539,7 +533,6 @@ export default function TaskDetailPage() {
                         <div className="p-8 text-center text-slate-500 text-sm">No activity yet</div>
                     ) : (
                         <div className="divide-y divide-slate-700/50">
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             {activity.map((evt: any) => (
                                 <div key={evt.id} className="px-5 py-3 flex items-start gap-3">
                                     <div className="w-2 h-2 rounded-full bg-brand-400 mt-2 shrink-0" />

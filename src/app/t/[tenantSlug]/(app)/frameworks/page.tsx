@@ -1,16 +1,26 @@
 import Link from 'next/link';
 import { getTenantCtx } from '@/app-layer/context';
 import { listFrameworks, computeCoverage } from '@/app-layer/usecases/framework';
+import {
+    ShieldCheck,
+    Flag,
+    BadgeCheck,
+    Package,
+    Car,
+    ClipboardList,
+    type LucideIcon,
+} from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-const FW_META: Record<string, { icon: string; color: string }> = {
-    ISO27001: { icon: '🛡️', color: 'from-indigo-500 to-purple-600' },
-    NIS2: { icon: '🇪🇺', color: 'from-blue-500 to-cyan-600' },
-    ISO9001: { icon: '✅', color: 'from-emerald-500 to-green-600' },
-    ISO28000: { icon: '📦', color: 'from-orange-500 to-amber-600' },
-    ISO39001: { icon: '🚗', color: 'from-rose-500 to-pink-600' },
+const FW_META: Record<string, { icon: LucideIcon; color: string }> = {
+    ISO27001: { icon: ShieldCheck, color: 'from-indigo-500 to-purple-600' },
+    NIS2: { icon: Flag, color: 'from-blue-500 to-cyan-600' },
+    ISO9001: { icon: BadgeCheck, color: 'from-emerald-500 to-green-600' },
+    ISO28000: { icon: Package, color: 'from-orange-500 to-amber-600' },
+    ISO39001: { icon: Car, color: 'from-rose-500 to-pink-600' },
 };
+const FW_DEFAULT: { icon: LucideIcon; color: string } = { icon: ClipboardList, color: 'from-slate-500 to-slate-600' };
 
 export default async function FrameworksPage({
     params,
@@ -39,7 +49,7 @@ export default async function FrameworksPage({
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white" id="frameworks-heading">🗺️ Compliance Frameworks</h1>
+                    <h1 className="text-2xl font-bold text-white" id="frameworks-heading">Compliance Frameworks</h1>
                     <p className="text-sm text-slate-400 mt-1">Browse standards, install control packs, and track requirement coverage</p>
                 </div>
             </div>
@@ -47,7 +57,8 @@ export default async function FrameworksPage({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {frameworks.map((fw: any) => {
-                    const meta = FW_META[fw.key] || { icon: '📋', color: 'from-slate-500 to-slate-600' };
+                    const meta = FW_META[fw.key] || FW_DEFAULT;
+                    const FwIcon = meta.icon;
                     const cov = coverages[fw.key];
                     const isInstalled = cov && cov.mapped > 0;
                     const coveragePercent = cov?.coveragePercent ?? 0;
@@ -60,7 +71,7 @@ export default async function FrameworksPage({
                             <div className="flex items-start justify-between pt-2">
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-2xl">{meta.icon}</span>
+                                        <FwIcon className="w-6 h-6 text-white" aria-hidden="true" />
                                         <h2 className="text-lg font-semibold text-white group-hover:text-brand-300 transition-colors">{fw.name}</h2>
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
@@ -69,7 +80,7 @@ export default async function FrameworksPage({
                                     </div>
                                 </div>
                                 {isInstalled ? (
-                                    <span className="badge badge-success text-xs" id={`fw-installed-${fw.key}`}>✓ Installed</span>
+                                    <span className="badge badge-success text-xs" id={`fw-installed-${fw.key}`}>Installed</span>
                                 ) : (
                                     <span className="badge badge-warning text-xs">Available</span>
                                 )}
@@ -106,12 +117,12 @@ export default async function FrameworksPage({
                             )}
 
                             {/* Actions */}
-                            <div className="flex gap-2 mt-4">
-                                <Link href={href(`/frameworks/${fw.key}`)} className="btn btn-primary flex-1 text-center text-sm" id={`view-framework-${fw.key}`}>
+                            <div className="flex flex-wrap gap-2 mt-4">
+                                <Link href={href(`/frameworks/${fw.key}`)} className="btn btn-primary flex-1" id={`view-framework-${fw.key}`}>
                                     View Details
                                 </Link>
                                 {!isInstalled && (
-                                    <Link href={href(`/frameworks/${fw.key}/install`)} className="btn btn-secondary text-sm" id={`install-framework-${fw.key}`}>
+                                    <Link href={href(`/frameworks/${fw.key}/install`)} className="btn btn-secondary" id={`install-framework-${fw.key}`}>
                                         Install
                                     </Link>
                                 )}

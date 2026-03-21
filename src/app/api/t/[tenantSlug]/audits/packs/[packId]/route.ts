@@ -8,6 +8,8 @@ import {
 import { clonePackForRetest, storeExportArtifact } from '@/app-layer/usecases/audit-hardening';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
+import { FEATURES } from '@/lib/entitlements';
+import { requireFeature } from '@/lib/entitlements-server';
 
 const UpdatePackSchema = z.object({
     name: z.string().min(1).max(200).optional(),
@@ -77,6 +79,8 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
         return NextResponse.json(await freezeAuditPack(ctx, params.packId));
     }
     if (action === 'share') {
+        // ─── Plan check: audit pack sharing requires PRO+ ───
+        await requireFeature(ctx.tenantId, FEATURES.AUDIT_PACK_SHARING);
         const body = ShareSchema.parse(raw);
         return NextResponse.json(await generateShareLink(ctx, params.packId, body.expiresAt), { status: 201 });
     }

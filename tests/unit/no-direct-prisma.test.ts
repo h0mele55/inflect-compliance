@@ -69,7 +69,7 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
     }
 
     // ─── Usecases ───
-    const USECASE_ALLOWLIST = ['evidence.ts', 'evidence-maintenance.ts', 'risk.ts', 'framework.ts', 'audit-readiness.ts', 'audit-readiness-scoring.ts', 'audit-hardening.ts', 'test-readiness.ts', 'test-hardening.ts'];
+    const USECASE_ALLOWLIST: string[] = [];
 
     const usecases = readFilesInDir(path.join(SRC_ROOT, 'app-layer/usecases'));
 
@@ -86,7 +86,13 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
     }
 
     // ─── Usecases must use runInTenantContext, not raw withTenantDb ───
+    // Exception: background-job modules that accept raw tenantId (no RequestContext)
+    // legitimately use the lower-level withTenantDb wrapper. RLS is still enforced.
+    const WITH_TENANT_DB_ALLOWLIST = ['evidence-maintenance.ts'];
+
     for (const file of usecases) {
+        if (WITH_TENANT_DB_ALLOWLIST.includes(file.name)) continue;
+
         it(`${file.name} must use runInTenantContext (not raw withTenantDb)`, () => {
             const hasWithTenantDb = file.content.includes('withTenantDb(');
             expect(hasWithTenantDb).toBe(false);

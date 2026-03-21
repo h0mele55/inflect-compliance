@@ -120,6 +120,7 @@ export default function NewRiskPage() {
         setSubmitting(true);
         setError(null);
         try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const payload: Record<string, any> = {
                 title: form.title,
                 description: form.description || undefined,
@@ -198,7 +199,7 @@ export default function NewRiskPage() {
                         className="glass-card p-6 text-left hover:border-brand-500/50 transition group cursor-pointer"
                         id="create-blank"
                     >
-                        <div className="text-2xl mb-2">📝</div>
+                        <div className="text-2xl mb-2"></div>
                         <h3 className="font-semibold text-white group-hover:text-brand-400 transition">{t('startScratch')}</h3>
                         <p className="text-sm text-slate-400 mt-1">{t('startScratchDesc')}</p>
                     </button>
@@ -208,7 +209,7 @@ export default function NewRiskPage() {
                         className="glass-card p-6 text-left hover:border-purple-500/50 transition group cursor-pointer"
                         id="create-from-template"
                     >
-                        <div className="text-2xl mb-2">📋</div>
+                        <div className="text-2xl mb-2"></div>
                         <h3 className="font-semibold text-white group-hover:text-purple-400 transition">{t('useTemplate')}</h3>
                         <p className="text-sm text-slate-400 mt-1">{t('useTemplateDesc')}</p>
                         {!loadingTemplates && templates.length > 0 && (

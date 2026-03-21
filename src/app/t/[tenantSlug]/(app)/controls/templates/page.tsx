@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { AppIcon } from '@/components/icons/AppIcon';
 
 export default function ControlTemplatesPage() {
     const apiUrl = useTenantApiUrl();
@@ -10,6 +11,7 @@ export default function ControlTemplatesPage() {
     const router = useRouter();
     const { permissions } = useTenantContext();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [templates, setTemplates] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -59,7 +61,7 @@ export default function ControlTemplatesPage() {
             }
             const result = await res.json();
             const count = Array.isArray(result) ? result.length : 1;
-            setSuccess(`✅ Installed ${count} control(s) successfully!`);
+            setSuccess(`Installed ${count} control(s) successfully!`);
             setTimeout(() => router.push(tenantHref('/controls')), 1500);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
@@ -84,7 +86,7 @@ export default function ControlTemplatesPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold" id="templates-heading">📋 Control Templates</h1>
+                    <h1 className="text-2xl font-bold" id="templates-heading"><AppIcon name="templates" className="inline-block mr-2 align-text-bottom" /> Control Templates</h1>
                     <p className="text-slate-400 text-sm">Select templates to install as controls in your register</p>
                 </div>
                 <Link href={tenantHref('/controls')} className="btn btn-secondary">

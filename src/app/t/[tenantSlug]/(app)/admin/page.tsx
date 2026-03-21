@@ -1,12 +1,17 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useTenantApiUrl } from '@/lib/tenant-context-provider';
+import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { RequirePermission } from '@/components/require-permission';
+import { Shield, CreditCard } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AdminPage() {
     const apiUrl = useTenantApiUrl();
+    const tenantHref = useTenantHref();
     const t = useTranslations('admin');
     const tc = useTranslations('common');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [auditLog, setAuditLog] = useState<any[]>([]);
     const [tab, setTab] = useState<'log' | 'templates'>('log');
 
@@ -24,6 +29,24 @@ export default function AdminPage() {
             <div className="flex gap-2">
                 <button onClick={() => setTab('log')} className={`btn ${tab === 'log' ? 'btn-primary' : 'btn-secondary'}`}>{t('auditLog')}</button>
                 <button onClick={() => setTab('templates')} className={`btn ${tab === 'templates' ? 'btn-primary' : 'btn-secondary'}`}>{t('policyTemplates')}</button>
+                <RequirePermission resource="admin" action="manage">
+                    <Link
+                        href={tenantHref('/admin/rbac')}
+                        className="btn btn-secondary"
+                        id="rbac-pill-btn"
+                    >
+                        <Shield className="w-3.5 h-3.5" />
+                        Roles &amp; Access
+                    </Link>
+                    <Link
+                        href={tenantHref('/admin/billing')}
+                        className="btn btn-secondary"
+                        id="billing-pill-btn"
+                    >
+                        <CreditCard className="w-3.5 h-3.5" />
+                        Billing
+                    </Link>
+                </RequirePermission>
             </div>
 
             {tab === 'log' ? (

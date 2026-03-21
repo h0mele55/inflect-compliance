@@ -1,7 +1,10 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { AppIcon } from '@/components/icons/AppIcon';
+import { User, Link2, AlertOctagon } from 'lucide-react';
 
 const STATUS_LABELS: Record<string, string> = {
     OPEN: 'Open', TRIAGED: 'Triaged', IN_PROGRESS: 'In Progress',
@@ -55,7 +58,6 @@ export default function TaskDashboardPage() {
         if (myRes.ok) {
             const all = await myRes.json();
             // Show only open tasks assigned to current user
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             setMyTasks(Array.isArray(all) ? all.filter((t: any) => !['RESOLVED', 'CLOSED', 'CANCELED'].includes(t.status)).slice(0, 10) : []);
         }
         setLoading(false);
@@ -74,7 +76,7 @@ export default function TaskDashboardPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">📊 Task Dashboard</h1>
+                    <h1 className="text-2xl font-bold"><AppIcon name="dashboard" className="inline-block mr-2 align-text-bottom" /> Task Dashboard</h1>
                     <p className="text-slate-400 text-sm">{metrics.total} total tasks</p>
                 </div>
                 <Link href={tenantHref('/tasks')} className="btn btn-secondary">← Task Register</Link>
@@ -102,12 +104,11 @@ export default function TaskDashboardPage() {
 
             {/* My Tasks */}
             <div className="glass-card p-4" id="my-tasks-section">
-                <h3 className="text-sm font-semibold mb-3 text-slate-300">👤 My Tasks</h3>
+                <h3 className="text-sm font-semibold mb-3 text-slate-300"><User size={14} className="inline-block mr-1" /> My Tasks</h3>
                 {myTasks.length === 0 ? (
                     <p className="text-slate-500 text-sm text-center py-4">No open tasks assigned to you</p>
                 ) : (
                     <div className="space-y-1">
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         {myTasks.map((task: any) => (
                             <Link
                                 key={task.id}
@@ -210,7 +211,7 @@ export default function TaskDashboardPage() {
             {/* Top Controls with Open Tasks */}
             {metrics.topControls && metrics.topControls.length > 0 && (
                 <div className="glass-card p-4" id="top-controls-section">
-                    <h3 className="text-sm font-semibold mb-3 text-slate-300">🛡️ Top Controls with Open Tasks</h3>
+                    <h3 className="text-sm font-semibold mb-3 text-slate-300"><AppIcon name="controls" size={14} className="inline-block mr-1" /> Top Controls with Open Tasks</h3>
                     <div className="space-y-2">
                         {metrics.topControls.map((ctrl) => (
                             <Link
@@ -230,7 +231,7 @@ export default function TaskDashboardPage() {
             {/* Top Linked Entities (Assets/Risks) */}
             {metrics.topLinkedEntities && metrics.topLinkedEntities.length > 0 && (
                 <div className="glass-card p-4" id="top-linked-entities-section">
-                    <h3 className="text-sm font-semibold mb-3 text-slate-300">🔗 Top Assets & Risks with Open Tasks</h3>
+                    <h3 className="text-sm font-semibold mb-3 text-slate-300"><Link2 size={14} className="inline-block mr-1" /> Top Assets & Risks with Open Tasks</h3>
                     <div className="space-y-2">
                         {metrics.topLinkedEntities.map((entity) => (
                             <div
@@ -251,9 +252,8 @@ export default function TaskDashboardPage() {
             {/* Overdue Tasks */}
             {overdueTasks.length > 0 && (
                 <div className="glass-card p-4" id="overdue-tasks-section">
-                    <h3 className="text-sm font-semibold mb-3 text-red-400">🚨 Overdue Tasks</h3>
+                    <h3 className="text-sm font-semibold mb-3 text-red-400"><AlertOctagon size={14} className="inline-block mr-1" /> Overdue Tasks</h3>
                     <div className="space-y-2">
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         {overdueTasks.slice(0, 10).map((task: any) => (
                             <Link
                                 key={task.id}

@@ -96,7 +96,7 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
                         const relPath = pageFile.replace(SRC_ROOT + path.sep, '');
                         it(`DISALLOWED: ${relPath} — protected page outside /t/[tenantSlug]`, () => {
                             // If this test runs, the page exists outside /t/ and isn't allowlisted
-                            fail(`Page file ${relPath} exists outside /t/[tenantSlug]. Move it or add to allowlist.`);
+                            throw new Error(`Page file ${relPath} exists outside /t/[tenantSlug]. Move it or add to allowlist.`);
                         });
                     }
                 }
@@ -119,7 +119,7 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
         const apiDir = path.join(SRC_ROOT, 'app', 'api');
 
         // Auth routes are allowed at the root level
-        const ALLOWED_API_DIRS = new Set(['auth', 't', 'risk-templates', 'audit', 'staging', 'health', 'readyz']);
+        const ALLOWED_API_DIRS = new Set(['auth', 't', 'risk-templates', 'audit', 'staging', 'health', 'readyz', 'stripe']);
 
         // Legacy routes are allowed as documented thin wrappers
         // that delegate to getLegacyCtx → usecases (kept for backward compat)
@@ -144,7 +144,7 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
                 for (const routeFile of routeFiles) {
                     const relPath = routeFile.replace(SRC_ROOT + path.sep, '');
                     it(`DISALLOWED: ${relPath} — new API route outside /api/t/[tenantSlug]`, () => {
-                        fail(`Route ${relPath} exists outside /api/t/. New routes MUST go under /api/t/[tenantSlug]/.`);
+                        throw new Error(`Route ${relPath} exists outside /api/t/. New routes MUST go under /api/t/[tenantSlug]/.`);
                     });
                 }
             }

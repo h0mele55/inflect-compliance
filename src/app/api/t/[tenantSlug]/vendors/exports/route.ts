@@ -3,6 +3,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { exportVendorsRegister, exportAssessments, exportDocumentExpiry } from '@/app-layer/usecases/vendor-audit';
 import { withApiErrorHandling } from '@/lib/errors/api';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toCsv(rows: Record<string, any>[]): string {
     if (rows.length === 0) return '';
     const flat = rows.map(r => flattenObj(r));
@@ -19,7 +20,9 @@ function toCsv(rows: Record<string, any>[]): string {
     return lines.join('\n');
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function flattenObj(obj: Record<string, any>, prefix = ''): Record<string, any> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result: Record<string, any> = {};
     for (const [k, v] of Object.entries(obj)) {
         const key = prefix ? `${prefix}_${k}` : k;
@@ -38,19 +41,23 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     const type = url.searchParams.get('type') || 'vendors';
     const format = url.searchParams.get('format') || 'json';
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let data: Record<string, any>[];
     let filename: string;
 
     switch (type) {
         case 'assessments':
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             data = await exportAssessments(ctx) as Record<string, any>[];
             filename = 'vendor-assessments';
             break;
         case 'documents':
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             data = await exportDocumentExpiry(ctx) as Record<string, any>[];
             filename = 'vendor-document-expiry';
             break;
         default:
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             data = await exportVendorsRegister(ctx) as Record<string, any>[];
             filename = 'vendor-register';
     }

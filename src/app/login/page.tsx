@@ -25,7 +25,7 @@ function LoginForm() {
         try {
             if (mode === 'register') {
                 // Registration still uses the legacy API (creates tenant + user)
-                const res = await fetch('/api/auth', {
+                const res = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'register', email, password, name, orgName }),

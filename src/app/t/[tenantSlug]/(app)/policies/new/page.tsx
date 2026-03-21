@@ -19,6 +19,7 @@ export default function NewPolicyPage() {
     const [category, setCategory] = useState('');
     const [content, setContent] = useState('');
     const [templateId, setTemplateId] = useState('');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [templates, setTemplates] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');

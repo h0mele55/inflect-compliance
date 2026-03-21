@@ -1,14 +1,16 @@
 import { getTranslations } from 'next-intl/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { getReports } from '@/app-layer/usecases/report';
+import { getSoA } from '@/app-layer/usecases/soa';
+import prisma from '@/lib/prisma';
 import { ReportsClient } from './ReportsClient';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Reports — Server Component wrapper.
- * Fetches SoA + risk register data server-side, delegates interactive
- * tabs and CSV export to client island.
+ * Fetches SoA report, risk register, and tenant controls server-side,
+ * delegates interactive tabs and export to client island.
  */
 export default async function ReportsPage({
     params,
@@ -19,12 +21,30 @@ export default async function ReportsPage({
     const t = await getTranslations('reports');
     const tc = await getTranslations('common');
     const ctx = await getTenantCtx({ tenantSlug });
-    const data = await getReports(ctx);
+
+    // Parallel fetch old reports + new SoA + controls
+    const [data, soaReport, controls] = await Promise.all([
+        getReports(ctx),
+        getSoA(ctx, {
+            includeEvidence: true,
+            includeTasks: true,
+            includeTests: true,
+        }),
+        prisma.control.findMany({
+            where: { tenantId: ctx.tenantId, deletedAt: null },
+            select: { id: true, code: true, name: true, status: true },
+            orderBy: { code: 'asc' },
+        }),
+    ]);
 
     return (
         <div className="space-y-6 animate-fadeIn">
             <ReportsClient
                 data={JSON.parse(JSON.stringify(data))}
+                soaReport={JSON.parse(JSON.stringify(soaReport))}
+                controls={JSON.parse(JSON.stringify(controls))}
+                tenantSlug={tenantSlug}
+                canEdit={ctx.permissions.canWrite}
                 translations={{
                     title: t('title'),
                     subtitle: t('subtitle'),

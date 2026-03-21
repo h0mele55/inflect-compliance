@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 
 interface TestPlan {
@@ -151,7 +152,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                         </div>
                     </div>
                     <button className="btn btn-primary btn-sm" onClick={createPlan} disabled={saving || !name.trim()} id="save-test-plan-btn">
-                        {saving ? '⏳ Creating...' : '💾 Create Plan'}
+                        {saving ? 'Creating...' : <><AppIcon name="save" size={14} className="inline-block mr-1" /> Create Plan</>}
                     </button>
                 </div>
             )}
@@ -192,7 +193,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                                         {plan.owner && (
                                             <>
                                                 <span className="text-xs text-slate-500">•</span>
-                                                <span className="text-xs text-slate-400">👤 {plan.owner.name || plan.owner.email}</span>
+                                                <span className="text-xs text-slate-400">{plan.owner.name || plan.owner.email}</span>
                                             </>
                                         )}
                                     </div>
@@ -213,7 +214,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                                             disabled={creatingRunFor === plan.id}
                                             id={`run-test-btn-${plan.id}`}
                                         >
-                                            {creatingRunFor === plan.id ? '⏳' : '▶ Run'}
+                                            {creatingRunFor === plan.id ? '...' : <><AppIcon name="run" size={14} className="inline-block mr-1" /> Run</>}
                                         </button>
                                     )}
                                 </div>

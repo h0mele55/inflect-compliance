@@ -163,11 +163,11 @@ export default function TestPlanDetailPage() {
                 {permissions.canWrite && (
                     <div className="flex gap-2">
                         <button className="btn btn-secondary btn-sm" onClick={() => setEditing(!editing)} id="edit-test-plan-btn">
-                            {editing ? 'Cancel' : '✏️ Edit'}
+                            {editing ? 'Cancel' : 'Edit'}
                         </button>
                         {plan.status === 'ACTIVE' && (
                             <button className="btn btn-primary btn-sm" onClick={createRun} disabled={creatingRun} id="create-test-run-btn">
-                                {creatingRun ? '⏳...' : '▶ Run Test Now'}
+                                {creatingRun ? '...' : 'Run Test Now'}
                             </button>
                         )}
                     </div>
@@ -208,7 +208,7 @@ export default function TestPlanDetailPage() {
                         </div>
                     </div>
                     <button className="btn btn-primary btn-sm" onClick={savePlan} disabled={saving} id="save-plan-changes-btn">
-                        {saving ? '⏳ Saving...' : '💾 Save Changes'}
+                        {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
             )}
@@ -273,7 +273,7 @@ export default function TestPlanDetailPage() {
                     <h3 className="text-sm font-semibold text-slate-300">Test Run History</h3>
                     {permissions.canWrite && plan.status === 'ACTIVE' && (
                         <button className="btn btn-primary btn-xs" onClick={createRun} disabled={creatingRun}>
-                            {creatingRun ? '⏳' : '▶ New Run'}
+                            {creatingRun ? '...' : 'New Run'}
                         </button>
                     )}
                 </div>
@@ -305,11 +305,11 @@ export default function TestPlanDetailPage() {
                                 <div className="flex items-center gap-2">
                                     {run.executedBy && (
                                         <span className="text-xs text-slate-500">
-                                            👤 {run.executedBy.name || run.executedBy.email}
+                                            {run.executedBy.name || run.executedBy.email}
                                         </span>
                                     )}
                                     {run._count?.evidence ? (
-                                        <span className="text-xs text-slate-500">📎 {run._count.evidence}</span>
+                                        <span className="text-xs text-slate-500">{run._count.evidence} evidence</span>
                                     ) : null}
                                     <span className="text-xs text-slate-600 opacity-0 group-hover:opacity-100">→</span>
                                 </div>

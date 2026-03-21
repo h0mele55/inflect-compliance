@@ -6,7 +6,7 @@ import { assertCanViewFrameworks, assertCanInstallFrameworkPack } from '../polic
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
-import prisma from '@/lib/prisma';
+
 
 // ─── Framework Catalog (global, no tenant filter needed) ───
 
@@ -79,7 +79,7 @@ export async function previewPackInstall(ctx: RequestContext, packKey: string) {
     // Check which controls already exist for this tenant
     const existingControls = await runInTenantContext(ctx, (db) =>
         db.control.findMany({
-            where: { tenantId: ctx.tenantId, code: { in: pack.templateLinks.map(l => l.template.code) } },
+            where: { tenantId: ctx.tenantId, code: { in: pack.templateLinks.map((l: any) => l.template.code) } },
             select: { code: true },
         })
     );
@@ -91,13 +91,13 @@ export async function previewPackInstall(ctx: RequestContext, packKey: string) {
         packName: pack.name,
         framework: { key: pack.framework.key, name: pack.framework.name, version: pack.framework.version },
         totalTemplates: pack.templateLinks.length,
-        newControls: pack.templateLinks.filter(l => !existingCodes.has(l.template.code)).length,
-        existingControls: pack.templateLinks.filter(l => existingCodes.has(l.template.code)).length,
-        templates: pack.templateLinks.map(l => ({
+        newControls: pack.templateLinks.filter((l: any) => !existingCodes.has(l.template.code)).length,
+        existingControls: pack.templateLinks.filter((l: any) => existingCodes.has(l.template.code)).length,
+        templates: pack.templateLinks.map((l: any) => ({
             code: l.template.code,
             title: l.template.title,
             tasks: l.template.tasks.length,
-            requirements: l.template.requirementLinks.map(rl => ({ code: rl.requirement.code, title: rl.requirement.title })),
+            requirements: l.template.requirementLinks.map((rl: any) => ({ code: rl.requirement.code, title: rl.requirement.title })),
             alreadyInstalled: existingCodes.has(l.template.code),
         })),
     };
@@ -224,7 +224,7 @@ export async function computeCoverage(ctx: RequestContext, frameworkKey: string,
     // Get all tenant control requirement links for this framework
     const links = await runInTenantContext(ctx, (tdb) =>
         tdb.controlRequirementLink.findMany({
-            where: { tenantId: ctx.tenantId, requirementId: { in: requirements.map(r => r.id) } },
+            where: { tenantId: ctx.tenantId, requirementId: { in: requirements.map((r: any) => r.id) } },
             include: {
                 control: { select: { id: true, code: true, name: true, status: true } },
                 requirement: { select: { id: true, code: true, title: true } },
@@ -234,16 +234,16 @@ export async function computeCoverage(ctx: RequestContext, frameworkKey: string,
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mappedReqIds = new Set(links.map((l: any) => l.requirementId));
-    const mapped = requirements.filter(r => mappedReqIds.has(r.id));
-    const unmapped = requirements.filter(r => !mappedReqIds.has(r.id));
+    const mapped = requirements.filter((r: any) => mappedReqIds.has(r.id));
+    const unmapped = requirements.filter((r: any) => !mappedReqIds.has(r.id));
     const total = requirements.length;
     const coveragePercent = total > 0 ? Math.round((mapped.length / total) * 100) : 0;
 
     // Group by section
-    const sections = [...new Set(requirements.map(r => r.section || r.category || 'Other'))];
-    const bySection = sections.map(s => {
-        const sectionReqs = requirements.filter(r => (r.section || r.category || 'Other') === s);
-        const sectionMapped = sectionReqs.filter(r => mappedReqIds.has(r.id));
+    const sections = [...new Set(requirements.map((r: any) => r.section || r.category || 'Other'))];
+    const bySection = sections.map((s: any) => {
+        const sectionReqs = requirements.filter((r: any) => (r.section || r.category || 'Other') === s);
+        const sectionMapped = sectionReqs.filter((r: any) => mappedReqIds.has(r.id));
         return {
             section: s,
             total: sectionReqs.length,
@@ -259,7 +259,7 @@ export async function computeCoverage(ctx: RequestContext, frameworkKey: string,
         unmapped: unmapped.length,
         coveragePercent,
         bySection,
-        unmappedRequirements: unmapped.map(r => ({ code: r.code, title: r.title, section: r.section || r.category })),
+        unmappedRequirements: unmapped.map((r: any) => ({ code: r.code, title: r.title, section: r.section || r.category })),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         controlMappings: links.map((l: any) => ({
             requirementCode: l.requirement.code,
@@ -310,7 +310,7 @@ export async function listTemplates(
     // Check install status per template for this tenant
     const existingControls = await runInTenantContext(ctx, (tdb) =>
         tdb.control.findMany({
-            where: { tenantId: ctx.tenantId, code: { in: templates.map(t => t.code) } },
+            where: { tenantId: ctx.tenantId, code: { in: templates.map((t: any) => t.code) } },
             select: { code: true },
         })
     );
@@ -320,13 +320,13 @@ export async function listTemplates(
     // Filter by section if specified (section comes from linked requirement)
     let result = templates;
     if (filters.section) {
-        result = templates.filter(t =>
+        result = templates.filter((t: any) =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             t.requirementLinks.some((rl: any) => (rl.requirement.section || rl.requirement.category) === filters.section)
         );
     }
 
-    return result.map(t => ({
+    return result.map((t: any) => ({
         id: t.id,
         code: t.code,
         title: t.title,
@@ -335,7 +335,7 @@ export async function listTemplates(
         defaultFrequency: t.defaultFrequency,
         isGlobal: t.isGlobal,
         installed: installedCodes.has(t.code),
-        tasks: t.tasks.map(tt => ({ id: tt.id, title: tt.title, description: tt.description })),
+        tasks: t.tasks.map((tt: any) => ({ id: tt.id, title: tt.title, description: tt.description })),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         requirements: t.requirementLinks.map((rl: any) => ({
             code: rl.requirement.code,
@@ -450,20 +450,20 @@ export async function bulkMapControls(
         where: { frameworkId: fw.id, id: { in: reqIds } },
         select: { id: true },
     });
-    const validReqIds = new Set(validReqs.map(r => r.id));
-    const invalidReqIds = reqIds.filter(id => !validReqIds.has(id));
+    const validReqIds = new Set(validReqs.map((r: any) => r.id));
+    const invalidReqIds = reqIds.filter((id: any) => !validReqIds.has(id));
     if (invalidReqIds.length > 0) throw badRequest(`Invalid requirement IDs: ${invalidReqIds.join(', ')}`);
 
     return runInTenantContext(ctx, async (tdb) => {
         // Validate all control IDs belong to this tenant
-        const controlIds = [...new Set(mappings.map(m => m.controlId))];
+        const controlIds = [...new Set(mappings.map((m: any) => m.controlId))];
         const validControls = await tdb.control.findMany({
             where: { tenantId: ctx.tenantId, id: { in: controlIds } },
             select: { id: true },
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const validCtrlIds = new Set(validControls.map((c: any) => c.id));
-        const invalidCtrlIds = controlIds.filter(id => !validCtrlIds.has(id));
+        const invalidCtrlIds = controlIds.filter((id: any) => !validCtrlIds.has(id));
         if (invalidCtrlIds.length > 0) throw badRequest(`Invalid control IDs: ${invalidCtrlIds.join(', ')}`);
 
         let created = 0;
@@ -509,8 +509,8 @@ export async function bulkInstallTemplates(
         where: { code: { in: templateCodes } },
         include: { tasks: true, requirementLinks: true },
     });
-    const foundCodes = new Set(templates.map(t => t.code));
-    const notFound_codes = templateCodes.filter(c => !foundCodes.has(c));
+    const foundCodes = new Set(templates.map((t: any) => t.code));
+    const notFound_codes = templateCodes.filter((c: any) => !foundCodes.has(c));
     if (notFound_codes.length > 0) throw badRequest(`Templates not found: ${notFound_codes.join(', ')}`);
 
     return runInTenantContext(ctx, async (tdb) => {
@@ -611,7 +611,7 @@ export async function exportCoverageData(
         rows.push(['Unmapped', r.code, r.title, r.section || '', '', '', '']);
     }
 
-    const csv = rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map((r: any) => r.map((c: any) => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
     return { csv, filename: `${frameworkKey}-coverage.csv` };
 }
 
@@ -643,7 +643,7 @@ export async function upsertRequirements(
     if (!requirements || requirements.length === 0) throw badRequest('At least one requirement required');
 
     // Validate unique codes within the fixture
-    const codes = requirements.map(r => r.code);
+    const codes = requirements.map((r: any) => r.code);
     const uniqueCodes = new Set(codes);
     if (uniqueCodes.size !== codes.length) {
         const dupes = codes.filter((c, i) => codes.indexOf(c) !== i);
@@ -724,17 +724,17 @@ export async function computeRequirementsDiff(
     if (!fwFrom) throw notFound(`Framework "${frameworkKeyFrom}" not found`);
     if (!fwTo) throw notFound(`Framework "${frameworkKeyTo}" not found`);
 
-    const reqsFrom = await db.frameworkRequirement.findMany({
+    const reqsFrom: any[] = await db.frameworkRequirement.findMany({
         where: { frameworkId: fwFrom.id, deprecatedAt: null },
         orderBy: { sortOrder: 'asc' },
     });
-    const reqsTo = await db.frameworkRequirement.findMany({
+    const reqsTo: any[] = await db.frameworkRequirement.findMany({
         where: { frameworkId: fwTo.id, deprecatedAt: null },
         orderBy: { sortOrder: 'asc' },
     });
 
-    const fromMap = new Map(reqsFrom.map(r => [r.code, r]));
-    const toMap = new Map(reqsTo.map(r => [r.code, r]));
+    const fromMap = new Map(reqsFrom.map((r: any) => [r.code, r]));
+    const toMap = new Map(reqsTo.map((r: any) => [r.code, r]));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const added: any[] = [];
@@ -779,7 +779,7 @@ export async function computeRequirementsDiff(
     // Compute impact: how many new requirements are unmapped for this tenant
     let unmappedNewCount = 0;
     if (added.length > 0) {
-        const newReqIds = added.map(a => {
+        const newReqIds = added.map((a: any) => {
             const req = toMap.get(a.code);
             return req?.id;
         }).filter(Boolean) as string[];
@@ -793,7 +793,7 @@ export async function computeRequirementsDiff(
         ) as any[];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mappedIds = new Set(existingMappings.map((l: any) => l.requirementId));
-        unmappedNewCount = newReqIds.filter(id => !mappedIds.has(id)).length;
+        unmappedNewCount = newReqIds.filter((id: any) => !mappedIds.has(id)).length;
     }
 
     return {
@@ -829,7 +829,7 @@ export async function generateReadinessReport(ctx: RequestContext, frameworkKey:
     // Get tenant control-requirement mappings
     const links = await runInTenantContext(ctx, (tdb) =>
         tdb.controlRequirementLink.findMany({
-            where: { tenantId: ctx.tenantId, requirementId: { in: requirements.map(r => r.id) } },
+            where: { tenantId: ctx.tenantId, requirementId: { in: requirements.map((r: any) => r.id) } },
             include: {
                 control: {
                     include: {
@@ -844,8 +844,8 @@ export async function generateReadinessReport(ctx: RequestContext, frameworkKey:
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mappedReqIds = new Set(links.map((l: any) => l.requirementId));
-    const mapped = requirements.filter(r => mappedReqIds.has(r.id));
-    const unmapped = requirements.filter(r => !mappedReqIds.has(r.id));
+    const mapped = requirements.filter((r: any) => mappedReqIds.has(r.id));
+    const unmapped = requirements.filter((r: any) => !mappedReqIds.has(r.id));
     const total = requirements.length;
     const coveragePercent = total > 0 ? Math.round((mapped.length / total) * 100) : 0;
 
@@ -892,10 +892,10 @@ export async function generateReadinessReport(ctx: RequestContext, frameworkKey:
     }
 
     // By section
-    const sections = [...new Set(requirements.map(r => r.section || r.category || 'Other'))];
-    const bySection = sections.map(s => {
-        const sectionReqs = requirements.filter(r => (r.section || r.category || 'Other') === s);
-        const sectionMapped = sectionReqs.filter(r => mappedReqIds.has(r.id));
+    const sections = [...new Set(requirements.map((r: any) => r.section || r.category || 'Other'))];
+    const bySection = sections.map((s: any) => {
+        const sectionReqs = requirements.filter((r: any) => (r.section || r.category || 'Other') === s);
+        const sectionMapped = sectionReqs.filter((r: any) => mappedReqIds.has(r.id));
         return {
             section: s,
             total: sectionReqs.length,
@@ -909,7 +909,7 @@ export async function generateReadinessReport(ctx: RequestContext, frameworkKey:
         generatedAt: now.toISOString(),
         coverage: { total, mapped: mapped.length, unmapped: unmapped.length, coveragePercent },
         bySection,
-        unmappedRequirements: unmapped.map(r => ({
+        unmappedRequirements: unmapped.map((r: any) => ({
             code: r.code, title: r.title, section: r.section || r.category,
         })),
         notApplicableControls: notApplicable,
@@ -953,6 +953,6 @@ export async function exportReadinessReport(
         rows.push(['', 'Overdue Task', t.controlCode, `${t.taskTitle} (${t.controlName})`, t.taskStatus, t.dueDate?.toString() || '']);
     }
 
-    const csv = rows.map(r => r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map((r: any) => r.map((c: any) => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
     return { csv, filename: `${frameworkKey}-readiness-report.csv`, summary: report.summary };
 }

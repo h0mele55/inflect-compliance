@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export default function TemplateLibraryPage() {
     const params = useParams();
     const searchParams = useSearchParams();
@@ -12,7 +13,6 @@ export default function TemplateLibraryPage() {
     const tenantHref = useCallback((path: string) => `/t/${tenantSlug}${path}`, [tenantSlug]);
 
     const [templates, setTemplates] = useState<any[]>([]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [framework, setFramework] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState(searchParams.get('search') || '');
@@ -91,7 +91,6 @@ export default function TemplateLibraryPage() {
     };
 
     const categories = [...new Set(templates.map(t => t.category).filter(Boolean))];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sections = [...new Set(templates.flatMap(t => t.requirements.map((r: any) => r.section)).filter(Boolean))];
     const installed = templates.filter(t => t.installed).length;
     const available = templates.filter(t => !t.installed).length;
@@ -122,7 +121,7 @@ export default function TemplateLibraryPage() {
                         className="btn btn-primary"
                         id="bulk-install-btn"
                     >
-                        {bulkInstalling ? '⏳ Installing...' : `Install ${selected.size} Selected`}
+                        {bulkInstalling ? 'Installing...' : `Install ${selected.size} Selected`}
                     </button>
                 )}
             </div>
@@ -190,7 +189,7 @@ export default function TemplateLibraryPage() {
                                                 disabled={installing === t.code}
                                                 className="btn btn-primary text-xs px-3 py-1 flex-shrink-0"
                                             >
-                                                {installing === t.code ? '⏳' : 'Install'}
+                                                {installing === t.code ? '...' : 'Install'}
                                             </button>
                                         )}
                                     </div>
@@ -214,7 +213,6 @@ export default function TemplateLibraryPage() {
                                             <div>
                                                 <h4 className="text-xs font-semibold text-slate-500 mb-1">Mapped Requirements</h4>
                                                 <div className="space-y-1">
-                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     {t.requirements.map((r: any, i: number) => (
                                                         <div key={i} className="flex items-center gap-2 text-xs">
                                                             <code className="text-brand-400 font-mono">{r.code}</code>
@@ -229,7 +227,6 @@ export default function TemplateLibraryPage() {
                                             <div>
                                                 <h4 className="text-xs font-semibold text-slate-500 mb-1">Default Tasks</h4>
                                                 <div className="space-y-1">
-                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     {t.tasks.map((task: any, i: number) => (
                                                         <div key={i} className="flex items-center gap-2 text-xs">
                                                             <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />

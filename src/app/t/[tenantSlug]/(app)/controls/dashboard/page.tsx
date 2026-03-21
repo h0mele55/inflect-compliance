@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import type { ControlDashboardDTO, ConsistencyCheckDTO } from '@/lib/dto';
+import { AppIcon } from '@/components/icons/AppIcon';
 
 const STATUS_COLORS: Record<string, string> = {
     NOT_STARTED: '#94a3b8', IN_PROGRESS: '#38bdf8', IMPLEMENTED: '#34d399', NEEDS_REVIEW: '#fbbf24',
@@ -21,10 +22,23 @@ export default function ControlsDashboard() {
     const [consistency, setConsistency] = useState<ConsistencyCheckDTO | null>(null);
     const [showConsistency, setShowConsistency] = useState(false);
 
-    const fetchDashboard = useCallback(async () => {
+    const fetchDashboard = useCallback(async (attempt = 0) => {
         setLoading(true);
-        const res = await fetch(apiUrl('/controls/dashboard'));
-        if (res.ok) setData(await res.json());
+        try {
+            const res = await fetch(apiUrl('/controls/dashboard'));
+            if (res.ok) {
+                setData(await res.json());
+            } else if (attempt < 2) {
+                // Retry on server errors (e.g., dev server compilation race)
+                await new Promise(r => setTimeout(r, 2000));
+                return fetchDashboard(attempt + 1);
+            }
+        } catch {
+            if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 2000));
+                return fetchDashboard(attempt + 1);
+            }
+        }
         setLoading(false);
     }, [apiUrl]);
 
@@ -36,8 +50,18 @@ export default function ControlsDashboard() {
         if (res.ok) setConsistency(await res.json());
     };
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading dashboard...</div>;
-    if (!data) return <div className="p-12 text-center text-red-400">Failed to load dashboard.</div>;
+    if (loading) return (
+        <div className="space-y-6 animate-fadeIn">
+            <h1 className="text-2xl font-bold" id="dashboard-heading"><AppIcon name="dashboard" className="inline-block mr-2 align-text-bottom" /> Controls Dashboard</h1>
+            <div className="p-12 text-center text-slate-500 animate-pulse">Loading dashboard...</div>
+        </div>
+    );
+    if (!data) return (
+        <div className="space-y-6 animate-fadeIn">
+            <h1 className="text-2xl font-bold" id="dashboard-heading"><AppIcon name="dashboard" className="inline-block mr-2 align-text-bottom" /> Controls Dashboard</h1>
+            <div className="p-12 text-center text-red-400">Failed to load dashboard.</div>
+        </div>
+    );
 
     const maxStatus = Math.max(...Object.values(data.statusDistribution || {}).map(Number), 1);
 
@@ -46,16 +70,16 @@ export default function ControlsDashboard() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold" id="dashboard-heading">📊 Controls Dashboard</h1>
+                    <h1 className="text-2xl font-bold" id="dashboard-heading"><AppIcon name="dashboard" className="inline-block mr-2 align-text-bottom" /> Controls Dashboard</h1>
                     <p className="text-slate-400 text-sm">{data.totalControls} controls in register</p>
                 </div>
                 <div className="flex gap-2">
                     {permissions.canAdmin && (
-                        <button onClick={fetchConsistency} className="btn btn-secondary text-sm" id="consistency-check-btn">
-                            🔍 Consistency Check
+                        <button onClick={fetchConsistency} className="btn btn-secondary" id="consistency-check-btn">
+                            <AppIcon name="search" size={16} className="inline-block" /> Consistency Check
                         </button>
                     )}
-                    <Link href={tenantHref('/controls')} className="btn btn-secondary text-sm">
+                    <Link href={tenantHref('/controls')} className="btn btn-secondary">
                         ← Back to Controls
                     </Link>
                 </div>
@@ -132,7 +156,7 @@ export default function ControlsDashboard() {
             {/* Consistency Check */}
             {showConsistency && consistency && (
                 <div className="glass-card p-5" id="consistency-results">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-3">🔍 Consistency Check Results</h3>
+                    <h3 className="text-sm font-semibold text-slate-300 mb-3"><AppIcon name="search" size={16} className="inline-block mr-1" /> Consistency Check Results</h3>
                     <div className="grid grid-cols-3 gap-4 mb-4">
                         <div className="text-center">
                             <p className={`text-xl font-bold ${consistency.summary.missingCodeCount > 0 ? 'text-yellow-400' : 'text-emerald-400'}`}>
@@ -154,7 +178,7 @@ export default function ControlsDashboard() {
                         </div>
                     </div>
                     {consistency.summary.missingCodeCount === 0 && consistency.summary.duplicateCodeCount === 0 && consistency.summary.overdueTaskCount === 0 && (
-                        <p className="text-sm text-emerald-400 text-center">✅ All checks passed — no issues found</p>
+                        <p className="text-sm text-emerald-400 text-center"><AppIcon name="success" size={16} className="inline-block mr-1" /> All checks passed — no issues found</p>
                     )}
                 </div>
             )}

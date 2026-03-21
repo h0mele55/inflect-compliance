@@ -4,7 +4,7 @@ const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
 async function loginAndGetTenant(page: Page): Promise<string> {
     await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
@@ -19,6 +19,7 @@ test.describe('Controls Center', () => {
     test.describe.configure({ mode: 'serial' });
 
     let tenantSlug: string;
+    let controlDetailPath: string;
     const uniqueId = Date.now().toString(36);
 
     test('controls list page loads with filters and CTAs', async ({ page }) => {
@@ -41,19 +42,19 @@ test.describe('Controls Center', () => {
         await page.fill('#control-description-input', 'Test control from e2e');
         await page.click('#create-control-btn');
 
-        await page.waitForURL('**/controls/**', { timeout: 10000 });
+        // Wait for navigation to the control detail page (UUID-like segment, not /new)
+        await page.waitForSelector('#control-title', { timeout: 15000 });
         await expect(page.locator('#control-title')).toContainText(`E2E Control ${uniqueId}`, { timeout: 5000 });
         await expect(page.locator('#control-status')).toBeVisible();
+        // Store the detail URL path for subsequent serial tests
+        controlDetailPath = new URL(page.url()).pathname;
     });
 
     test('open control → create task → mark done', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('h1', { timeout: 10000 });
-
-        // Click on the control we created
-        await page.click(`text=E2E Control ${uniqueId}`);
-        await page.waitForSelector('#control-title', { timeout: 10000 });
+        // Navigate directly to the control detail page
+        await page.goto(controlDetailPath);
+        await page.waitForSelector('#control-title', { timeout: 15000 });
 
         // Go to tasks tab
         await page.click('#tab-tasks');
@@ -68,19 +69,21 @@ test.describe('Controls Center', () => {
         // Verify task appears
         await expect(page.locator('#tasks-table')).toContainText(`E2E Task ${uniqueId}`, { timeout: 5000 });
 
-        // Mark done
+        // Mark done - wait for the PATCH API call to complete before asserting
         const doneBtn = page.locator('button:has-text("Done")').first();
-        await doneBtn.click();
-        await expect(page.locator('#tasks-table')).toContainText('DONE', { timeout: 5000 });
+        await Promise.all([
+            page.waitForResponse(resp => resp.url().includes('/controls/tasks/') && resp.request().method() === 'PATCH', { timeout: 10000 }),
+            doneBtn.click(),
+        ]);
+        // Wait for refetch + re-render to show the updated status badge
+        await expect(page.locator('#tasks-table')).toContainText('DONE', { timeout: 10000 });
     });
 
     test('attach evidence → see it listed', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('h1', { timeout: 10000 });
-
-        await page.click(`text=E2E Control ${uniqueId}`);
-        await page.waitForSelector('#control-title', { timeout: 10000 });
+        // Navigate directly to the control detail page
+        await page.goto(controlDetailPath);
+        await page.waitForSelector('#control-title', { timeout: 15000 });
 
         // Go to evidence tab
         await page.click('#tab-evidence');
@@ -91,19 +94,21 @@ test.describe('Controls Center', () => {
         await page.waitForSelector('#evidence-url-input', { timeout: 5000 });
         await page.fill('#evidence-url-input', 'https://docs.example.com/evidence-report');
         await page.fill('#evidence-note-input', 'E2E evidence note');
-        await page.click('#submit-evidence-btn');
+        // Wait for the POST API call to complete before asserting
+        await Promise.all([
+            page.waitForResponse(resp => resp.url().includes('/evidence') && resp.request().method() === 'POST', { timeout: 10000 }),
+            page.click('#submit-evidence-btn'),
+        ]);
 
-        // Verify evidence appears
-        await expect(page.locator('#evidence-table')).toContainText('docs.example.com', { timeout: 5000 });
+        // Verify evidence appears after refetch + re-render
+        await expect(page.locator('#evidence-table')).toContainText('docs.example.com', { timeout: 10000 });
     });
 
     test('mark NOT_APPLICABLE requires justification', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('h1', { timeout: 10000 });
-
-        await page.click(`text=E2E Control ${uniqueId}`);
-        await page.waitForSelector('#control-title', { timeout: 10000 });
+        // Navigate directly to the control detail page
+        await page.goto(controlDetailPath);
+        await page.waitForSelector('#control-title', { timeout: 15000 });
 
         // Click applicability toggle
         await page.click('#toggle-applicability-btn');
@@ -129,7 +134,7 @@ test.describe('Controls Center', () => {
     test('reader user sees view-only controls', async ({ page }) => {
         // Login as reader
         await page.goto('/login');
-        await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+        await page.waitForSelector('input[type="email"]', { timeout: 60000 });
         await page.fill('input[type="email"]', 'viewer@acme.com');
         await page.fill('input[type="password"]', 'password123');
         await page.click('button[type="submit"]');

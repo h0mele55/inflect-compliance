@@ -3,10 +3,10 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export default function MappingPage() {
     const apiUrl = useTenantApiUrl();
     const t = useTranslations('mapping');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [data, setData] = useState<any>(null);
     const [tab, setTab] = useState<'soc2' | 'nis2'>('soc2');
 
@@ -29,7 +29,6 @@ export default function MappingPage() {
             </div>
 
             <div className="space-y-3">
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 {items.map((item: any) => (
                     <div key={item.code} className="glass-card p-5">
                         <div className="flex items-center justify-between mb-2">

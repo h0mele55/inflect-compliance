@@ -4,18 +4,18 @@ const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
 async function loginAndGetTenant(page: Page): Promise<string> {
     await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 30000 });
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
     const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug');
     return match[1];
 }
 
 test.describe('Audit Readiness', () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
     let tenantSlug: string;
     let page: Page;
@@ -25,8 +25,13 @@ test.describe('Audit Readiness', () => {
 
     test.beforeAll(async ({ browser }) => {
         page = await browser.newPage();
-        await page.goto('/login', { timeout: 60000 }).catch(() => null);
-        await page.waitForTimeout(2000);
+        // Retry loop: Next.js dev server may need several attempts to compile on cold start
+        for (let attempt = 0; attempt < 5; attempt++) {
+            await page.goto('/login', { timeout: 60000 }).catch(() => null);
+            const emailInput = page.locator('input[type="email"]');
+            if (await emailInput.isVisible({ timeout: 10000 }).catch(() => false)) break;
+            await page.waitForTimeout(5000);
+        }
         tenantSlug = await loginAndGetTenant(page);
     });
 
@@ -46,14 +51,17 @@ test.describe('Audit Readiness', () => {
         await page.click('#create-cycle-btn');
         await page.waitForSelector('#cycle-form', { timeout: 5000 });
 
+        const uid = Date.now().toString(36);
+        const cycleName = `E2E ISO27001 Audit ${uid}`;
+
         // Select ISO27001
         await page.selectOption('#fw-select', 'ISO27001');
-        await page.fill('#cycle-name-input', 'E2E ISO27001 Audit');
+        await page.fill('#cycle-name-input', cycleName);
         await page.click('#submit-cycle-btn');
 
         // Should redirect to cycle detail
         await page.waitForURL(/\/audits\/cycles\//, { timeout: 15000 });
-        await expect(page.locator('#cycle-name')).toContainText('E2E ISO27001 Audit');
+        await expect(page.locator('#cycle-name')).toContainText(cycleName);
 
         // Extract cycle ID from URL
         const url = page.url();
@@ -77,8 +85,9 @@ test.describe('Audit Readiness', () => {
         await btn.click();
 
         // Should redirect to pack detail
-        await page.waitForURL(/\/audits\/packs\//, { timeout: 15000 });
-        await expect(page.locator('#pack-name')).toBeVisible({ timeout: 10000 });
+        await page.waitForURL(/\/audits\/packs\//, { timeout: 60000 });
+        await page.waitForLoadState('networkidle', { timeout: 60000 });
+        await expect(page.locator('#pack-name')).toBeVisible({ timeout: 60000 });
 
         // Extract pack ID
         const url = page.url();
@@ -131,17 +140,23 @@ test.describe('Audit Readiness', () => {
 
     test('create NIS2 cycle', async () => {
         await page.goto(`/t/${tenantSlug}/audits/cycles`);
-        await page.waitForTimeout(2000);
+        // Wait for Network to settle instead of hardcoded 2000ms
+        await page.waitForLoadState('networkidle');
 
+        // Wait explicitly for the button to appear in DOM, meaning the data fetch completed
+        await page.waitForSelector('#create-cycle-btn', { timeout: 15000 });
         await page.click('#create-cycle-btn');
         await page.waitForSelector('#cycle-form', { timeout: 5000 });
 
+        const uid = Date.now().toString(36);
+        const cycleName = `E2E NIS2 Audit ${uid}`;
+
         await page.selectOption('#fw-select', 'NIS2');
-        await page.fill('#cycle-name-input', 'E2E NIS2 Audit');
+        await page.fill('#cycle-name-input', cycleName);
         await page.click('#submit-cycle-btn');
 
         await page.waitForURL(/\/audits\/cycles\//, { timeout: 15000 });
-        await expect(page.locator('#cycle-name')).toContainText('E2E NIS2 Audit');
+        await expect(page.locator('#cycle-name')).toContainText(cycleName);
     });
 
     test('NIS2 cycle shows preview and can create pack', async () => {

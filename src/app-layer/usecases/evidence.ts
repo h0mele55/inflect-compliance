@@ -3,7 +3,6 @@ import { EvidenceRepository, EvidenceListFilters } from '../repositories/Evidenc
 import { assertCanRead, assertCanWrite, assertCanAdmin } from '../policies/common';
 import { logEvent } from '../events/audit';
 import { validateFile, uploadFile } from '@/lib/storage';
-import prisma from '@/lib/prisma';
 import { notFound, badRequest, forbidden } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
 import type { EvidenceType, ReviewCadence } from '@prisma/client';
@@ -148,10 +147,10 @@ export async function reviewEvidence(ctx: RequestContext, id: string, data: { ac
         await EvidenceRepository.update(db, ctx, id, { status: newStatus });
         await EvidenceRepository.addReview(db, ctx, id, newStatus, comment);
 
-        // Create notification — User lookup uses global prisma (User table has no RLS)
+        // Create notification — User lookup uses injected db
         if (newStatus === 'APPROVED' || newStatus === 'REJECTED') {
             const ownerUser = evidence.owner
-                ? await prisma.user.findFirst({ where: { tenantId: ctx.tenantId, name: evidence.owner } })
+                ? await db.user.findFirst({ where: { tenantId: ctx.tenantId, name: evidence.owner } })
                 : null;
             if (ownerUser) {
                 await db.notification.create({
@@ -223,59 +222,61 @@ export async function getEvidenceMetrics(ctx: RequestContext) {
     assertCanAdmin(ctx);
     const tenantId = ctx.tenantId;
 
-    const [totalEvidence, fileEvidence, linkedFileEvidence, fileRecordAgg, topControls] = await Promise.all([
-        prisma.evidence.count({ where: { tenantId, deletedAt: null } }),
-        prisma.evidence.count({ where: { tenantId, type: 'FILE', deletedAt: null } }),
-        prisma.evidence.count({ where: { tenantId, type: 'FILE', controlId: { not: null }, deletedAt: null } }),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (prisma as any).fileRecord.aggregate({
-            where: { tenantId, status: 'STORED' },
-            _sum: { sizeBytes: true },
-            _count: { id: true },
-        }),
-        prisma.evidence.groupBy({
-            by: ['controlId'],
-            where: { tenantId, controlId: { not: null }, deletedAt: null },
-            _count: { id: true },
-            orderBy: { _count: { id: 'desc' } },
-            take: 10,
-        }),
-    ]);
+    return runInTenantContext(ctx, async (db) => {
+        const [totalEvidence, fileEvidence, linkedFileEvidence, fileRecordAgg, topControls] = await Promise.all([
+            db.evidence.count({ where: { tenantId, deletedAt: null } }),
+            db.evidence.count({ where: { tenantId, type: 'FILE', deletedAt: null } }),
+            db.evidence.count({ where: { tenantId, type: 'FILE', controlId: { not: null }, deletedAt: null } }),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (db as any).fileRecord.aggregate({
+                where: { tenantId, status: 'STORED' },
+                _sum: { sizeBytes: true },
+                _count: { id: true },
+            }),
+            db.evidence.groupBy({
+                by: ['controlId'],
+                where: { tenantId, controlId: { not: null }, deletedAt: null },
+                _count: { id: true },
+                orderBy: { _count: { id: 'desc' } },
+                take: 10,
+            }),
+        ]);
 
-    const controlIds = topControls
-        .map((g: { controlId: string | null }) => g.controlId)
-        .filter(Boolean) as string[];
-    const controlNames = controlIds.length > 0
-        ? await prisma.control.findMany({
-            where: { id: { in: controlIds } },
-            select: { id: true, name: true, annexId: true, code: true },
-        })
-        : [];
+        const controlIds = topControls
+            .map((g: { controlId: string | null }) => g.controlId)
+            .filter(Boolean) as string[];
+        const controlNames = controlIds.length > 0
+            ? await db.control.findMany({
+                where: { id: { in: controlIds } },
+                select: { id: true, name: true, annexId: true, code: true },
+            })
+            : [];
 
-    const controlLookup = new Map(controlNames.map(c => [c.id, c]));
-    const totalBytesStored = fileRecordAgg._sum?.sizeBytes ?? 0;
-    const storedFileCount = fileRecordAgg._count?.id ?? 0;
-    const linkedRate = fileEvidence > 0 ? Math.round((linkedFileEvidence / fileEvidence) * 100) : 0;
+        const controlLookup = new Map(controlNames.map(c => [c.id, c]));
+        const totalBytesStored = fileRecordAgg._sum?.sizeBytes ?? 0;
+        const storedFileCount = fileRecordAgg._count?.id ?? 0;
+        const linkedRate = fileEvidence > 0 ? Math.round((linkedFileEvidence / fileEvidence) * 100) : 0;
 
-    return {
-        totalEvidence,
-        fileEvidence,
-        linkedFileEvidence,
-        linkedRate,
-        storedFileCount,
-        totalBytesStored,
-        totalBytesFormatted: totalBytesStored < 1048576
-            ? `${(totalBytesStored / 1024).toFixed(1)} KB`
-            : `${(totalBytesStored / 1048576).toFixed(1)} MB`,
-        topControlsByEvidence: topControls.map((g: { controlId: string | null; _count: { id: number } }) => {
-            const ctrl = g.controlId ? controlLookup.get(g.controlId) : null;
-            return {
-                controlId: g.controlId,
-                controlName: ctrl ? `${ctrl.annexId || ctrl.code || ''} ${ctrl.name}`.trim() : '—',
-                evidenceCount: g._count.id,
-            };
-        }),
-    };
+        return {
+            totalEvidence,
+            fileEvidence,
+            linkedFileEvidence,
+            linkedRate,
+            storedFileCount,
+            totalBytesStored,
+            totalBytesFormatted: totalBytesStored < 1048576
+                ? `${(totalBytesStored / 1024).toFixed(1)} KB`
+                : `${(totalBytesStored / 1048576).toFixed(1)} MB`,
+            topControlsByEvidence: topControls.map((g: { controlId: string | null; _count: { id: number } }) => {
+                const ctrl = g.controlId ? controlLookup.get(g.controlId) : null;
+                return {
+                    controlId: g.controlId,
+                    controlName: ctrl ? `${ctrl.annexId || ctrl.code || ''} ${ctrl.name}`.trim() : '—',
+                    evidenceCount: g._count.id,
+                };
+            }),
+        };
+    });
 }
 
 // ─── File Upload / Download ───

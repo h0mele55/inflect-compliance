@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Paperclip } from 'lucide-react';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 
 interface EvidenceLink {
@@ -56,10 +57,12 @@ export default function TestRunPage() {
 
     // Evidence form
     const [showEvForm, setShowEvForm] = useState(false);
-    const [evKind, setEvKind] = useState<'LINK' | 'EVIDENCE'>('LINK');
+    const [evKind, setEvKind] = useState<'LINK' | 'EVIDENCE' | 'FILE_UPLOAD'>('FILE_UPLOAD');
     const [evUrl, setEvUrl] = useState('');
     const [evNote, setEvNote] = useState('');
     const [evEvidenceId, setEvEvidenceId] = useState('');
+    const [evFile, setEvFile] = useState<File | null>(null);
+    const [evFileTitle, setEvFileTitle] = useState('');
     const [linkingEv, setLinkingEv] = useState(false);
     const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
 
@@ -114,21 +117,51 @@ export default function TestRunPage() {
     const linkEvidence = async () => {
         setLinkingEv(true);
         try {
-            const body: Record<string, unknown> = { kind: evKind, note: evNote || null };
-            if (evKind === 'LINK') body.url = evUrl;
-            if (evKind === 'EVIDENCE') body.evidenceId = evEvidenceId;
-            const res = await fetch(apiUrl(`/tests/runs/${runId}/evidence`), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-            });
-            if (res.ok) {
-                setShowEvForm(false);
-                setEvUrl('');
-                setEvNote('');
-                setEvEvidenceId('');
-                await fetchRun();
+            if (evKind === 'FILE_UPLOAD') {
+                // Step 1: Upload file as evidence record
+                if (!evFile) return;
+                const formData = new FormData();
+                formData.append('file', evFile);
+                formData.append('title', evFileTitle || evFile.name);
+                formData.append('type', 'FILE');
+                if (evNote) formData.append('content', evNote);
+
+                const uploadRes = await fetch(apiUrl('/evidence'), {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (!uploadRes.ok) {
+                    const err = await uploadRes.text();
+                    throw new Error(err || 'Upload failed');
+                }
+                const newEvidence = await uploadRes.json();
+
+                // Step 2: Link the evidence to the test run
+                const linkRes = await fetch(apiUrl(`/tests/runs/${runId}/evidence`), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ kind: 'EVIDENCE', evidenceId: newEvidence.id, note: evNote || null }),
+                });
+                if (!linkRes.ok) throw new Error('Failed to link evidence');
+            } else {
+                const body: Record<string, unknown> = { kind: evKind, note: evNote || null };
+                if (evKind === 'LINK') body.url = evUrl;
+                if (evKind === 'EVIDENCE') body.evidenceId = evEvidenceId;
+                const res = await fetch(apiUrl(`/tests/runs/${runId}/evidence`), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (!res.ok) throw new Error('Failed to link');
             }
+
+            setShowEvForm(false);
+            setEvUrl('');
+            setEvNote('');
+            setEvEvidenceId('');
+            setEvFile(null);
+            setEvFileTitle('');
+            await fetchRun();
         } finally {
             setLinkingEv(false);
         }
@@ -149,11 +182,14 @@ export default function TestRunPage() {
         return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     };
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading test run...</div>;
+    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse"><div className="h-6 w-full sm:w-48 bg-slate-700 rounded mx-auto" /></div>;
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
     if (!run) return <div className="p-12 text-center text-slate-500">Run not found.</div>;
 
     const isCompleted = run.status === 'COMPLETED';
+
+    // Determine if "Link" button should be disabled
+    const canSubmitEvidence = evKind === 'LINK' ? !!evUrl : evKind === 'EVIDENCE' ? !!evEvidenceId : !!evFile;
 
     return (
         <div className="space-y-6 animate-fadeIn">
@@ -206,7 +242,7 @@ export default function TestRunPage() {
                                     onClick={() => setResult(r)}
                                     id={`result-btn-${r}`}
                                 >
-                                    {r === 'PASS' ? '✅' : r === 'FAIL' ? '❌' : '⚠️'} {r}
+                                    {r}
                                 </button>
                             ))}
                         </div>
@@ -242,7 +278,7 @@ export default function TestRunPage() {
                         disabled={completing}
                         id="complete-test-run-btn"
                     >
-                        {completing ? '⏳ Completing...' : `✓ Complete as ${result}`}
+                        {completing ? 'Completing...' : `Complete as ${result}`}
                     </button>
                 </div>
             )}
@@ -277,7 +313,7 @@ export default function TestRunPage() {
                                 className="btn btn-sm btn-secondary"
                                 id="retest-btn"
                             >
-                                {retesting ? '⏳ Creating...' : '🔄 Retest'}
+                                {retesting ? 'Creating...' : 'Retest'}
                             </button>
                             <span className="text-xs text-slate-500 ml-2">Create a new run for this test plan</span>
                         </div>
@@ -288,7 +324,7 @@ export default function TestRunPage() {
             {/* Evidence Section */}
             <div className="glass-card p-4">
                 <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-slate-300">📎 Evidence ({run.evidence?.length ?? 0})</h3>
+                    <h3 className="text-sm font-semibold text-slate-300">Evidence ({run.evidence?.length ?? 0})</h3>
                     {permissions.canWrite && (
                         <button
                             className="btn btn-secondary btn-xs"
@@ -304,11 +340,47 @@ export default function TestRunPage() {
                     <div className="space-y-3 mb-4 p-3 rounded bg-slate-800/50 animate-fadeIn">
                         <div>
                             <label className="text-xs text-slate-400 block mb-1">Evidence Type</label>
-                            <select className="input w-full" value={evKind} onChange={e => setEvKind(e.target.value as 'LINK' | 'EVIDENCE')} id="evidence-kind-select">
+                            <select className="input w-full" value={evKind} onChange={e => setEvKind(e.target.value as 'LINK' | 'EVIDENCE' | 'FILE_UPLOAD')} id="evidence-kind-select">
+                                <option value="FILE_UPLOAD">Upload File</option>
                                 <option value="LINK">URL / Link</option>
                                 <option value="EVIDENCE">Existing Evidence Record</option>
                             </select>
                         </div>
+                        {evKind === 'FILE_UPLOAD' && (
+                            <>
+                                <div>
+                                    <label className="text-xs text-slate-400 block mb-1">File</label>
+                                    <label className="flex flex-col items-center justify-center w-full p-4 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-brand-500/50 transition-colors bg-slate-900/30">
+                                        <input
+                                            type="file"
+                                            className="hidden"
+                                            onChange={e => {
+                                                const f = e.target.files?.[0] || null;
+                                                setEvFile(f);
+                                                if (f && !evFileTitle) setEvFileTitle(f.name);
+                                            }}
+                                            id="evidence-file-input"
+                                        />
+                                        {evFile ? (
+                                            <div className="text-sm text-white flex items-center gap-2">
+                                                <Paperclip className="w-4 h-4 text-brand-400" aria-hidden="true" />
+                                                <span>{evFile.name}</span>
+                                                <span className="text-xs text-slate-500">({(evFile.size / 1024).toFixed(1)} KB)</span>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center">
+                                                <p className="text-sm text-slate-400">Click to select a file</p>
+                                                <p className="text-xs text-slate-600 mt-1">PDF, images, documents, logs, etc.</p>
+                                            </div>
+                                        )}
+                                    </label>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-400 block mb-1">Title</label>
+                                    <input className="input w-full" value={evFileTitle} onChange={e => setEvFileTitle(e.target.value)} placeholder="Evidence title..." id="evidence-file-title-input" />
+                                </div>
+                            </>
+                        )}
                         {evKind === 'LINK' && (
                             <div>
                                 <label className="text-xs text-slate-400 block mb-1">URL</label>
@@ -325,8 +397,13 @@ export default function TestRunPage() {
                             <label className="text-xs text-slate-400 block mb-1">Note</label>
                             <input className="input w-full" value={evNote} onChange={e => setEvNote(e.target.value)} placeholder="Optional note..." id="evidence-note-input" />
                         </div>
-                        <button className="btn btn-primary btn-xs" onClick={linkEvidence} disabled={linkingEv} id="save-evidence-link-btn">
-                            {linkingEv ? '⏳ Linking...' : '🔗 Link'}
+                        <button
+                            className="btn btn-primary btn-xs"
+                            onClick={linkEvidence}
+                            disabled={linkingEv || !canSubmitEvidence}
+                            id="save-evidence-link-btn"
+                        >
+                            {linkingEv ? (evKind === 'FILE_UPLOAD' ? 'Uploading...' : 'Linking...') : (evKind === 'FILE_UPLOAD' ? 'Upload & Link' : 'Link')}
                         </button>
                     </div>
                 )}
@@ -360,7 +437,7 @@ export default function TestRunPage() {
                                         onClick={() => unlinkEvidence(ev.id)}
                                         disabled={unlinkingId === ev.id}
                                     >
-                                        {unlinkingId === ev.id ? '⏳' : '✕'}
+                                        {unlinkingId === ev.id ? '...' : <span aria-label="Unlink evidence">×</span>}
                                     </button>
                                 )}
                             </div>

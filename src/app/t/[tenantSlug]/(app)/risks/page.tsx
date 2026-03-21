@@ -4,12 +4,15 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { RequirePermission } from '@/components/require-permission';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { risksFilterConfig } from '@/components/filters/configs';
 
 const RISK_COLORS = ['', '#22c55e', '#84cc16', '#f59e0b', '#ef4444', '#dc2626'];
+
+
 
 interface RiskListItem {
     id: string;
@@ -19,6 +22,9 @@ interface RiskListItem {
     impact: number;
     inherentScore: number;
     treatment: string | null;
+    status?: string;
+    nextReviewAt?: string | null;
+    treatmentOwner?: string | null;
     asset: { name: string } | null;
     controls: unknown[];
 }
@@ -28,6 +34,7 @@ export default function RisksPage() {
     const tenantHref = useTenantHref();
     const { tenantSlug } = useTenantContext();
     const t = useTranslations('risks');
+    const td = useTranslations('riskManager');
     const tc = useTranslations('common');
     const [view, setView] = useState<'register' | 'heatmap'>('register');
 
@@ -46,6 +53,13 @@ export default function RisksPage() {
     });
 
     const risks = risksQuery.data ?? [];
+
+    // ── KPI Computations ──
+    const total = risks.length;
+    const avgScore = total ? (risks.reduce((s, r) => s + r.inherentScore, 0) / total).toFixed(1) : '0.0';
+    const openCount = risks.filter(r => r.status === 'OPEN' || r.status === 'MITIGATING').length;
+    const now = new Date();
+    const overdueRisks = risks.filter(r => r.nextReviewAt && new Date(r.nextReviewAt) < now);
 
     const heatmap: number[][] = Array.from({ length: 5 }, (_, l) =>
         Array.from({ length: 5 }, (_, i) => risks.filter(r => r.likelihood === (5 - l) && r.impact === (i + 1)).length)
@@ -66,16 +80,38 @@ export default function RisksPage() {
                     <p className="text-slate-400 text-sm">{t('risksIdentified', { count: risks.length })}</p>
                 </div>
                 <div className="flex gap-2">
-                    <Link href={tenantHref('/risks/dashboard')} className="btn btn-secondary" id="risk-dashboard-btn">
-                        {t('heatmap')}
-                    </Link>
                     <button onClick={() => setView(view === 'register' ? 'heatmap' : 'register')} className="btn btn-secondary">
                         {view === 'register' ? t('heatmap') : t('register')}
                     </button>
-                    <Link href={tenantHref('/risks/import')} className="btn btn-secondary" id="risk-import-btn">
-                        Import
-                    </Link>
-                    <Link href={tenantHref('/risks/new')} className="btn btn-primary" id="new-risk-btn">{t('addRisk')}</Link>
+                    <RequirePermission resource="risks" action="create">
+                        <Link href={tenantHref('/risks/ai')} className="btn btn-secondary" id="ai-risk-btn">
+                            AI Assessment
+                        </Link>
+                        <Link href={tenantHref('/risks/import')} className="btn btn-secondary" id="risk-import-btn">
+                            Import
+                        </Link>
+                        <Link href={tenantHref('/risks/new')} className="btn btn-primary" id="new-risk-btn">{t('addRisk')}</Link>
+                    </RequirePermission>
+                </div>
+            </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="glass-card p-5 text-center">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">{td('totalRisks')}</p>
+                    <p className="text-3xl font-bold mt-2">{total}</p>
+                </div>
+                <div className="glass-card p-5 text-center">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">{td('avgScore')}</p>
+                    <p className="text-3xl font-bold mt-2 text-amber-400">{avgScore}</p>
+                </div>
+                <div className="glass-card p-5 text-center">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">{td('openRisks')}</p>
+                    <p className="text-3xl font-bold mt-2 text-emerald-400">{openCount}</p>
+                </div>
+                <div className="glass-card p-5 text-center">
+                    <p className="text-xs text-slate-400 uppercase tracking-wider">{td('overdueReviews')}</p>
+                    <p className="text-3xl font-bold mt-2 text-red-400">{overdueRisks.length}</p>
                 </div>
             </div>
 
@@ -145,3 +181,4 @@ export default function RisksPage() {
         </div>
     );
 }
+

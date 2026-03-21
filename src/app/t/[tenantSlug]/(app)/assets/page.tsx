@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -56,7 +57,7 @@ export default function AssetsPage() {
                     <p className="text-slate-400 text-sm">{t('assetsRegistered', { count: assets.length })}</p>
                 </div>
                 <div className="flex gap-2">
-                    <Link href={tenantHref('/coverage')} className="btn btn-secondary">📊 Coverage</Link>
+                    <Link href={tenantHref('/coverage')} className="btn btn-secondary">Coverage</Link>
                     <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t('addAsset')}</button>
                 </div>
             </div>

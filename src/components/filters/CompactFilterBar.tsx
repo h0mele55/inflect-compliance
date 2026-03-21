@@ -49,6 +49,8 @@ export interface CompactFilterBarProps {
     clearFilters: () => void;
     /** hasActiveFilters from the parent's useUrlFilters */
     hasActiveFilters: boolean;
+    /** Optional ID prefix for page-level element IDs (e.g. 'control' → #control-search, #control-status-filter) */
+    idPrefix?: string;
 }
 
 // ─── Pill Dropdown ───
@@ -57,10 +59,12 @@ function PillDropdown({
     config,
     value,
     onChange,
+    id,
 }: {
     config: DropdownConfig;
     value: string;
     onChange: (val: string) => void;
+    id?: string;
 }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
@@ -105,6 +109,7 @@ function PillDropdown({
                 `}
                 onClick={() => setOpen(!open)}
                 data-testid={`filter-dd-${config.key}`}
+                {...(id ? { id } : {})}
             >
                 {selectedLabel || config.label}
                 <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -144,7 +149,7 @@ function PillDropdown({
 
 // ─── CompactFilterBar ───
 
-export function CompactFilterBar({ config, filters, setFilter, clearFilters, hasActiveFilters }: CompactFilterBarProps) {
+export function CompactFilterBar({ config, filters, setFilter, clearFilters, hasActiveFilters, idPrefix }: CompactFilterBarProps) {
     const [searchInput, setSearchInput] = useState(filters.q || '');
     const searchRef = useRef<HTMLInputElement>(null);
 
@@ -197,6 +202,7 @@ export function CompactFilterBar({ config, filters, setFilter, clearFilters, has
                     onChange={(e) => setSearchInput(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
                     data-testid="filter-search"
+                    {...(idPrefix ? { id: `${idPrefix}-search` } : {})}
                 />
                 {searchInput && (
                     <button
@@ -217,6 +223,7 @@ export function CompactFilterBar({ config, filters, setFilter, clearFilters, has
                     config={dd}
                     value={filters[dd.key] || ''}
                     onChange={(val) => setFilter(dd.key, val)}
+                    id={idPrefix ? `${idPrefix}-${dd.key}-filter` : undefined}
                 />
             ))}
 

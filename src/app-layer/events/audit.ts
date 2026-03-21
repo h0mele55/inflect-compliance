@@ -6,6 +6,7 @@ export interface AuditEventPayload {
     entityType: string;
     entityId: string;
     details?: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     metadata?: Record<string, any>; // Must be safe/non-secret
 }
 

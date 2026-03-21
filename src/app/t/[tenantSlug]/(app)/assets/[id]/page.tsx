@@ -1,7 +1,9 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import TraceabilityPanel from '@/components/TraceabilityPanel';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
@@ -13,13 +15,11 @@ export default function AssetDetailPage() {
     const { permissions } = useTenantContext();
     const assetId = params.id as string;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [asset, setAsset] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [form, setForm] = useState<any>({});
 
     const fetchAsset = useCallback(async () => {
@@ -29,7 +29,6 @@ export default function AssetDetailPage() {
             if (!res.ok) throw new Error(`Failed to load (${res.status})`);
             const data = await res.json();
             setAsset(data);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -69,7 +68,6 @@ export default function AssetDetailPage() {
             const data = await res.json();
             setAsset(data);
             setEditing(false);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -101,7 +99,10 @@ export default function AssetDetailPage() {
                     </div>
                 </div>
                 {permissions.canWrite && !editing && (
-                    <button onClick={startEdit} className="btn btn-secondary" id="edit-asset-btn">Edit</button>
+                    <div className="flex gap-2">
+                        <Link href={tenantHref(`/risks/ai?assetId=${assetId}`)} className="btn btn-secondary" id="suggest-risks-btn">Suggest Risks</Link>
+                        <button onClick={startEdit} className="btn btn-secondary" id="edit-asset-btn">Edit</button>
+                    </div>
                 )}
             </div>
 
@@ -112,21 +113,13 @@ export default function AssetDetailPage() {
                 {editing ? (
                     <>
                         <div className="grid grid-cols-2 gap-4">
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <div><label className="input-label">Name *</label><input className="input" value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} /></div>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <div><label className="input-label">Type</label><select className="input" value={form.type} onChange={e => setForm((f: any) => ({ ...f, type: e.target.value }))}>{TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}</select></div>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <div><label className="input-label">Criticality</label><select className="input" value={form.criticality} onChange={e => setForm((f: any) => ({ ...f, criticality: e.target.value || null }))}><option value="">—</option>{CRITICALITIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <div><label className="input-label">Status</label><select className="input" value={form.status} onChange={e => setForm((f: any) => ({ ...f, status: e.target.value }))}><option value="ACTIVE">Active</option><option value="RETIRED">Retired</option></select></div>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <div><label className="input-label">Owner</label><input className="input" value={form.owner} onChange={e => setForm((f: any) => ({ ...f, owner: e.target.value }))} /></div>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <div><label className="input-label">External Ref</label><input className="input" value={form.externalRef} onChange={e => setForm((f: any) => ({ ...f, externalRef: e.target.value }))} /></div>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <div><label className="input-label">Classification</label><input className="input" value={form.classification} onChange={e => setForm((f: any) => ({ ...f, classification: e.target.value }))} /></div>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <div><label className="input-label">Location</label><input className="input" value={form.location} onChange={e => setForm((f: any) => ({ ...f, location: e.target.value }))} /></div>
                         </div>
                         <div className="flex gap-3 pt-2">
@@ -158,7 +151,7 @@ export default function AssetDetailPage() {
 
             {/* Linked Tasks */}
             <div className="glass-card p-6" id="linked-tasks-section">
-                <h2 className="text-lg font-semibold text-white mb-4">✅ Linked Tasks</h2>
+                <h2 className="text-lg font-semibold text-white mb-4 inline-flex items-center gap-2"><AppIcon name="tasks" size={18} /> Linked Tasks</h2>
                 <LinkedTasksPanel
                     apiBase={apiUrl('')}
                     entityType="ASSET"
@@ -169,7 +162,7 @@ export default function AssetDetailPage() {
 
             {/* Traceability */}
             <div className="glass-card p-6">
-                <h2 className="text-lg font-semibold text-white mb-4">🔗 Traceability</h2>
+                <h2 className="text-lg font-semibold text-white mb-4 inline-flex items-center gap-2"><AppIcon name="link" size={18} /> Traceability</h2>
                 <TraceabilityPanel
                     apiBase={apiUrl('')}
                     entityType="asset"

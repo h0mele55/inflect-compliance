@@ -4,11 +4,11 @@ const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
 async function loginAndGetTenant(page: Page): Promise<string> {
     await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 15000 });
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
     const url = new URL(page.url());
     const match = url.pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug from ' + url.pathname);
@@ -34,7 +34,9 @@ test.describe('Control Toggle Pills', () => {
         expect(initialText).toBeTruthy();
 
         // Click to advance
+        const res1 = page.waitForResponse(res => res.url().includes('/status') && res.request().method() === 'POST');
         await statusPill.click();
+        await res1;
 
         // Wait for optimistic update — the text should change
         await expect(statusPill).not.toHaveText(initialText, { timeout: 5000 });
@@ -53,7 +55,9 @@ test.describe('Control Toggle Pills', () => {
         const text1 = (await statusPill.textContent())!.trim();
 
         // Click once
+        const resA = page.waitForResponse(res => res.url().includes('/status') && res.request().method() === 'POST');
         await statusPill.click();
+        await resA;
         await expect(statusPill).not.toHaveText(text1, { timeout: 5000 });
         const text2 = (await statusPill.textContent())!.trim();
 
@@ -61,7 +65,9 @@ test.describe('Control Toggle Pills', () => {
         await page.waitForTimeout(500);
 
         // Click twice
+        const resB = page.waitForResponse(res => res.url().includes('/status') && res.request().method() === 'POST');
         await statusPill.click();
+        await resB;
         await expect(statusPill).not.toHaveText(text2, { timeout: 5000 });
         const text3 = (await statusPill.textContent())!.trim();
 
@@ -107,7 +113,9 @@ test.describe('Control Toggle Pills', () => {
         await expect(page.locator('#justification-save-btn')).toBeEnabled();
 
         // Save
+        const resApp = page.waitForResponse(res => res.url().includes('/applicability') && res.request().method() === 'POST');
         await page.locator('#justification-save-btn').click();
+        await resApp;
         await expect(page.locator('#justification-modal-backdrop')).toBeHidden({ timeout: 3000 });
 
         // Pill should now show N/A
@@ -155,20 +163,21 @@ test.describe('Control Toggle Pills', () => {
     test('reader user sees non-interactive pills', async ({ page }) => {
         // Login as reader
         await page.goto('/login');
-        await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+        await page.waitForSelector('input[type="email"]', { timeout: 60000 });
         await page.fill('input[type="email"]', 'viewer@acme.com');
         await page.fill('input[type="password"]', 'password123');
         await page.click('button[type="submit"]');
-        await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 15000 });
+        await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
         const url = new URL(page.url());
         const match = url.pathname.match(/^\/t\/([^/]+)\//);
         tenantSlug = match?.[1] || tenantSlug;
 
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('h1', { timeout: 10000 });
+        await page.waitForSelector('#controls-table', { timeout: 15000 });
+        await page.waitForTimeout(2000); // let hydration settle
 
         // Reader should NOT see clickable status pills (they should be <span> not <button>)
         const statusPillBtn = page.locator('#controls-table tbody tr').first().locator('button[id^="status-pill-"]');
-        await expect(statusPillBtn).not.toBeVisible({ timeout: 3000 });
+        await expect(statusPillBtn).not.toBeVisible({ timeout: 5000 });
     });
 });

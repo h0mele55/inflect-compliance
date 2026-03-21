@@ -1,9 +1,11 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { RequirePermission } from '@/components/require-permission';
 import { queryKeys } from '@/lib/queryKeys';
 import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
@@ -56,18 +58,20 @@ export default function PoliciesPage() {
                     <h1 className="text-2xl font-bold">{t('title')}</h1>
                     <p className="text-slate-400 text-sm">{policies.length} policies</p>
                 </div>
-                <div className="flex gap-2">
-                    <Link href={tenantHref('/policies/templates')} className="btn btn-secondary" id="policy-from-template-btn">
-                        📋 From Template
-                    </Link>
-                    <Link href={tenantHref('/policies/new')} className="btn btn-primary" id="new-policy-btn">
-                        + New Policy
-                    </Link>
-                </div>
+                <RequirePermission resource="policies" action="create">
+                    <div className="flex gap-2">
+                        <Link href={tenantHref('/policies/templates')} className="btn btn-secondary" id="policy-from-template-btn">
+                            From Template
+                        </Link>
+                        <Link href={tenantHref('/policies/new')} className="btn btn-primary" id="new-policy-btn">
+                            + New Policy
+                        </Link>
+                    </div>
+                </RequirePermission>
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={policiesFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
+            <CompactFilterBar config={policiesFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="policy" />
 
             {/* Table */}
             <div className="glass-card overflow-hidden">
@@ -128,7 +132,7 @@ export default function PoliciesPage() {
                                             <span className="flex items-center gap-1">
                                                 {new Date(p.nextReviewAt).toLocaleDateString()}
                                                 {new Date(p.nextReviewAt) < new Date() && p.status !== 'ARCHIVED' && (
-                                                    <span className="badge badge-danger text-xs">⚠️ Overdue</span>
+                                                    <span className="badge badge-danger text-xs">Overdue</span>
                                                 )}
                                             </span>
                                         ) : '—'}

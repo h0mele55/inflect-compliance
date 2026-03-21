@@ -1,7 +1,9 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 
 function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
     const r = (size - 8) / 2;
@@ -22,9 +24,9 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
     );
 }
 
-const GAP_ICON: Record<string, string> = {
-    UNMAPPED_REQUIREMENT: '📋', MISSING_EVIDENCE: '📎', OVERDUE_TASK: '⏰',
-    OPEN_ISSUE: '⚠️', MISSING_POLICY: '📄',
+const GAP_ICON: Record<string, AppIconName> = {
+    UNMAPPED_REQUIREMENT: 'overview', MISSING_EVIDENCE: 'evidence', OVERDUE_TASK: 'clock',
+    OPEN_ISSUE: 'warning', MISSING_POLICY: 'fileWarning',
 };
 const SEV_BADGE: Record<string, string> = {
     HIGH: 'badge-danger', MEDIUM: 'badge-warning', LOW: 'badge-neutral',
@@ -36,9 +38,7 @@ export default function CycleReadinessPage() {
     const cycleId = params.cycleId as string;
     const apiUrl = useCallback((path: string) => `/api/t/${tenantSlug}${path}`, [tenantSlug]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [result, setResult] = useState<any>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [cycle, setCycle] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
@@ -101,7 +101,7 @@ export default function CycleReadinessPage() {
             {/* Recommendations */}
             {result.recommendations?.length > 0 && (
                 <div className="glass-card p-6" id="recommendations">
-                    <h3 className="text-sm font-semibold mb-3">💡 Recommended Next Actions</h3>
+                    <h3 className="text-sm font-semibold mb-3 inline-flex items-center gap-2"><AppIcon name="info" size={16} /> Recommended Next Actions</h3>
                     <div className="space-y-2">
                         {result.recommendations.map((r: string, i: number) => (
                             <div key={i} className="flex items-start gap-2 text-sm">
@@ -118,11 +118,10 @@ export default function CycleReadinessPage() {
                 <div className="space-y-3" id="gaps-section">
                     <h3 className="text-sm font-semibold">Top Gaps ({result.gaps.length})</h3>
                     <div className="glass-card divide-y divide-slate-700/50">
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         {result.gaps.map((g: any, i: number) => (
                             <div key={i} className="p-3 flex items-center justify-between text-sm">
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <span>{GAP_ICON[g.type] || '📋'}</span>
+                                    <AppIcon name={GAP_ICON[g.type] || 'overview'} size={16} />
                                     <div className="min-w-0">
                                         <span className="font-medium truncate block">{g.title}</span>
                                         <span className="text-xs text-slate-500">{g.details}</span>
@@ -137,7 +136,7 @@ export default function CycleReadinessPage() {
 
             {/* Exports */}
             <div className="glass-card p-6" id="exports-section">
-                <h3 className="text-sm font-semibold mb-3">📥 Exports</h3>
+                <h3 className="text-sm font-semibold mb-3 inline-flex items-center gap-2"><AppIcon name="export" size={16} /> Exports</h3>
                 <div className="flex flex-wrap gap-2">
                     <a href={apiUrl(`/audits/cycles/${cycleId}/readiness?action=export-json`)}
                         target="_blank" rel="noopener" className="btn btn-secondary btn-sm">Readiness Report (JSON)</a>

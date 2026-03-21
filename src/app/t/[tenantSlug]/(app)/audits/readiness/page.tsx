@@ -2,11 +2,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import {
+    ShieldCheck,
+    Flag,
+    ClipboardList,
+    BarChart3,
+    type LucideIcon,
+} from 'lucide-react';
 
-const FW_META: Record<string, { icon: string; label: string; color: string }> = {
-    ISO27001: { icon: '🛡️', label: 'ISO/IEC 27001:2022', color: 'from-indigo-500 to-purple-600' },
-    NIS2: { icon: '🇪🇺', label: 'NIS2 Directive', color: 'from-blue-500 to-cyan-600' },
+const FW_META: Record<string, { icon: LucideIcon; label: string; color: string }> = {
+    ISO27001: { icon: ShieldCheck, label: 'ISO/IEC 27001:2022', color: 'from-indigo-500 to-purple-600' },
+    NIS2: { icon: Flag, label: 'NIS2 Directive', color: 'from-blue-500 to-cyan-600' },
 };
+const FW_DEFAULT: { icon: LucideIcon; label: string; color: string } = { icon: ClipboardList, label: '', color: 'from-gray-500 to-gray-600' };
 
 function ScoreRing({ score, size = 96 }: { score: number; size?: number }) {
     const r = (size - 8) / 2;
@@ -32,7 +40,9 @@ export default function ReadinessOverviewPage() {
     const tenantSlug = params.tenantSlug as string;
     const apiUrl = useCallback((path: string) => `/api/t/${tenantSlug}${path}`, [tenantSlug]);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [cycles, setCycles] = useState<any[]>([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [scores, setScores] = useState<Record<string, any>>({});
     const [loading, setLoading] = useState(true);
 
@@ -42,6 +52,7 @@ export default function ReadinessOverviewPage() {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .then(async (cycs: any[]) => {
                 setCycles(cycs);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const scoreMap: Record<string, any> = {};
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 await Promise.all(cycs.map(async (c: any) => {
@@ -65,7 +76,7 @@ export default function ReadinessOverviewPage() {
 
     return (
         <div className="space-y-6 animate-fadeIn">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-bold" id="readiness-heading">Audit Readiness</h1>
                     <p className="text-slate-400 text-sm">Framework readiness scores across all audit cycles</p>
@@ -75,7 +86,7 @@ export default function ReadinessOverviewPage() {
 
             {cycles.length === 0 ? (
                 <div className="glass-card p-12 text-center">
-                    <div className="text-4xl mb-4">📊</div>
+                    <div className="text-4xl mb-4"><BarChart3 className="w-10 h-10 text-slate-400 mx-auto" /></div>
                     <h3 className="text-lg font-semibold mb-2">No audit cycles yet</h3>
                     <p className="text-slate-400 text-sm mb-4">Create an audit cycle to see readiness scores</p>
                     <Link href={`/t/${tenantSlug}/audits/cycles`} className="btn btn-primary">+ New Audit Cycle</Link>
@@ -83,7 +94,8 @@ export default function ReadinessOverviewPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {cycles.map(c => {
-                        const meta = FW_META[c.frameworkKey] || { icon: '📋', label: c.frameworkKey, color: 'from-gray-500 to-gray-600' };
+                        const meta = FW_META[c.frameworkKey] || { ...FW_DEFAULT, label: c.frameworkKey };
+                        const FwIcon = meta.icon;
                         const sc = scores[c.id];
                         return (
                             <Link key={c.id} href={`/t/${tenantSlug}/audits/cycles/${c.id}/readiness`}
@@ -96,7 +108,7 @@ export default function ReadinessOverviewPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className={`w-8 h-8 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-sm`}>{meta.icon}</span>
+                                            <span className={`w-8 h-8 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-sm`}><FwIcon className="w-4 h-4 text-white" aria-hidden="true" /></span>
                                             <h3 className="font-semibold text-sm truncate">{c.name}</h3>
                                         </div>
                                         <p className="text-xs text-slate-400">{meta.label}</p>

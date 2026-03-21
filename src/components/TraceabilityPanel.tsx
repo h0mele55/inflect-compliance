@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { AppIcon } from '@/components/icons/AppIcon';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 
@@ -225,7 +226,7 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
             {showRisks && (
                 <div>
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-white">{entityType === 'control' ? '🛡️ Mitigates Risks' : '⚠️ Associated Risks'} ({risks.length})</h3>
+                        <h3 className="text-sm font-semibold text-white inline-flex items-center gap-2">{entityType === 'control' ? <><AppIcon name="shield" size={16} /> Mitigates Risks</> : <><AppIcon name="warning" size={16} /> Associated Risks</>} ({risks.length})</h3>
                         {canWrite && (
                             <button className="btn btn-primary text-xs" onClick={() => { setShowAddRisk(!showAddRisk); setAddId(''); }} id="add-risk-link-btn">+ Link Risk</button>
                         )}
@@ -260,7 +261,7 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
                                                 <td className="text-sm text-white font-medium">{r?.score ?? '—'}</td>
                                                 <td className="text-xs text-slate-400">{l.rationale || '—'}</td>
                                                 {canWrite && (
-                                                    <td><button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('risk', r?.id)} disabled={unlinkMutation.isPending} id={`unlink-risk-${r?.id}`}>✕</button></td>
+                                                    <td><button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('risk', r?.id)} disabled={unlinkMutation.isPending} id={`unlink-risk-${r?.id}`} aria-label="Unlink risk">×</button></td>
                                                 )}
                                             </tr>
                                         );
@@ -276,7 +277,7 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
             {showControls && (
                 <div>
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-white">{entityType === 'risk' ? '🛡️ Mitigated by Controls' : '🔒 Covered by Controls'} ({controls.length})</h3>
+                        <h3 className="text-sm font-semibold text-white inline-flex items-center gap-2">{entityType === 'risk' ? <><AppIcon name="shield" size={16} /> Mitigated by Controls</> : <><AppIcon name="controls" size={16} /> Covered by Controls</>} ({controls.length})</h3>
                         {canWrite && (
                             <button className="btn btn-primary text-xs" onClick={() => { setShowAddControl(!showAddControl); setAddId(''); }} id="add-control-link-btn">+ Link Control</button>
                         )}
@@ -311,7 +312,7 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
                                                 <td><span className="badge badge-info text-xs">{c?.status || '—'}</span></td>
                                                 <td className="text-xs text-slate-400">{l.rationale || '—'}</td>
                                                 {canWrite && (
-                                                    <td><button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('control', c?.id)} disabled={unlinkMutation.isPending} id={`unlink-control-${c?.id}`}>✕</button></td>
+                                                    <td><button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('control', c?.id)} disabled={unlinkMutation.isPending} id={`unlink-control-${c?.id}`} aria-label="Unlink control">×</button></td>
                                                 )}
                                             </tr>
                                         );
@@ -327,7 +328,7 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
             {showAssets && (
                 <div>
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-white">{entityType === 'control' ? '📦 Covers Assets' : '📦 Affects Assets'} ({assets.length})</h3>
+                        <h3 className="text-sm font-semibold text-white inline-flex items-center gap-2"><AppIcon name="package" size={16} /> {entityType === 'control' ? 'Covers Assets' : 'Affects Assets'} ({assets.length})</h3>
                         {canWrite && (
                             <button className="btn btn-primary text-xs" onClick={() => { setShowAddAsset(!showAddAsset); setAddId(''); }} id="add-asset-link-btn">+ Link Asset</button>
                         )}
@@ -362,7 +363,7 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
                                                 <td className="text-xs">{a?.criticality ? <span className={`badge ${a.criticality === 'HIGH' ? 'badge-danger' : a.criticality === 'MEDIUM' ? 'badge-warning' : 'badge-neutral'}`}>{a.criticality}</span> : '—'}</td>
                                                 <td className="text-xs text-slate-400">{l.rationale || '—'}</td>
                                                 {canWrite && (
-                                                    <td><button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('asset', a?.id)} disabled={unlinkMutation.isPending} id={`unlink-asset-${a?.id}`}>✕</button></td>
+                                                    <td><button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('asset', a?.id)} disabled={unlinkMutation.isPending} id={`unlink-asset-${a?.id}`} aria-label="Unlink asset">×</button></td>
                                                 )}
                                             </tr>
                                         );

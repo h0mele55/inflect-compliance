@@ -1,11 +1,15 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
+import { RequirePermission } from '@/components/require-permission';
+import { UpgradeGate } from '@/components/UpgradeGate';
 
-const ENTITY_ICON: Record<string, string> = {
-    CONTROL: '🔧', POLICY: '📄', EVIDENCE: '📎', FILE: '📁', ISSUE: '⚠️',
-    READINESS_REPORT: '📊', FRAMEWORK_COVERAGE: '📈',
+const ENTITY_ICON: Record<string, AppIconName> = {
+    CONTROL: 'controls', POLICY: 'policies', EVIDENCE: 'evidence', FILE: 'overview', ISSUE: 'warning',
+    READINESS_REPORT: 'dashboard', FRAMEWORK_COVERAGE: 'frameworks',
 };
 
 export default function PackDetailPage() {
@@ -14,7 +18,6 @@ export default function PackDetailPage() {
     const packId = params.packId as string;
     const apiUrl = useCallback((path: string) => `/api/t/${tenantSlug}${path}`, [tenantSlug]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [pack, setPack] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [freezing, setFreezing] = useState(false);
@@ -68,7 +71,6 @@ export default function PackDetailPage() {
 
     // Group items by entity type
     const grouped: Record<string, any[]> = {};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (pack.items || []).forEach((item: any) => {
         if (!grouped[item.entityType]) grouped[item.entityType] = [];
         grouped[item.entityType].push(item);
@@ -97,30 +99,41 @@ export default function PackDetailPage() {
                     </div>
                     <div className="flex gap-2">
                         {isDraft && (
-                            <button onClick={freeze} disabled={freezing} className="btn btn-primary" id="freeze-pack-btn">
-                                {freezing ? 'Freezing...' : '🔒 Freeze Pack'}
-                            </button>
+                            <RequirePermission resource="audits" action="freeze">
+                                <button onClick={freeze} disabled={freezing} className="btn btn-primary inline-flex items-center gap-2" id="freeze-pack-btn">
+                                    <AppIcon name="lock" size={16} />
+                                    {freezing ? 'Freezing...' : 'Freeze Pack'}
+                                </button>
+                            </RequirePermission>
                         )}
                         {isFrozen && (
-                            <button onClick={share} disabled={sharing} className="btn btn-primary" id="share-pack-btn">
-                                {sharing ? 'Creating...' : '🔗 Generate Share Link'}
-                            </button>
+                            <RequirePermission resource="audits" action="share">
+                                <UpgradeGate feature="AUDIT_PACK_SHARING">
+                                    <button onClick={share} disabled={sharing} className="btn btn-primary inline-flex items-center gap-2" id="share-pack-btn">
+                                        <AppIcon name="share" size={16} />
+                                        {sharing ? 'Creating...' : 'Generate Share Link'}
+                                    </button>
+                                </UpgradeGate>
+                            </RequirePermission>
                         )}
                         {isFrozen && (
-                            <button onClick={async () => {
-                                setCloning(true);
-                                try {
-                                    const res = await fetch(apiUrl(`/audits/packs/${packId}?action=clone`), {
-                                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-                                    });
-                                    if (res.ok) {
-                                        const cloned = await res.json();
-                                        router.push(`/t/${tenantSlug}/audits/packs/${cloned.id}`);
-                                    }
-                                } finally { setCloning(false); }
-                            }} disabled={cloning} className="btn btn-secondary" id="clone-pack-btn">
-                                {cloning ? 'Cloning...' : '🔄 Clone for Retest'}
-                            </button>
+                            <RequirePermission resource="audits" action="manage">
+                                <button onClick={async () => {
+                                    setCloning(true);
+                                    try {
+                                        const res = await fetch(apiUrl(`/audits/packs/${packId}?action=clone`), {
+                                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+                                        });
+                                        if (res.ok) {
+                                            const cloned = await res.json();
+                                            router.push(`/t/${tenantSlug}/audits/packs/${cloned.id}`);
+                                        }
+                                    } finally { setCloning(false); }
+                                }} disabled={cloning} className="btn btn-secondary" id="clone-pack-btn">
+                                    <AppIcon name="refresh" size={16} className="inline-block mr-1" />
+                                    {cloning ? 'Cloning...' : 'Clone for Retest'}
+                                </button>
+                            </RequirePermission>
                         )}
                     </div>
                 </div>
@@ -149,14 +162,12 @@ export default function PackDetailPage() {
                 Object.entries(grouped).map(([type, items]) => (
                     <div key={type} className="space-y-2">
                         <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                            <span>{ENTITY_ICON[type] || '📋'}</span>
+                            <AppIcon name={ENTITY_ICON[type] || 'overview'} size={16} />
                             <span>{type}</span>
                             <span className="text-slate-500">({items.length})</span>
                         </h3>
                         <div className="glass-card divide-y divide-slate-700/50">
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            {items.map((item: any) => {
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            {items.slice(0, 50).map((item: any) => {
                                 let snap: any = {};
                                 try { snap = JSON.parse(item.snapshotJson || '{}'); } catch { /* */ }
                                 const name = snap.code || snap.title || snap.name || item.entityId;
@@ -191,12 +202,12 @@ export default function PackDetailPage() {
             {/* Export area (placeholder) */}
             {isFrozen && (
                 <div className="glass-card p-6">
-                    <h3 className="text-sm font-semibold mb-2">Exports</h3>
+                    <h3 className="text-sm font-semibold mb-2 inline-flex items-center gap-2"><AppIcon name="export" size={16} /> Exports</h3>
                     <div className="flex gap-2">
                         <a href={apiUrl(`/audits/packs/${packId}?action=export&format=json`)}
-                            target="_blank" rel="noopener" className="btn btn-secondary btn-sm">📥 Export JSON</a>
+                            target="_blank" rel="noopener" className="btn btn-secondary btn-sm inline-flex items-center gap-1"><AppIcon name="download" size={14} /> Export JSON</a>
                         <a href={apiUrl(`/audits/packs/${packId}?action=export&format=csv`)}
-                            target="_blank" rel="noopener" className="btn btn-secondary btn-sm">📥 Export CSV</a>
+                            target="_blank" rel="noopener" className="btn btn-secondary btn-sm inline-flex items-center gap-1"><AppIcon name="download" size={14} /> Export CSV</a>
                     </div>
                 </div>
             )}

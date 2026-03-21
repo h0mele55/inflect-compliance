@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantContext, useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import TraceabilityPanel from '@/components/TraceabilityPanel';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
@@ -98,6 +99,7 @@ export default function RiskDetailPage() {
         setSaving(true);
         setError(null);
         try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const payload: Record<string, any> = {
                 title: editForm.title,
                 description: editForm.description || null,
@@ -196,7 +198,7 @@ export default function RiskDetailPage() {
                                 {risk.status}
                             </span>
                             <span className={`badge ${badge.cls}`}>{risk.inherentScore} · {badge.label}</span>
-                            {overdue && <span className="badge badge-danger">⚠ Overdue Review</span>}
+                            {overdue && <span className="badge badge-danger">Overdue Review</span>}
                         </div>
                     </div>
                 </div>
@@ -358,7 +360,7 @@ export default function RiskDetailPage() {
                                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Next Review</h3>
                                 <p className={`text-sm ${overdue ? 'text-red-400 font-semibold' : ''}`}>
                                     {risk.nextReviewAt
-                                        ? `${overdue ? '⚠ ' : ''}${new Date(risk.nextReviewAt).toLocaleDateString()}`
+                                        ? `${overdue ? '! ' : ''}${new Date(risk.nextReviewAt).toLocaleDateString()}`
                                         : '—'
                                     }
                                 </p>
@@ -374,7 +376,7 @@ export default function RiskDetailPage() {
 
             {/* Linked Tasks */}
             <div className="glass-card p-6">
-                <h2 className="text-lg font-semibold text-white mb-4">✅ Linked Tasks</h2>
+                <h2 className="text-lg font-semibold text-white mb-4 inline-flex items-center gap-2"><AppIcon name="tasks" size={18} /> Linked Tasks</h2>
                 <LinkedTasksPanel
                     apiBase={apiUrl('')}
                     entityType="RISK"
@@ -385,7 +387,7 @@ export default function RiskDetailPage() {
 
             {/* Traceability */}
             <div className="glass-card p-6">
-                <h2 className="text-lg font-semibold text-white mb-4">🔗 Traceability</h2>
+                <h2 className="text-lg font-semibold text-white mb-4 inline-flex items-center gap-2"><AppIcon name="link" size={18} /> Traceability</h2>
                 <TraceabilityPanel
                     apiBase={apiUrl('')}
                     entityType="risk"

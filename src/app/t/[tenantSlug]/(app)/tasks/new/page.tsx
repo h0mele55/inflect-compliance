@@ -202,7 +202,7 @@ export default function NewTaskPage() {
                 {/* Audit fields — shown for AUDIT_FINDING / CONTROL_GAP */}
                 {(form.type === 'AUDIT_FINDING' || form.type === 'CONTROL_GAP') && (
                     <div className="border-t border-slate-700 pt-4 space-y-4">
-                        <h3 className="text-sm font-semibold text-slate-300">🔍 Audit Details</h3>
+                        <h3 className="text-sm font-semibold text-slate-300">Audit Details</h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm text-slate-300 mb-1">Finding Source</label>
@@ -224,10 +224,10 @@ export default function NewTaskPage() {
 
                 {/* Links section */}
                 <div className="border-t border-slate-700 pt-4 space-y-3">
-                    <h3 className="text-sm font-semibold text-slate-300">🔗 Links</h3>
+                    <h3 className="text-sm font-semibold text-slate-300">Links</h3>
                     {validationMessage && (
                         <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2" id="link-validation-hint">
-                            ⚠ {validationMessage}
+                            {validationMessage}
                         </div>
                     )}
                     <div className="flex gap-2 items-end">
@@ -241,7 +241,7 @@ export default function NewTaskPage() {
                             <label className="block text-xs text-slate-400 mb-1">Entity ID</label>
                             <input type="text" className="input w-full text-sm" placeholder="Paste ID" value={linkEntityId} onChange={e => setLinkEntityId(e.target.value)} id="link-entity-id" />
                         </div>
-                        <button type="button" className="btn btn-secondary text-sm" onClick={addPendingLink} id="add-link-btn">+ Add</button>
+                        <button type="button" className="btn btn-secondary" onClick={addPendingLink} id="add-link-btn">+ Add</button>
                     </div>
                     {pendingLinks.length > 0 && (
                         <div className="space-y-1" id="pending-links-list">
@@ -249,7 +249,7 @@ export default function NewTaskPage() {
                                 <div key={i} className="flex items-center gap-2 text-sm text-slate-300 bg-slate-800/50 rounded px-3 py-1.5">
                                     <span className="badge badge-info text-xs">{l.entityType}</span>
                                     <span className="font-mono text-xs flex-1">{l.entityId}</span>
-                                    <button type="button" className="text-red-400 text-xs hover:text-red-300" onClick={() => removePendingLink(i)}>✕</button>
+                                    <button type="button" className="text-red-400 text-xs hover:text-red-300" onClick={() => removePendingLink(i)} aria-label="Remove link">×</button>
                                 </div>
                             ))}
                         </div>

@@ -1,11 +1,13 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 
-const FW_META: Record<string, { icon: string; label: string }> = {
-    ISO27001: { icon: '🛡️', label: 'ISO/IEC 27001:2022' },
-    NIS2: { icon: '🇪🇺', label: 'NIS2 Directive' },
+const FW_META: Record<string, { icon: AppIconName; label: string }> = {
+    ISO27001: { icon: 'shield', label: 'ISO/IEC 27001:2022' },
+    NIS2: { icon: 'globe', label: 'NIS2 Directive' },
 };
 
 export default function AuditorPortalPage() {
@@ -15,7 +17,6 @@ export default function AuditorPortalPage() {
 
     const [packs, setPacks] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [selectedPack, setSelectedPack] = useState<any>(null);
 
     useEffect(() => {
@@ -45,7 +46,7 @@ export default function AuditorPortalPage() {
 
             {packs.length === 0 ? (
                 <div className="glass-card p-12 text-center">
-                    <div className="text-4xl mb-4">🔒</div>
+                    <div className="mb-4"><AppIcon name="lock" size={48} className="text-slate-400" /></div>
                     <h3 className="text-lg font-semibold mb-2">No assigned packs</h3>
                     <p className="text-slate-400 text-sm">You have not been assigned any audit packs yet.</p>
                 </div>
@@ -53,12 +54,12 @@ export default function AuditorPortalPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <div className="space-y-2">
                         {packs.map(p => {
-                            const meta = FW_META[p.cycle?.frameworkKey] || { icon: '📋', label: p.cycle?.frameworkKey || '' };
+                            const meta = FW_META[p.cycle?.frameworkKey] || { icon: 'shield' as AppIconName, label: p.cycle?.frameworkKey || '' };
                             return (
                                 <button key={p.id} onClick={() => loadPack(p.id)}
                                     className={`w-full text-left glass-card p-4 hover:bg-slate-700/30 transition ${selectedPack?.id === p.id ? 'ring-2 ring-brand-500' : ''}`}>
                                     <div className="flex items-center gap-3">
-                                        <span className="text-xl">{meta.icon}</span>
+                                        <AppIcon name={meta.icon} size={20} />
                                         <div className="min-w-0">
                                             <p className="font-medium text-sm truncate">{p.name}</p>
                                             <p className="text-xs text-slate-500">{meta.label} · {p.status}</p>
@@ -88,7 +89,6 @@ export default function AuditorPortalPage() {
                                 {/* Items grouped */}
                                 {selectedPack.items?.length > 0 && (() => {
                                     const grouped: Record<string, any[]> = {};
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     selectedPack.items.forEach((item: any) => {
                                         if (!grouped[item.entityType]) grouped[item.entityType] = [];
                                         grouped[item.entityType].push(item);
@@ -97,9 +97,7 @@ export default function AuditorPortalPage() {
                                         <div key={type}>
                                             <h3 className="text-sm font-semibold text-slate-300 mb-1">{type} ({items.length})</h3>
                                             <div className="border border-slate-700/50 rounded-lg divide-y divide-slate-700/50">
-                                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                 {items.map((item: any) => {
-                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     let snap: any = {};
                                                     try { snap = JSON.parse(item.snapshotJson || '{}'); } catch { /* */ }
                                                     return (

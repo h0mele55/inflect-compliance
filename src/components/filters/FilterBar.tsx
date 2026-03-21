@@ -103,7 +103,7 @@ export function FilterBar({
                         onClick={clearFilters}
                         id="filter-clear"
                     >
-                        ✕ Clear filters
+                        × Clear filters
                     </button>
                 )}
             </div>

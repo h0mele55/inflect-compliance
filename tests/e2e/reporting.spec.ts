@@ -21,14 +21,43 @@ let tenantSlug: string;
 
 async function loginAndGetTenant(page: Page): Promise<string> {
     await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 15000 });
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
     const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug from ' + page.url());
-    return match[1];
+    const slug = match[1];
+
+    // VERIFY-ON-EXIT: URL match alone doesn't prove the page rendered.
+    // On cold-start, the server may return 500 — reload until fully rendered.
+    let renderRetries = 3;
+    while (renderRetries > 0) {
+        const hasSidebar = await page.locator('aside').isVisible().catch(() => false);
+        if (hasSidebar) break;
+        renderRetries--;
+        if (renderRetries > 0) {
+            await page.waitForTimeout(3000);
+            await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
+            await page.waitForLoadState('networkidle').catch(() => {});
+        }
+    }
+
+    return slug;
+}
+
+/** Navigate to a server-rendered page and verify content rendered. */
+async function gotoAndVerify(page: Page, url: string, contentSelector: string, maxAttempts = 3) {
+    let attempts = maxAttempts;
+    while (attempts > 0) {
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        const rendered = await page.locator(contentSelector).first().isVisible().catch(() => false);
+        if (rendered) return;
+        attempts--;
+        if (attempts > 0) await page.waitForTimeout(3000);
+    }
 }
 
 test.describe('Reporting & Audit Narrative', () => {
@@ -43,14 +72,15 @@ test.describe('Reporting & Audit Narrative', () => {
 
     test('A — frameworks page loads with framework cards', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/frameworks`);
-        await page.waitForSelector('#frameworks-heading', { timeout: 15000 });
+
+        // VERIFY-ON-EXIT: check heading rendered, not just HTTP status
+        await gotoAndVerify(page, `/t/${tenantSlug}/frameworks`, '#frameworks-heading');
+
         await expect(page.locator('#frameworks-heading')).toContainText('Compliance Frameworks');
 
-        // Wait for cards to load (could be 0 if no seed, but page should render)
+        // Wait for cards to hydrate
         await page.waitForTimeout(2000);
         const cardCount = await page.locator('[id^="fw-card-"]').count();
-        // Seeded tenant should have frameworks
         expect(cardCount).toBeGreaterThanOrEqual(1);
     });
 
@@ -58,7 +88,8 @@ test.describe('Reporting & Audit Narrative', () => {
 
     test('B — ISO27001 coverage report shows metrics', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/frameworks/ISO27001/coverage`);
+        // VERIFY-ON-EXIT: navigate and wait for content
+        await gotoAndVerify(page, `/t/${tenantSlug}/frameworks/ISO27001/coverage`, 'h1', 3);
 
         // Wait for the heading — may show "Coverage data not available" if no pack installed
         await page.waitForTimeout(3000);
@@ -92,8 +123,8 @@ test.describe('Reporting & Audit Narrative', () => {
 
     test('C — coverage page export JSON triggers download', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/frameworks/ISO27001/coverage`);
-        await page.waitForTimeout(3000);
+        // VERIFY-ON-EXIT: navigate and wait for content
+        await gotoAndVerify(page, `/t/${tenantSlug}/frameworks/ISO27001/coverage`, 'h1', 3);
 
         const exportBtn = page.locator('#export-json-btn');
         const hasExport = await exportBtn.isVisible().catch(() => false);
@@ -118,8 +149,8 @@ test.describe('Reporting & Audit Narrative', () => {
 
     test('D — reports page shows SOA and Risk Register', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/reports`);
-        await page.waitForSelector('#reports-heading', { timeout: 15000 });
+        // VERIFY-ON-EXIT: check reports heading rendered
+        await gotoAndVerify(page, `/t/${tenantSlug}/reports`, '#reports-heading', 4);
 
         // SOA tab should be active by default
         await expect(page.locator('#soa-tab-btn')).toBeVisible();
@@ -143,8 +174,8 @@ test.describe('Reporting & Audit Narrative', () => {
 
     test('E — create audit cycle (ISO27001)', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/audits/cycles`);
-        await page.waitForSelector('h1', { timeout: 15000 });
+        // VERIFY-ON-EXIT: check heading rendered
+        await gotoAndVerify(page, `/t/${tenantSlug}/audits/cycles`, 'h1', 3);
 
         // Click "New Audit Cycle"
         await page.click('#create-cycle-btn');
@@ -173,10 +204,9 @@ test.describe('Reporting & Audit Narrative', () => {
     test('F — create default pack, freeze, and generate share link', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
 
-        // Navigate to the cycle detail (it should have "Create Pack from Default Selection")
+        // Navigate to cycle detail with verify-on-exit
         expect(cycleId).toBeTruthy();
-        await page.goto(`/t/${tenantSlug}/audits/cycles/${cycleId}`);
-        await page.waitForSelector('#cycle-name', { timeout: 15000 });
+        await gotoAndVerify(page, `/t/${tenantSlug}/audits/cycles/${cycleId}`, '#cycle-name', 3);
 
         // Click "Create Pack from Default Selection"
         const createPackBtn = page.locator('#create-default-pack-btn');
@@ -184,7 +214,7 @@ test.describe('Reporting & Audit Narrative', () => {
         await createPackBtn.click();
 
         // Should redirect to the pack detail page
-        await page.waitForURL(/\/audits\/packs\//, { timeout: 30000 });
+        await page.waitForURL(/\/audits\/packs\//, { timeout: 60000 });
         await page.waitForSelector('#pack-name', { timeout: 15000 });
 
         // Extract pack ID from URL

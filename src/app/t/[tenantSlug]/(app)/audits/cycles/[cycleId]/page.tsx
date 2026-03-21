@@ -1,11 +1,13 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 
-const FW_META: Record<string, { icon: string; label: string }> = {
-    ISO27001: { icon: '🛡️', label: 'ISO/IEC 27001:2022' },
-    NIS2: { icon: '🇪🇺', label: 'NIS2 Directive' },
+const FW_META: Record<string, { icon: AppIconName; label: string }> = {
+    ISO27001: { icon: 'shield', label: 'ISO/IEC 27001:2022' },
+    NIS2: { icon: 'globe', label: 'NIS2 Directive' },
 };
 
 export default function CycleDetailPage() {
@@ -15,9 +17,7 @@ export default function CycleDetailPage() {
     const cycleId = params.cycleId as string;
     const apiUrl = useCallback((path: string) => `/api/t/${tenantSlug}${path}`, [tenantSlug]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [cycle, setCycle] = useState<any>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [preview, setPreview] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -43,7 +43,6 @@ export default function CycleDetailPage() {
 
             // 2) Add all items from preview
             if (preview?.selection) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const items: any[] = [];
                 const sel = preview.selection;
                 sel.controls?.ids?.forEach((id: string, i: number) => items.push({ entityType: 'CONTROL', entityId: id, sortOrder: i }));
@@ -66,7 +65,7 @@ export default function CycleDetailPage() {
     if (loading) return <div className="p-8"><div className="glass-card animate-pulse h-64" /></div>;
     if (!cycle) return <div className="p-8 text-center text-slate-400">Audit cycle not found</div>;
 
-    const meta = FW_META[cycle.frameworkKey] || { icon: '📋', label: cycle.frameworkKey };
+    const meta = FW_META[cycle.frameworkKey] || { icon: 'shield' as AppIconName, label: cycle.frameworkKey };
 
     return (
         <div className="space-y-6 animate-fadeIn">
@@ -77,7 +76,7 @@ export default function CycleDetailPage() {
             <div className="glass-card p-6">
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
-                        <div className="text-3xl">{meta.icon}</div>
+                        <div><AppIcon name={meta.icon} size={32} /></div>
                         <div>
                             <h1 className="text-xl font-bold" id="cycle-name">{cycle.name}</h1>
                             <p className="text-sm text-slate-400">{meta.label} · v{cycle.frameworkVersion} · {cycle.status}</p>
@@ -92,7 +91,8 @@ export default function CycleDetailPage() {
                     <h2 className="text-lg font-semibold">Default Pack Preview</h2>
                     <button onClick={createDefaultPack} disabled={creating}
                         className="btn btn-primary" id="create-default-pack-btn">
-                        {creating ? 'Creating...' : '📦 Create Pack from Default Selection'}
+                        <AppIcon name="package" size={16} className="inline-block mr-1" />
+                        {creating ? 'Creating...' : 'Create Pack from Default Selection'}
                     </button>
                 </div>
 
@@ -128,7 +128,6 @@ export default function CycleDetailPage() {
             {cycle.packs?.length > 0 && (
                 <div className="space-y-3">
                     <h2 className="text-lg font-semibold">Packs</h2>
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     {cycle.packs.map((p: any) => (
                         <Link key={p.id} href={`/t/${tenantSlug}/audits/packs/${p.id}`}
                             className="glass-card p-4 flex items-center justify-between hover:bg-slate-700/30 transition block" id={`pack-link-${p.id}`}>

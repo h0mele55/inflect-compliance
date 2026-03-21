@@ -82,12 +82,12 @@ export default function TestDashboardPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold" id="dashboard-title">📊 Test Dashboard</h1>
+                    <h1 className="text-2xl font-bold" id="dashboard-title">Test Dashboard</h1>
                     <p className="text-sm text-slate-400 mt-1">Testing health and framework readiness</p>
                 </div>
                 <div className="flex gap-3">
                     <Link href={tenantHref('/tests')} className="btn btn-ghost btn-sm">← Tests</Link>
-                    <Link href={tenantHref('/tests/due')} className="btn btn-ghost btn-sm">⏰ Due Queue</Link>
+                    <Link href={tenantHref('/tests/due')} className="btn btn-ghost btn-sm">Due Queue</Link>
                     <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">
                         {[30, 90].map(d => (
                             <button
@@ -149,7 +149,7 @@ export default function TestDashboardPage() {
                 <div className="glass-card p-6">
                     <h2 className="text-lg font-semibold mb-4">Repeated Failures</h2>
                     {metrics.repeatedFailures.length === 0 ? (
-                        <p className="text-slate-500 text-sm">No controls with repeated failures 🎉</p>
+                        <p className="text-slate-500 text-sm">No controls with repeated failures</p>
                     ) : (
                         <div className="space-y-2">
                             {metrics.repeatedFailures.map(f => (
@@ -173,7 +173,7 @@ export default function TestDashboardPage() {
             {/* Framework Test Readiness */}
             {readiness.length > 0 && (
                 <div className="glass-card p-6">
-                    <h2 className="text-lg font-semibold mb-4" id="framework-readiness-title">🛡 Framework Test Coverage</h2>
+                    <h2 className="text-lg font-semibold mb-4" id="framework-readiness-title">Framework Test Coverage</h2>
                     <p className="text-sm text-slate-400 mb-4">
                         How well your mapped controls are covered by active test plans and recent test runs
                     </p>

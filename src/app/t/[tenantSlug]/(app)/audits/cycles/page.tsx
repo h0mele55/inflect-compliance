@@ -2,10 +2,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 
-const FW_META: Record<string, { icon: string; label: string; color: string }> = {
-    ISO27001: { icon: '🛡️', label: 'ISO/IEC 27001:2022', color: 'from-indigo-500 to-purple-600' },
-    NIS2: { icon: '🇪🇺', label: 'NIS2 Directive', color: 'from-blue-500 to-cyan-600' },
+const FW_META: Record<string, { icon: AppIconName; label: string; color: string }> = {
+    ISO27001: { icon: 'shield', label: 'ISO/IEC 27001:2022', color: 'from-indigo-500 to-purple-600' },
+    NIS2: { icon: 'globe', label: 'NIS2 Directive', color: 'from-blue-500 to-cyan-600' },
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -18,6 +19,7 @@ export default function AuditCyclesPage() {
     const tenantSlug = params.tenantSlug as string;
     const apiUrl = useCallback((path: string) => `/api/t/${tenantSlug}${path}`, [tenantSlug]);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [cycles, setCycles] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -71,8 +73,8 @@ export default function AuditCyclesPage() {
                             <label className="input-label">Framework *</label>
                             <select className="input w-full" value={form.frameworkKey}
                                 onChange={e => setForm(f => ({ ...f, frameworkKey: e.target.value }))} id="fw-select">
-                                <option value="ISO27001">🛡️ ISO/IEC 27001:2022</option>
-                                <option value="NIS2">🇪🇺 NIS2 Directive (EU 2022/2555)</option>
+                                <option value="ISO27001">ISO/IEC 27001:2022</option>
+                                <option value="NIS2">NIS2 Directive (EU 2022/2555)</option>
                             </select>
                         </div>
                         <div>
@@ -91,7 +93,7 @@ export default function AuditCyclesPage() {
 
             {cycles.length === 0 && !showForm ? (
                 <div className="glass-card p-12 text-center">
-                    <div className="text-4xl mb-4">📋</div>
+                    <div className="mb-4"><AppIcon name="overview" size={48} className="text-slate-400" /></div>
                     <h3 className="text-lg font-semibold mb-2">No audit cycles yet</h3>
                     <p className="text-slate-400 text-sm mb-4">Create your first audit cycle for ISO 27001 or NIS2</p>
                     <button onClick={() => setShowForm(true)} className="btn btn-primary">+ New Audit Cycle</button>
@@ -99,13 +101,13 @@ export default function AuditCyclesPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {cycles.map(c => {
-                        const meta = FW_META[c.frameworkKey] || { icon: '📋', label: c.frameworkKey, color: 'from-gray-500 to-gray-600' };
+                        const meta = FW_META[c.frameworkKey] || { icon: 'shield' as AppIconName, label: c.frameworkKey, color: 'from-gray-500 to-gray-600' };
                         return (
                             <Link key={c.id} href={`/t/${tenantSlug}/audits/cycles/${c.id}`} id={`cycle-link-${c.id}`}
                                 className="glass-card p-6 hover:bg-slate-700/30 transition group">
                                 <div className="flex items-start justify-between mb-3">
                                     <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-lg`}>
-                                        {meta.icon}
+                                        <AppIcon name={meta.icon} size={20} />
                                     </div>
                                     <span className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'}`}>{c.status}</span>
                                 </div>

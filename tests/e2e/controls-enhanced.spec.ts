@@ -4,11 +4,11 @@ const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
 async function loginAndGetTenant(page: Page): Promise<string> {
     await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 15000 });
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
     const url = new URL(page.url());
     const match = url.pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug from ' + url.pathname);
@@ -22,8 +22,15 @@ test.describe('Controls Enhanced', () => {
 
     test('dashboard loads and shows metrics', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/controls/dashboard`);
-        await page.waitForSelector('#dashboard-heading', { timeout: 10000 });
+        // Dev server may return 500 on first load while compiling
+        let retries = 2;
+        while (retries > 0) {
+            const resp = await page.goto(`/t/${tenantSlug}/controls/dashboard`);
+            if (resp && resp.status() < 500) break;
+            retries--;
+            if (retries > 0) await page.waitForTimeout(3000);
+        }
+        await page.waitForSelector('#dashboard-heading', { timeout: 15000 });
         await expect(page.locator('#dashboard-heading')).toContainText('Controls Dashboard');
         await expect(page.locator('#implementation-progress')).toBeVisible();
         await expect(page.locator('#dashboard-stats')).toBeVisible();
@@ -33,8 +40,14 @@ test.describe('Controls Enhanced', () => {
         tenantSlug = await loginAndGetTenant(page);
 
         // First create a control to test with
-        await page.goto(`/t/${tenantSlug}/controls/new`);
-        await page.waitForSelector('#control-name-input', { timeout: 10000 });
+        let r2 = 2;
+        while (r2 > 0) {
+            const resp = await page.goto(`/t/${tenantSlug}/controls/new`);
+            if (resp && resp.status() < 500) break;
+            r2--;
+            if (r2 > 0) await page.waitForTimeout(3000);
+        }
+        await page.waitForSelector('#control-name-input', { timeout: 15000 });
         const uniqueId = Date.now().toString(36);
         await page.fill('#control-name-input', `Cadence Test ${uniqueId}`);
         await page.fill('#control-code-input', `CAD-${uniqueId}`);

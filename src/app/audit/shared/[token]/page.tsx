@@ -1,17 +1,18 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 
-const ENTITY_ICON: Record<string, string> = {
-    CONTROL: '🔧', POLICY: '📄', EVIDENCE: '📎', FILE: '📁', ISSUE: '⚠️',
-    READINESS_REPORT: '📊', FRAMEWORK_COVERAGE: '📈',
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const ENTITY_ICON: Record<string, AppIconName> = {
+    CONTROL: 'controls', POLICY: 'policies', EVIDENCE: 'evidence', FILE: 'overview', ISSUE: 'warning',
+    READINESS_REPORT: 'dashboard', FRAMEWORK_COVERAGE: 'frameworks',
 };
 
 export default function SharedPackPage() {
     const params = useParams();
     const token = params.token as string;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function SharedPackPage() {
     if (error) return (
         <div className="min-h-screen bg-slate-900 flex items-center justify-center">
             <div className="glass-card p-8 max-w-md text-center">
-                <div className="text-4xl mb-4">🔒</div>
+                <div className="mb-4"><AppIcon name="lock" size={48} className="text-slate-400" /></div>
                 <h1 className="text-xl font-bold mb-2">Access Denied</h1>
                 <p className="text-slate-400 text-sm">{error}</p>
             </div>
@@ -51,7 +52,6 @@ export default function SharedPackPage() {
     const items = data?.items || [];
 
     const grouped: Record<string, any[]> = {};
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     items.forEach((item: any) => {
         if (!grouped[item.entityType]) grouped[item.entityType] = [];
         grouped[item.entityType].push(item);
@@ -79,7 +79,7 @@ export default function SharedPackPage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                         {Object.entries(grouped).map(([type, typeItems]) => (
                             <div key={type} className="p-3">
-                                <div className="text-xl">{ENTITY_ICON[type] || '📋'}</div>
+                                <div><AppIcon name={ENTITY_ICON[type] || 'overview'} size={20} /></div>
                                 <div className="text-lg font-bold">{typeItems.length}</div>
                                 <div className="text-xs text-slate-400">{type}</div>
                             </div>
@@ -91,14 +91,12 @@ export default function SharedPackPage() {
                 {Object.entries(grouped).map(([type, typeItems]) => (
                     <div key={type} className="space-y-2">
                         <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                            <span>{ENTITY_ICON[type] || '📋'}</span>
+                            <AppIcon name={ENTITY_ICON[type] || 'overview'} size={16} />
                             <span>{type}</span>
                             <span className="text-slate-500">({typeItems.length})</span>
                         </h3>
                         <div className="glass-card divide-y divide-slate-700/50">
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             {typeItems.map((item: any) => {
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 let snap: any = {};
                                 try { snap = JSON.parse(item.snapshotJson || '{}'); } catch { /* */ }
                                 const name = snap.code || snap.title || snap.name || item.entityId;
@@ -113,7 +111,6 @@ export default function SharedPackPage() {
                                             {snap.taskCompletion && <span>Tasks: {snap.taskCompletion.done}/{snap.taskCompletion.total}</span>}
                                             {snap.evidenceCount !== undefined && <span>Evidence: {snap.evidenceCount}</span>}
                                             {snap.mappedRequirements?.length > 0 && (
-                                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                 <span>Requirements: {snap.mappedRequirements.map((r: any) => r.code).join(', ')}</span>
                                             )}
                                             {snap.severity && <span>Severity: {snap.severity}</span>}

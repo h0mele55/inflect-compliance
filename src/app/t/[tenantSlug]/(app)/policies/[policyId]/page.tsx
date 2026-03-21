@@ -12,9 +12,9 @@ const APPROVAL_BADGE: Record<string, string> = {
     PENDING: 'badge-info', APPROVED: 'badge-success', REJECTED: 'badge-danger',
 };
 const EVENT_ICONS: Record<string, string> = {
-    POLICY_CREATED: '📝', POLICY_VERSION_CREATED: '📄', POLICY_UPDATED: '✏️',
-    POLICY_APPROVAL_REQUESTED: '📨', POLICY_APPROVED: '✅', POLICY_REJECTED: '❌',
-    POLICY_PUBLISHED: '🚀', POLICY_ARCHIVED: '🗃️', POLICY_REVIEW_OVERDUE: '⚠️',
+    POLICY_CREATED: 'create', POLICY_VERSION_CREATED: 'version', POLICY_UPDATED: 'edit',
+    POLICY_APPROVAL_REQUESTED: 'request', POLICY_APPROVED: 'approve', POLICY_REJECTED: 'reject',
+    POLICY_PUBLISHED: 'publish', POLICY_ARCHIVED: 'archive', POLICY_REVIEW_OVERDUE: 'overdue',
 };
 
 type ContentMode = 'MARKDOWN' | 'EXTERNAL_LINK' | 'FILE';
@@ -113,7 +113,7 @@ export default function PolicyDetailPage() {
                 });
                 if (!uploadRes.ok) throw new Error('File upload failed');
                 const uploadData = await uploadRes.json();
-                body.contentText = `📎 File: ${selectedFile.name}`;
+                body.contentText = `File: ${selectedFile.name}`;
                 body.changeSummary = changeSummary || `Uploaded file: ${selectedFile.name}`;
             }
 
@@ -208,7 +208,7 @@ export default function PolicyDetailPage() {
             return (
                 <a href={v.externalUrl} target="_blank" rel="noopener noreferrer"
                     className="text-brand-400 hover:text-brand-300 underline flex items-center gap-1">
-                    🔗 {v.externalUrl}
+                    {v.externalUrl}
                 </a>
             );
         }
@@ -251,7 +251,7 @@ export default function PolicyDetailPage() {
 
     const tabItems = ['current', 'versions', ...(canWrite ? ['editor'] : []), 'activity'] as const;
     const tabLabels: Record<string, string> = {
-        current: '📄 Current', versions: '📋 Versions', editor: '✏️ Editor', activity: '📊 Activity',
+        current: 'Current', versions: 'Versions', editor: 'Editor', activity: 'Activity',
     };
 
     return (
@@ -266,7 +266,7 @@ export default function PolicyDetailPage() {
             {error && (
                 <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                     {error}
-                    <button onClick={() => setError('')} className="ml-2 text-red-300 hover:text-white">×</button>
+                    <button onClick={() => setError('')} className="ml-2 text-red-300 hover:text-white" aria-label="Dismiss error">×</button>
                 </div>
             )}
 
@@ -277,19 +277,19 @@ export default function PolicyDetailPage() {
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-xl font-bold truncate" id="policy-title">{policy.title}</h1>
                             <span className={`badge ${STATUS_BADGE[policy.status] || 'badge-neutral'}`} id="policy-status">{policy.status}</span>
-                            {isOverdue && <span className="badge badge-danger text-xs">⚠️ Overdue</span>}
+                            {isOverdue && <span className="badge badge-danger text-xs">Overdue</span>}
                         </div>
                         {policy.description && <p className="text-sm text-slate-400 mb-3">{policy.description}</p>}
                         <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
-                            {policy.category && <span>📁 {policy.category}</span>}
-                            {policy.owner && <span>👤 {policy.owner.name}</span>}
+                            {policy.category && <span>{policy.category}</span>}
+                            {policy.owner && <span>{policy.owner.name}</span>}
                             {policy.nextReviewAt && (
                                 <span className={isOverdue ? 'text-red-400' : ''}>
-                                    📅 Review: {new Date(policy.nextReviewAt).toLocaleDateString()}
+                                    Review: {new Date(policy.nextReviewAt).toLocaleDateString()}
                                 </span>
                             )}
-                            {policy.reviewFrequencyDays && <span>🔄 Every {policy.reviewFrequencyDays}d</span>}
-                            <span>📝 {versions.length} version{versions.length !== 1 ? 's' : ''}</span>
+                            {policy.reviewFrequencyDays && <span>Every {policy.reviewFrequencyDays}d</span>}
+                            <span>{versions.length} version{versions.length !== 1 ? 's' : ''}</span>
                         </div>
                         {/* Review edit toggle */}
                         {canWrite && !editingReview && (
@@ -319,12 +319,12 @@ export default function PolicyDetailPage() {
                     <div className="flex gap-2 flex-shrink-0">
                         {canWrite && policy.status !== 'ARCHIVED' && (
                             <button onClick={() => { setTab('editor'); setEditorContent(currentVersion?.contentText || ''); }}
-                                className="btn btn-primary btn-sm" id="new-version-btn">✏️ New Version</button>
+                                className="btn btn-primary btn-sm" id="new-version-btn">New Version</button>
                         )}
                         {canAdmin && policy.status !== 'ARCHIVED' && (
                             <button onClick={archivePolicy} disabled={actionLoading === 'archive'}
                                 className="btn btn-ghost btn-sm text-slate-400 hover:text-red-400" id="archive-btn">
-                                {actionLoading === 'archive' ? '...' : '🗃️ Archive'}
+                                {actionLoading === 'archive' ? '...' : 'Archive'}
                             </button>
                         )}
                     </div>
@@ -389,13 +389,13 @@ export default function PolicyDetailPage() {
                                         {canWrite && !hasPending && !isCurrentPublished && (
                                             <button onClick={() => requestApproval(v.id)} disabled={!!actionLoading}
                                                 className="btn btn-sm btn-secondary" id={`request-approval-${v.versionNumber}`}>
-                                                {actionLoading === 'approve-' + v.id ? '...' : '📨 Request Approval'}
+                                                {actionLoading === 'approve-' + v.id ? '...' : 'Request Approval'}
                                             </button>
                                         )}
                                         {canAdmin && hasApproved && !isCurrentPublished && (
                                             <button onClick={() => publishVersion(v.id)} disabled={!!actionLoading}
                                                 className="btn btn-sm btn-success" id={`publish-version-${v.versionNumber}`}>
-                                                {actionLoading === 'publish-' + v.id ? '...' : '🚀 Publish'}
+                                                {actionLoading === 'publish-' + v.id ? '...' : 'Publish'}
                                             </button>
                                         )}
                                     </div>
@@ -421,7 +421,7 @@ export default function PolicyDetailPage() {
                                                     <div className="flex gap-1">
                                                         <button onClick={() => decideApproval(a.id, 'APPROVED')} disabled={!!actionLoading}
                                                             className="btn btn-xs btn-success" id={`approve-${a.id}`}>
-                                                            {actionLoading === 'decide-' + a.id ? '...' : '✅ Approve'}
+                                                            {actionLoading === 'decide-' + a.id ? '...' : 'Approve'}
                                                         </button>
                                                         <button onClick={() => decideApproval(a.id, 'REJECTED')} disabled={!!actionLoading}
                                                             className="btn btn-xs btn-danger">Reject</button>
@@ -447,9 +447,9 @@ export default function PolicyDetailPage() {
                     {/* Content type selector */}
                     <div className="flex gap-2">
                         {([
-                            { key: 'MARKDOWN' as const, label: '📝 Markdown', icon: '' },
-                            { key: 'EXTERNAL_LINK' as const, label: '🔗 External Link', icon: '' },
-                            { key: 'FILE' as const, label: '📎 File Upload', icon: '' },
+                            { key: 'MARKDOWN' as const, label: 'Markdown', icon: '' },
+                            { key: 'EXTERNAL_LINK' as const, label: 'External Link', icon: '' },
+                            { key: 'FILE' as const, label: 'File Upload', icon: '' },
                         ]).map(opt => (
                             <button key={opt.key} onClick={() => setContentMode(opt.key)}
                                 className={`px-3 py-1.5 text-xs rounded-lg border transition ${contentMode === opt.key
@@ -464,7 +464,7 @@ export default function PolicyDetailPage() {
                         <>
                             <div className="flex justify-end">
                                 <button onClick={() => setShowPreview(!showPreview)} className="btn btn-xs btn-ghost text-slate-400">
-                                    {showPreview ? '✏️ Edit' : '👁️ Preview'}
+                                    {showPreview ? 'Edit' : 'Preview'}
                                 </button>
                             </div>
                             {showPreview ? (
@@ -498,7 +498,7 @@ export default function PolicyDetailPage() {
                                 onChange={e => setSelectedFile(e.target.files?.[0] || null)}
                                 accept=".pdf,.doc,.docx,.txt,.md" />
                             {selectedFile && (
-                                <p className="text-xs text-brand-400 mt-1">📎 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
+                                <p className="text-xs text-brand-400 mt-1">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
                             )}
                         </div>
                     )}
@@ -510,7 +510,7 @@ export default function PolicyDetailPage() {
                     </div>
 
                     <button onClick={createVersion} disabled={saving} className="btn btn-primary" id="save-version-btn">
-                        {saving ? 'Saving...' : '💾 Save as New Version'}
+                        {saving ? 'Saving...' : 'Save as New Version'}
                     </button>
                 </div>
             )}
@@ -527,7 +527,7 @@ export default function PolicyDetailPage() {
                         <div className="space-y-3">
                             {activities.map((evt: AuditLogEntry) => (
                                 <div key={evt.id} className="flex items-start gap-3 text-sm">
-                                    <span className="text-base mt-0.5">{EVENT_ICONS[evt.action] || '📌'}</span>
+                                    <span className="text-base mt-0.5">{EVENT_ICONS[evt.action] || 'event'}</span>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
                                             <span className="font-medium text-slate-200 text-xs">

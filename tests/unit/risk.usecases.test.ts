@@ -5,7 +5,11 @@
  */
 
 // Create a mock db object that withTenantDb will pass to callbacks
-const mockDb = {} as any;
+const mockDb = {
+    tenant: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'tenant-1', maxRiskScale: 5 }),
+    },
+} as any;
 
 // Mock withTenantDb/runInTenantContext to eagerly call the callback with mockDb
 jest.mock('@/lib/db-context', () => ({

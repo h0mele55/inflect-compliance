@@ -35,14 +35,14 @@ type RetentionFilter = 'active' | 'expiring' | 'archived';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getRetentionStatus(ev: any): { label: string; badge: string; icon: string } {
-    if (ev.isArchived) return { label: 'Archived', badge: 'badge-neutral', icon: '📦' };
-    if (ev.expiredAt) return { label: 'Expired', badge: 'badge-danger', icon: '⏰' };
+    if (ev.isArchived) return { label: 'Archived', badge: 'badge-neutral', icon: '' };
+    if (ev.expiredAt) return { label: 'Expired', badge: 'badge-danger', icon: '' };
     if (ev.retentionUntil) {
         const until = new Date(ev.retentionUntil);
         const daysLeft = Math.ceil((until.getTime() - Date.now()) / 86_400_000);
-        if (daysLeft <= 0) return { label: 'Expired', badge: 'badge-danger', icon: '⏰' };
-        if (daysLeft <= 30) return { label: `Expiring (${daysLeft}d)`, badge: 'badge-warning', icon: '⚠️' };
-        return { label: 'Active', badge: 'badge-success', icon: '✅' };
+        if (daysLeft <= 0) return { label: 'Expired', badge: 'badge-danger', icon: '' };
+        if (daysLeft <= 30) return { label: `Expiring (${daysLeft}d)`, badge: 'badge-warning', icon: '' };
+        return { label: 'Active', badge: 'badge-success', icon: '' };
     }
     return { label: 'No policy', badge: 'badge-neutral', icon: '—' };
 }
@@ -69,6 +69,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
     const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'type', 'controlId', 'tab']);
 
     // ─── Query: evidence list (hydrated with server data) ───
+    const hasFilters = !!(filters.q || filters.type || filters.controlId || filters.tab);
     const evidenceQuery = useQuery({
         queryKey: queryKeys.evidence.list(tenantSlug, filters),
         queryFn: async () => {
@@ -83,7 +84,10 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
             if (!res.ok) throw new Error('Failed to fetch evidence');
             return res.json();
         },
-        initialData: initialEvidence,
+        // Only hydrate initialData when no filters are active (server data is unfiltered).
+        // Mark it as immediately stale so React Query refetches on any key change.
+        initialData: hasFilters ? undefined : initialEvidence,
+        initialDataUpdatedAt: 0,
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -308,7 +312,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
     };
 
     const statusLabel = (status: string) => {
-        const map: Record<string, string> = { DRAFT: t.draft, SUBMITTED: t.submitted, APPROVED: t.approved, REJECTED: t.rejected, PENDING_UPLOAD: '⏳ Uploading...' };
+        const map: Record<string, string> = { DRAFT: t.draft, SUBMITTED: t.submitted, APPROVED: t.approved, REJECTED: t.rejected, PENDING_UPLOAD: 'Uploading...' };
         return map[status] || status;
     };
 
@@ -352,7 +356,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                             className="btn btn-primary"
                             id="upload-evidence-btn"
                         >
-                            📤 Upload File
+                            Upload File
                         </button>
                         <button
                             onClick={() => { setShowTextForm(!showTextForm); setShowUpload(false); }}
@@ -368,7 +372,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
             {/* File Upload Form */}
             {showUpload && permissions.canWrite && (
                 <form onSubmit={handleUpload} className="glass-card p-6 space-y-4 animate-fadeIn" id="upload-form">
-                    <h3 className="text-sm font-semibold text-white">📤 Upload Evidence File</h3>
+                    <h3 className="text-sm font-semibold text-white">Upload Evidence File</h3>
 
                     {/* File picker */}
                     <div>
@@ -385,7 +389,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                             />
                             {uploadFile && (
                                 <p className="text-xs text-slate-400 mt-1">
-                                    📎 {uploadFile.name} ({formatBytes(uploadFile.size)})
+                                    {uploadFile.name} ({formatBytes(uploadFile.size)})
                                 </p>
                             )}
                         </div>
@@ -431,7 +435,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
 
                         {/* Retention date */}
                         <div>
-                            <label className="input-label">📅 Retain until</label>
+                            <label className="input-label">Retain until</label>
                             <input
                                 type="date"
                                 className="input w-full"
@@ -457,7 +461,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                     {/* Error */}
                     {uploadError && (
                         <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2" id="upload-error">
-                            ❌ {uploadError}
+                            {uploadError}
                         </div>
                     )}
 
@@ -468,7 +472,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                             className="btn btn-primary"
                             id="submit-upload-btn"
                         >
-                            {uploadMutation.isPending ? '⏳ Uploading...' : '📤 Upload'}
+                            {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
                         </button>
                         <button
                             type="button"
@@ -484,7 +488,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
             {/* Text/Link Evidence Form (legacy) */}
             {showTextForm && permissions.canWrite && (
                 <form onSubmit={createTextEvidence} className="glass-card p-6 space-y-4 animate-fadeIn" id="text-evidence-form">
-                    <h3 className="text-sm font-semibold text-white">📝 Add Text/Link Evidence</h3>
+                    <h3 className="text-sm font-semibold text-white">Add Text/Link Evidence</h3>
                     <div className="grid grid-cols-2 gap-4">
                         <div><label className="input-label">{t.evidenceTitle} *</label><input className="input w-full" required value={textForm.title} onChange={e => setTextForm(f => ({ ...f, title: e.target.value }))} /></div>
                         <div><label className="input-label">{t.control}</label><select className="input w-full" value={textForm.controlId} onChange={e => setTextForm(f => ({ ...f, controlId: e.target.value }))}><option value="">{t.none}</option>{controls.map(c => <option key={c.id} value={c.id}>{c.annexId || 'Custom'}: {c.name}</option>)}</select></div>
@@ -501,24 +505,24 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                 <div className="flex items-center gap-1" id="retention-tabs">
                     <button
                         onClick={() => setFilter('tab', 'active')}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${retentionFilter === 'active' ? 'bg-brand-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+                        className={`btn ${retentionFilter === 'active' ? 'btn-primary' : 'btn-ghost'}`}
                         id="tab-active"
                     >
-                        ✅ Active ({activeEvidence.length})
+                        Active ({activeEvidence.length})
                     </button>
                     <button
                         onClick={() => setFilter('tab', 'expiring')}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${retentionFilter === 'expiring' ? 'bg-amber-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+                        className={`btn ${retentionFilter === 'expiring' ? 'btn-danger' : 'btn-ghost'}`}
                         id="tab-expiring"
                     >
-                        ⚠️ Expiring ({expiringEvidence.length})
+                        Expiring ({expiringEvidence.length})
                     </button>
                     <button
                         onClick={() => setFilter('tab', 'archived')}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${retentionFilter === 'archived' ? 'bg-slate-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+                        className={`btn ${retentionFilter === 'archived' ? 'btn-secondary' : 'btn-ghost'}`}
                         id="tab-archived"
                     >
-                        📦 Archived ({archivedEvidence.length})
+                        Archived ({archivedEvidence.length})
                     </button>
                 </div>
 
@@ -528,7 +532,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
             {/* Archived warning */}
             {retentionFilter === 'archived' && archivedEvidence.length > 0 && (
                 <div className="bg-amber-900/20 border border-amber-700/30 rounded-lg px-4 py-3 text-sm text-amber-300 flex items-start gap-2">
-                    <span className="text-lg">⚠️</span>
+                    <span className="text-lg">!</span>
                     <div>
                         <strong>Archived evidence</strong> should not be used in active audit packs or compliance assessments.
                         Unarchive if you need to reuse this evidence.
@@ -564,7 +568,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                                 </td>
                                 <td>
                                     <span className={`badge ${ev.type === 'FILE' ? 'badge-success' : 'badge-info'}`}>
-                                        {ev.type === 'FILE' ? '📎 FILE' : ev.type}
+                                        {ev.type === 'FILE' ? 'FILE' : ev.type}
                                     </span>
                                 </td>
                                 <td className="text-xs text-slate-400">
@@ -589,8 +593,8 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                                                 onChange={e => setEditRetentionDate(e.target.value)}
                                                 id={`retention-edit-${ev.id}`}
                                             />
-                                            <button onClick={() => saveRetention(ev.id)} className="btn btn-sm btn-primary text-xs py-0.5 px-1.5">✓</button>
-                                            <button onClick={() => setEditingRetention(null)} className="btn btn-sm btn-secondary text-xs py-0.5 px-1.5">✕</button>
+                                            <button onClick={() => saveRetention(ev.id)} className="btn btn-sm btn-primary text-xs py-0.5 px-1.5">Save</button>
+                                            <button onClick={() => setEditingRetention(null)} className="btn btn-sm btn-secondary text-xs py-0.5 px-1.5" aria-label="Cancel">×</button>
                                         </div>
                                     )}
                                 </td>
@@ -620,7 +624,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                                                 title="Edit retention date"
                                                 id={`edit-retention-${ev.id}`}
                                             >
-                                                📅
+                                                Edit
                                             </button>
                                         )}
                                         {permissions.canWrite && !ev.isArchived && (
@@ -630,7 +634,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                                                 title="Archive this evidence"
                                                 id={`archive-${ev.id}`}
                                             >
-                                                📦
+                                                Archive
                                             </button>
                                         )}
                                         {permissions.canWrite && ev.isArchived && (
@@ -640,7 +644,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                                                 title="Unarchive this evidence"
                                                 id={`unarchive-${ev.id}`}
                                             >
-                                                📤 Unarchive
+                                                Unarchive
                                             </button>
                                         )}
                                         {/* Review actions */}

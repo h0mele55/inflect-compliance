@@ -9,12 +9,12 @@ import {
     assertCanManageAuditors,
 } from '../policies/audit-readiness.policies';
 import { logEvent } from '../events/audit';
-import { runInTenantContext } from '@/lib/db-context';
+import { runInTenantContext, runInGlobalContext } from '@/lib/db-context';
 import { notFound, badRequest, forbidden } from '@/lib/errors/types';
-import prisma from '@/lib/prisma';
+
 import crypto from 'crypto';
 
-// ─── Token Hashing ───
+// в”Ђв”Ђв”Ђ Token Hashing в”Ђв”Ђв”Ђ
 
 export function hashToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
@@ -24,7 +24,7 @@ export function generateShareToken(): string {
     return crypto.randomBytes(32).toString('hex');
 }
 
-// ─── Audit Cycles ───
+// в”Ђв”Ђв”Ђ Audit Cycles в”Ђв”Ђв”Ђ
 
 export async function createAuditCycle(
     ctx: RequestContext,
@@ -99,7 +99,7 @@ export async function updateAuditCycle(
     });
 }
 
-// ─── Audit Packs ───
+// в”Ђв”Ђв”Ђ Audit Packs в”Ђв”Ђв”Ђ
 
 export async function createAuditPack(ctx: RequestContext, auditCycleId: string, name: string) {
     assertCanManageAuditPacks(ctx);
@@ -155,7 +155,7 @@ export async function updateAuditPack(ctx: RequestContext, packId: string, data:
     });
 }
 
-// ─── Pack Items ───
+// в”Ђв”Ђв”Ђ Pack Items в”Ђв”Ђв”Ђ
 
 export async function addAuditPackItems(
     ctx: RequestContext,
@@ -169,33 +169,30 @@ export async function addAuditPackItems(
         if (pack.status !== 'DRAFT') throw badRequest('Cannot add items to a frozen or exported pack');
         if (!items || items.length === 0) throw badRequest('At least one item required');
 
-        let created = 0;
-        let skipped = 0;
-        for (const item of items) {
-            try {
-                await tdb.auditPackItem.create({
-                    data: {
-                        tenantId: ctx.tenantId,
-                        auditPackId: packId,
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        entityType: item.entityType as any,
-                        entityId: item.entityId,
-                        snapshotJson: item.snapshotJson || '{}',
-                        sortOrder: item.sortOrder ?? 0,
-                    },
-                });
-                created++;
-            } catch {
-                skipped++;
-            }
-        }
+        const payload = items.map(item => ({
+            tenantId: ctx.tenantId,
+            auditPackId: packId,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            entityType: item.entityType as any,
+            entityId: item.entityId,
+            snapshotJson: item.snapshotJson || '{}',
+            sortOrder: item.sortOrder ?? 0,
+        }));
+
+        const result = await tdb.auditPackItem.createMany({
+            data: payload,
+            skipDuplicates: true,
+        });
+
+        const created = result.count;
+        const skipped = items.length - created;
 
         await logEvent(tdb, ctx, { action: 'AUDIT_PACK_UPDATED', entityType: 'AuditPack', entityId: packId, details: JSON.stringify({ created, skipped }) });
         return { created, skipped };
     });
 }
 
-// ─── Snapshot Creation ───
+// в”Ђв”Ђв”Ђ Snapshot Creation в”Ђв”Ђв”Ђ
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function createControlSnapshot(tdb: any, controlId: string, tenantId: string): Promise<string> {
@@ -259,11 +256,13 @@ async function createIssueSnapshot(tdb: any, issueId: string, tenantId: string):
     });
 }
 
-// ─── Freeze Pack ───
+// в”Ђв”Ђв”Ђ Freeze Pack в”Ђв”Ђв”Ђ
 
 export async function freezeAuditPack(ctx: RequestContext, packId: string) {
     assertCanFreezePack(ctx);
-    return runInTenantContext(ctx, async (tdb) => {
+
+    // Phase 1: Freeze the pack (atomic transaction)
+    const frozenPack = await runInTenantContext(ctx, async (tdb) => {
         const pack = await tdb.auditPack.findFirst({
             where: { id: packId, tenantId: ctx.tenantId },
             include: { items: true },
@@ -272,34 +271,85 @@ export async function freezeAuditPack(ctx: RequestContext, packId: string) {
         if (pack.status !== 'DRAFT') throw badRequest('Pack is already frozen or exported');
         if (pack.items.length === 0) throw badRequest('Cannot freeze an empty pack');
 
-        // Create snapshots for all items
-        for (const item of pack.items) {
-            let snapshot = item.snapshotJson;
-            try {
-                if (!snapshot || snapshot === '{}') {
-                    switch (item.entityType) {
-                        case 'CONTROL': snapshot = await createControlSnapshot(tdb, item.entityId, ctx.tenantId); break;
-                        case 'POLICY': snapshot = await createPolicySnapshot(tdb, item.entityId, ctx.tenantId); break;
-                        case 'EVIDENCE': snapshot = await createEvidenceSnapshot(tdb, item.entityId, ctx.tenantId); break;
-                        case 'ISSUE': snapshot = await createIssueSnapshot(tdb, item.entityId, ctx.tenantId); break;
-                        default: snapshot = JSON.stringify({ entityType: item.entityType, entityId: item.entityId, snapshotAt: new Date().toISOString() });
+        // Create snapshots for all items in chunks
+        const CHUNK_SIZE = 10;
+        for (let i = 0; i < pack.items.length; i += CHUNK_SIZE) {
+            const chunk = pack.items.slice(i, i + CHUNK_SIZE);
+            await Promise.all(chunk.map(async (item) => {
+                let snapshot = item.snapshotJson;
+                try {
+                    if (!snapshot || snapshot === '{}') {
+                        switch (item.entityType) {
+                            case 'CONTROL': snapshot = await createControlSnapshot(tdb, item.entityId, ctx.tenantId); break;
+                            case 'POLICY': snapshot = await createPolicySnapshot(tdb, item.entityId, ctx.tenantId); break;
+                            case 'EVIDENCE': snapshot = await createEvidenceSnapshot(tdb, item.entityId, ctx.tenantId); break;
+                            case 'ISSUE': snapshot = await createIssueSnapshot(tdb, item.entityId, ctx.tenantId); break;
+                            default: snapshot = JSON.stringify({ entityType: item.entityType, entityId: item.entityId, snapshotAt: new Date().toISOString() });
+                        }
+                        await tdb.auditPackItem.update({ where: { id: item.id }, data: { snapshotJson: snapshot } });
                     }
-                    await tdb.auditPackItem.update({ where: { id: item.id }, data: { snapshotJson: snapshot } });
-                }
-            } catch { /* keep existing snapshot */ }
+                } catch { /* keep existing snapshot */ }
+            }));
         }
 
-        const frozenPack = await tdb.auditPack.update({
+        const result = await tdb.auditPack.update({
             where: { id: packId },
             data: { status: 'FROZEN', frozenAt: new Date(), frozenByUserId: ctx.userId },
         });
 
         await logEvent(tdb, ctx, { action: 'AUDIT_PACK_FROZEN', entityType: 'AuditPack', entityId: packId, details: JSON.stringify({ itemCount: pack.items.length }) });
-        return frozenPack;
+
+        return { frozenPack: result, itemCount: pack.items.length };
     });
+
+    // Phase 2: Attach SoA snapshot as EXPORT_ARTIFACT (best-effort, separate transaction)
+    // This runs outside the freeze transaction because getSoA opens its own
+    // runInTenantContext calls, and Prisma interactive transactions cannot be nested.
+    try {
+        const { getSoA } = await import('./soa');
+        const soaReport = await getSoA(ctx, {
+            includeEvidence: true,
+            includeTasks: true,
+            includeTests: true,
+        });
+        const soaSnapshot = JSON.stringify({
+            type: 'SOA_REPORT',
+            framework: soaReport.framework,
+            generatedAt: soaReport.generatedAt,
+            summary: soaReport.summary,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            entries: soaReport.entries.map((e: any) => ({
+                code: e.requirementCode,
+                title: e.requirementTitle,
+                section: e.section,
+                applicable: e.applicable,
+                justification: e.justification,
+                status: e.implementationStatus,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                controlRefs: e.mappedControls.map((c: any) => `${c.code || '—'} ${c.title}`).join('; '),
+                evidenceCount: e.evidenceCount,
+            })),
+            snapshotAt: new Date().toISOString(),
+        });
+        await runInTenantContext(ctx, (tdb) =>
+            tdb.auditPackItem.create({
+                data: {
+                    tenantId: ctx.tenantId,
+                    auditPackId: packId,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    entityType: 'EXPORT_ARTIFACT' as any,
+                    entityId: `soa-${soaReport.framework}`,
+                    snapshotJson: soaSnapshot,
+                    sortOrder: frozenPack.itemCount + 1,
+                },
+            })
+        );
+    } catch { /* SoA attachment is best-effort */ }
+
+    return frozenPack.frozenPack;
 }
 
-// ─── Share Pack ───
+// в”Ђв”Ђв”Ђ Share Pack в”Ђв”Ђв”Ђ
 
 export async function generateShareLink(ctx: RequestContext, packId: string, expiresAt?: string) {
     assertCanSharePack(ctx);
@@ -341,8 +391,8 @@ export async function revokeShare(ctx: RequestContext, shareId: string) {
 
 export async function getPackByShareToken(token: string) {
     const hash = hashToken(token);
-    const db = prisma;
-    const share = await db.auditPackShare.findFirst({
+    return runInGlobalContext(async (db) => {
+        const share = await db.auditPackShare.findFirst({
         where: { tokenHash: hash, revokedAt: null },
         include: {
             pack: {
@@ -357,14 +407,15 @@ export async function getPackByShareToken(token: string) {
     if (share.expiresAt && share.expiresAt < new Date()) {
         throw forbidden('Share link has expired');
     }
-    return {
-        pack: share.pack,
-        cycle: share.pack.cycle,
-        items: share.pack.items,
-    };
+        return {
+            pack: share.pack,
+            cycle: share.pack.cycle,
+            items: share.pack.items,
+        };
+    });
 }
 
-// ─── Auditor Accounts ───
+// в”Ђв”Ђв”Ђ Auditor Accounts в”Ђв”Ђв”Ђ
 
 export async function inviteAuditor(ctx: RequestContext, email: string, name?: string) {
     assertCanManageAuditors(ctx);
@@ -405,7 +456,7 @@ export async function revokeAuditorAccess(ctx: RequestContext, auditorId: string
     });
 }
 
-// ─── Default Pack Templates (selection logic) ───
+// в”Ђв”Ђв”Ђ Default Pack Templates (selection logic) в”Ђв”Ђв”Ђ
 
 export async function previewDefaultPack(ctx: RequestContext, cycleId: string) {
     assertCanViewPack(ctx);
@@ -425,8 +476,7 @@ export async function previewDefaultPack(ctx: RequestContext, cycleId: string) {
 }
 
 async function previewISO27001DefaultPack(ctx: RequestContext) {
-    const db = prisma;
-    const fw = await db.framework.findFirst({ where: { key: 'ISO27001' } });
+    const fw = await runInTenantContext(ctx, (tdb) => tdb.framework.findFirst({ where: { key: 'ISO27001' } }));
 
     // Controls mapped to ISO27001 requirements
     let controlIds: string[] = [];
@@ -500,8 +550,7 @@ async function previewISO27001DefaultPack(ctx: RequestContext) {
 }
 
 async function previewNIS2DefaultPack(ctx: RequestContext) {
-    const db = prisma;
-    const fw = await db.framework.findFirst({ where: { key: 'NIS2' } });
+    const fw = await runInTenantContext(ctx, (tdb) => tdb.framework.findFirst({ where: { key: 'NIS2' } }));
 
     // Controls mapped to NIS2 requirements (Art.21 measures)
     let controlIds: string[] = [];
@@ -577,7 +626,7 @@ async function previewNIS2DefaultPack(ctx: RequestContext) {
     };
 }
 
-// ─── Export Primitives ───
+// в”Ђв”Ђв”Ђ Export Primitives в”Ђв”Ђв”Ђ
 
 export async function exportAuditPack(ctx: RequestContext, packId: string, format: 'json' | 'csv' = 'json') {
     assertCanViewPack(ctx);

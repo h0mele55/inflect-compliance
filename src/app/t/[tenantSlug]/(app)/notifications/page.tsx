@@ -2,10 +2,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
+import { AppIcon } from '@/components/icons/AppIcon';
 
 export default function NotificationsPage() {
     const apiUrl = useTenantApiUrl();
     const t = useTranslations('notifications');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [notifications, setNotifications] = useState<any[]>([]);
 
     useEffect(() => { fetch(apiUrl('/notifications')).then(r => r.json()).then(setNotifications); }, [apiUrl]);
@@ -21,7 +23,7 @@ export default function NotificationsPage() {
             <div className="space-y-2">
                 {notifications.map(n => (
                     <div key={n.id} className={`glass-card p-4 flex items-start gap-3 ${!n.read ? 'border-l-2 border-brand-500' : 'opacity-60'}`}>
-                        <span className="text-lg">{n.type === 'EVIDENCE' ? '📎' : n.type === 'FINDING' ? '🐛' : '🔔'}</span>
+                        <span className="text-lg"><AppIcon name={n.type === 'EVIDENCE' ? 'evidence' : n.type === 'FINDING' ? 'bug' : 'bell'} size={18} /></span>
                         <div className="flex-1">
                             <p className="text-sm text-slate-200">{n.message}</p>
                             <p className="text-xs text-slate-500 mt-1">{new Date(n.createdAt).toLocaleString()}</p>

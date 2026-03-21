@@ -221,6 +221,7 @@ export async function clonePackForRetest(
 
 // ─── Auditor Pack Access ───
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getAuditorAssignedPacks(ctx: RequestContext): Promise<any[]> {
     if (ctx.role !== 'AUDITOR') throw forbidden('Only auditors can access this view');
 

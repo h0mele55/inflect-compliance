@@ -107,7 +107,7 @@ export default function VendorDashboardPage() {
             {metrics.expiringDocuments > 0 && (
                 <div className="card p-5 border border-orange-500/30">
                     <div className="flex items-center gap-2">
-                        <span className="text-orange-400 text-lg">⚠️</span>
+                        <span className="text-orange-400 text-lg font-semibold">!</span>
                         <span className="font-semibold">{metrics.expiringDocuments} document(s) expiring within 30 days</span>
                     </div>
                     <p className="text-sm text-slate-400 mt-1">Review vendor documents tab to check validity dates.</p>

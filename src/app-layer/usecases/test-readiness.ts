@@ -9,7 +9,6 @@
 import { RequestContext } from '../types';
 import { assertCanReadTests } from '../policies/test.policies';
 import { runInTenantContext } from '@/lib/db-context';
-import prisma from '@/lib/prisma';
 
 export interface FrameworkTestReadiness {
     frameworkKey: string;
@@ -28,9 +27,11 @@ export async function computeTestReadiness(ctx: RequestContext): Promise<Framewo
     assertCanReadTests(ctx);
 
     // Get all frameworks
-    const frameworks = await prisma.framework.findMany({
-        select: { id: true, key: true, name: true },
-    });
+    const frameworks = await runInTenantContext(ctx, (db) =>
+        db.framework.findMany({
+            select: { id: true, key: true, name: true },
+        })
+    ) as any[];
 
     const results: FrameworkTestReadiness[] = [];
     const ninetyDaysAgo = new Date();

@@ -10,6 +10,7 @@ export default function TemplatesPage() {
     const router = useRouter();
     const tenant = useTenantContext();
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [templates, setTemplates] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -119,7 +120,7 @@ export default function TemplatesPage() {
                                     className="btn btn-primary btn-sm mt-4 w-full"
                                     id={`use-template-${tpl.id}`}
                                 >
-                                    {creating === tpl.id ? 'Creating...' : '📋 Use Template'}
+                                    {creating === tpl.id ? 'Creating...' : 'Use Template'}
                                 </button>
                             )}
                         </div>

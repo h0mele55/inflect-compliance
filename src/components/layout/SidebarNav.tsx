@@ -4,29 +4,132 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useTenantContext, useTenantHref } from '@/lib/tenant-context-provider';
-import { X } from 'lucide-react';
+import { useTenantContext, useTenantHref, usePermissions } from '@/lib/tenant-context-provider';
+import {
+    X,
+    LayoutDashboard,
+    Building2,
+    AlertTriangle,
+    ShieldCheck,
+    Paperclip,
+    FileText,
+    ClipboardList,
+    FlaskConical,
+    Truck,
+    Map,
+    BarChart3,
+    Settings,
+    LogOut,
+    Bell,
+    type LucideIcon,
+} from 'lucide-react';
+
+// ─── Types ───
+
+interface NavItemDef {
+    href: string;
+    label: string;
+    icon: LucideIcon;
+    badge?: string | number;
+    /** If set, item is only shown when this returns true */
+    visible?: boolean;
+}
+
+interface NavSectionDef {
+    title?: string;
+    items: NavItemDef[];
+}
 
 // ─── Navigation configuration ───
 
-export function useNavItems() {
+export function useNavSections(): NavSectionDef[] {
     const t = useTranslations('nav');
     const tenantHref = useTenantHref();
+    const perms = usePermissions();
 
     return [
-        { href: tenantHref('/dashboard'), label: t('dashboard'), icon: '📊' },
-        { href: tenantHref('/assets'), label: t('assets'), icon: '🏢' },
-        { href: tenantHref('/risks'), label: t('risks'), icon: '⚠️' },
-        { href: tenantHref('/controls'), label: t('controls'), icon: '🛡️' },
-        { href: tenantHref('/evidence'), label: t('evidence'), icon: '📎' },
-        { href: tenantHref('/policies'), label: t('policies'), icon: '📄' },
-        { href: tenantHref('/tasks'), label: t('tasks'), icon: '📋' },
-        { href: tenantHref('/tests'), label: 'Tests', icon: '🧪' },
-        { href: tenantHref('/vendors'), label: 'Vendors', icon: '🏢' },
-        { href: tenantHref('/frameworks'), label: 'Frameworks', icon: '🗺️' },
-        { href: tenantHref('/reports'), label: t('reports'), icon: '📈' },
-        { href: tenantHref('/admin'), label: t('admin'), icon: '⚙️' },
+        {
+            items: [
+                { href: tenantHref('/dashboard'), label: t('dashboard'), icon: LayoutDashboard },
+                { href: tenantHref('/assets'), label: t('assets'), icon: Building2 },
+                { href: tenantHref('/risks'), label: t('risks'), icon: AlertTriangle },
+                { href: tenantHref('/controls'), label: t('controls'), icon: ShieldCheck },
+                { href: tenantHref('/evidence'), label: t('evidence'), icon: Paperclip },
+                { href: tenantHref('/policies'), label: t('policies'), icon: FileText },
+                { href: tenantHref('/tasks'), label: t('tasks'), icon: ClipboardList },
+                { href: tenantHref('/tests'), label: 'Tests', icon: FlaskConical },
+            ],
+        },
+        {
+            title: 'Management',
+            items: [
+                { href: tenantHref('/vendors'), label: 'Vendors', icon: Truck },
+                { href: tenantHref('/frameworks'), label: 'Frameworks', icon: Map },
+                { href: tenantHref('/reports'), label: t('reports'), icon: BarChart3, visible: perms.reports.view },
+                { href: tenantHref('/admin'), label: t('admin'), icon: Settings, visible: perms.admin.view },
+                { href: tenantHref('/admin/notifications'), label: 'Notifications', icon: Bell, visible: perms.admin.view },
+            ].filter(item => {
+                // DEFENSE-IN-DEPTH (Layer 2 of 2):
+                // Layer 1: Server layout uses noStore() to ensure fresh permissions per request.
+                // Layer 2: This client-side filter removes gated items based on the resolved permissions.
+                // Fail-closed: if `visible` is explicitly set, only include when strictly `true`.
+                if (item.visible === undefined) return true; // no gate — always visible
+                return item.visible === true;               // gated — only if permission is true
+            }),
+        },
     ];
+}
+
+// ─── NavItem ───
+
+interface NavItemProps {
+    href: string;
+    icon: LucideIcon;
+    label: string;
+    active: boolean;
+    badge?: string | number;
+    onClick?: () => void;
+}
+
+function NavItem({ href, icon: Icon, label, active, badge, onClick }: NavItemProps) {
+    const slug = href.split('/').pop() ?? '';
+
+    return (
+        <Link
+            href={href}
+            onClick={onClick}
+            className={`nav-link ${active ? 'active' : ''}`}
+            data-testid={`nav-${slug}`}
+        >
+            <Icon className="w-[18px] h-[18px] flex-shrink-0" aria-hidden="true" />
+            <span className="nav-link-label">{label}</span>
+            {badge != null && (
+                <span className="ml-auto badge badge-info text-[10px] tabular-nums">
+                    {badge}
+                </span>
+            )}
+        </Link>
+    );
+}
+
+// ─── NavSection ───
+
+interface NavSectionProps {
+    title?: string;
+    children: React.ReactNode;
+}
+
+function NavSection({ title, children }: NavSectionProps) {
+    return (
+        <div className="nav-section">
+            {title && (
+                <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                    {title}
+                </p>
+            )}
+            <div className="space-y-0.5">{children}</div>
+        </div>
+    );
 }
 
 // ─── Sidebar content (shared between desktop sidebar and mobile drawer) ───
@@ -41,7 +144,7 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
     const pathname = usePathname();
     const tc = useTranslations('common');
     const tenant = useTenantContext();
-    const navItems = useNavItems();
+    const sections = useNavSections();
 
     return (
         <div className="flex flex-col h-full">
@@ -56,17 +159,21 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
             </div>
 
             {/* Nav */}
-            <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-                {navItems.map((item) => (
-                    <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={onNavClick}
-                        className={`nav-link ${pathname.startsWith(item.href) ? 'active' : ''}`}
-                    >
-                        <span className="text-base">{item.icon}</span>
-                        <span>{item.label}</span>
-                    </Link>
+            <nav className="flex-1 p-2 overflow-y-auto" aria-label="Main navigation">
+                {sections.map((section, idx) => (
+                    <NavSection key={idx} title={section.title}>
+                        {section.items.map((item) => (
+                            <NavItem
+                                key={item.href}
+                                href={item.href}
+                                icon={item.icon}
+                                label={item.label}
+                                badge={item.badge}
+                                active={pathname.startsWith(item.href)}
+                                onClick={onNavClick}
+                            />
+                        ))}
+                    </NavSection>
                 ))}
             </nav>
 
@@ -77,7 +184,12 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
                     <p className="text-xs text-slate-500 truncate">{tenant.tenantName}</p>
                     <p className="text-xs text-brand-400">{tenant.role}</p>
                 </div>
-                <button onClick={onLogout} className="btn btn-ghost btn-sm w-full text-xs">
+                <button
+                    onClick={onLogout}
+                    className="btn btn-ghost btn-sm w-full text-xs"
+                    data-testid="nav-logout"
+                >
+                    <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
                     {tc('signOut')}
                 </button>
             </div>
@@ -96,9 +208,9 @@ interface MobileDrawerProps {
 export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
     const pathname = usePathname();
 
-    // Close on route change
+    // Close on route change (always close to avoid stale open state)
     useEffect(() => {
-        if (open) onClose();
+        onClose();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pathname]);
 
@@ -147,11 +259,12 @@ export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
                 aria-modal="true"
                 aria-label="Navigation menu"
                 data-testid="nav-drawer"
+                data-open={open ? 'true' : 'false'}
             >
-                {/* Close button */}
+                {/* Close button — 44px touch target */}
                 <button
                     type="button"
-                    className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+                    className="absolute top-3 right-3 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
                     onClick={onClose}
                     aria-label="Close navigation"
                     data-testid="nav-drawer-close"

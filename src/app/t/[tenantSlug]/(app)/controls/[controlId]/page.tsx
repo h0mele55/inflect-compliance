@@ -417,13 +417,13 @@ export default function ControlDetailPage() {
     const doneTasks = control.controlTasks?.filter((t: ControlTaskDTO) => t.status === 'DONE').length ?? 0;
     const totalTasks = control.controlTasks?.length ?? 0;
     const tabs: { key: Tab; label: string; count?: number }[] = [
-        { key: 'overview', label: '📋 Overview' },
-        { key: 'tasks', label: '✅ Tasks', count: totalTasks },
-        { key: 'evidence', label: '📎 Evidence', count: control.evidenceLinks?.length ?? 0 },
-        { key: 'mappings', label: '🗺️ Mappings', count: control.frameworkMappings?.length ?? 0 },
-        { key: 'traceability', label: '🔗 Traceability' },
-        { key: 'activity', label: '📜 Activity' },
-        { key: 'tests', label: '🧪 Tests' },
+        { key: 'overview', label: 'Overview' },
+        { key: 'tasks', label: 'Tasks', count: totalTasks },
+        { key: 'evidence', label: 'Evidence', count: control.evidenceLinks?.length ?? 0 },
+        { key: 'mappings', label: 'Mappings', count: control.frameworkMappings?.length ?? 0 },
+        { key: 'traceability', label: 'Traceability' },
+        { key: 'activity', label: 'Activity' },
+        { key: 'tests', label: 'Tests' },
     ];
 
     return (
@@ -456,12 +456,12 @@ export default function ControlDetailPage() {
                                 <option key={val} value={val}>{lbl}</option>
                             ))}
                         </select>
-                        <button className="btn btn-secondary text-sm" onClick={() => { setAppChoice(control.applicability); setAppJustification(control.applicabilityJustification || ''); setShowApplicability(!showApplicability); }} id="toggle-applicability-btn">
-                            ⚙️ Applicability
+                        <button className="btn btn-secondary" onClick={() => { setAppChoice(control.applicability); setAppJustification(control.applicabilityJustification || ''); setShowApplicability(!showApplicability); }} id="toggle-applicability-btn">
+                            Applicability
                         </button>
                         {control.applicability !== 'NOT_APPLICABLE' && (
-                            <button className="btn btn-primary text-sm" onClick={handleMarkTestCompleted} disabled={markingTest} id="mark-test-completed-btn">
-                                {markingTest ? '⏳...' : '✓ Mark Test Completed'}
+                            <button className="btn btn-primary" onClick={handleMarkTestCompleted} disabled={markingTest} id="mark-test-completed-btn">
+                                {markingTest ? '...' : 'Mark Test Completed'}
                             </button>
                         )}
                     </div>
@@ -485,7 +485,7 @@ export default function ControlDetailPage() {
                     {appChoice === 'NOT_APPLICABLE' && (
                         <textarea className="input w-full" rows={2} placeholder="Justification required..." value={appJustification} onChange={e => setAppJustification(e.target.value)} id="applicability-justification" />
                     )}
-                    <button onClick={saveApplicability} disabled={savingApp || (appChoice === 'NOT_APPLICABLE' && !appJustification.trim())} className="btn btn-primary text-sm" id="save-applicability-btn">
+                    <button onClick={saveApplicability} disabled={savingApp || (appChoice === 'NOT_APPLICABLE' && !appJustification.trim())} className="btn btn-primary" id="save-applicability-btn">
                         {savingApp ? 'Saving...' : 'Save'}
                     </button>
                 </div>
@@ -513,7 +513,7 @@ export default function ControlDetailPage() {
                         <div className="flex justify-end -mt-1 -mb-2">
                             <button
                                 type="button"
-                                className="btn btn-secondary text-sm inline-flex items-center gap-1.5"
+                                className="btn btn-secondary"
                                 onClick={openEditModal}
                                 data-testid="control-edit-button"
                                 id="control-edit-button"
@@ -574,7 +574,7 @@ export default function ControlDetailPage() {
                     {/* Automation Section */}
                     <div className="border-t border-slate-700 pt-4 mt-4">
                         <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-sm font-semibold text-slate-300">🔌 Automation</h3>
+                            <h3 className="text-sm font-semibold text-slate-300">Automation</h3>
                             {permissions.canWrite && (
                                 <button className="text-xs text-brand-400 hover:underline" onClick={() => { setAutoEvidenceSource(control.evidenceSource || ''); setAutoKey(control.automationKey || ''); setEditingAutomation(!editingAutomation); }} id="edit-automation-btn">
                                     {editingAutomation ? 'Cancel' : 'Edit'}
@@ -591,7 +591,7 @@ export default function ControlDetailPage() {
                                 {autoEvidenceSource === 'INTEGRATION' && (
                                     <input type="text" className="input w-full" placeholder="Automation key (e.g. aws-cis-1.2)" value={autoKey} onChange={e => setAutoKey(e.target.value)} id="automation-key-input" />
                                 )}
-                                <button onClick={saveAutomation} disabled={savingAutomation} className="btn btn-primary text-sm" id="save-automation-btn">
+                                <button onClick={saveAutomation} disabled={savingAutomation} className="btn btn-primary" id="save-automation-btn">
                                     {savingAutomation ? 'Saving...' : 'Save'}
                                 </button>
                             </div>
@@ -618,7 +618,7 @@ export default function ControlDetailPage() {
                         <h3 className="text-lg font-semibold text-white">Edit Control</h3>
 
                         {editError && (
-                            <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2">❌ {editError}</div>
+                            <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2">{editError}</div>
                         )}
 
                         <div className="space-y-3">
@@ -705,11 +705,11 @@ export default function ControlDetailPage() {
                         </div>
 
                         <div className="flex justify-end gap-2 pt-2">
-                            <button type="button" className="btn btn-secondary text-sm" onClick={handleEditCancel} data-testid="edit-cancel-button">
+                            <button type="button" className="btn btn-secondary" onClick={handleEditCancel} data-testid="edit-cancel-button">
                                 Cancel
                             </button>
-                            <button type="submit" className="btn btn-primary text-sm" disabled={savingEdit || editForm.name.trim().length < 3} data-testid="edit-save-button">
-                                {savingEdit ? '⏳ Saving...' : '💾 Save'}
+                            <button type="submit" className="btn btn-primary" disabled={savingEdit || editForm.name.trim().length < 3} data-testid="edit-save-button">
+                                {savingEdit ? 'Saving...' : 'Save'}
                             </button>
                         </div>
                     </form>
@@ -719,7 +719,7 @@ export default function ControlDetailPage() {
             {/* Success toast */}
             {editSuccess && (
                 <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg animate-fadeIn text-sm" id="edit-success-toast">
-                    ✅ Control updated
+                    Control updated
                 </div>
             )}
 
@@ -727,7 +727,7 @@ export default function ControlDetailPage() {
                 <div className="space-y-4">
                     {permissions.canWrite && (
                         <div className="flex justify-end">
-                            <button className="btn btn-primary text-sm" onClick={() => setShowTaskForm(!showTaskForm)} id="create-task-btn">
+                            <button className="btn btn-primary" onClick={() => setShowTaskForm(!showTaskForm)} id="create-task-btn">
                                 + Create Task
                             </button>
                         </div>
@@ -737,7 +737,7 @@ export default function ControlDetailPage() {
                             <input type="text" className="input w-full" placeholder="Task title *" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} required id="task-title-input" />
                             <textarea className="input w-full" rows={2} placeholder="Description (optional)" value={taskDesc} onChange={e => setTaskDesc(e.target.value)} id="task-desc-input" />
                             <input type="date" className="input" value={taskDue} onChange={e => setTaskDue(e.target.value)} id="task-due-input" />
-                            <button type="submit" disabled={savingTask} className="btn btn-primary text-sm" id="submit-task-btn">
+                            <button type="submit" disabled={savingTask} className="btn btn-primary" id="submit-task-btn">
                                 {savingTask ? 'Creating...' : 'Create'}
                             </button>
                         </form>
@@ -761,7 +761,7 @@ export default function ControlDetailPage() {
                                                 <td>
                                                     {t.status !== 'DONE' && (
                                                         <button className="btn btn-sm btn-secondary" onClick={() => updateTaskStatus(t.id, 'DONE')} id={`mark-done-${t.id}`}>
-                                                            ✓ Done
+                                                            Done
                                                         </button>
                                                     )}
                                                 </td>
@@ -774,7 +774,7 @@ export default function ControlDetailPage() {
                     </div>
                     {/* Linked Work Items (via TaskLink) */}
                     <div className="glass-card p-4 mt-4" id="linked-work-items-section">
-                        <h3 className="text-sm font-semibold mb-3 text-slate-300">🔗 Linked Work Items (Tasks)</h3>
+                        <h3 className="text-sm font-semibold mb-3 text-slate-300">Linked Work Items (Tasks)</h3>
                         <LinkedTasksPanel
                             apiBase={apiUrl('')}
                             entityType="CONTROL"
@@ -789,10 +789,10 @@ export default function ControlDetailPage() {
                 <div className="space-y-4">
                     {permissions.canWrite && (
                         <div className="flex justify-end gap-2">
-                            <button className="btn btn-primary text-sm" onClick={() => { setShowFileUpload(!showFileUpload); setShowEvidenceForm(false); }} id="upload-evidence-btn">
-                                📤 Upload Evidence
+                            <button className="btn btn-primary" onClick={() => { setShowFileUpload(!showFileUpload); setShowEvidenceForm(false); }} id="upload-evidence-btn">
+                                Upload Evidence
                             </button>
-                            <button className="btn btn-secondary text-sm" onClick={() => { setShowEvidenceForm(!showEvidenceForm); setShowFileUpload(false); }} id="link-evidence-btn">
+                            <button className="btn btn-secondary" onClick={() => { setShowEvidenceForm(!showEvidenceForm); setShowFileUpload(false); }} id="link-evidence-btn">
                                 + Link Evidence
                             </button>
                         </div>
@@ -800,7 +800,7 @@ export default function ControlDetailPage() {
                     {/* File upload form for this control */}
                     {showFileUpload && permissions.canWrite && (
                         <form onSubmit={handleFileUpload} className="glass-card p-4 space-y-3" id="control-upload-form">
-                            <h4 className="text-sm font-semibold text-white">📤 Upload Evidence for {control.name}</h4>
+                            <h4 className="text-sm font-semibold text-white">Upload Evidence for {control.name}</h4>
                             <input
                                 ref={fileUploadRef}
                                 type="file"
@@ -811,7 +811,7 @@ export default function ControlDetailPage() {
                                 accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.csv,.txt,.doc,.docx,.xlsx,.xls,.json,.zip"
                             />
                             {fileToUpload && (
-                                <p className="text-xs text-slate-400">📎 {fileToUpload.name} ({fileToUpload.size < 1048576 ? `${(fileToUpload.size / 1024).toFixed(1)} KB` : `${(fileToUpload.size / 1048576).toFixed(1)} MB`})</p>
+                                <p className="text-xs text-slate-400">{fileToUpload.name} ({fileToUpload.size < 1048576 ? `${(fileToUpload.size / 1024).toFixed(1)} KB` : `${(fileToUpload.size / 1048576).toFixed(1)} MB`})</p>
                             )}
                             <input
                                 type="text"
@@ -822,15 +822,15 @@ export default function ControlDetailPage() {
                                 id="control-upload-title"
                             />
                             {fileUploadError && (
-                                <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2">❌ {fileUploadError}</div>
+                                <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2">{fileUploadError}</div>
                             )}
                             {fileUploading && (
                                 <div className="w-full bg-slate-700 rounded-full h-2">
                                     <div className="bg-brand-500 h-2 rounded-full transition-all" style={{ width: '60%' }} />
                                 </div>
                             )}
-                            <button type="submit" disabled={fileUploading || !fileToUpload} className="btn btn-primary text-sm" id="submit-control-upload">
-                                {fileUploading ? '⏳ Uploading...' : '📤 Upload'}
+                            <button type="submit" disabled={fileUploading || !fileToUpload} className="btn btn-primary" id="submit-control-upload">
+                                {fileUploading ? 'Uploading...' : 'Upload'}
                             </button>
                         </form>
                     )}
@@ -838,7 +838,7 @@ export default function ControlDetailPage() {
                         <form onSubmit={linkEvidence} className="glass-card p-4 space-y-3">
                             <input type="url" className="input w-full" placeholder="Evidence URL *" value={evidenceUrl} onChange={e => setEvidenceUrl(e.target.value)} required id="evidence-url-input" />
                             <textarea className="input w-full" rows={2} placeholder="Note (optional)" value={evidenceNote} onChange={e => setEvidenceNote(e.target.value)} id="evidence-note-input" />
-                            <button type="submit" disabled={savingEvidence} className="btn btn-primary text-sm" id="submit-evidence-btn">
+                            <button type="submit" disabled={savingEvidence} className="btn btn-primary" id="submit-evidence-btn">
                                 {savingEvidence ? 'Linking...' : 'Link Evidence'}
                             </button>
                         </form>
@@ -854,7 +854,7 @@ export default function ControlDetailPage() {
                                 <tbody>
                                     {control.evidenceLinks?.map((el: EvidenceLinkDTO) => (
                                         <tr key={el.id}>
-                                            <td><span className={`badge ${el.kind === 'FILE' ? 'badge-success' : 'badge-info'} text-xs`}>{el.kind === 'FILE' ? '📎 FILE' : el.kind}</span></td>
+                                            <td><span className={`badge ${el.kind === 'FILE' ? 'badge-success' : 'badge-info'} text-xs`}>{el.kind === 'FILE' ? 'FILE' : el.kind}</span></td>
                                             <td className="text-sm">
                                                 {el.url ? <a href={el.url} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">{el.url}</a> : (el.note || '—')}
                                             </td>
@@ -863,7 +863,7 @@ export default function ControlDetailPage() {
                                             {permissions.canWrite && (
                                                 <td>
                                                     <button className="text-red-400 text-xs hover:text-red-300" onClick={() => unlinkEvidence(el.id)} id={`unlink-${el.id}`}>
-                                                        ✕ Remove
+                                                        × Remove
                                                     </button>
                                                 </td>
                                             )}
@@ -880,7 +880,7 @@ export default function ControlDetailPage() {
                 <div className="space-y-4">
                     {permissions.canWrite && (
                         <div className="flex justify-end">
-                            <button className="btn btn-primary text-sm" onClick={() => setShowMapForm(!showMapForm)} id="map-requirement-btn">
+                            <button className="btn btn-primary" onClick={() => setShowMapForm(!showMapForm)} id="map-requirement-btn">
                                 + Map Requirement
                             </button>
                         </div>
@@ -901,7 +901,7 @@ export default function ControlDetailPage() {
                                             <option key={r.id} value={r.id}>{r.code ? `${r.code} — ` : ''}{r.title || r.description}</option>
                                         ))}
                                     </select>
-                                    <button onClick={mapRequirement} disabled={!selectedReq || savingMap} className="btn btn-primary text-sm" id="submit-mapping-btn">
+                                    <button onClick={mapRequirement} disabled={!selectedReq || savingMap} className="btn btn-primary" id="submit-mapping-btn">
                                         {savingMap ? 'Mapping...' : 'Map'}
                                     </button>
                                 </>
@@ -927,7 +927,7 @@ export default function ControlDetailPage() {
                                             {permissions.canWrite && (
                                                 <td>
                                                     <button className="text-red-400 text-xs hover:text-red-300" onClick={() => unmapRequirement(m.fromRequirement?.id || m.fromRequirementId || '')} id={`unmap-${m.id}`}>
-                                                        ✕ Remove
+                                                        × Remove
                                                     </button>
                                                 </td>
                                             )}

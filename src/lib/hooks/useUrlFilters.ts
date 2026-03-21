@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 
 /**
@@ -29,9 +29,13 @@ export function useUrlFilters(keys: string[]) {
     }, [keys]);
 
     const [filters, setFilters] = useState<Record<string, string>>(readFromUrl);
+    const filtersRef = useRef<Record<string, string>>(filters);
 
-    // Debounce timer ref for q
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Keep ref in sync if state updates externally
+    useEffect(() => {
+        filtersRef.current = filters;
+    }, [filters]);
+
 
     // Push filters to URL
     const pushToUrl = useCallback(
@@ -58,32 +62,23 @@ export function useUrlFilters(keys: string[]) {
     // Set a single filter value
     const setFilter = useCallback(
         (key: string, value: string) => {
-            setFilters((prev) => {
-                const next = { ...prev };
-                if (value) {
-                    next[key] = value;
-                } else {
-                    delete next[key];
-                }
-
-                // Debounce q updates
-                if (key === 'q') {
-                    if (debounceRef.current) clearTimeout(debounceRef.current);
-                    debounceRef.current = setTimeout(() => {
-                        pushToUrl(next);
-                    }, 400);
-                } else {
-                    pushToUrl(next);
-                }
-
-                return next;
-            });
+            const nextState = { ...filtersRef.current };
+            if (value) {
+                nextState[key] = value;
+            } else {
+                delete nextState[key];
+            }
+            
+            filtersRef.current = nextState;
+            setFilters(nextState);
+            pushToUrl(nextState);
         },
         [pushToUrl],
     );
 
     // Clear all filters
     const clearFilters = useCallback(() => {
+        filtersRef.current = {};
         setFilters({});
         if (typeof window === 'undefined') return;
         const params = new URLSearchParams(window.location.search);
@@ -102,12 +97,7 @@ export function useUrlFilters(keys: string[]) {
         return () => window.removeEventListener('popstate', handlePopState);
     }, [readFromUrl]);
 
-    // Clean up debounce on unmount
-    useEffect(() => {
-        return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-        };
-    }, []);
+
 
     const hasActiveFilters = Object.keys(filters).length > 0;
 

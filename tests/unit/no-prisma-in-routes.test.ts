@@ -40,7 +40,7 @@ describe('Structural: No direct Prisma calls in tenant-scoped API route handlers
         }
 
         if (violations.length > 0) {
-            fail(
+            throw new Error(
                 `The following route files contain direct Prisma calls:\n${violations.map(v => `  - ${v}`).join('\n')}\n\n` +
                 'Route handlers should delegate to the application layer (usecases/repositories).'
             );

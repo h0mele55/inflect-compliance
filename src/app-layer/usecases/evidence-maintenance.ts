@@ -3,8 +3,12 @@
  * - Reconcile unlinked evidence
  * - Cleanup failed/pending uploads
  * - Detect broken evidence (missing files)
+ *
+ * NOTE: These are background/cron operations that receive a raw tenantId
+ * rather than a full RequestContext. They use withTenantDb to ensure
+ * RLS enforcement via the app_user role + app.tenant_id session variable.
  */
-import { prisma } from '@/lib/prisma';
+import { withTenantDb } from '@/lib/db-context';
 import { deleteStoredFile } from '@/lib/storage';
 
 /**
@@ -17,34 +21,37 @@ export async function reconcileUnlinkedEvidence(
 ) {
     const cutoff = new Date(Date.now() - olderThanMinutes * 60_000);
 
-    const unlinked = await prisma.evidence.findMany({
-        where: {
-            tenantId,
-            type: 'FILE',
-            controlId: null,
-            createdAt: { lt: cutoff },
-            deletedAt: null,
-        },
-        select: { id: true, title: true, fileName: true, createdAt: true },
-    });
-
-    if (unlinked.length > 0) {
-        await prisma.auditLog.createMany({
-            data: unlinked.map(ev => ({
+    return withTenantDb(tenantId, async (db) => {
+        const unlinked = await db.evidence.findMany({
+            where: {
                 tenantId,
-                entity: 'Evidence',
-                entityId: ev.id,
-                action: 'EVIDENCE_UNLINKED_WARNING',
-                details: JSON.stringify({
-                    title: ev.title,
-                    fileName: ev.fileName,
-                    unlinkedSince: ev.createdAt,
-                }),
-            })),
+                type: 'FILE',
+                controlId: null,
+                createdAt: { lt: cutoff },
+                deletedAt: null,
+            },
+            select: { id: true, title: true, fileName: true, createdAt: true },
         });
-    }
 
-    return { flagged: unlinked.length, items: unlinked };
+        if (unlinked.length > 0) {
+            await db.auditLog.createMany({
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                data: unlinked.map((ev: any) => ({
+                    tenantId,
+                    entity: 'Evidence',
+                    entityId: ev.id,
+                    action: 'EVIDENCE_UNLINKED_WARNING',
+                    details: JSON.stringify({
+                        title: ev.title,
+                        fileName: ev.fileName,
+                        unlinkedSince: ev.createdAt,
+                    }),
+                })),
+            });
+        }
+
+        return { flagged: unlinked.length, items: unlinked };
+    });
 }
 
 /**
@@ -55,28 +62,34 @@ export async function cleanupFailedOrPendingUploads(
     olderThanMinutes: number = 30,
 ) {
     const cutoff = new Date(Date.now() - olderThanMinutes * 60_000);
-    const pending = await (prisma as any).fileRecord.findMany({     // eslint-disable-line @typescript-eslint/no-explicit-any
-        where: {
-            tenantId,
-            status: { in: ['PENDING', 'FAILED'] },
-            createdAt: { lt: cutoff },
-        },
-    });
 
-    let cleaned = 0;
-    for (const record of pending) {
-        try {
-            await deleteStoredFile(record.pathKey);
-        } catch { /* best effort */ }
-
-        await (prisma as any).fileRecord.update({                   // eslint-disable-line @typescript-eslint/no-explicit-any
-            where: { id: record.id },
-            data: { status: 'FAILED' },
+    return withTenantDb(tenantId, async (db) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pending = await (db as any).fileRecord.findMany({
+            where: {
+                tenantId,
+                status: { in: ['PENDING', 'FAILED'] },
+                createdAt: { lt: cutoff },
+            },
         });
-        cleaned++;
-    }
 
-    return { cleaned };
+        let cleaned = 0;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const record of pending as any[]) {
+            try {
+                await deleteStoredFile(record.pathKey);
+            } catch { /* best effort */ }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (db as any).fileRecord.update({
+                where: { id: record.id },
+                data: { status: 'FAILED' },
+            });
+            cleaned++;
+        }
+
+        return { cleaned };
+    });
 }
 
 /**
@@ -84,44 +97,47 @@ export async function cleanupFailedOrPendingUploads(
  * Marks them for admin review.
  */
 export async function detectBrokenEvidence(tenantId: string) {
-    // Find FILE evidence — use raw query approach to handle stale Prisma types
-    const fileEvidence = await prisma.evidence.findMany({
-        where: { tenantId, type: 'FILE', deletedAt: null },
+    return withTenantDb(tenantId, async (db) => {
+        const fileEvidence = await db.evidence.findMany({
+            where: { tenantId, type: 'FILE', deletedAt: null },
+        });
+
+        const broken: Array<{ id: string; title: string | null; reason: string }> = [];
+
+        for (const ev of fileEvidence) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fileRecordId = (ev as any).fileRecordId as string | null;
+            if (!fileRecordId) {
+                broken.push({ id: ev.id, title: ev.title, reason: 'missing_file_record_id' });
+                continue;
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const record = await (db as any).fileRecord.findUnique({
+                where: { id: fileRecordId },
+                select: { status: true },
+            });
+
+            if (!record) {
+                broken.push({ id: ev.id, title: ev.title, reason: 'file_record_not_found' });
+            } else if (record.status === 'DELETED' || record.status === 'FAILED') {
+                broken.push({ id: ev.id, title: ev.title, reason: `file_record_${record.status.toLowerCase()}` });
+            }
+        }
+
+        if (broken.length > 0) {
+            await db.auditLog.createMany({
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                data: broken.map((b: any) => ({
+                    tenantId,
+                    entity: 'Evidence',
+                    entityId: b.id,
+                    action: 'EVIDENCE_BROKEN_DETECTED',
+                    details: JSON.stringify({ title: b.title, reason: b.reason }),
+                })),
+            });
+        }
+
+        return { broken: broken.length, items: broken };
     });
-
-    const broken: Array<{ id: string; title: string | null; reason: string }> = [];
-
-    for (const ev of fileEvidence) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fileRecordId = (ev as any).fileRecordId as string | null;
-        if (!fileRecordId) {
-            broken.push({ id: ev.id, title: ev.title, reason: 'missing_file_record_id' });
-            continue;
-        }
-
-        const record = await (prisma as any).fileRecord.findUnique({ // eslint-disable-line @typescript-eslint/no-explicit-any
-            where: { id: fileRecordId },
-            select: { status: true },
-        });
-
-        if (!record) {
-            broken.push({ id: ev.id, title: ev.title, reason: 'file_record_not_found' });
-        } else if (record.status === 'DELETED' || record.status === 'FAILED') {
-            broken.push({ id: ev.id, title: ev.title, reason: `file_record_${record.status.toLowerCase()}` });
-        }
-    }
-
-    if (broken.length > 0) {
-        await prisma.auditLog.createMany({
-            data: broken.map(b => ({
-                tenantId,
-                entity: 'Evidence',
-                entityId: b.id,
-                action: 'EVIDENCE_BROKEN_DETECTED',
-                details: JSON.stringify({ title: b.title, reason: b.reason }),
-            })),
-        });
-    }
-
-    return { broken: broken.length, items: broken };
 }

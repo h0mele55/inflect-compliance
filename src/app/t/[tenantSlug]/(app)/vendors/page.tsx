@@ -1,7 +1,9 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { usePermissions } from '@/lib/tenant-context-provider';
 import { queryKeys } from '@/lib/queryKeys';
 import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
@@ -32,6 +34,7 @@ export default function VendorRegisterPage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
     const { permissions, tenantSlug } = useTenantContext();
+    const appPerms = usePermissions();
 
     // URL-driven filter state
     const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'criticality', 'reviewDue']);
@@ -60,9 +63,9 @@ export default function VendorRegisterPage() {
                 </div>
                 <div className="flex gap-2">
                     <Link href={tenantHref('/vendors/dashboard')} className="btn btn-secondary" id="vendor-dashboard-btn">
-                        📊 Dashboard
+                        Dashboard
                     </Link>
-                    {permissions?.canWrite && (
+                    {appPerms.vendors.create && (
                         <Link href={tenantHref('/vendors/new')} className="btn btn-primary" id="new-vendor-btn">
                             + New Vendor
                         </Link>
@@ -71,7 +74,7 @@ export default function VendorRegisterPage() {
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={vendorsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
+            <CompactFilterBar config={vendorsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="vendor" />
 
             {/* Table */}
             <div className="card overflow-x-auto">
@@ -107,11 +110,11 @@ export default function VendorRegisterPage() {
                                 </td>
                                 <td className="p-3">
                                     {fmtDate(v.nextReviewAt)}
-                                    {isOverdue(v.nextReviewAt) && <span className="ml-1 text-xs text-red-400 font-semibold">⚠ Overdue</span>}
+                                    {isOverdue(v.nextReviewAt) && <span className="ml-1 text-xs text-red-400 font-semibold">Overdue</span>}
                                 </td>
                                 <td className="p-3">
                                     {fmtDate(v.contractRenewalAt)}
-                                    {isOverdue(v.contractRenewalAt) && <span className="ml-1 text-xs text-orange-400 font-semibold">⚠ Due</span>}
+                                    {isOverdue(v.contractRenewalAt) && <span className="ml-1 text-xs text-orange-400 font-semibold">Due</span>}
                                 </td>
                                 <td className="p-3 text-slate-400">{v.owner?.name || '—'}</td>
                             </tr>

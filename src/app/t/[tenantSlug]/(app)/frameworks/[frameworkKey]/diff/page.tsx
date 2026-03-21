@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export default function DiffPage() {
     const params = useParams();
     const searchParams = useSearchParams();
@@ -12,11 +13,9 @@ export default function DiffPage() {
     const tenantHref = useCallback((path: string) => `/t/${tenantSlug}${path}`, [tenantSlug]);
 
     const fromKey = searchParams.get('from') || '';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [diff, setDiff] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [framework, setFramework] = useState<any>(null);
     const [activeTab, setActiveTab] = useState<'added' | 'removed' | 'changed'>('added');
 
@@ -109,7 +108,6 @@ export default function DiffPage() {
 
                     {/* Content */}
                     <div className="space-y-2" id="diff-content">
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         {activeTab === 'added' && diff.added.map((r: any, i: number) => (
                             <div key={i} className="glass-card flex items-center gap-3">
                                 <span className="text-emerald-500 text-lg font-bold">+</span>
@@ -119,7 +117,6 @@ export default function DiffPage() {
                             </div>
                         ))}
 
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         {activeTab === 'removed' && diff.removed.map((r: any, i: number) => (
                             <div key={i} className="glass-card flex items-center gap-3">
                                 <span className="text-red-500 text-lg font-bold">−</span>
@@ -129,7 +126,6 @@ export default function DiffPage() {
                             </div>
                         ))}
 
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         {activeTab === 'changed' && diff.changed.map((r: any, i: number) => (
                             <div key={i} className="glass-card">
                                 <div className="flex items-center gap-3 mb-2">

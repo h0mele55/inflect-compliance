@@ -81,6 +81,7 @@ export default function RiskImportPage() {
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
             try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const payload: Record<string, any> = {
                     title: row.title,
                     description: row.description,

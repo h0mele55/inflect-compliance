@@ -15,7 +15,7 @@ const TEST_USER = {
  */
 async function gotoLoginReady(page: Page) {
     await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
 }
 
 async function doLogin(page: Page) {

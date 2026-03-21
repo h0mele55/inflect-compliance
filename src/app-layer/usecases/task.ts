@@ -2,6 +2,7 @@ import { RequestContext } from '../types';
 import { WorkItemRepository, TaskLinkRepository, TaskCommentRepository, TaskWatcherRepository, TaskFilters, TaskListParams } from '../repositories/WorkItemRepository';
 import { assertCanReadTasks, assertCanWriteTasks, assertCanCommentOnTasks } from '../policies/task.policies';
 import { logEvent } from '../events/audit';
+import { enqueueEmail } from '../notifications/enqueue';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
 import type { PrismaTx } from '@/lib/db-context';
@@ -107,6 +108,12 @@ export async function createTask(ctx: RequestContext, input: {
             details: `Created task ${task.key}: ${task.title}`,
             metadata: { type: input.type, severity: input.severity, priority: input.priority },
         });
+
+        // Enqueue email to assignee if set
+        if (input.assigneeUserId) {
+            await enqueueTaskAssignedNotification(db, ctx, task.id, task.title, task.key, input.type || 'TASK', input.assigneeUserId);
+        }
+
         return task;
     });
 }
@@ -177,8 +184,57 @@ export async function assignTask(ctx: RequestContext, taskId: string, assigneeUs
             details: assigneeUserId ? `Assigned to ${assigneeUserId}` : 'Unassigned',
             metadata: { assigneeUserId },
         });
+
+        // Enqueue email to new assignee
+        if (assigneeUserId) {
+            await enqueueTaskAssignedNotification(db, ctx, taskId, task.title, task.key, task.type, assigneeUserId);
+        }
+
         return task;
     });
+}
+
+/** Look up assignee email and enqueue TASK_ASSIGNED notification */
+async function enqueueTaskAssignedNotification(
+    db: PrismaTx,
+    ctx: RequestContext,
+    taskId: string,
+    taskTitle: string,
+    taskKey: string | null | undefined,
+    taskType: string,
+    assigneeUserId: string,
+): Promise<void> {
+    try {
+        const assignee = await db.user.findUnique({
+            where: { id: assigneeUserId },
+            select: { email: true, name: true },
+        });
+        if (!assignee?.email) return;
+
+        const assigner = await db.user.findUnique({
+            where: { id: ctx.userId },
+            select: { name: true },
+        });
+
+        await enqueueEmail(db, {
+            tenantId: ctx.tenantId,
+            type: 'TASK_ASSIGNED',
+            toEmail: assignee.email,
+            entityId: taskId,
+            requestId: ctx.requestId,
+            payload: {
+                taskTitle,
+                taskKey,
+                taskType,
+                assigneeName: assignee.name || assignee.email,
+                assignerName: assigner?.name || undefined,
+                tenantSlug: ctx.tenantSlug || '',
+            },
+        });
+    } catch (err) {
+        // Fire-and-forget — never break the task operation
+        console.warn('[notifications] Failed to enqueue task assignment email:', err);
+    }
 }
 
 // ─── Links ───

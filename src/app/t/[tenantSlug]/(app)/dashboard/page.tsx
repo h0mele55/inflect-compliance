@@ -2,6 +2,17 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { getDashboardData } from '@/app-layer/usecases/dashboard';
+import {
+    Building2,
+    AlertTriangle,
+    ShieldCheck,
+    Paperclip,
+    CheckCircle2,
+    Bug,
+    Bell,
+    type LucideIcon,
+} from 'lucide-react';
+import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,18 +36,19 @@ export default async function DashboardPage({
 
     const href = (path: string) => `/t/${tenantSlug}${path}`;
 
-    const statCards = [
-        { label: t('assets'), value: stats.assets, icon: '🏢', color: 'from-blue-500 to-cyan-500' },
-        { label: t('risks'), value: stats.risks, icon: '⚠️', color: 'from-amber-500 to-orange-500', sub: t('highCritical', { count: stats.highRisks }) },
-        { label: t('controls'), value: stats.controls, icon: '🛡️', color: 'from-emerald-500 to-teal-500' },
-        { label: t('evidence'), value: stats.evidence, icon: '📎', color: 'from-purple-500 to-pink-500', sub: t('pendingReview', { count: stats.pendingEvidence }) },
-        { label: t('openTasks'), value: stats.openTasks, icon: '✅', color: 'from-indigo-500 to-blue-500' },
-        { label: t('openFindings'), value: stats.openFindings, icon: '🐛', color: 'from-red-500 to-rose-500' },
+    const statCards: { label: string; value: number; icon: LucideIcon; color: string; sub?: string }[] = [
+        { label: t('assets'), value: stats.assets, icon: Building2, color: 'from-blue-500 to-cyan-500' },
+        { label: t('risks'), value: stats.risks, icon: AlertTriangle, color: 'from-amber-500 to-orange-500', sub: t('highCritical', { count: stats.highRisks }) },
+        { label: t('controls'), value: stats.controls, icon: ShieldCheck, color: 'from-emerald-500 to-teal-500' },
+        { label: t('evidence'), value: stats.evidence, icon: Paperclip, color: 'from-purple-500 to-pink-500', sub: t('pendingReview', { count: stats.pendingEvidence }) },
+        { label: t('openTasks'), value: stats.openTasks, icon: CheckCircle2, color: 'from-indigo-500 to-blue-500' },
+        { label: t('openFindings'), value: stats.openFindings, icon: Bug, color: 'from-red-500 to-rose-500' },
     ];
 
     return (
         <div className="space-y-6 animate-fadeIn">
-            <div className="flex items-center justify-between">
+            <OnboardingBanner />
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-bold">{t('title')}</h1>
                     <p className="text-slate-400 text-sm mt-1">{t('subtitle')}</p>
@@ -44,7 +56,7 @@ export default async function DashboardPage({
                 <div className="flex items-center gap-2">
                     {stats.unreadNotifications > 0 && (
                         <Link href={href('/notifications')} className="btn btn-ghost btn-sm">
-                            🔔 <span className="badge badge-danger">{stats.unreadNotifications}</span>
+                            <Bell className="w-4 h-4" aria-hidden="true" /> <span className="badge badge-danger">{stats.unreadNotifications}</span>
                         </Link>
                     )}
                 </div>
@@ -52,18 +64,21 @@ export default async function DashboardPage({
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {statCards.map((card) => (
+                {statCards.map((card) => {
+                    const Icon = card.icon;
+                    return (
                     <div key={card.label} className="glass-card p-4 hover:scale-[1.02] transition-transform">
                         <div className="flex items-center gap-2 mb-2">
-                            <span className="text-lg">{card.icon}</span>
+                            <Icon className="w-4 h-4 text-slate-400" aria-hidden="true" />
                             <span className="text-xs text-slate-400">{card.label}</span>
                         </div>
-                        <p className="text-2xl font-bold bg-gradient-to-r bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(to right, var(--tw-gradient-from), var(--tw-gradient-to))` }}>
+                        <p className={`text-2xl font-bold bg-gradient-to-r ${card.color} bg-clip-text text-transparent`}>
                             {card.value}
                         </p>
                         {card.sub && <p className="text-xs text-slate-500 mt-1">{card.sub}</p>}
                     </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Clause Progress + Alerts */}
@@ -135,7 +150,7 @@ export default async function DashboardPage({
                     <div className="space-y-2 max-h-40 overflow-y-auto">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {recentActivity.map((log: any) => (
-                            <div key={log.id} className="flex items-start gap-2 text-xs">
+                            <div key={log.id} className="flex flex-col sm:flex-row items-start gap-1 sm:gap-2 text-xs">
                                 <span className="text-slate-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</span>
                                 <span className="text-slate-400">
                                     <span className="text-slate-300 font-medium">{log.user?.name}</span>{' '}

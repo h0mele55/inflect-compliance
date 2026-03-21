@@ -83,12 +83,12 @@ export default function TestsRollupPage() {
         <div className="space-y-6 animate-fadeIn">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold" id="tests-page-title">🧪 Tests</h1>
+                    <h1 className="text-2xl font-bold" id="tests-page-title">Tests</h1>
                     <p className="text-sm text-slate-400 mt-1">Test plans and recent results across all controls</p>
                 </div>
                 <div className="flex gap-2">
-                    <Link href={tenantHref('/tests/due')} className="btn btn-ghost btn-sm">⏰ Due Queue</Link>
-                    <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">📊 Dashboard</Link>
+                    <Link href={tenantHref('/tests/due')} className="btn btn-ghost btn-sm">Due Queue</Link>
+                    <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">Dashboard</Link>
                 </div>
             </div>
 
@@ -126,7 +126,7 @@ export default function TestsRollupPage() {
                         className={`btn btn-xs ${filter === f ? 'btn-primary' : 'btn-ghost'}`}
                         onClick={() => setFilter(f)}
                     >
-                        {f === 'all' ? 'All' : f === 'due' ? '⏰ Overdue' : '❌ Failed'}
+                        {f === 'all' ? 'All' : f === 'due' ? 'Overdue' : 'Failed'}
                     </button>
                 ))}
             </div>

@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
@@ -25,7 +26,6 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
     const { permissions, role } = useTenantContext();
     const canWrite = permissions?.canWrite;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [vendor, setVendor] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<Tab>('overview');
@@ -33,7 +33,6 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
     const [assessments, setAssessments] = useState<any[]>([]);
     const [templates, setTemplates] = useState<any[]>([]);
     const [editing, setEditing] = useState(false);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [editForm, setEditForm] = useState<any>({});
 
     // Doc form
@@ -114,7 +113,6 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
 
     const addDoc = async (e: React.FormEvent) => {
         e.preventDefault();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const body: any = { type: docForm.type };
         if (docForm.title) body.title = docForm.title;
         if (docForm.externalUrl) body.externalUrl = docForm.externalUrl;
@@ -122,7 +120,14 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
         const res = await fetch(apiUrl(`/vendors/${params.vendorId}/documents`), {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
-        if (res.ok) { setShowDocForm(false); setDocForm({ type: 'CONTRACT', title: '', externalUrl: '', notes: '' }); fetchDocs(); }
+        if (res.ok) { 
+            const newDoc = await res.json();
+            setDocs(prev => [newDoc, ...prev]);
+            setShowDocForm(false); 
+            setDocForm({ type: 'CONTRACT', title: '', externalUrl: '', notes: '' }); 
+            // Also call fetchDocs just in case we need uploadedBy info, but state already has the doc
+            fetchDocs(); 
+        }
     };
 
     const removeDoc = async (docId: string) => {
@@ -168,7 +173,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                 <div className="flex gap-2">
                     {canWrite && (vendor.domain || vendor.websiteUrl) && (
                         <button className="btn btn-secondary" onClick={handleEnrich} disabled={enriching} id="enrich-vendor-btn">
-                            {enriching ? 'Enriching…' : '🔍 Auto-fill'}
+                            {enriching ? 'Enriching…' : 'Auto-fill'}
                         </button>
                     )}
                     {canWrite && !editing && (
@@ -227,24 +232,20 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">Name</label>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <input className="input w-full" value={editForm.name} onChange={e => setEditForm((p: any) => ({ ...p, name: e.target.value }))} />
                         </div>
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">Legal Name</label>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <input className="input w-full" value={editForm.legalName} onChange={e => setEditForm((p: any) => ({ ...p, legalName: e.target.value }))} />
                         </div>
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">Status</label>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <select className="input w-full" value={editForm.status} onChange={e => setEditForm((p: any) => ({ ...p, status: e.target.value }))}>
                                 {['ACTIVE', 'ONBOARDING', 'OFFBOARDING', 'OFFBOARDED'].map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">Criticality</label>
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             <select className="input w-full" value={editForm.criticality} onChange={e => setEditForm((p: any) => ({ ...p, criticality: e.target.value }))}>
                                 {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
@@ -252,7 +253,6 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                     </div>
                     <div>
                         <label className="block text-sm text-slate-400 mb-1">Description</label>
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         <textarea className="input w-full h-20" value={editForm.description} onChange={e => setEditForm((p: any) => ({ ...p, description: e.target.value }))} />
                     </div>
                     <div className="flex gap-3">
@@ -363,7 +363,6 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                                 </tr>
                             </thead>
                             <tbody>
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 {assessments.map((a: any) => (
                                     <tr key={a.id} className="border-b border-slate-800">
                                         <td className="p-3">{a.template?.name || '—'}</td>
@@ -425,13 +424,11 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                         </div>
                     )}
                     {['ASSET', 'RISK', 'ISSUE', 'CONTROL'].map(type => {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const typeLinks = links.filter((l: any) => l.entityType === type);
                         if (typeLinks.length === 0) return null;
                         return (
                             <div key={type} className="card p-4 space-y-2">
                                 <h3 className="text-sm font-semibold text-slate-300">{type}s ({typeLinks.length})</h3>
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 {typeLinks.map((l: any) => (
                                     <div key={l.id} className="flex items-center justify-between text-sm border-b border-slate-800 py-1">
                                         <span><code className="text-xs text-blue-400">{l.entityId}</code> <span className="badge badge-neutral text-xs ml-1">{l.relation}</span></span>
@@ -463,21 +460,20 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                             }}>+ New Bundle</button>
                         </div>
                     )}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     {bundles.map((b: any) => (
                         <div key={b.id} className="card p-4 space-y-2">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <span className="font-medium">{b.name}</span>
                                     <span className="ml-2 text-xs text-slate-400">{b._count?.items || 0} items</span>
-                                    {b.frozenAt && <span className="badge badge-success ml-2">🔒 Frozen</span>}
+                                    {b.frozenAt && <span className="badge badge-success ml-2">Frozen</span>}
                                 </div>
                                 {canWrite && !b.frozenAt && (
                                     <button className="btn btn-secondary text-xs" id={`freeze-bundle-${b.id}`} onClick={async () => {
                                         if (!confirm('Freeze this bundle? Items become immutable.')) return;
                                         await fetch(apiUrl(`/vendors/${params.vendorId}/bundles/${b.id}?action=freeze`), { method: 'POST' });
                                         fetchBundles();
-                                    }}>🧳 Freeze</button>
+                                    }}>Freeze</button>
                                 )}
                             </div>
                             <div className="text-xs text-slate-400">Created by {b.createdBy?.name || '—'} on {new Date(b.createdAt).toLocaleDateString()}</div>
@@ -520,7 +516,6 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                                 {canWrite && <th className="p-3"></th>}
                             </tr></thead>
                             <tbody>
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 {subs.map((s: any) => (
                                     <tr key={s.id} className="border-b border-slate-800">
                                         <td className="p-3 font-medium">{s.subprocessor?.name || s.subprocessorVendorId}</td>

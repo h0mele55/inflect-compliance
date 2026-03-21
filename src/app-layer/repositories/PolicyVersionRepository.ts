@@ -17,6 +17,7 @@ export class PolicyVersionRepository {
 
         return db.policyVersion.create({
             data: {
+                tenantId: ctx.tenantId,
                 policyId,
                 versionNumber: nextVersion,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any

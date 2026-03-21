@@ -1,7 +1,9 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { RequirePermission } from '@/components/require-permission';
 
 type Tab = 'requirements' | 'packs' | 'coverage';
 
@@ -13,11 +15,9 @@ export default function FrameworkDetailPage() {
     const tenantHref = useCallback((path: string) => `/t/${tenantSlug}${path}`, [tenantSlug]);
 
     const [activeTab, setActiveTab] = useState<Tab>('requirements');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [framework, setFramework] = useState<any>(null);
     const [requirements, setRequirements] = useState<any[]>([]);
     const [packs, setPacks] = useState<any[]>([]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [coverage, setCoverage] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -45,7 +45,6 @@ export default function FrameworkDetailPage() {
     if (!framework) return <div className="p-8 text-red-400">Framework not found</div>;
 
     // Group requirements by section
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const groupedReqs = requirements.reduce((acc: Record<string, any[]>, r: any) => {
         const section = r.section || r.category || 'Other';
         (acc[section] = acc[section] || []).push(r);
@@ -53,7 +52,6 @@ export default function FrameworkDetailPage() {
     }, {});
 
     // Coverage lookup
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mappedReqCodes = new Set((coverage?.controlMappings || []).map((m: any) => m.requirementCode));
     const controlsByReq: Record<string, any[]> = {};
     for (const m of (coverage?.controlMappings || [])) {
@@ -62,7 +60,6 @@ export default function FrameworkDetailPage() {
 
     // Filter
     const filteredGroups = Object.entries(groupedReqs).reduce((acc: Record<string, any[]>, [section, reqs]) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const filtered = (reqs as any[]).filter((r: any) =>
             !search || r.code.toLowerCase().includes(search.toLowerCase()) || r.title.toLowerCase().includes(search.toLowerCase())
         );
@@ -79,7 +76,7 @@ export default function FrameworkDetailPage() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <div className="flex items-center gap-3">
                         <Link href={tenantHref('/frameworks')} className="text-slate-400 hover:text-white transition-colors">← Frameworks</Link>
@@ -91,18 +88,20 @@ export default function FrameworkDetailPage() {
                     </div>
                     {framework.description && <p className="text-sm text-slate-400 mt-2">{framework.description}</p>}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Link href={tenantHref(`/frameworks/${frameworkKey}/templates`)} className="btn btn-secondary" id="browse-templates-cta">
                         Browse Templates
                     </Link>
-                    <Link href={tenantHref(`/frameworks/${frameworkKey}/install`)} className="btn btn-primary" id="install-pack-cta">
-                        Install Pack
-                    </Link>
+                    <RequirePermission resource="frameworks" action="install">
+                        <Link href={tenantHref(`/frameworks/${frameworkKey}/install`)} className="btn btn-primary" id="install-pack-cta">
+                            Install Pack
+                        </Link>
+                    </RequirePermission>
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-slate-800/50 p-1 rounded-lg w-fit" id="framework-tabs">
+            <div className="flex gap-1 bg-slate-800/50 p-1 rounded-lg w-full sm:w-fit overflow-x-auto" id="framework-tabs">
                 {tabs.map(tab => (
                     <button
                         key={tab.key}
@@ -126,7 +125,7 @@ export default function FrameworkDetailPage() {
                             placeholder="Search requirements..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            className="input w-72"
+                            className="input w-full sm:w-72"
                             id="requirements-search"
                         />
                         <span className="text-xs text-slate-500">
@@ -138,7 +137,6 @@ export default function FrameworkDetailPage() {
                         <div key={section} className="glass-card">
                             <h3 className="text-sm font-semibold text-brand-300 mb-3">{section}</h3>
                             <div className="space-y-1">
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 {(reqs as any[]).map((r: any) => {
                                     const isMapped = mappedReqCodes.has(r.code);
                                     const controls = controlsByReq[r.code] || [];
@@ -151,7 +149,7 @@ export default function FrameworkDetailPage() {
                                                 className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-700/30 transition-colors text-left"
                                             >
                                                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isMapped ? 'bg-emerald-500' : 'bg-slate-600'}`} />
-                                                <code className="text-xs text-slate-500 font-mono w-28 flex-shrink-0">{r.code}</code>
+                                                <code className="text-xs text-slate-500 font-mono w-16 sm:w-28 flex-shrink-0 truncate">{r.code}</code>
                                                 <span className="text-sm text-slate-300 flex-1">{r.title}</span>
                                                 {isMapped ? (
                                                     <span className="badge badge-success text-xs">Mapped ({controls.length})</span>
@@ -160,9 +158,8 @@ export default function FrameworkDetailPage() {
                                                 )}
                                             </button>
                                             {isExpanded && controls.length > 0 && (
-                                                <div className="ml-12 mt-1 mb-2 p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
+                                                <div className="ml-4 sm:ml-12 mt-1 mb-2 p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
                                                     <p className="text-xs text-slate-500 mb-2">Mapped Controls:</p>
-                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     {controls.map((ctrl: any, i: number) => (
                                                         <div key={i} className="flex items-center gap-2 text-sm py-1">
                                                             <code className="text-xs text-brand-400 font-mono">{ctrl.controlCode}</code>
@@ -186,7 +183,6 @@ export default function FrameworkDetailPage() {
             {/* Packs Tab */}
             {activeTab === 'packs' && (
                 <div className="space-y-4" id="packs-panel">
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     {packs.map((p: any) => (
                         <div key={p.id} className="glass-card">
                             <div className="flex items-start justify-between">
@@ -198,13 +194,15 @@ export default function FrameworkDetailPage() {
                                         {p.version && <span>v{p.version}</span>}
                                     </div>
                                 </div>
-                                <Link
-                                    href={tenantHref(`/frameworks/${frameworkKey}/install?pack=${p.key}`)}
-                                    className="btn btn-primary text-sm"
-                                    id={`install-pack-${p.key}`}
-                                >
-                                    Install Pack
-                                </Link>
+                                <RequirePermission resource="frameworks" action="install">
+                                    <Link
+                                        href={tenantHref(`/frameworks/${frameworkKey}/install?pack=${p.key}`)}
+                                        className="btn btn-primary"
+                                        id={`install-pack-${p.key}`}
+                                    >
+                                        Install Pack
+                                    </Link>
+                                </RequirePermission>
                             </div>
                         </div>
                     ))}
@@ -254,7 +252,6 @@ export default function FrameworkDetailPage() {
                         <div className="glass-card">
                             <h3 className="text-sm font-semibold text-white mb-3">Coverage by Section</h3>
                             <div className="space-y-3">
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 {coverage.bySection.map((s: any) => (
                                     <div key={s.section}>
                                         <div className="flex items-center justify-between text-xs mb-1">
@@ -280,11 +277,10 @@ export default function FrameworkDetailPage() {
                                 Unmapped Requirements ({coverage.unmappedRequirements.length})
                             </h3>
                             <div className="space-y-1 max-h-64 overflow-y-auto">
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 {coverage.unmappedRequirements.map((r: any, i: number) => (
                                     <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-md hover:bg-slate-700/20 text-sm">
                                         <span className="w-2 h-2 rounded-full bg-slate-600 flex-shrink-0" />
-                                        <code className="text-xs text-slate-500 font-mono w-28 flex-shrink-0">{r.code}</code>
+                                        <code className="text-xs text-slate-500 font-mono w-16 sm:w-28 flex-shrink-0 truncate">{r.code}</code>
                                         <span className="text-slate-400">{r.title}</span>
                                     </div>
                                 ))}
@@ -293,7 +289,7 @@ export default function FrameworkDetailPage() {
                     )}
 
                     <div className="flex justify-end">
-                        <Link href={tenantHref(`/frameworks/${frameworkKey}/coverage`)} className="btn btn-secondary text-sm">
+                        <Link href={tenantHref(`/frameworks/${frameworkKey}/coverage`)} className="btn btn-secondary">
                             Full Coverage Report →
                         </Link>
                     </div>

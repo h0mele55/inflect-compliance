@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const TASK_STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
     BLOCKED: 'badge-danger', RESOLVED: 'badge-success', CLOSED: 'badge-neutral', CANCELED: 'badge-neutral',
@@ -40,7 +41,6 @@ export default function LinkedTasksPanel({ apiBase, entityType, entityId, tenant
 
     return (
         <div className="space-y-1">
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             {tasks.map((task: any) => (
                 <Link
                     key={task.id}

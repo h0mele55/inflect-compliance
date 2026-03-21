@@ -55,9 +55,9 @@ export function ClausesBrowser({ clauses: initialClauses, tenantSlug }: ClausesB
             <div className="lg:col-span-2">
                 {selected ? (
                     <div className="glass-card p-6 animate-slideIn">
-                        <div className="flex items-center justify-between mb-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
                             <h2 className="text-lg font-bold">{t('clause')} {selected.number}: {selected.title}</h2>
-                            <select className="input w-40" value={selected.status} onChange={e => updateStatus(selected.id, e.target.value)}>
+                            <select className="input w-full sm:w-40" value={selected.status} onChange={e => updateStatus(selected.id, e.target.value)}>
                                 <option value="NOT_STARTED">{t('notStarted')}</option>
                                 <option value="IN_PROGRESS">{t('inProgress')}</option>
                                 <option value="READY">{t('ready')}</option>

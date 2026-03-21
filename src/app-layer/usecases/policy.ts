@@ -5,6 +5,7 @@ import { PolicyApprovalRepository } from '../repositories/PolicyApprovalReposito
 import { PolicyTemplateRepository } from '../repositories/PolicyTemplateRepository';
 import { assertCanRead, assertCanWrite, assertCanAdmin } from '../policies/common';
 import { logEvent } from '../events/audit';
+import { enqueueEmail } from '../notifications/enqueue';
 import { notFound, badRequest, forbidden, conflict } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
 
@@ -285,6 +286,37 @@ export async function requestPolicyApproval(ctx: RequestContext, policyId: strin
             metadata: { versionId, approvalId: approval.id },
         });
 
+        // Notify admin users with POLICY_APPROVAL_REQUESTED email
+        try {
+            const requester = await db.user.findUnique({
+                where: { id: ctx.userId },
+                select: { name: true },
+            });
+            const admins = await db.tenantMembership.findMany({
+                where: { tenantId: ctx.tenantId, role: 'ADMIN' },
+                include: { user: { select: { email: true, name: true } } },
+            });
+            for (const m of admins) {
+                if (!m.user.email) continue;
+                await enqueueEmail(db, {
+                    tenantId: ctx.tenantId,
+                    type: 'POLICY_APPROVAL_REQUESTED',
+                    toEmail: m.user.email,
+                    entityId: policyId,
+                    requestId: ctx.requestId,
+                    payload: {
+                        policyTitle: policy.title,
+                        requesterName: requester?.name || 'A team member',
+                        approverName: m.user.name || m.user.email,
+                        versionNumber: version.versionNumber,
+                        tenantSlug: ctx.tenantSlug || '',
+                    },
+                });
+            }
+        } catch (err) {
+            console.warn('[notifications] Failed to enqueue policy approval email:', err);
+        }
+
         return approval;
     });
 }
@@ -328,6 +360,38 @@ export async function decidePolicyApproval(ctx: RequestContext, approvalId: stri
             details: `Policy ${decision.decision.toLowerCase()}`,
             metadata: { approvalId, decision: decision.decision, comment: decision.comment },
         });
+
+        // Notify the requester about the decision
+        try {
+            const requester = await db.user.findUnique({
+                where: { id: approval.requestedByUserId },
+                select: { email: true, name: true },
+            });
+            const decider = await db.user.findUnique({
+                where: { id: ctx.userId },
+                select: { name: true },
+            });
+            if (requester?.email) {
+                const emailType = decision.decision === 'APPROVED' ? 'POLICY_APPROVED' as const : 'POLICY_REJECTED' as const;
+                await enqueueEmail(db, {
+                    tenantId: ctx.tenantId,
+                    type: emailType,
+                    toEmail: requester.email,
+                    entityId: approval.policyId,
+                    requestId: ctx.requestId,
+                    payload: {
+                        policyTitle: approval.policy.title,
+                        decision: decision.decision,
+                        deciderName: decider?.name || 'An administrator',
+                        requesterName: requester.name || requester.email,
+                        comment: decision.comment,
+                        tenantSlug: ctx.tenantSlug || '',
+                    },
+                });
+            }
+        } catch (err) {
+            console.warn('[notifications] Failed to enqueue policy decision email:', err);
+        }
 
         return result;
     });

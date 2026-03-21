@@ -19,6 +19,7 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [assessment, setAssessment] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [answers, setAnswers] = useState<Record<string, any>>({});
     const [saving, setSaving] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -33,6 +34,7 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
             const a = await res.json();
             setAssessment(a);
             // Populate answers from existing
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ansMap: Record<string, any> = {};
             for (const ans of (a.answers || [])) {
                 ansMap[ans.questionId] = ans.answerJson;
@@ -90,6 +92,7 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
     const questions = assessment.template?.questions || [];
 
     // Group questions by section
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sections: Record<string, any[]> = {};
     for (const q of questions) {
         if (!sections[q.section]) sections[q.section] = [];
@@ -189,10 +192,10 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
                 {isDraft && canWrite && (
                     <>
                         <button className="btn btn-primary" onClick={saveAnswers} disabled={saving} id="save-answers-btn">
-                            {saving ? 'Saving…' : '💾 Save Answers'}
+                            {saving ? 'Saving…' : 'Save Answers'}
                         </button>
                         <button className="btn btn-secondary" onClick={submitAssessment} disabled={submitting} id="submit-assessment-btn">
-                            {submitting ? 'Submitting…' : '📤 Submit for Review'}
+                            {submitting ? 'Submitting…' : 'Submit for Review'}
                         </button>
                     </>
                 )}
@@ -201,10 +204,10 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
                         <input className="input flex-1" placeholder="Decision notes (optional)…" value={decideNotes}
                             onChange={e => setDecideNotes(e.target.value)} id="decide-notes-input" />
                         <button className="btn btn-primary" onClick={() => decideAssessment('APPROVED')} disabled={deciding} id="approve-assessment-btn">
-                            ✅ Approve
+                            Approve
                         </button>
                         <button className="btn btn-danger" onClick={() => decideAssessment('REJECTED')} disabled={deciding} id="reject-assessment-btn">
-                            ❌ Reject
+                            Reject
                         </button>
                     </div>
                 )}

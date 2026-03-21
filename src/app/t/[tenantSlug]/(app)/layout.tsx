@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -26,6 +26,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }, []);
 
     const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+
+    // Auto-close drawer on route change
+    const pathname = usePathname();
+    const prevPathname = useRef(pathname);
+    useEffect(() => {
+        if (prevPathname.current !== pathname) {
+            setDrawerOpen(false);
+            prevPathname.current = pathname;
+        }
+    }, [pathname]);
 
     if (status === 'loading' || !session) return (
         <div className="min-h-screen flex items-center justify-center">

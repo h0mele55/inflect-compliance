@@ -4,11 +4,11 @@ const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
 async function loginAndGetTenant(page: Page): Promise<string> {
     await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 30000 });
+    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 30000 });
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
     const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug');
     return match[1];
@@ -34,7 +34,7 @@ test.describe('Framework Coverage UI', () => {
 
     test('frameworks page loads', async () => {
         await page.goto(`/t/${tenantSlug}/frameworks`);
-        await page.waitForSelector('#frameworks-heading', { timeout: 30000 });
+        await page.waitForSelector('#frameworks-heading', { timeout: 60000 });
         await expect(page.locator('#frameworks-heading')).toContainText('Compliance Frameworks');
     });
 
@@ -131,7 +131,7 @@ test.describe('Framework Coverage UI', () => {
             return;
         }
         await installBtn.click();
-        await page.waitForSelector('#install-result', { timeout: 30000 }).catch(() => null);
+        await page.waitForSelector('#install-result', { timeout: 60000 }).catch(() => null);
         if (await page.locator('#install-result').isVisible().catch(() => false)) {
             await expect(page.locator('#install-result')).toContainText('Successfully');
         }

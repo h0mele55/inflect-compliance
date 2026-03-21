@@ -85,12 +85,12 @@ export default function DueQueuePage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold" id="due-queue-title">⏰ Due Queue</h1>
+                    <h1 className="text-2xl font-bold" id="due-queue-title">Due Queue</h1>
                     <p className="text-sm text-slate-400 mt-1">Test plans due or overdue for execution</p>
                 </div>
                 <div className="flex gap-3">
                     <Link href={tenantHref('/tests')} className="btn btn-ghost btn-sm">← Tests</Link>
-                    <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">📊 Dashboard</Link>
+                    <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">Dashboard</Link>
                     {permissions.canWrite && (
                         <button
                             onClick={handleRunDuePlanning}
@@ -98,7 +98,7 @@ export default function DueQueuePage() {
                             className="btn btn-primary btn-sm"
                             id="run-due-planning-btn"
                         >
-                            {planning ? '⏳ Running...' : '▶ Run Due Planning'}
+                            {planning ? 'Running...' : 'Run Due Planning'}
                         </button>
                     )}
                 </div>
@@ -108,7 +108,7 @@ export default function DueQueuePage() {
             {planningResult && (
                 <div className="glass-card p-4 border border-green-500/30 bg-green-500/5" id="planning-result">
                     <p className="text-sm text-green-400">
-                        ✅ Due planning complete: checked {planningResult.checked} plans,
+                        Due planning complete: checked {planningResult.checked} plans,
                         created {planningResult.created} new runs,
                         {planningResult.alreadyPending} already had pending runs.
                     </p>
@@ -135,7 +135,7 @@ export default function DueQueuePage() {
             {/* Queue Table */}
             {queue.length === 0 ? (
                 <div className="glass-card p-8 text-center text-slate-500">
-                    🎉 No tests are due! All plans are on schedule.
+                    No tests are due! All plans are on schedule.
                 </div>
             ) : (
                 <div className="glass-card overflow-hidden">
@@ -171,7 +171,7 @@ export default function DueQueuePage() {
                                     <td className="p-3">
                                         <span className={plan.isOverdue ? 'text-red-400 font-semibold' : 'text-amber-400'}>
                                             {formatDate(plan.nextDueAt)}
-                                            {plan.isOverdue && ' ⚠'}
+                                            {plan.isOverdue && ' !'}
                                         </span>
                                     </td>
                                     <td className="p-3 text-slate-400 text-xs">{plan.owner?.name || plan.owner?.email || '—'}</td>
@@ -188,7 +188,7 @@ export default function DueQueuePage() {
                                                 onClick={() => handleQuickRun(plan.id)}
                                                 className="btn btn-xs btn-primary"
                                             >
-                                                ▶ Run Now
+                                                Run Now
                                             </button>
                                         )}
                                     </td>

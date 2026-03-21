@@ -17,7 +17,9 @@ export default function GlobalError({
             <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif', backgroundColor: '#0f172a', color: '#e2e8f0' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '24px' }}>
                     <div style={{ maxWidth: '28rem', width: '100%', textAlign: 'center', padding: '32px', borderRadius: '12px', background: '#1e293b', border: '1px solid #334155' }}>
-                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+                        <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                        </div>
                         <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '8px' }}>
                             Something went wrong
                         </h2>

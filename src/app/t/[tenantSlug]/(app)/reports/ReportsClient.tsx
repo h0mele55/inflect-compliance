@@ -1,18 +1,32 @@
 'use client';
 import { useState } from 'react';
+import { SoAClient } from './soa/SoAClient';
+import { PdfExportButton } from '@/components/PdfExportButton';
+import { RequirePermission } from '@/components/require-permission';
+import { UpgradeGate } from '@/components/UpgradeGate';
+import type { SoAReportDTO } from '@/lib/dto/soa';
+
+interface ControlOption {
+    id: string;
+    code: string | null;
+    name: string;
+    status: string;
+}
 
 interface ReportsClientProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: { soa: any[]; riskRegister: any[] };
+    soaReport: SoAReportDTO;
+    controls: ControlOption[];
+    tenantSlug: string;
+    canEdit: boolean;
     translations: Record<string, string>;
 }
 
 /**
- * Client island for reports — handles tab toggle and CSV download.
- * CSV download requires `document.createElement` (browser API).
- * Data arrives pre-fetched from the server component.
+ * Client island for reports — tab toggle between full SoA and risk register.
  */
-export function ReportsClient({ data, translations: t }: ReportsClientProps) {
+export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, translations: t }: ReportsClientProps) {
     const [tab, setTab] = useState<'soa' | 'risk'>('soa');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,38 +41,35 @@ export function ReportsClient({ data, translations: t }: ReportsClientProps) {
 
     return (
         <>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div><h1 className="text-2xl font-bold" id="reports-heading">{t.title}</h1><p className="text-slate-400 text-sm">{t.subtitle}</p></div>
-                <div className="flex gap-2">
-                    <button onClick={() => downloadCSV(data.soa, 'soa-report.csv')} className="btn btn-secondary" id="export-soa-btn">{t.exportSoa}</button>
-                    <button onClick={() => downloadCSV(data.riskRegister, 'risk-register.csv')} className="btn btn-secondary" id="export-risks-btn">{t.exportRisks}</button>
-                </div>
+                <RequirePermission resource="reports" action="export">
+                    <div className="flex flex-wrap gap-2">
+                        <button onClick={() => downloadCSV(data.riskRegister, 'risk-register.csv')} className="btn btn-secondary" id="export-risks-btn">{t.exportRisks}</button>
+                        <UpgradeGate feature="PDF_EXPORTS">
+                            <PdfExportButton
+                                tenantSlug={tenantSlug}
+                                reportType="RISK_REGISTER"
+                                label="Risk Register PDF"
+                                allowSave={canEdit}
+                            />
+                        </UpgradeGate>
+                    </div>
+                </RequirePermission>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
                 <button onClick={() => setTab('soa')} className={`btn ${tab === 'soa' ? 'btn-primary' : 'btn-secondary'}`} id="soa-tab-btn">{t.soa}</button>
                 <button onClick={() => setTab('risk')} className={`btn ${tab === 'risk' ? 'btn-primary' : 'btn-secondary'}`} id="risk-tab-btn">{t.riskRegister}</button>
             </div>
 
             {tab === 'soa' ? (
-                <div className="glass-card overflow-auto">
-                    <table className="data-table" id="soa-table">
-                        <thead><tr><th>{t.control}</th><th>{t.name}</th><th>{t.applicable}</th><th>{t.status}</th><th>{t.evidence}</th><th>{t.overdue}</th></tr></thead>
-                        <tbody>
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                            {data.soa.map((c: any) => (
-                                <tr key={c.controlId}>
-                                    <td className="text-xs font-mono text-brand-400">{c.controlId}</td>
-                                    <td className="text-sm">{c.name}</td>
-                                    <td>{c.applicable ? <span className="badge badge-success">{t.yes}</span> : <span className="badge badge-neutral">{t.no}</span>}</td>
-                                    <td><span className={`badge ${c.status === 'IMPLEMENTED' ? 'badge-success' : c.status === 'IMPLEMENTING' ? 'badge-info' : 'badge-neutral'}`}>{c.status}</span></td>
-                                    <td className="text-xs">{c.approvedEvidence}/{c.evidenceCount}</td>
-                                    <td>{c.hasOverdue ? <span className="badge badge-danger">⚠️</span> : '—'}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <SoAClient
+                    report={soaReport}
+                    controls={controls}
+                    tenantSlug={tenantSlug}
+                    canEdit={canEdit}
+                />
             ) : (
                 <div className="glass-card overflow-auto">
                     <table className="data-table" id="risk-table">

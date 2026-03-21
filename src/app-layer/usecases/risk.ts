@@ -5,7 +5,6 @@ import { assertCanRead, assertCanWrite, assertCanAdmin } from '../policies/commo
 import { logEvent } from '../events/audit';
 import { notFound, badRequest } from '@/lib/errors/types';
 import { calculateRiskScore } from '@/lib/risk-scoring';
-import prisma from '@/lib/prisma';
 import { runInTenantContext } from '@/lib/db-context';
 import type { TreatmentDecision, RiskStatus } from '@prisma/client';
 
@@ -51,12 +50,12 @@ export async function createRisk(ctx: RequestContext, data: {
 }) {
     assertCanWrite(ctx);
 
-    // Tenant lookup is global (Tenant table has no RLS)
-    const tenant = await prisma.tenant.findUnique({ where: { id: ctx.tenantId } });
-    const maxScale = tenant?.maxRiskScale || 5;
-    const inherentScore = calculateRiskScore(data.likelihood ?? 3, data.impact ?? 3, maxScale);
-
     return runInTenantContext(ctx, async (db) => {
+        // Tenant lookup is global (Tenant table has no RLS)
+        const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId } });
+        const maxScale = tenant?.maxRiskScale || 5;
+        const inherentScore = calculateRiskScore(data.likelihood ?? 3, data.impact ?? 3, maxScale);
+
         const risk = await RiskRepository.create(db, ctx, {
             title: data.title,
             description: data.description || null,
@@ -111,13 +110,13 @@ export async function createRiskFromTemplate(ctx: RequestContext, templateId: st
     const template = await RiskTemplateRepository.getById(templateId);
     if (!template) throw notFound('Risk template not found');
 
-    const tenant = await prisma.tenant.findUnique({ where: { id: ctx.tenantId } });
-    const maxScale = tenant?.maxRiskScale || 5;
-    const likelihood = overrides.likelihood ?? template.defaultLikelihood;
-    const impact = overrides.impact ?? template.defaultImpact;
-    const score = calculateRiskScore(likelihood, impact, maxScale);
-
     return runInTenantContext(ctx, async (db) => {
+        const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId } });
+        const maxScale = tenant?.maxRiskScale || 5;
+        const likelihood = overrides.likelihood ?? template.defaultLikelihood;
+        const impact = overrides.impact ?? template.defaultImpact;
+        const score = calculateRiskScore(likelihood, impact, maxScale);
+
         const risk = await RiskRepository.create(db, ctx, {
             title: overrides.title ?? template.title,
             description: overrides.description ?? template.description ?? null,
@@ -163,14 +162,14 @@ export async function updateRisk(ctx: RequestContext, id: string, data: {
 }) {
     assertCanWrite(ctx);
 
-    // Tenant lookup is global (Tenant table has no RLS)
-    const tenant = await prisma.tenant.findUnique({ where: { id: ctx.tenantId } });
-    const maxScale = tenant?.maxRiskScale || 5;
-    const inherentScore = data.likelihood && data.impact
-        ? calculateRiskScore(data.likelihood, data.impact, maxScale)
-        : undefined;
-
     return runInTenantContext(ctx, async (db) => {
+        // Tenant lookup is global (Tenant table has no RLS)
+        const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId } });
+        const maxScale = tenant?.maxRiskScale || 5;
+        const inherentScore = data.likelihood && data.impact
+            ? calculateRiskScore(data.likelihood, data.impact, maxScale)
+            : undefined;
+
         const risk = await RiskRepository.update(db, ctx, id, {
             title: data.title,
             description: data.description,
