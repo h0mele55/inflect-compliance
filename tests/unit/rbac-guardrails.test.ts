@@ -1,0 +1,156 @@
+/**
+ * RBAC Guardrail Scan Tests
+ *
+ * These tests statically scan critical source files to ensure RBAC enforcement
+ * patterns are present and haven't regressed. They don't test runtime behavior —
+ * they verify that the right permission checks exist in the right files.
+ *
+ * If a test fails, it means someone removed or bypassed a required RBAC guard.
+ */
+import * as fs from 'fs';
+import * as path from 'path';
+
+const SRC = path.resolve(__dirname, '../../src');
+
+function readFile(relativePath: string): string {
+    const fullPath = path.join(SRC, relativePath);
+    if (!fs.existsSync(fullPath)) {
+        throw new Error(`Expected file not found: ${fullPath}`);
+    }
+    return fs.readFileSync(fullPath, 'utf-8');
+}
+
+describe('RBAC Guardrail Scans', () => {
+    describe('Admin route guards', () => {
+        test('admin/rbac page has server-side admin permission check', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/admin/rbac/page.tsx');
+            // Must check admin.manage permission
+            expect(content).toMatch(/appPermissions\.admin\.manage/);
+            // Must render forbidden or notFound on unauthorized
+            expect(content).toMatch(/ServerForbiddenPage|notFound/);
+        });
+
+        test('admin page has RequirePermission guard on RBAC button', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/admin/page.tsx');
+            expect(content).toMatch(/RequirePermission/);
+            expect(content).toMatch(/resource="admin"/);
+        });
+    });
+
+    describe('Controls page RBAC', () => {
+        test('controls page uses appPerms for create actions', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/controls/page.tsx');
+            expect(content).toMatch(/appPerms\.controls\.create/);
+        });
+
+        test('controls page uses appPerms for edit actions (status/applicability toggles)', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/controls/page.tsx');
+            expect(content).toMatch(/appPerms\.controls\.edit/);
+        });
+    });
+
+    describe('Audit pack RBAC', () => {
+        test('freeze button is wrapped in RequirePermission', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/audits/packs/[packId]/page.tsx');
+            expect(content).toMatch(/RequirePermission/);
+            expect(content).toMatch(/resource="audits" action="freeze"/);
+        });
+
+        test('share button is wrapped in RequirePermission', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/audits/packs/[packId]/page.tsx');
+            expect(content).toMatch(/resource="audits" action="share"/);
+        });
+
+        test('clone button is wrapped in RequirePermission', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/audits/packs/[packId]/page.tsx');
+            expect(content).toMatch(/resource="audits" action="manage"/);
+        });
+    });
+
+    describe('Policies page RBAC', () => {
+        test('policy create buttons are wrapped in RequirePermission', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/policies/page.tsx');
+            expect(content).toMatch(/RequirePermission/);
+            expect(content).toMatch(/resource="policies" action="create"/);
+        });
+    });
+
+    describe('Risks page RBAC', () => {
+        test('risk create/import buttons are wrapped in RequirePermission', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/risks/page.tsx');
+            expect(content).toMatch(/RequirePermission/);
+            expect(content).toMatch(/resource="risks" action="create"/);
+        });
+    });
+
+    describe('Tasks page RBAC', () => {
+        test('task create button uses appPerms', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/tasks/page.tsx');
+            expect(content).toMatch(/appPerms\.tasks\.create/);
+        });
+
+        test('task bulk actions use appPerms', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/tasks/page.tsx');
+            expect(content).toMatch(/appPerms\.tasks\.edit/);
+        });
+    });
+
+    describe('Vendors page RBAC', () => {
+        test('vendor create button uses appPerms', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/vendors/page.tsx');
+            expect(content).toMatch(/appPerms\.vendors\.create/);
+        });
+    });
+
+    describe('Frameworks page RBAC', () => {
+        test('install pack buttons are wrapped in RequirePermission', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/frameworks/[frameworkKey]/page.tsx');
+            expect(content).toMatch(/RequirePermission/);
+            expect(content).toMatch(/resource="frameworks" action="install"/);
+        });
+    });
+
+    describe('Reports RBAC', () => {
+        test('reports export buttons are wrapped in RequirePermission', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/reports/ReportsClient.tsx');
+            expect(content).toMatch(/RequirePermission/);
+            expect(content).toMatch(/resource="reports" action="export"/);
+        });
+
+        test('SoA export buttons are wrapped in RequirePermission', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/reports/soa/SoAClient.tsx');
+            expect(content).toMatch(/RequirePermission/);
+            expect(content).toMatch(/resource="reports" action="export"/);
+        });
+    });
+
+    describe('Navigation RBAC', () => {
+        test('SidebarNav filters hidden items by permission', () => {
+            const content = readFile('components/layout/SidebarNav.tsx');
+            expect(content).toMatch(/usePermissions/);
+            expect(content).toMatch(/visible.*perms\./);
+            expect(content).toMatch(/\.filter\(/);
+        });
+    });
+
+    describe('Core permission infrastructure', () => {
+        test('RequirePermission component exists and uses usePermissions', () => {
+            const content = readFile('components/require-permission.tsx');
+            expect(content).toMatch(/usePermissions/);
+            expect(content).toMatch(/hasPermission/);
+        });
+
+        test('PermissionSet type covers all critical resources', () => {
+            const content = readFile('lib/permissions.ts');
+            const requiredResources = ['controls', 'evidence', 'policies', 'tasks', 'risks', 'vendors', 'tests', 'frameworks', 'audits', 'reports', 'admin'];
+            for (const resource of requiredResources) {
+                expect(content).toContain(`${resource}:`);
+            }
+        });
+
+        test('TenantProvider passes appPermissions', () => {
+            const content = readFile('app/t/[tenantSlug]/layout.tsx');
+            expect(content).toMatch(/appPermissions/);
+        });
+    });
+});
