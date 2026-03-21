@@ -6,6 +6,7 @@ import { badRequest } from '@/lib/errors/types';
  * Higher-order function to wrap route handlers with JSON body validation.
  * Enforces Zod schema validation and strips unknown fields (schema should use .strip()).
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withValidatedBody<T, Context = any>(
     schema: ZodSchema<T>,
     handler: (req: NextRequest, ctx: Context, body: T) => Promise<NextResponse | Response> | NextResponse | Response
@@ -30,6 +31,7 @@ export function withValidatedBody<T, Context = any>(
  * Higher-order function to wrap route handlers with multipart/form-data validation.
  * Note: schema should define file fields appropriately (often customized per route).
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withValidatedForm<T, Context = any>(
     schema: ZodSchema<T>,
     handler: (req: NextRequest, ctx: Context, formData: T) => Promise<NextResponse | Response> | NextResponse | Response
@@ -67,6 +69,7 @@ export function withValidatedForm<T, Context = any>(
 /**
  * Optional: query parameter validation wrapper.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withValidatedQuery<T, Context = any>(
     schema: ZodSchema<T>,
     handler: (req: NextRequest, ctx: Context, query: T) => Promise<NextResponse | Response> | NextResponse | Response

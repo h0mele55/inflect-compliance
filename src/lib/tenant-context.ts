@@ -10,6 +10,7 @@
 import prisma from './prisma';
 import { notFound, forbidden } from '@/lib/errors/types';
 import type { Role, Tenant, TenantMembership } from '@prisma/client';
+import { getPermissionsForRole, type PermissionSet } from '@/lib/permissions';
 
 // ─── Permission shape ───
 
@@ -26,6 +27,7 @@ export interface TenantContext {
     membership: TenantMembership;
     role: Role;
     permissions: Permissions;
+    appPermissions: PermissionSet;
 }
 
 // ─── Permission calculator ───
@@ -90,6 +92,7 @@ export async function resolveTenantContext(
         membership,
         role: membership.role,
         permissions: computePermissions(membership.role),
+        appPermissions: getPermissionsForRole(membership.role),
     };
 }
 

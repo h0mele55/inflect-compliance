@@ -41,6 +41,7 @@ const INCLUDE_DELETED_KEY = '__includeDeleted';
  *
  * Sets a magic key that the middleware strips before passing to Prisma.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withDeleted<T extends Record<string, any>>(args: T): T {
     return { ...args, [INCLUDE_DELETED_KEY]: true };
 }

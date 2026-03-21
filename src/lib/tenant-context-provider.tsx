@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useCallback } from 'react';
 import type { Role } from '@prisma/client';
+import type { PermissionSet } from '@/lib/permissions';
 
 // ─── Tenant context ───
 
@@ -10,6 +11,7 @@ export interface TenantContextValue {
     tenantSlug: string;
     tenantName: string;
     role: Role;
+    plan?: string;
     permissions: {
         canRead: boolean;
         canWrite: boolean;
@@ -17,6 +19,7 @@ export interface TenantContextValue {
         canAudit: boolean;
         canExport: boolean;
     };
+    appPermissions: PermissionSet;
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null);
@@ -39,6 +42,13 @@ export function useTenantContext(): TenantContextValue {
         throw new Error('useTenantContext must be used within a TenantProvider');
     }
     return ctx;
+}
+
+/**
+ * Hook to retrieve granular app permissions for UI rendering logic.
+ */
+export function usePermissions(): PermissionSet {
+    return useTenantContext().appPermissions;
 }
 
 /**

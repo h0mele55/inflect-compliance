@@ -78,3 +78,16 @@ export async function runInTenantContext<T>(
             })
     ) as Promise<T>;
 }
+
+
+/**
+ * Executes a callback with the global Prisma Client, bypassing RLS.
+ * Use this SAFELY and specifically for unauthenticated public routes 
+ * where tenant context cannot be established (e.g. share links).
+ */
+export async function runInGlobalContext<T>(
+    callback: (db: PrismaTx) => Promise<T>,
+    customPrisma?: PrismaClient
+): Promise<T> {
+    return callback(customPrisma || prisma);
+}

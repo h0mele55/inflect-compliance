@@ -81,13 +81,16 @@ function summarizeBlob(value: string): string {
  * - null/undefined values are preserved as-is
  */
 export function redactSensitiveFields(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: Record<string, any> | null | undefined,
     depth: number = 0,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Record<string, any> | null {
     if (data == null) return null;
     if (typeof data !== 'object') return null;
     if (depth > 3) return { _truncated: true };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result: Record<string, any> = {};
 
     for (const [key, value] of Object.entries(data)) {
@@ -146,6 +149,7 @@ export function redactSensitiveFields(
  * Filters out Prisma operator wrappers (set, increment, etc.) and returns
  * just the field names.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function extractChangedFields(data: Record<string, any> | null | undefined): string[] {
     if (data == null) return [];
     return Object.keys(data).filter((key) => !key.startsWith('_'));

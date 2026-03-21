@@ -21,6 +21,7 @@ function generateRequestId(): string {
  * 
  * Also provides an x-request-id for correlation tracking.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withApiErrorHandling<Context = any>(
     handler: (req: NextRequest, ctx: Context) => Promise<NextResponse | Response> | NextResponse | Response
 ) {
@@ -54,8 +55,14 @@ export function withApiErrorHandling<Context = any>(
             // In local dev ONLY, log the actual stack trace. Never production.
             if (env.NODE_ENV === 'development') {
                 try {
-                    const msg = error instanceof Error ? error.message : String(error);
-                    console.error(`[API Error ${status}] [ID: ${requestId}] ${req.method} ${req.url} - `, msg);
+                    console.error(`\n[API Error ${status}] [ID: ${requestId}] ${req.method} ${req.url}`);
+                    if (error instanceof Error) {
+                        console.error('[Error Type]:', error.constructor.name);
+                        console.error('[Message]:', error.message);
+                        console.error('[Stack]:', error.stack);
+                    } else {
+                        console.error('[Raw Error]:', JSON.stringify(error, null, 2));
+                    }
                 } catch { /* Node inspect crash on Prisma errors */ }
             }
 
