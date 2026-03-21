@@ -1,0 +1,61 @@
+/**
+ * PDF Report Types
+ */
+
+export enum ReportType {
+    AUDIT_READINESS = 'AUDIT_READINESS',
+    RISK_REGISTER = 'RISK_REGISTER',
+    GAP_ANALYSIS = 'GAP_ANALYSIS',
+}
+
+export type WatermarkMode = 'DRAFT' | 'FINAL' | 'NONE';
+
+export interface ReportMeta {
+    tenantName: string;
+    reportTitle: string;
+    reportSubtitle?: string;
+    generatedAt: string;
+    framework?: string;
+    watermark?: WatermarkMode;
+    /** SHA-256 hash of report data (set after generation) */
+    contentHash?: string;
+}
+
+export interface TableColumn {
+    key: string;
+    header: string;
+    width: number;      // points
+    align?: 'left' | 'center' | 'right';
+}
+
+export interface TableRenderOptions {
+    headerBg?: string;
+    headerColor?: string;
+    altRowBg?: string;
+    fontSize?: number;
+    rowPadding?: number;
+    startY?: number;
+}
+
+export interface TotalsRow {
+    /** Map of column key → display value for totals */
+    values: Record<string, string>;
+    /** Background color */
+    bg?: string;
+}
+
+export interface GeneratePdfInput {
+    type: ReportType;
+    saveToFileRecord?: boolean;
+    watermark?: WatermarkMode;
+}
+
+export interface SummaryMetric {
+    label: string;
+    value: string | number;
+}
+
+export interface DataSourceNote {
+    source: string;
+    description: string;
+}
