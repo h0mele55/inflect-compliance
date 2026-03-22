@@ -171,6 +171,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
                 if (dbUser) {
                     token.userId = dbUser.id;
+                    token.sessionVersion = dbUser.sessionVersion;
                     // Resolve from TenantMembership (authoritative)
                     const defaultMembership = dbUser.tenantMemberships[0];
                     if (defaultMembership) {
@@ -184,6 +185,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 } else {
                     token.userId = user.id!;
                     token.role = 'READER' as Role;
+                    token.sessionVersion = 0;
                 }
 
                 // Store provider tokens for refresh (server-side JWT only)
@@ -235,6 +237,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 } catch (error) {
                     console.error('[auth] Token refresh failed, forcing reauth');
                     token.error = 'RefreshTokenError';
+                }
+            }
+
+            // Check session revocation: if sessionVersion in token is stale, force reauth
+            if (typeof token.sessionVersion === 'number' && token.userId) {
+                const currentUser = await prisma.user.findUnique({
+                    where: { id: token.userId as string },
+                    select: { sessionVersion: true },
+                });
+                if (currentUser && currentUser.sessionVersion > (token.sessionVersion as number)) {
+                    // Session has been revoked — return empty token to force sign-out
+                    return { ...token, error: 'SessionRevoked' };
                 }
             }
 

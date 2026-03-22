@@ -361,6 +361,16 @@ enum IdentityProviderType {
   OIDC
 }
 
+enum MfaPolicy {
+  DISABLED
+  OPTIONAL
+  REQUIRED
+}
+
+enum MfaType {
+  TOTP
+}
+
 // ─── Core Multi-Tenant ───
 
 model Tenant {
@@ -432,6 +442,8 @@ model Tenant {
   policyVersions         PolicyVersion[]
   identityProviders      TenantIdentityProvider[]
   identityLinks          UserIdentityLink[]
+  securitySettings       TenantSecuritySettings?
+  mfaEnrollments         UserMfaEnrollment[]
 }
 
 // ─── Tenant Onboarding Wizard ───
@@ -476,6 +488,7 @@ model User {
   emailVerified DateTime?
   image         String?
   role          Role      @default(READER) // @deprecated — use TenantMembership.role
+  sessionVersion Int      @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -523,6 +536,7 @@ model User {
   notificationPreferences         UserNotificationPreference[]
   riskSuggestionSessions          RiskSuggestionSession[]    @relation("SuggestionSessionCreator")
   identityLinks                   UserIdentityLink[]
+  mfaEnrollments                  UserMfaEnrollment[]
 }
 
 // ─── Auth.js Models ───
@@ -2162,4 +2176,37 @@ model UserIdentityLink {
   @@unique([userId, providerId])
   @@index([tenantId])
   @@index([userId])
+}
+
+// ─── MFA & Session Security ───
+
+model TenantSecuritySettings {
+  id                    String    @id @default(cuid())
+  tenantId              String    @unique
+  mfaPolicy             MfaPolicy @default(DISABLED)
+  sessionMaxAgeMinutes  Int?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+}
+
+model UserMfaEnrollment {
+  id                  String    @id @default(cuid())
+  userId              String
+  tenantId            String
+  type                MfaType   @default(TOTP)
+  secretEncrypted     String    @db.Text
+  isVerified          Boolean   @default(false)
+  verifiedAt          DateTime?
+  backupCodesHashJson String?   @db.Text
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([userId, tenantId, type])
+  @@index([userId])
+  @@index([tenantId])
 }
