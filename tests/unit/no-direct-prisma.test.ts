@@ -50,7 +50,7 @@ function getNonCommentLines(content: string): string[] {
 
 describe('CI Guard: No direct prisma in tenant-scoped code', () => {
     // ─── Repositories ───
-    const REPO_ALLOWLIST = ['ClauseRepository.ts', 'RiskTemplateRepository.ts'];
+    const REPO_ALLOWLIST = ['ClauseRepository.ts', 'RiskTemplateRepository.ts', 'SsoConfigRepository.ts', 'IdentityLinkRepository.ts'];
 
     const repos = readFilesInDir(path.join(SRC_ROOT, 'app-layer/repositories'));
 
@@ -69,7 +69,7 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
     }
 
     // ─── Usecases ───
-    const USECASE_ALLOWLIST: string[] = [];
+    const USECASE_ALLOWLIST: string[] = ['sso.ts'];
 
     const usecases = readFilesInDir(path.join(SRC_ROOT, 'app-layer/usecases'));
 

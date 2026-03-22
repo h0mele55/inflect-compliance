@@ -235,7 +235,11 @@ export default function SsoAdminPage() {
         return (
             <div className="space-y-6 animate-fadeIn">
                 <h1 className="text-2xl font-bold">SSO &amp; Identity</h1>
-                <div className="glass-card p-8 text-center text-slate-400">Loading...</div>
+                <div className="glass-card p-8 space-y-4">
+                    <div className="h-4 bg-slate-700/50 rounded w-1/3 animate-pulse" />
+                    <div className="h-4 bg-slate-700/50 rounded w-2/3 animate-pulse" />
+                    <div className="h-4 bg-slate-700/50 rounded w-1/2 animate-pulse" />
+                </div>
             </div>
         );
     }

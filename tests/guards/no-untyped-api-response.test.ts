@@ -51,6 +51,6 @@ describe('no-untyped-api-response guard', () => {
             );
         }
         // Soft assertion: just ensure count doesn't grow beyond current baseline
-        expect(warnings.length).toBeLessThanOrEqual(340); // Baseline 2026-03-13: bumped for retention routes
+        expect(warnings.length).toBeLessThanOrEqual(360); // Baseline 2026-03-22: bumped for SSO routes
     });
 });

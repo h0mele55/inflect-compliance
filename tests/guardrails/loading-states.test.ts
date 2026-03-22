@@ -63,7 +63,7 @@ describe('Loading-state guardrails', () => {
                     // Check if it's an allowed mutation pattern
                     const isAllowed = ALLOWED_PATTERNS.some(p => p.test(line));
                     if (!isAllowed) {
-                        fail(
+                        throw new Error(
                             `Found bare "Loading..." text at ${path.relative(TENANT_ROUTES_DIR, filePath)}:${i + 1}\n` +
                             `  Line: ${line.trim()}\n` +
                             `  Replace with a skeleton component from @/components/ui/skeleton`
