@@ -71,6 +71,19 @@ export function isTenantPath(pathname: string): boolean {
 }
 
 /**
+ * Check if a path should remain accessible when MFA is pending.
+ * These routes are allowed so users can complete MFA enrollment/challenge.
+ */
+export function isMfaAllowedPath(pathname: string): boolean {
+    // MFA challenge page and enrollment API routes
+    if (/^\/t\/[^/]+\/auth\/mfa/.test(pathname)) return true;
+    if (/^\/api\/t\/[^/]+\/security\/mfa/.test(pathname)) return true;
+    // Auth callbacks (sign-out, etc.)
+    if (pathname.startsWith('/api/auth/')) return true;
+    return false;
+}
+
+/**
  * Sanitize a redirect path to prevent open-redirect attacks.
  * Only allows relative paths starting with '/'.
  * Strips protocol, host, and any absolute URL to return '/'.

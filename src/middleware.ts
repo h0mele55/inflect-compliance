@@ -6,6 +6,8 @@ import {
     isPublicPath,
     isApiRoute,
     isAdminPath,
+    isTenantPath,
+    isMfaAllowedPath,
     buildLoginRedirect,
     unauthorizedJson,
     forbiddenJson,
@@ -76,7 +78,32 @@ const authMiddleware = auth(async (req) => {
         }
     }
 
-    // ── 4. Authenticated and authorized → proceed ──
+    // ── 4. MFA enforcement ──
+    if (isTenantPath(pathname) && !isMfaAllowedPath(pathname)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const session = req.auth as any;
+        const mfaPending = session?.user?.mfaPending === true;
+
+        if (mfaPending) {
+            // Extract tenant slug from path: /t/:slug/... or /api/t/:slug/...
+            const segments = pathname.split('/');
+            const tIndex = segments.indexOf('t');
+            const tenantSlug = tIndex >= 0 ? segments[tIndex + 1] : null;
+
+            if (isApiRoute(pathname)) {
+                return forbiddenJson('MFA verification required');
+            }
+
+            // Redirect to MFA challenge page
+            if (tenantSlug) {
+                const mfaUrl = new URL(`/t/${tenantSlug}/auth/mfa`, req.nextUrl.origin);
+                mfaUrl.searchParams.set('next', pathname);
+                return NextResponse.redirect(mfaUrl);
+            }
+        }
+    }
+
+    // ── 5. Authenticated and authorized → proceed ──
     return NextResponse.next();
 });
 

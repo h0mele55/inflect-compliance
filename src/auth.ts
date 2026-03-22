@@ -27,6 +27,7 @@ declare module 'next-auth' {
             image?: string | null;
             tenantId?: string | null;
             role: Role;
+            mfaPending?: boolean;
         };
     }
 }
@@ -196,6 +197,43 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     token.expiresAt = (account.expires_at as number) ?? undefined;
                 }
 
+                // ── MFA enforcement check ──
+                // Determine if MFA challenge is needed based on tenant policy
+                token.mfaPending = false;
+                const activeTenantId = (token.tenantId as string) || null;
+                if (activeTenantId) {
+                    try {
+                        const secSettings = await prisma.tenantSecuritySettings.findUnique({
+                            where: { tenantId: activeTenantId },
+                        });
+                        const policy = secSettings?.mfaPolicy ?? 'DISABLED';
+
+                        if (policy === 'REQUIRED' || policy === 'OPTIONAL') {
+                            // Check if user has a verified MFA enrollment
+                            const enrollment = await prisma.userMfaEnrollment.findUnique({
+                                where: {
+                                    userId_tenantId_type: {
+                                        userId: token.userId as string,
+                                        tenantId: activeTenantId,
+                                        type: 'TOTP',
+                                    },
+                                },
+                            });
+
+                            if (policy === 'REQUIRED') {
+                                // REQUIRED: always challenge (enrolled+verified → challenge code;
+                                // not enrolled → redirect to enrollment)
+                                token.mfaPending = true;
+                            } else if (policy === 'OPTIONAL' && enrollment?.isVerified) {
+                                // OPTIONAL: only challenge if user has voluntarily enrolled
+                                token.mfaPending = true;
+                            }
+                        }
+                    } catch {
+                        // If MFA lookup fails, don't block login — fail open for availability
+                    }
+                }
+
                 return token;
             }
 
@@ -240,7 +278,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 }
             }
 
-            // Check session revocation: if sessionVersion in token is stale, force reauth
+            // Check MFA challenge completion: if mfaPending, see if user completed challenge
+            if (token.mfaPending === true && token.userId && token.tenantId) {
+                try {
+                    const enrollment = await prisma.userMfaEnrollment.findUnique({
+                        where: {
+                            userId_tenantId_type: {
+                                userId: token.userId as string,
+                                tenantId: token.tenantId as string,
+                                type: 'TOTP',
+                            },
+                        },
+                        select: { lastChallengeAt: true, isVerified: true },
+                    });
+
+                    if (enrollment?.lastChallengeAt) {
+                        // Challenge was completed — check it's after token creation
+                        const tokenIat = (token.iat as number) || 0;
+                        const challengeTime = Math.floor(enrollment.lastChallengeAt.getTime() / 1000);
+                        if (challengeTime >= tokenIat) {
+                            token.mfaPending = false;
+                        }
+                    }
+                } catch {
+                    // Fail open — don't block access if DB check fails
+                }
+            }
+
             if (typeof token.sessionVersion === 'number' && token.userId) {
                 const currentUser = await prisma.user.findUnique({
                     where: { id: token.userId as string },
@@ -264,6 +328,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 session.user.id = token.userId as string ?? token.sub!;
                 session.user.tenantId = (token.tenantId as string) ?? null;
                 session.user.role = (token.role as Role) ?? 'READER';
+                session.user.mfaPending = (token.mfaPending as boolean) ?? false;
             }
             return session;
         },

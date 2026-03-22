@@ -2199,6 +2199,7 @@ model UserMfaEnrollment {
   secretEncrypted     String    @db.Text
   isVerified          Boolean   @default(false)
   verifiedAt          DateTime?
+  lastChallengeAt     DateTime?
   backupCodesHashJson String?   @db.Text
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
