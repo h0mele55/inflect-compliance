@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
-import { ShieldCheck, Save, AlertTriangle, CheckCircle } from 'lucide-react';
+import { ShieldCheck, Save, AlertTriangle, CheckCircle, LogOut, Users, UserX } from 'lucide-react';
 
 type MfaPolicy = 'DISABLED' | 'OPTIONAL' | 'REQUIRED';
 
@@ -36,6 +36,8 @@ export default function AdminSecurityPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const [revoking, setRevoking] = useState(false);
+    const [revokeUserId, setRevokeUserId] = useState('');
 
     const fetchSettings = useCallback(async () => {
         try {
@@ -75,6 +77,70 @@ export default function AdminSecurityPage() {
             setError(err instanceof Error ? err.message : 'Failed to save settings');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleRevokeMySessions = async () => {
+        if (!confirm('This will sign you out of all devices. Continue?')) return;
+        setRevoking(true);
+        setError(null);
+        try {
+            const res = await fetch(apiUrl('/security/sessions/revoke-current'), { method: 'POST' });
+            if (res.ok) {
+                setSuccess('Your sessions have been revoked. You will be signed out shortly.');
+                setTimeout(() => window.location.href = '/login', 2000);
+            } else {
+                throw new Error('Failed to revoke sessions');
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Revocation failed');
+        } finally {
+            setRevoking(false);
+        }
+    };
+
+    const handleRevokeAllTenant = async () => {
+        if (!confirm('⚠️ This will sign out ALL users in your organization. Are you sure?')) return;
+        setRevoking(true);
+        setError(null);
+        try {
+            const res = await fetch(apiUrl('/security/sessions/revoke-all'), { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                setSuccess(`Sessions revoked for ${data.usersAffected} users. Everyone will need to sign in again.`);
+            } else {
+                throw new Error(data.error || 'Failed to revoke');
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Bulk revocation failed');
+        } finally {
+            setRevoking(false);
+        }
+    };
+
+    const handleRevokeUser = async () => {
+        if (!revokeUserId.trim()) return;
+        if (!confirm(`Revoke all sessions for user ${revokeUserId}?`)) return;
+        setRevoking(true);
+        setError(null);
+        try {
+            const res = await fetch(apiUrl('/security/sessions/revoke-user'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetUserId: revokeUserId.trim() }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setSuccess('Sessions revoked for user.');
+                setRevokeUserId('');
+                setTimeout(() => setSuccess(null), 3000);
+            } else {
+                throw new Error(data.error || 'Failed to revoke user sessions');
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'User revocation failed');
+        } finally {
+            setRevoking(false);
         }
     };
 
@@ -217,6 +283,70 @@ export default function AdminSecurityPage() {
                     <Save className="w-4 h-4" />
                     {saving ? 'Saving...' : 'Save Settings'}
                 </button>
+            </div>
+
+            {/* ──── Session Management ──── */}
+            <div className="glass-card p-6 space-y-5">
+                <div>
+                    <h2 className="text-lg font-semibold text-white mb-1">Session Management</h2>
+                    <p className="text-sm text-slate-400">
+                        Revoke active sessions. Revoked users must sign in again.
+                    </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Revoke my sessions */}
+                    <button
+                        onClick={handleRevokeMySessions}
+                        disabled={revoking}
+                        className="p-4 border border-slate-700 rounded-lg hover:border-brand-500/50 transition text-left flex items-start gap-3 group"
+                        id="revoke-my-sessions-btn"
+                    >
+                        <LogOut className="w-5 h-5 text-slate-400 group-hover:text-brand-400 transition mt-0.5 shrink-0" />
+                        <div>
+                            <span className="text-sm font-medium text-white">Sign Out Other Sessions</span>
+                            <p className="text-xs text-slate-500 mt-1">Invalidate all your active sessions across devices.</p>
+                        </div>
+                    </button>
+
+                    {/* Revoke all tenant sessions */}
+                    <button
+                        onClick={handleRevokeAllTenant}
+                        disabled={revoking}
+                        className="p-4 border border-red-500/30 rounded-lg hover:border-red-500/60 transition text-left flex items-start gap-3 group"
+                        id="revoke-all-sessions-btn"
+                    >
+                        <Users className="w-5 h-5 text-red-400/70 group-hover:text-red-400 transition mt-0.5 shrink-0" />
+                        <div>
+                            <span className="text-sm font-medium text-red-300">Revoke All User Sessions</span>
+                            <p className="text-xs text-slate-500 mt-1">Force all organization members to sign in again. Use for incidents.</p>
+                        </div>
+                    </button>
+                </div>
+
+                {/* Revoke specific user */}
+                <div className="border-t border-slate-700/50 pt-4">
+                    <label className="block text-sm text-slate-300 mb-2">Revoke sessions for a specific user</label>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="User ID"
+                            value={revokeUserId}
+                            onChange={(e) => setRevokeUserId(e.target.value)}
+                            className="input flex-1"
+                            id="revoke-user-id-input"
+                        />
+                        <button
+                            onClick={handleRevokeUser}
+                            disabled={revoking || !revokeUserId.trim()}
+                            className="btn btn-secondary text-red-400 hover:text-red-300"
+                            id="revoke-user-btn"
+                        >
+                            <UserX className="w-4 h-4" />
+                            Revoke
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
