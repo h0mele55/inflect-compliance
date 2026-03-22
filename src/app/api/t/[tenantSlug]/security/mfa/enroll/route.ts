@@ -1,0 +1,52 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getTenantCtx } from '@/app-layer/context';
+import { getUserMfaStatus } from '@/app-layer/usecases/mfa';
+import { removeMfaEnrollment } from '@/app-layer/usecases/mfa-enrollment';
+import { withApiErrorHandling } from '@/lib/errors/api';
+
+/**
+ * GET /api/t/[tenantSlug]/security/mfa/enroll
+ *
+ * Returns the current user's MFA enrollment status for this tenant.
+ */
+export const GET = withApiErrorHandling(async (
+    req: NextRequest,
+    { params }: { params: { tenantSlug: string } },
+) => {
+    const ctx = await getTenantCtx(params, req);
+    const status = await getUserMfaStatus(ctx);
+
+    return NextResponse.json(status);
+});
+
+/**
+ * DELETE /api/t/[tenantSlug]/security/mfa/enroll
+ *
+ * Removes MFA enrollment for the authenticated user (or a target user if admin).
+ * Body (optional): { targetUserId: "..." }
+ */
+export const DELETE = withApiErrorHandling(async (
+    req: NextRequest,
+    { params }: { params: { tenantSlug: string } },
+) => {
+    const ctx = await getTenantCtx(params, req);
+
+    let targetUserId: string | undefined;
+    try {
+        const body = await req.json();
+        targetUserId = body?.targetUserId;
+    } catch {
+        // No body — remove own enrollment
+    }
+
+    const result = await removeMfaEnrollment(ctx, targetUserId);
+
+    if (!result.removed) {
+        return NextResponse.json(
+            { error: 'No MFA enrollment found to remove.' },
+            { status: 404 },
+        );
+    }
+
+    return NextResponse.json({ success: true, message: 'MFA enrollment removed.' });
+});
