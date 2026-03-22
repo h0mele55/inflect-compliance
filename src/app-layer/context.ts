@@ -3,6 +3,7 @@ import { getSessionOrThrow } from '@/lib/auth';
 import { resolveTenantContext } from '@/lib/tenant-context';
 import { RequestContext } from './types';
 import { randomUUID } from 'crypto';
+import { mergeRequestContext } from '@/lib/observability/context';
 
 /**
  * Generates or extracts a request ID.
@@ -29,6 +30,10 @@ export async function getTenantCtx(
     // This checks membership and resolves the tenant UUID & role
     const ctx = await resolveTenantContext(params, session.userId);
 
+    // Enrich the observability context with tenant and user info
+    // so that logs/traces emitted downstream automatically include them.
+    mergeRequestContext({ tenantId: ctx.tenant.id, userId: session.userId });
+
     return {
         requestId,
         userId: session.userId,
@@ -51,6 +56,9 @@ export async function getLegacyCtx(req?: NextRequest): Promise<RequestContext> {
 
     // Resolve tenant context from session's tenantId (verifies membership)
     const ctx = await resolveTenantContext({ tenantId: session.tenantId }, session.userId);
+
+    // Enrich the observability context with tenant and user info
+    mergeRequestContext({ tenantId: ctx.tenant.id, userId: session.userId });
 
     return {
         requestId,
