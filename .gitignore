@@ -19,6 +19,8 @@ prisma/generated/
 # Build
 dist/
 build/
+build-output.txt
+tsconfig.tsbuildinfo
 
 # Test outputs
 coverage/
@@ -27,6 +29,9 @@ playwright-report/
 jest_out.json
 jest_out_utf8.txt
 jest-debug.txt
+test-output*.json
+test-out.txt
+test-login.js
 
 # IDE
 .vscode/
@@ -45,6 +50,9 @@ tmp/
 npm-debug.log*
 
 # Debug / scratch output
+*-result.txt
+*-result*.txt
+*-output.txt
 ct_detail.txt
 ct_full.txt
 ct_list.txt
