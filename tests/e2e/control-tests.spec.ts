@@ -61,9 +61,10 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await page.waitForSelector('#control-title', { timeout: 15000 });
         await expect(page.locator('#control-title')).toContainText(`Test Ctrl ${uid}`, { timeout: 5000 });
 
-        // Go to Tests tab
+        // Go to Tests tab — TestPlansPanel fetches data on mount, wait for the API to settle
         await page.click('#tab-tests');
-        await page.waitForSelector('#create-test-plan-btn', { timeout: 5000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#create-test-plan-btn', { timeout: 15000 });
 
         // Create a test plan
         await page.click('#create-test-plan-btn');
@@ -72,8 +73,11 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await page.selectOption('#test-plan-frequency-select', 'QUARTERLY');
         await page.click('#save-test-plan-btn');
 
+        // Wait for API round-trip
+        await page.waitForLoadState('networkidle');
+
         // Plan should appear in the list
-        await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 5000 });
+        await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 10000 });
     });
 
     test('open test plan detail and start a run', async ({ page }) => {
@@ -86,9 +90,10 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });
 
-        // Go to Tests tab
+        // Go to Tests tab — wait for TestPlansPanel fetch to complete
         await page.click('#tab-tests');
-        await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 10000 });
+        await page.waitForLoadState('networkidle');
+        await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 15000 });
 
         // Click the test plan name to go to detail page
         await page.click(`text=Access Review ${uid}`);
@@ -111,7 +116,8 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });
         await page.click('#tab-tests');
-        await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 5000 });
+        await page.waitForLoadState('networkidle');
+        await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 10000 });
         const planLink = page.locator(`[id^="test-plan-link-"]`).filter({ hasText: `Access Review ${uid}` }).first();
         await planLink.click();
         await page.waitForSelector('#test-plan-title', { timeout: 10000 });
@@ -156,7 +162,7 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });
         await page.click('#tab-tests');
-        await page.waitForLoadState('networkidle'); /* replaced wait */
+        await page.waitForLoadState('networkidle');
         const planLink = page.locator(`[id^="test-plan-link-"]`).filter({ hasText: `Access Review ${uid}` }).first();
         await planLink.click();
         await page.waitForSelector('#test-plan-title', { timeout: 10000 });

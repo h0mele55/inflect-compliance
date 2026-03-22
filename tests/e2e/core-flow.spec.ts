@@ -211,12 +211,19 @@ test.describe('Core Certification Flow', () => {
         // Click "+ Link Control"
         await page.click('#add-control-link-btn');
 
-        // Wait for the control dropdown to populate
+        // Wait for the control dropdown to populate — the TraceabilityPanel
+        // fetches controls asynchronously via useEffect after the form renders.
+        // We must wait for actual option elements beyond the placeholder.
         const controlDropdown = page.locator('#traceability-panel select').first();
         await controlDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await page.waitForLoadState('networkidle');
 
-        // Select our control from the dropdown
+        // Poll until dropdown has real options (> 1 means more than just "Select control...")
+        await expect(async () => {
+            const optCount = await controlDropdown.locator('option').count();
+            expect(optCount).toBeGreaterThan(1);
+        }).toPass({ timeout: 15000 });
+
+        // Now iterate dropdown options to find our control
         const optCount = await controlDropdown.locator('option').count();
         let linked = false;
         for (let i = 0; i < optCount; i++) {
