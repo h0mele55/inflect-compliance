@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { SamlConfigSchema } from '@/app-layer/schemas/sso-config.schemas';
+import {
+    buildSamlInstance,
+    generateAuthnRequest,
+    encodeSamlRelayState,
+} from '@/lib/security/saml-client';
+import { env } from '@/env';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * GET /api/auth/sso/saml/start?tenant=<tenantSlug>&provider=<providerId>&returnTo=<path>
+ *
+ * Initiates the SAML 2.0 SSO flow:
+ * 1. Resolves tenant by slug
+ * 2. Loads enabled SAML provider config
+ * 3. Builds a SAML AuthnRequest
+ * 4. Encodes tenant context in RelayState
+ * 5. Redirects to IdP's SSO endpoint
+ */
+export async function GET(req: NextRequest) {
+    const { searchParams } = req.nextUrl;
+    const tenantSlug = searchParams.get('tenant');
+    const providerId = searchParams.get('provider');
+    const returnTo = searchParams.get('returnTo') || '/';
+
+    // ── Validate params ──
+    if (!tenantSlug || !providerId) {
+        return NextResponse.json(
+            { error: 'Missing required parameters: tenant and provider' },
+            { status: 400 }
+        );
+    }
+
+    // ── Resolve tenant ──
+    const tenant = await prisma.tenant.findUnique({
+        where: { slug: tenantSlug },
+        select: { id: true, slug: true },
+    });
+
+    if (!tenant) {
+        return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+    }
+
+    // ── Load provider config ──
+    const provider = await prisma.tenantIdentityProvider.findFirst({
+        where: {
+            id: providerId,
+            tenantId: tenant.id,
+            isEnabled: true,
+            type: 'SAML',
+        },
+    });
+
+    if (!provider) {
+        return NextResponse.json(
+            { error: 'SAML provider not found or not enabled' },
+            { status: 404 }
+        );
+    }
+
+    // ── Parse SAML config ──
+    const configResult = SamlConfigSchema.safeParse(provider.configJson);
+    if (!configResult.success) {
+        console.error('[SSO-SAML] Invalid config for provider:', provider.id, configResult.error.message);
+        return NextResponse.json(
+            { error: 'SSO configuration error' },
+            { status: 500 }
+        );
+    }
+    const samlConfig = configResult.data;
+
+    if (!samlConfig.ssoUrl || !samlConfig.entityId) {
+        // If metadataUrl was provided but not ssoUrl/entityId, we need to handle that
+        // For now, require explicit ssoUrl + entityId
+        console.error('[SSO-SAML] SAML config missing ssoUrl or entityId:', provider.id);
+        return NextResponse.json(
+            { error: 'SAML configuration incomplete — ssoUrl and entityId required' },
+            { status: 500 }
+        );
+    }
+
+    // ── Build SAML instance ──
+    const baseUrl = env.APP_URL || req.nextUrl.origin;
+    const callbackUrl = `${baseUrl}/api/auth/sso/saml/callback`;
+    const spIssuer = `${baseUrl}/saml/metadata/${tenant.slug}`;
+
+    const saml = buildSamlInstance(samlConfig, callbackUrl, spIssuer);
+
+    // ── Encode tenant context in RelayState ──
+    const relayState = encodeSamlRelayState({
+        tenantSlug: tenant.slug,
+        providerId: provider.id,
+        returnTo,
+    });
+
+    // ── Generate AuthnRequest and redirect ──
+    try {
+        const redirectUrl = await generateAuthnRequest(saml, relayState);
+        return NextResponse.redirect(redirectUrl);
+    } catch (err) {
+        console.error('[SSO-SAML] AuthnRequest generation failed:', (err as Error).message);
+        return NextResponse.json(
+            { error: 'Failed to initiate SAML authentication' },
+            { status: 500 }
+        );
+    }
+}

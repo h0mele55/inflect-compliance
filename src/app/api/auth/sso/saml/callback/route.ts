@@ -1,0 +1,205 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import prisma from '@/lib/prisma';
+import { SamlConfigSchema } from '@/app-layer/schemas/sso-config.schemas';
+import {
+    buildSamlInstance,
+    validateSamlResponse,
+    decodeSamlRelayState,
+} from '@/lib/security/saml-client';
+import { linkExternalIdentity } from '@/app-layer/usecases/sso';
+import { env } from '@/env';
+import jwt from 'jsonwebtoken';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * POST /api/auth/sso/saml/callback
+ *
+ * SAML Assertion Consumer Service (ACS) endpoint.
+ * Receives the SAML Response (POST binding) from the IdP:
+ * 1. Extracts RelayState to identify tenant + provider
+ * 2. Validates the SAML response signature and assertions
+ * 3. Extracts NameID/email/name claims
+ * 4. Links external identity to local user
+ * 5. Creates JWT session
+ * 6. Redirects to app
+ */
+export async function POST(req: NextRequest) {
+    let formData: FormData;
+    try {
+        formData = await req.formData();
+    } catch {
+        return redirectToLogin(req, 'invalid_request', 'Invalid SAML response format');
+    }
+
+    const samlResponse = formData.get('SAMLResponse') as string | null;
+    const relayStateRaw = formData.get('RelayState') as string | null;
+
+    if (!samlResponse) {
+        return redirectToLogin(req, 'missing_response', 'No SAML response received');
+    }
+
+    // ── Decode RelayState ──
+    if (!relayStateRaw) {
+        return redirectToLogin(req, 'missing_relay', 'Missing RelayState parameter');
+    }
+
+    const relayState = decodeSamlRelayState(relayStateRaw);
+    if (!relayState) {
+        return redirectToLogin(req, 'invalid_relay', 'Invalid RelayState');
+    }
+
+    // ── Resolve tenant ──
+    const tenant = await prisma.tenant.findUnique({
+        where: { slug: relayState.tenantSlug },
+        select: { id: true, slug: true },
+    });
+
+    if (!tenant) {
+        return redirectToLogin(req, 'tenant_not_found');
+    }
+
+    // ── Load provider config (verify still enabled) ──
+    const provider = await prisma.tenantIdentityProvider.findFirst({
+        where: {
+            id: relayState.providerId,
+            tenantId: tenant.id,
+            isEnabled: true,
+            type: 'SAML',
+        },
+    });
+
+    if (!provider) {
+        return redirectToLogin(req, 'provider_disabled', 'SAML provider is no longer active');
+    }
+
+    // ── Parse SAML config ──
+    const configResult = SamlConfigSchema.safeParse(provider.configJson);
+    if (!configResult.success) {
+        console.error('[SSO-SAML] Invalid config on callback:', provider.id);
+        return redirectToLogin(req, 'config_error');
+    }
+    const samlConfig = configResult.data;
+
+    // ── Build SAML instance for validation ──
+    const baseUrl = env.APP_URL || req.nextUrl.origin;
+    const callbackUrl = `${baseUrl}/api/auth/sso/saml/callback`;
+    const spIssuer = `${baseUrl}/saml/metadata/${tenant.slug}`;
+
+    const saml = buildSamlInstance(samlConfig, callbackUrl, spIssuer);
+
+    // ── Validate SAML response ──
+    let validatedResponse;
+    try {
+        validatedResponse = await validateSamlResponse(saml, samlResponse);
+    } catch (err) {
+        console.error('[SSO-SAML] Response validation failed:', (err as Error).message);
+        return redirectToLogin(req, 'validation_failed', 'SAML response validation failed');
+    }
+
+    if (!validatedResponse.email) {
+        return redirectToLogin(req, 'no_email', 'Identity provider did not return an email');
+    }
+
+    // ── Link external identity to local user ──
+    const linkResult = await linkExternalIdentity(
+        tenant.id,
+        provider.id,
+        validatedResponse.nameId,
+        validatedResponse.email
+    );
+
+    if (!linkResult) {
+        console.warn('[SSO-SAML] Identity linking failed', {
+            tenantId: tenant.id,
+            providerId: provider.id,
+            email: validatedResponse.email,
+            nameId: validatedResponse.nameId,
+        });
+        return redirectToLogin(
+            req,
+            'no_account',
+            'No matching account found. Contact your administrator.'
+        );
+    }
+
+    // ── Load membership for session ──
+    const membership = await prisma.tenantMembership.findUnique({
+        where: {
+            tenantId_userId: {
+                tenantId: tenant.id,
+                userId: linkResult.userId,
+            },
+        },
+    });
+
+    if (!membership) {
+        return redirectToLogin(req, 'no_membership');
+    }
+
+    const user = await prisma.user.findUnique({
+        where: { id: linkResult.userId },
+        select: { id: true, email: true, name: true },
+    });
+
+    if (!user) {
+        return redirectToLogin(req, 'user_not_found');
+    }
+
+    // ── Create JWT session ──
+    const authSecret = env.AUTH_SECRET;
+    if (!authSecret) {
+        console.error('[SSO-SAML] AUTH_SECRET not set');
+        return redirectToLogin(req, 'config_error');
+    }
+
+    const sessionToken = jwt.sign(
+        {
+            userId: user.id,
+            email: user.email,
+            name: user.name ?? validatedResponse.name,
+            tenantId: tenant.id,
+            role: membership.role,
+            provider: `sso-saml-${provider.id}`,
+            sub: user.id,
+            iat: Math.floor(Date.now() / 1000),
+        },
+        authSecret,
+        { expiresIn: '7d' }
+    );
+
+    // ── Set session cookie ──
+    const isProduction = env.NODE_ENV === 'production';
+    const cookieName = isProduction
+        ? '__Secure-authjs.session-token'
+        : 'authjs.session-token';
+
+    const cookieStore = await cookies();
+    cookieStore.set(cookieName, sessionToken, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60,
+    });
+
+    // ── Redirect to app ──
+    const returnTo = relayState.returnTo || `/t/${tenant.slug}/dashboard`;
+    return NextResponse.redirect(new URL(returnTo, baseUrl));
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+function redirectToLogin(
+    req: NextRequest,
+    errorCode: string,
+    errorMessage?: string
+): NextResponse {
+    const loginUrl = new URL('/login', req.nextUrl.origin);
+    loginUrl.searchParams.set('error', errorCode);
+    if (errorMessage) {
+        loginUrl.searchParams.set('error_description', errorMessage);
+    }
+    return NextResponse.redirect(loginUrl);
+}
