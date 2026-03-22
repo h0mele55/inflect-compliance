@@ -1,0 +1,164 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { ShieldCheck, KeyRound, AlertTriangle } from 'lucide-react';
+
+/**
+ * MFA Challenge Page — shown when mfaPending is true.
+ * User must enter a TOTP code to continue.
+ *
+ * After successful verification, redirects to the original target page
+ * (or tenant home if no target is specified).
+ */
+export default function MfaChallengePage() {
+    const apiUrl = useTenantApiUrl();
+    const tenantHref = useTenantHref();
+    const searchParams = useSearchParams();
+    const next = searchParams.get('next') || tenantHref('/');
+
+    const [code, setCode] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [attempts, setAttempts] = useState(0);
+
+    // Check if user has MFA enrolled
+    const [enrolled, setEnrolled] = useState<boolean | null>(null);
+    const checkEnrollment = useCallback(async () => {
+        try {
+            const res = await fetch(apiUrl('/security/mfa/enroll'));
+            if (res.ok) {
+                const data = await res.json();
+                setEnrolled(data.isVerified);
+            }
+        } catch {
+            // Fail silently
+        }
+    }, [apiUrl]);
+
+    useEffect(() => { checkEnrollment(); }, [checkEnrollment]);
+
+    const handleVerify = async () => {
+        if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+            setError('Please enter a valid 6-digit code');
+            return;
+        }
+        setSubmitting(true);
+        setError(null);
+        try {
+            const res = await fetch(apiUrl('/security/mfa/challenge/verify'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code }),
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // MFA challenge complete — redirect to original target
+                // The JWT will be refreshed on next request, clearing mfaPending
+                window.location.href = next;
+            } else {
+                setAttempts(a => a + 1);
+                setCode('');
+                setError(
+                    attempts >= 4
+                        ? 'Too many failed attempts. Please wait a moment and try again.'
+                        : 'Invalid code. Please check your authenticator app and try again.'
+                );
+            }
+        } catch {
+            setError('Verification failed. Please try again.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && code.length === 6) {
+            handleVerify();
+        }
+    };
+
+    // If not enrolled, show enrollment redirect
+    if (enrolled === false) {
+        return (
+            <div className="min-h-[60vh] flex items-center justify-center">
+                <div className="glass-card p-8 max-w-md w-full space-y-5 text-center">
+                    <div className="flex justify-center">
+                        <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center">
+                            <AlertTriangle className="w-8 h-8 text-amber-400" />
+                        </div>
+                    </div>
+                    <h1 className="text-xl font-bold text-white">MFA Enrollment Required</h1>
+                    <p className="text-sm text-slate-400">
+                        Your organization requires multi-factor authentication.
+                        Please set up MFA to continue.
+                    </p>
+                    <a
+                        href={tenantHref('/security/mfa')}
+                        className="btn btn-primary w-full justify-center"
+                        id="mfa-go-enroll-btn"
+                    >
+                        <KeyRound className="w-4 h-4" />
+                        Set Up MFA
+                    </a>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-[60vh] flex items-center justify-center">
+            <div className="glass-card p-8 max-w-md w-full space-y-5">
+                <div className="flex justify-center">
+                    <div className="w-16 h-16 rounded-full bg-brand-500/20 flex items-center justify-center">
+                        <ShieldCheck className="w-8 h-8 text-brand-400" />
+                    </div>
+                </div>
+
+                <div className="text-center">
+                    <h1 className="text-xl font-bold text-white">Verify Your Identity</h1>
+                    <p className="text-sm text-slate-400 mt-2">
+                        Enter the 6-digit code from your authenticator app to continue.
+                    </p>
+                </div>
+
+                {error && (
+                    <div className="p-3 rounded-lg border border-red-500/40 bg-red-500/10 text-sm text-red-300 text-center">
+                        {error}
+                    </div>
+                )}
+
+                <div className="flex flex-col items-center gap-4">
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="000000"
+                        value={code}
+                        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        onKeyDown={handleKeyDown}
+                        className="input text-center text-2xl font-mono tracking-[0.4em] w-48 py-3"
+                        id="mfa-challenge-input"
+                        autoFocus
+                        autoComplete="one-time-code"
+                    />
+
+                    <button
+                        onClick={handleVerify}
+                        disabled={submitting || code.length !== 6}
+                        className="btn btn-primary w-full justify-center"
+                        id="mfa-challenge-submit"
+                    >
+                        {submitting ? 'Verifying...' : 'Continue'}
+                    </button>
+                </div>
+
+                <p className="text-xs text-slate-500 text-center">
+                    Can&apos;t access your authenticator? Contact your organization administrator.
+                </p>
+            </div>
+        </div>
+    );
+}

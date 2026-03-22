@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { RequirePermission } from '@/components/require-permission';
-import { Shield, CreditCard, KeyRound } from 'lucide-react';
+import { Shield, CreditCard, KeyRound, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminPage() {
@@ -53,6 +53,14 @@ export default function AdminPage() {
                     >
                         <KeyRound className="w-3.5 h-3.5" />
                         SSO &amp; Identity
+                    </Link>
+                    <Link
+                        href={tenantHref('/admin/security')}
+                        className="btn btn-secondary"
+                        id="security-pill-btn"
+                    >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Security &amp; MFA
                     </Link>
                 </RequirePermission>
             </div>
