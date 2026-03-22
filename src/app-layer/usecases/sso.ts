@@ -5,6 +5,8 @@ import * as IdentityLinkRepo from '@/app-layer/repositories/IdentityLinkReposito
 import { UpsertSsoConfigInput } from '@/app-layer/schemas/sso-config.schemas';
 import { forbidden, notFound } from '@/lib/errors/types';
 import prisma from '@/lib/prisma';
+import { logger } from '@/lib/observability/logger';
+import { traceUsecase } from '@/lib/observability/tracing';
 
 /**
  * Enterprise SSO Usecases
@@ -50,6 +52,11 @@ export async function upsertTenantSsoConfig(
     input: UpsertSsoConfigInput
 ): Promise<TenantIdentityProvider> {
     if (!ctx.permissions.canAdmin) throw forbidden('Only admins can manage SSO configuration');
+
+    logger.info('sso config upsert', {
+        component: 'sso', action: input.id ? 'update' : 'create',
+        providerType: input.type, isEnforced: input.isEnforced,
+    });
 
     // If updating, verify the provider belongs to this tenant
     if (input.id) {
@@ -125,6 +132,10 @@ export async function setTenantSsoEnforced(
 ): Promise<TenantIdentityProvider> {
     if (!ctx.permissions.canAdmin) throw forbidden('Only admins can manage SSO configuration');
 
+    logger.info('sso enforcement toggle', {
+        component: 'sso', providerId, enforced,
+    });
+
     const existing = await SsoConfigRepo.findById(ctx.tenantId, providerId);
     if (!existing) throw notFound('Identity provider not found');
 
@@ -138,6 +149,7 @@ export async function setTenantSsoEnforced(
         // At least one admin must have a password (break-glass) or SSO link
         const hasBreakGlassAdmin = adminMembers.some((m) => m.user.passwordHash);
         if (!hasBreakGlassAdmin) {
+            logger.warn('sso enforcement blocked — no break-glass admin', { component: 'sso', providerId });
             throw forbidden(
                 'Cannot enforce SSO: at least one admin must have a local password for break-glass access'
             );
@@ -275,7 +287,10 @@ export async function linkExternalIdentity(
     externalSubject: string,
     email: string
 ): Promise<LinkResult> {
+    logger.info('sso identity link started', { component: 'sso', providerId });
+
     if (!email) {
+        logger.warn('sso identity link rejected', { component: 'sso', reason: 'no_email' });
         return { status: 'rejected', reason: 'no_email' };
     }
 
@@ -289,6 +304,7 @@ export async function linkExternalIdentity(
     // ── Step 1: Domain validation ──
     if (provider) {
         if (!validateEmailAgainstDomains(normalizedEmail, provider.emailDomains)) {
+            logger.warn('sso identity link rejected', { component: 'sso', reason: 'domain_mismatch' });
             return { status: 'rejected', reason: 'domain_mismatch' };
         }
     }
@@ -302,9 +318,11 @@ export async function linkExternalIdentity(
     if (existingLink) {
         // ── Step 3: Cross-tenant safety ──
         if (existingLink.tenantId !== tenantId) {
+            logger.warn('sso identity link rejected', { component: 'sso', reason: 'cross_tenant' });
             return { status: 'rejected', reason: 'cross_tenant' };
         }
         await IdentityLinkRepo.updateLastLogin(existingLink.id);
+        logger.info('sso identity link resolved', { component: 'sso', status: 'linked', isNewLink: false });
         return { status: 'linked', userId: existingLink.userId, isNewLink: false };
     }
 
@@ -345,6 +363,7 @@ export async function linkExternalIdentity(
             emailAtLinkTime: normalizedEmail,
         });
 
+        logger.info('sso identity link resolved', { component: 'sso', status: 'linked', isNewLink: true });
         return { status: 'linked', userId: user.id, isNewLink: true };
     }
 
@@ -391,6 +410,7 @@ export async function linkExternalIdentity(
         return created;
     });
 
+    logger.info('sso identity link resolved', { component: 'sso', status: 'jit_created' });
     return { status: 'jit_created', userId: newUser.id };
 }
 

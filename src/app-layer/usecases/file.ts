@@ -5,9 +5,11 @@ import { notFound, forbidden } from '@/lib/errors/types';
 import { getFile } from '@/lib/storage';
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
+import { logger } from '@/lib/observability/logger';
 
 export async function downloadFile(ctx: RequestContext, fileName: string) {
     assertCanRead(ctx);
+    logger.info('file download started', { component: 'file', fileName });
 
     return runInTenantContext(ctx, async (db) => {
         const isOwned = await FileRepository.isFileOwnedByTenant(db, ctx, fileName);

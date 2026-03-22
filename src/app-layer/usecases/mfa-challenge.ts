@@ -13,6 +13,7 @@ import { logEvent } from '../events/audit';
 import type { RequestContext } from '../types';
 import { badRequest, internal } from '@/lib/errors/types';
 import { env } from '@/env';
+import { logger } from '@/lib/observability/logger';
 
 export interface MfaChallengeResult {
     success: boolean;
@@ -30,6 +31,8 @@ export async function verifyMfaChallenge(
     code: string,
     remaining: number,
 ): Promise<MfaChallengeResult> {
+    logger.info('mfa challenge started', { component: 'mfa', userId });
+
     // Look up enrollment
     const enrollment = await prisma.userMfaEnrollment.findUnique({
         where: {
@@ -74,6 +77,7 @@ export async function verifyMfaChallenge(
             });
         } catch { /* audit is best-effort */ }
 
+        logger.warn('mfa challenge failed', { component: 'mfa', userId, remaining });
         return {
             success: false,
             message: 'Invalid code. Please check your authenticator app and try again.',
@@ -97,6 +101,7 @@ export async function verifyMfaChallenge(
         });
     } catch { /* audit is best-effort */ }
 
+    logger.info('mfa challenge passed', { component: 'mfa', userId });
     return {
         success: true,
         message: 'MFA verification successful',

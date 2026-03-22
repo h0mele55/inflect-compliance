@@ -9,6 +9,7 @@
  *   await runEvidenceRetentionNotifications({ tenantId: 'xxx' });    // single tenant
  */
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/observability/logger';
 
 export interface RetentionNotificationOptions {
     tenantId?: string;
@@ -127,7 +128,7 @@ export async function runEvidenceRetentionNotifications(
                 });
             }
         } catch (err) {
-            console.warn('[notifications] Failed to enqueue evidence expiring emails:', err);
+            logger.warn('failed to enqueue evidence expiring emails', { component: 'job' });
         }
 
         // Audit event

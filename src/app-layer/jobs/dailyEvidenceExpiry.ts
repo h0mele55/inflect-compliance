@@ -13,6 +13,8 @@
 
 import { runEvidenceRetentionNotifications, type RetentionNotificationResult } from './retention-notifications';
 import { processOutbox, type ProcessOutboxResult } from '../notifications/processOutbox';
+import { runJob } from '@/lib/observability/job-runner';
+import { logger } from '@/lib/observability/logger';
 
 export interface DailyExpiryResult {
     sweeps: {
@@ -26,25 +28,24 @@ export interface DailyExpiryResult {
 export async function runDailyEvidenceExpiryNotifications(
     options: { tenantId?: string; skipOutbox?: boolean } = {},
 ): Promise<DailyExpiryResult> {
-    console.log('[daily-expiry] Starting evidence expiry notification sweep...');
+    return runJob('daily-evidence-expiry', async () => {
+        // Sweep at three urgency thresholds
+        const days30 = await runEvidenceRetentionNotifications({ days: 30, tenantId: options.tenantId });
+        logger.info('expiry sweep completed', { component: 'job', threshold: 30, tasksCreated: days30.tasksCreated, skipped: days30.skippedDuplicate });
 
-    // Sweep at three urgency thresholds
-    const days30 = await runEvidenceRetentionNotifications({ days: 30, tenantId: options.tenantId });
-    console.log(`[daily-expiry] 30-day sweep: ${days30.tasksCreated} tasks, ${days30.skippedDuplicate} skipped`);
+        const days7 = await runEvidenceRetentionNotifications({ days: 7, tenantId: options.tenantId });
+        logger.info('expiry sweep completed', { component: 'job', threshold: 7, tasksCreated: days7.tasksCreated, skipped: days7.skippedDuplicate });
 
-    const days7 = await runEvidenceRetentionNotifications({ days: 7, tenantId: options.tenantId });
-    console.log(`[daily-expiry] 7-day sweep: ${days7.tasksCreated} tasks, ${days7.skippedDuplicate} skipped`);
+        const days1 = await runEvidenceRetentionNotifications({ days: 1, tenantId: options.tenantId });
+        logger.info('expiry sweep completed', { component: 'job', threshold: 1, tasksCreated: days1.tasksCreated, skipped: days1.skippedDuplicate });
 
-    const days1 = await runEvidenceRetentionNotifications({ days: 1, tenantId: options.tenantId });
-    console.log(`[daily-expiry] 1-day sweep: ${days1.tasksCreated} tasks, ${days1.skippedDuplicate} skipped`);
+        // Flush outbox
+        let outbox: ProcessOutboxResult = { sent: 0, failed: 0, skipped: 0 };
+        if (!options.skipOutbox) {
+            outbox = await processOutbox({ limit: 200 });
+            logger.info('outbox flushed', { component: 'job', sent: outbox.sent, failed: outbox.failed, skipped: outbox.skipped });
+        }
 
-    // Flush outbox
-    let outbox: ProcessOutboxResult = { sent: 0, failed: 0, skipped: 0 };
-    if (!options.skipOutbox) {
-        outbox = await processOutbox({ limit: 200 });
-        console.log(`[daily-expiry] Outbox: ${outbox.sent} sent, ${outbox.failed} failed, ${outbox.skipped} retried`);
-    }
-
-    console.log('[daily-expiry] Done.');
-    return { sweeps: { days30, days7, days1 }, outbox };
+        return { sweeps: { days30, days7, days1 }, outbox };
+    }, { tenantId: options.tenantId });
 }

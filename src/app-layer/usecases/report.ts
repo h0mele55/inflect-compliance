@@ -2,11 +2,14 @@ import { RequestContext } from '../types';
 import { ReportRepository } from '../repositories/ReportRepository';
 import { assertCanRead } from '../policies/common';
 import { runInTenantContext } from '@/lib/db-context';
+import { logger } from '@/lib/observability/logger';
+import { traceUsecase } from '@/lib/observability/tracing';
 
 export async function getReports(ctx: RequestContext) {
     assertCanRead(ctx);
+    logger.info('report generation started', { component: 'report' });
 
-    return runInTenantContext(ctx, async (db) => {
+    return traceUsecase('report.generate', ctx, () => runInTenantContext(ctx, async (db) => {
         const controls = await ReportRepository.getSOAData(db, ctx);
 
         const soa = controls.map((c) => ({
@@ -38,6 +41,10 @@ export async function getReports(ctx: RequestContext) {
             controls: r.controls.map((rc: { control: { annexId: string | null; name: string } }) => rc.control.annexId || rc.control.name).join(', '),
         }));
 
+        logger.info('report generation completed', {
+            component: 'report', soaCount: soa.length, riskCount: riskRegister.length,
+        });
+
         return { soa, riskRegister };
-    });
+    }));
 }

@@ -10,6 +10,7 @@ import {
     emitOnboardingRestarted,
 } from '../events/onboarding.events';
 import { runStepAction, storeActionResult } from './onboarding-automation';
+import { logger } from '@/lib/observability/logger';
 
 // ─── Step keys & ordering ───
 
@@ -55,6 +56,7 @@ export async function getOnboardingState(ctx: RequestContext) {
  */
 export async function startOnboarding(ctx: RequestContext) {
     assertCanManageOnboarding(ctx);
+    logger.info('onboarding started', { component: 'onboarding' });
     return runInTenantContext(ctx, async (db) => {
         const existing = await OnboardingRepository.getByTenantId(db, ctx);
         if (existing && existing.status === 'IN_PROGRESS') {
@@ -139,12 +141,20 @@ export async function completeOnboardingStep(ctx: RequestContext, step: Onboardi
         const sd = allData[step] || {};
         const result = await runStepAction(ctx, step, sd, allData);
         if (result) {
+            logger.info('onboarding automation completed', {
+                component: 'onboarding', step, action: result.action,
+                created: result.created, skipped: result.skipped,
+            });
             await storeActionResult(ctx, step, result);
         }
     } catch (e) {
-        console.warn(`[onboarding] Automation for step ${step} failed:`, e);
+        logger.warn('onboarding automation failed', {
+            component: 'onboarding', step,
+            error: e instanceof Error ? { name: e.name, message: e.message } : { name: 'UnknownError', message: String(e) },
+        });
     }
 
+    logger.info('onboarding step completed', { component: 'onboarding', step });
     return record;
 }
 
@@ -193,6 +203,7 @@ export async function finishOnboarding(ctx: RequestContext) {
 
         const record = await OnboardingRepository.finish(db, ctx);
         await emitOnboardingFinished(db, ctx);
+        logger.info('onboarding finished', { component: 'onboarding' });
         return record;
     });
 }

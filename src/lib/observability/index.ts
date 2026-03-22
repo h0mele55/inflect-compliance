@@ -48,3 +48,7 @@ export {
     initTelemetry,
     isTelemetryInitialized,
 } from './instrumentation';
+
+export {
+    runJob,
+} from './job-runner';
