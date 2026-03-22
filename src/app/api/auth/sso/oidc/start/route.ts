@@ -9,6 +9,7 @@ import {
     encodeState,
     buildAuthorizationUrl,
 } from '@/lib/security/oidc-client';
+import { ssoLog, generateSsoRequestId, redactSsoUrl } from '@/lib/security/sso-logging';
 import { env } from '@/env';
 
 export const dynamic = 'force-dynamic';
@@ -16,13 +17,10 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/auth/sso/oidc/start?tenant=<tenantSlug>&provider=<providerId>&returnTo=<path>
  *
- * Initiates the OIDC authorization flow for a tenant-scoped IdP:
- * 1. Resolves tenant by slug
- * 2. Loads the enabled OIDC provider config
- * 3. Generates PKCE + nonce + state
- * 4. Redirects to the IdP's authorization endpoint
+ * Initiates the OIDC authorization flow for a tenant-scoped IdP.
  */
 export async function GET(req: NextRequest) {
+    const requestId = generateSsoRequestId();
     const { searchParams } = req.nextUrl;
     const tenantSlug = searchParams.get('tenant');
     const providerId = searchParams.get('provider');
@@ -30,11 +28,18 @@ export async function GET(req: NextRequest) {
 
     // ── Validate params ──
     if (!tenantSlug || !providerId) {
+        ssoLog('warn', 'Missing required parameters', {
+            requestId, stage: 'start', providerType: 'OIDC',
+        });
         return NextResponse.json(
             { error: 'Missing required parameters: tenant and provider' },
             { status: 400 }
         );
     }
+
+    const logCtx = { requestId, tenantSlug, providerType: 'OIDC' as const, providerId };
+
+    ssoLog('info', 'OIDC flow started', { ...logCtx, stage: 'start' });
 
     // ── Resolve tenant ──
     const tenant = await prisma.tenant.findUnique({
@@ -43,6 +48,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!tenant) {
+        ssoLog('warn', 'Tenant not found', { ...logCtx, stage: 'start' });
         return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
     }
 
@@ -57,6 +63,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!provider) {
+        ssoLog('warn', 'Provider not found or disabled', { ...logCtx, stage: 'config_load' });
         return NextResponse.json(
             { error: 'OIDC provider not found or not enabled' },
             { status: 404 }
@@ -66,7 +73,10 @@ export async function GET(req: NextRequest) {
     // ── Parse OIDC config ──
     const configResult = OidcConfigSchema.safeParse(provider.configJson);
     if (!configResult.success) {
-        console.error('[SSO] Invalid OIDC config for provider:', provider.id, configResult.error.message);
+        ssoLog('error', 'Invalid OIDC configuration', {
+            ...logCtx, stage: 'config_load',
+            meta: { validationError: configResult.error.message },
+        });
         return NextResponse.json(
             { error: 'SSO configuration error' },
             { status: 500 }
@@ -78,8 +88,12 @@ export async function GET(req: NextRequest) {
     let discovery;
     try {
         discovery = await discoverOidc(oidcConfig);
+        ssoLog('info', 'OIDC discovery successful', { ...logCtx, stage: 'discovery' });
     } catch (err) {
-        console.error('[SSO] OIDC discovery failed:', (err as Error).message);
+        ssoLog('error', 'OIDC discovery failed', {
+            ...logCtx, stage: 'discovery',
+            meta: { error: (err as Error).message },
+        });
         return NextResponse.json(
             { error: 'Failed to contact identity provider' },
             { status: 502 }
@@ -112,6 +126,11 @@ export async function GET(req: NextRequest) {
         codeChallenge,
         nonce
     );
+
+    ssoLog('info', 'Redirecting to IdP', {
+        ...logCtx, stage: 'redirect',
+        meta: { authUrl: redactSsoUrl(authUrl) },
+    });
 
     return NextResponse.redirect(authUrl);
 }

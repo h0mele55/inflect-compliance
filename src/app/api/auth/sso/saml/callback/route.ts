@@ -8,6 +8,7 @@ import {
     decodeSamlRelayState,
 } from '@/lib/security/saml-client';
 import { linkExternalIdentity } from '@/app-layer/usecases/sso';
+import { ssoLog, generateSsoRequestId } from '@/lib/security/sso-logging';
 import { env } from '@/env';
 import jwt from 'jsonwebtoken';
 
@@ -26,6 +27,7 @@ export const dynamic = 'force-dynamic';
  * 6. Redirects to app
  */
 export async function POST(req: NextRequest) {
+    const requestId = generateSsoRequestId();
     let formData: FormData;
     try {
         formData = await req.formData();
@@ -95,6 +97,11 @@ export async function POST(req: NextRequest) {
         validatedResponse = await validateSamlResponse(saml, samlResponse);
     } catch (err) {
         console.error('[SSO-SAML] Response validation failed:', (err as Error).message);
+        ssoLog('error', 'SAML response validation failed', {
+            requestId, tenantSlug: relayState.tenantSlug, providerType: 'SAML',
+            providerId: provider.id, stage: 'response_validation',
+            meta: { error: (err as Error).message },
+        });
         return redirectToLogin(req, 'validation_failed', 'SAML response validation failed');
     }
 
@@ -120,12 +127,10 @@ export async function POST(req: NextRequest) {
             jit_disabled: 'No matching account found. Contact your administrator.',
             no_email: 'Identity provider did not return an email',
         };
-        console.warn('[SSO-SAML] Identity linking rejected', {
-            tenantId: tenant.id,
-            providerId: provider.id,
-            email: validatedResponse.email,
-            nameId: validatedResponse.nameId,
-            reason: linkResult.reason,
+        ssoLog('warn', 'SAML identity linking rejected', {
+            requestId, tenantSlug: relayState.tenantSlug, providerType: 'SAML',
+            providerId: provider.id, stage: 'identity_linking',
+            meta: { reason: linkResult.reason, email: validatedResponse.email },
         });
         return redirectToLogin(
             req,

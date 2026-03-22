@@ -6,6 +6,7 @@ import {
     generateAuthnRequest,
     encodeSamlRelayState,
 } from '@/lib/security/saml-client';
+import { ssoLog, generateSsoRequestId } from '@/lib/security/sso-logging';
 import { env } from '@/env';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,7 @@ export const dynamic = 'force-dynamic';
  * 5. Redirects to IdP's SSO endpoint
  */
 export async function GET(req: NextRequest) {
+    const requestId = generateSsoRequestId();
     const { searchParams } = req.nextUrl;
     const tenantSlug = searchParams.get('tenant');
     const providerId = searchParams.get('provider');
@@ -65,6 +67,10 @@ export async function GET(req: NextRequest) {
     const configResult = SamlConfigSchema.safeParse(provider.configJson);
     if (!configResult.success) {
         console.error('[SSO-SAML] Invalid config for provider:', provider.id, configResult.error.message);
+        ssoLog('error', 'Invalid SAML configuration', {
+            requestId, tenantSlug: tenantSlug || '', providerType: 'SAML',
+            providerId: provider.id, stage: 'config_load',
+        });
         return NextResponse.json(
             { error: 'SSO configuration error' },
             { status: 500 }
@@ -99,8 +105,17 @@ export async function GET(req: NextRequest) {
     // ── Generate AuthnRequest and redirect ──
     try {
         const redirectUrl = await generateAuthnRequest(saml, relayState);
+        ssoLog('info', 'SAML AuthnRequest generated, redirecting to IdP', {
+            requestId, tenantSlug: tenant.slug, providerType: 'SAML',
+            providerId: provider.id, stage: 'redirect',
+        });
         return NextResponse.redirect(redirectUrl);
     } catch (err) {
+        ssoLog('error', 'AuthnRequest generation failed', {
+            requestId, tenantSlug: tenant.slug, providerType: 'SAML',
+            providerId: provider.id, stage: 'authn_request',
+            meta: { error: (err as Error).message },
+        });
         console.error('[SSO-SAML] AuthnRequest generation failed:', (err as Error).message);
         return NextResponse.json(
             { error: 'Failed to initiate SAML authentication' },

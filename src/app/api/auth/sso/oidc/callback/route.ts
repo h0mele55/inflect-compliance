@@ -10,6 +10,7 @@ import {
     validateIdTokenNonce,
 } from '@/lib/security/oidc-client';
 import { linkExternalIdentity } from '@/app-layer/usecases/sso';
+import { ssoLog, generateSsoRequestId } from '@/lib/security/sso-logging';
 import { env } from '@/env';
 import jwt from 'jsonwebtoken';
 
@@ -27,6 +28,7 @@ export const dynamic = 'force-dynamic';
  * 6. Redirects to app
  */
 export async function GET(req: NextRequest) {
+    const requestId = generateSsoRequestId();
     const { searchParams } = req.nextUrl;
     const code = searchParams.get('code');
     const stateParam = searchParams.get('state');
@@ -35,7 +37,10 @@ export async function GET(req: NextRequest) {
 
     // ── Handle IdP errors ──
     if (error) {
-        console.warn('[SSO] IdP returned error:', error, errorDescription);
+        ssoLog('warn', 'IdP returned error', {
+            requestId, providerType: 'OIDC', stage: 'callback_received',
+            meta: { error, errorDescription: errorDescription || '' },
+        });
         return redirectToLogin(req, 'sso_error', 'Identity provider returned an error');
     }
 
@@ -110,7 +115,10 @@ export async function GET(req: NextRequest) {
 
     // ── Validate nonce ──
     if (!validateIdTokenNonce(tokens.id_token, state.nonce)) {
-        console.error('[SSO] Nonce mismatch — possible replay attack');
+        ssoLog('error', 'Nonce mismatch — possible replay attack', {
+            requestId, tenantSlug: state.tenantSlug, providerType: 'OIDC',
+            providerId: state.providerId, stage: 'nonce_validation',
+        });
         return redirectToLogin(req, 'nonce_mismatch');
     }
 
@@ -145,12 +153,10 @@ export async function GET(req: NextRequest) {
             jit_disabled: 'No matching account found. Contact your administrator.',
             no_email: 'Identity provider did not return an email',
         };
-        console.warn('[SSO] Identity linking rejected', {
-            tenantId: tenant.id,
-            providerId: provider.id,
-            email: claims.email,
-            sub: claims.sub,
-            reason: linkResult.reason,
+        ssoLog('warn', 'Identity linking rejected', {
+            requestId, tenantSlug: state.tenantSlug, providerType: 'OIDC',
+            providerId: provider.id, stage: 'identity_linking',
+            meta: { reason: linkResult.reason, email: claims.email },
         });
         return redirectToLogin(
             req,
