@@ -27,7 +27,11 @@ test.describe('Control Edit Modal', () => {
 
         // Click first control link
         const firstLink = page.locator('#controls-table tbody tr a[id^="control-link-"]').first();
+        await firstLink.waitFor({ state: 'visible' });
         await firstLink.click();
+        
+        // Wait for page transition and hydration
+        await page.waitForLoadState('networkidle');
         await page.waitForSelector('#control-title', { timeout: 10000 });
 
         // Edit button should be visible
@@ -41,15 +45,21 @@ test.describe('Control Edit Modal', () => {
 
         // Click first control
         const firstLink = page.locator('#controls-table tbody tr a[id^="control-link-"]').first();
+        await firstLink.waitFor({ state: 'visible' });
         await firstLink.click();
+        
+        // Wait for page transition and hydration
+        await page.waitForLoadState('networkidle');
         await page.waitForSelector('#control-title', { timeout: 10000 });
 
         // Record original title
         const originalTitle = (await page.locator('#control-title').textContent())!.trim();
 
-        // Click Edit
-        await page.locator('[data-testid="control-edit-button"]').click();
-        await expect(page.locator('[data-testid="control-edit-dialog"]')).toBeVisible({ timeout: 3000 });
+        // Click Edit (Ensure button is ready)
+        const editBtn = page.locator('[data-testid="control-edit-button"]');
+        await editBtn.waitFor({ state: 'visible' });
+        await editBtn.click();
+        await expect(page.locator('[data-testid="control-edit-dialog"]')).toBeVisible({ timeout: 5000 });
 
         // Name input should have the original title
         const nameInput = page.locator('[data-testid="edit-name-input"]');
@@ -70,8 +80,10 @@ test.describe('Control Edit Modal', () => {
         await expect(page.locator('#edit-success-toast')).toBeVisible({ timeout: 3000 });
 
         // Restore original title
-        await page.locator('[data-testid="control-edit-button"]').click();
-        await expect(page.locator('[data-testid="control-edit-dialog"]')).toBeVisible({ timeout: 3000 });
+        const editBtn2 = page.locator('[data-testid="control-edit-button"]');
+        await editBtn2.waitFor({ state: 'visible' });
+        await editBtn2.click();
+        await expect(page.locator('[data-testid="control-edit-dialog"]')).toBeVisible({ timeout: 5000 });
         await nameInput.fill(originalTitle);
         await page.locator('[data-testid="edit-save-button"]').click();
         await expect(page.locator('[data-testid="control-edit-dialog"]')).toBeHidden({ timeout: 5000 });
@@ -83,14 +95,19 @@ test.describe('Control Edit Modal', () => {
         await page.waitForSelector('#controls-table', { timeout: 15000 });
 
         const firstLink = page.locator('#controls-table tbody tr a[id^="control-link-"]').first();
+        await firstLink.waitFor({ state: 'visible' });
         await firstLink.click();
+        
+        await page.waitForLoadState('networkidle');
         await page.waitForSelector('#control-title', { timeout: 10000 });
 
         const originalTitle = (await page.locator('#control-title').textContent())!.trim();
 
         // Open edit modal
-        await page.locator('[data-testid="control-edit-button"]').click();
-        await expect(page.locator('[data-testid="control-edit-dialog"]')).toBeVisible({ timeout: 3000 });
+        const editBtn = page.locator('[data-testid="control-edit-button"]');
+        await editBtn.waitFor({ state: 'visible' });
+        await editBtn.click();
+        await expect(page.locator('[data-testid="control-edit-dialog"]')).toBeVisible({ timeout: 5000 });
 
         // Change title
         await page.locator('[data-testid="edit-name-input"]').fill('This should not save');

@@ -62,7 +62,7 @@ test.describe('Control Toggle Pills', () => {
         const text2 = (await statusPill.textContent())!.trim();
 
         // Wait for loading to clear before clicking again
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle');
 
         // Click twice
         const resB = page.waitForResponse(res => res.url().includes('/status') && res.request().method() === 'POST');
@@ -174,7 +174,7 @@ test.describe('Control Toggle Pills', () => {
 
         await page.goto(`/t/${tenantSlug}/controls`);
         await page.waitForSelector('#controls-table', { timeout: 15000 });
-        await page.waitForTimeout(2000); // let hydration settle
+        await page.waitForLoadState('networkidle'); /* replaced wait */
 
         // Reader should NOT see clickable status pills (they should be <span> not <button>)
         const statusPillBtn = page.locator('#controls-table tbody tr').first().locator('button[id^="status-pill-"]');

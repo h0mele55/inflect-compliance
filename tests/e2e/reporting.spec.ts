@@ -38,7 +38,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
         if (hasSidebar) break;
         renderRetries--;
         if (renderRetries > 0) {
-            await page.waitForTimeout(3000);
+            await page.waitForLoadState('networkidle');
             await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
             await page.waitForLoadState('networkidle').catch(() => {});
         }
@@ -79,7 +79,7 @@ test.describe('Reporting & Audit Narrative', () => {
         await expect(page.locator('#frameworks-heading')).toContainText('Compliance Frameworks');
 
         // Wait for cards to hydrate
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle');
         const cardCount = await page.locator('[id^="fw-card-"]').count();
         expect(cardCount).toBeGreaterThanOrEqual(1);
     });
@@ -92,7 +92,7 @@ test.describe('Reporting & Audit Narrative', () => {
         await gotoAndVerify(page, `/t/${tenantSlug}/frameworks/ISO27001/coverage`, 'h1', 3);
 
         // Wait for the heading — may show "Coverage data not available" if no pack installed
-        await page.waitForTimeout(3000);
+        await page.waitForLoadState('networkidle');
         const heading = page.locator('#coverage-report-heading');
         const hasReport = await heading.isVisible().catch(() => false);
 

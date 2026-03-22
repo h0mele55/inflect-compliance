@@ -21,7 +21,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
         if (hasSidebar) break;
         renderRetries--;
         if (renderRetries > 0) {
-            await page.waitForTimeout(3000);
+            await page.waitForLoadState('networkidle');
             await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
             await page.waitForLoadState('networkidle').catch(() => {});
         }
@@ -92,7 +92,7 @@ test.describe('Issue Management', () => {
 
         // Change status to TRIAGED
         await page.selectOption('#task-status-select', 'TRIAGED');
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle');
 
         // Reload and verify
         await page.reload();
@@ -120,7 +120,7 @@ test.describe('Issue Management', () => {
         if (userId) {
             await page.fill('#task-assignee-input', userId);
             await page.click('#assign-task-btn');
-            await page.waitForTimeout(2000);
+            await page.waitForLoadState('networkidle');
             // After assign, reload and confirm the input still has the value
             await page.reload();
             await page.waitForSelector('#task-assignee', { timeout: 10000 });
@@ -136,7 +136,7 @@ test.describe('Issue Management', () => {
 
         // Go to links tab
         await page.click('#tab-links');
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
 
         // Add a link
         await page.click('#add-link-btn');
@@ -144,7 +144,7 @@ test.describe('Issue Management', () => {
         await page.selectOption('#link-entity-type', 'CONTROL');
         await page.fill('#link-entity-id', 'test-control-id');
         await page.click('#submit-link-btn');
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle');
 
         // Verify link appears
         await expect(page.locator('#links-list')).toContainText('CONTROL', { timeout: 5000 });
@@ -160,12 +160,12 @@ test.describe('Issue Management', () => {
 
         // Go to comments tab
         await page.click('#tab-comments');
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('networkidle');
 
         // Add a comment
         await page.fill('#comment-body', `E2E comment ${uniqueId}`);
         await page.click('#submit-comment-btn');
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle');
 
         // Verify comment appears
         await expect(page.locator('#comments-list')).toContainText(`E2E comment ${uniqueId}`, { timeout: 5000 });
@@ -217,7 +217,7 @@ test.describe('Issue Management', () => {
             if (rendered) break;
             renderRetries--;
             if (renderRetries > 0) {
-                await page.waitForTimeout(3000);
+                await page.waitForLoadState('networkidle');
                 await page.goto(`/t/${tenantSlug}/dashboard`, { waitUntil: 'domcontentloaded' });
                 await page.waitForLoadState('networkidle').catch(() => {});
             }

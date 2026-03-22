@@ -29,7 +29,7 @@ async function loginAndGetTenant(page: Page, user: { email: string; password: st
         if (hasSidebar) break;
         renderRetries--;
         if (renderRetries > 0) {
-            await page.waitForTimeout(3000);
+            await page.waitForLoadState('networkidle');
             await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
             await page.waitForLoadState('networkidle').catch(() => {});
         }
@@ -71,7 +71,7 @@ test.describe('RBAC Access Control', () => {
 
         // Middleware redirects non-admin users away from admin paths.
         await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
-        await page.waitForTimeout(2000); // Let any redirects settle
+        await page.waitForLoadState('networkidle'); /* replaced wait */
 
         // If redirected away, that's expected middleware behavior
         const currentUrl = page.url();

@@ -21,7 +21,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
         if (hasSidebar) break;
         renderRetries--;
         if (renderRetries > 0) {
-            await page.waitForTimeout(3000);
+            await page.waitForLoadState('networkidle');
             await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
             await page.waitForLoadState('networkidle').catch(() => {});
         }
@@ -82,7 +82,7 @@ test.describe('Control Tests (Test-of-Control)', () => {
 
         // Use search to find the specific control
         await page.fill('#control-search', `Test Ctrl ${uid}`);
-        await page.waitForTimeout(2000); // debounced search filter
+        await page.waitForLoadState('networkidle'); /* replaced wait */
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });
 
@@ -107,7 +107,7 @@ test.describe('Control Tests (Test-of-Control)', () => {
 
         // Use search to find the specific control
         await page.fill('#control-search', `Test Ctrl ${uid}`);
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle');
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });
         await page.click('#tab-tests');
@@ -152,11 +152,11 @@ test.describe('Control Tests (Test-of-Control)', () => {
 
         // Use search to find the specific control
         await page.fill('#control-search', `Test Ctrl ${uid}`);
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('networkidle');
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });
         await page.click('#tab-tests');
-        await page.waitForTimeout(2000); // Wait for plans list to load
+        await page.waitForLoadState('networkidle'); /* replaced wait */
         const planLink = page.locator(`[id^="test-plan-link-"]`).filter({ hasText: `Access Review ${uid}` }).first();
         await planLink.click();
         await page.waitForSelector('#test-plan-title', { timeout: 10000 });

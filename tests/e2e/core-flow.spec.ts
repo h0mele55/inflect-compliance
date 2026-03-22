@@ -94,7 +94,7 @@ test.describe('Core Certification Flow', () => {
         // Select the control we created — search and pick from dropdown
         await page.fill('#control-search-input', CONTROL_CODE);
         // Wait for filtered dropdown to show our control
-        await page.waitForTimeout(500); // let filtering settle
+        await page.waitForLoadState('networkidle'); /* replaced wait */
 
         // Select the control from the dropdown
         const controlSelect = page.locator('#control-select');
@@ -115,7 +115,7 @@ test.describe('Core Certification Flow', () => {
         // If control not found in dropdown (e.g. search doesn't match), try without search
         if (!controlFound) {
             await page.fill('#control-search-input', '');
-            await page.waitForTimeout(500);
+            await page.waitForLoadState('networkidle');
             const allOptionCount = await controlSelect.locator('option').count();
             for (let i = 0; i < allOptionCount; i++) {
                 const text = await controlSelect.locator('option').nth(i).textContent();
@@ -214,7 +214,7 @@ test.describe('Core Certification Flow', () => {
         // Wait for the control dropdown to populate
         const controlDropdown = page.locator('#traceability-panel select').first();
         await controlDropdown.waitFor({ state: 'visible', timeout: 5000 });
-        await page.waitForTimeout(1500); // let options load
+        await page.waitForLoadState('networkidle');
 
         // Select our control from the dropdown
         const optCount = await controlDropdown.locator('option').count();

@@ -29,7 +29,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
         if (hasSidebar) break;
         renderRetries--;
         if (renderRetries > 0) {
-            await page.waitForTimeout(3000);
+            await page.waitForLoadState('networkidle');
             await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
             await page.waitForLoadState('networkidle').catch(() => {});
         }

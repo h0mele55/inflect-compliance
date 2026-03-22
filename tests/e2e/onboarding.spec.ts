@@ -29,7 +29,7 @@ async function loginAsAdmin(page: Page): Promise<string> {
         if (hasSidebar) break;
         retries--;
         if (retries > 0) {
-            await page.waitForTimeout(3000);
+            await page.waitForLoadState('networkidle');
             await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
             await page.waitForLoadState('networkidle').catch(() => {});
         }
@@ -93,7 +93,7 @@ test.describe('Onboarding Wizard', () => {
         await gotoAndVerify(page, `/t/${slug}/onboarding`);
 
         // Should NOT show the welcome screen — should show the wizard with progress
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle');
         const wizardEl = page.locator('[data-testid="onboarding-wizard"]');
         const hasWizard = await wizardEl.isVisible({ timeout: 5000 }).catch(() => false);
 
@@ -119,7 +119,7 @@ test.describe('Onboarding Wizard', () => {
         const slug = match ? match[1] : 'acme-corp';
 
         await gotoAndVerify(page, `/t/${slug}/onboarding`);
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState('networkidle');
 
         const pageContent = await page.textContent('body');
         const blocked = pageContent?.includes('Access Restricted') || pageContent?.includes('administrator');
