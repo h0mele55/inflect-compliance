@@ -3,6 +3,8 @@
  *
  * Tests the usecase logic for identity linking, SSO enforcement,
  * tenant resolution, and cross-tenant rejection.
+ *
+ * Updated for LinkResult return type with explicit rejection reasons.
  */
 
 // ─── Mocks ──────────────────────────────────────────────────────────
@@ -71,6 +73,10 @@ describe('linkExternalIdentity', () => {
     const EMAIL = 'alice@acme.com';
 
     it('returns existing user if identity link already exists for this tenant', async () => {
+        // Provider with no domain restrictions
+        mockPrisma.tenantIdentityProvider.findFirst.mockResolvedValueOnce({
+            id: PROVIDER_ID, tenantId: TENANT_ID, emailDomains: [], configJson: {},
+        });
         mockPrisma.userIdentityLink.findUnique.mockResolvedValueOnce({
             id: 'link-1',
             userId: 'user-1',
@@ -83,10 +89,13 @@ describe('linkExternalIdentity', () => {
         mockPrisma.userIdentityLink.update.mockResolvedValueOnce({});
 
         const result = await linkExternalIdentity(TENANT_ID, PROVIDER_ID, SUBJECT, EMAIL);
-        expect(result).toEqual({ userId: 'user-1', isNewLink: false });
+        expect(result).toEqual({ status: 'linked', userId: 'user-1', isNewLink: false });
     });
 
     it('rejects if existing link belongs to a different tenant (cross-tenant attack)', async () => {
+        mockPrisma.tenantIdentityProvider.findFirst.mockResolvedValueOnce({
+            id: PROVIDER_ID, tenantId: TENANT_ID, emailDomains: [], configJson: {},
+        });
         mockPrisma.userIdentityLink.findUnique.mockResolvedValueOnce({
             id: 'link-1',
             userId: 'user-1',
@@ -96,10 +105,13 @@ describe('linkExternalIdentity', () => {
         });
 
         const result = await linkExternalIdentity(TENANT_ID, PROVIDER_ID, SUBJECT, EMAIL);
-        expect(result).toBeNull();
+        expect(result).toEqual({ status: 'rejected', reason: 'cross_tenant' });
     });
 
     it('creates a new link if user exists with membership but no prior link', async () => {
+        mockPrisma.tenantIdentityProvider.findFirst.mockResolvedValueOnce({
+            id: PROVIDER_ID, tenantId: TENANT_ID, emailDomains: [], configJson: {},
+        });
         // No existing link by subject
         mockPrisma.userIdentityLink.findUnique
             .mockResolvedValueOnce(null)   // findByProviderAndSubject
@@ -122,7 +134,7 @@ describe('linkExternalIdentity', () => {
         });
 
         const result = await linkExternalIdentity(TENANT_ID, PROVIDER_ID, SUBJECT, EMAIL);
-        expect(result).toEqual({ userId: 'user-1', isNewLink: true });
+        expect(result).toEqual({ status: 'linked', userId: 'user-1', isNewLink: true });
         expect(mockPrisma.userIdentityLink.create).toHaveBeenCalledWith({
             data: expect.objectContaining({
                 userId: 'user-1',
@@ -135,23 +147,32 @@ describe('linkExternalIdentity', () => {
     });
 
     it('rejects if user has no membership in the target tenant', async () => {
+        mockPrisma.tenantIdentityProvider.findFirst.mockResolvedValueOnce({
+            id: PROVIDER_ID, tenantId: TENANT_ID, emailDomains: [], configJson: {},
+        });
         mockPrisma.userIdentityLink.findUnique.mockResolvedValueOnce(null);
         mockPrisma.user.findUnique.mockResolvedValueOnce({ id: 'user-1' });
-        mockPrisma.tenantMembership.findUnique.mockResolvedValueOnce(null); // No membership
+        mockPrisma.tenantMembership.findUnique.mockResolvedValueOnce(null);
 
         const result = await linkExternalIdentity(TENANT_ID, PROVIDER_ID, SUBJECT, EMAIL);
-        expect(result).toBeNull();
+        expect(result).toEqual({ status: 'rejected', reason: 'no_membership' });
     });
 
-    it('rejects if no user matches the email', async () => {
+    it('rejects if no user matches the email (JIT disabled)', async () => {
+        mockPrisma.tenantIdentityProvider.findFirst.mockResolvedValueOnce({
+            id: PROVIDER_ID, tenantId: TENANT_ID, emailDomains: [], configJson: {},
+        });
         mockPrisma.userIdentityLink.findUnique.mockResolvedValueOnce(null);
-        mockPrisma.user.findUnique.mockResolvedValueOnce(null); // No user
+        mockPrisma.user.findUnique.mockResolvedValueOnce(null);
 
         const result = await linkExternalIdentity(TENANT_ID, PROVIDER_ID, SUBJECT, EMAIL);
-        expect(result).toBeNull();
+        expect(result).toEqual({ status: 'rejected', reason: 'jit_disabled' });
     });
 
     it('rejects if user already has a different subject linked for this provider', async () => {
+        mockPrisma.tenantIdentityProvider.findFirst.mockResolvedValueOnce({
+            id: PROVIDER_ID, tenantId: TENANT_ID, emailDomains: [], configJson: {},
+        });
         mockPrisma.userIdentityLink.findUnique
             .mockResolvedValueOnce(null)                        // No link by subject
             .mockResolvedValueOnce({ id: 'existing-link' });    // Has existing link for provider
@@ -163,7 +184,19 @@ describe('linkExternalIdentity', () => {
         });
 
         const result = await linkExternalIdentity(TENANT_ID, PROVIDER_ID, SUBJECT, EMAIL);
-        expect(result).toBeNull();
+        expect(result).toEqual({ status: 'rejected', reason: 'subject_conflict' });
+    });
+
+    it('rejects email not matching allowed domains', async () => {
+        mockPrisma.tenantIdentityProvider.findFirst.mockResolvedValueOnce({
+            id: PROVIDER_ID, tenantId: TENANT_ID,
+            emailDomains: ['acme.com'], // Only acme.com allowed
+            configJson: {},
+        });
+
+        // Try with wrong domain
+        const result = await linkExternalIdentity(TENANT_ID, PROVIDER_ID, SUBJECT, 'user@evil.com');
+        expect(result).toEqual({ status: 'rejected', reason: 'domain_mismatch' });
     });
 });
 

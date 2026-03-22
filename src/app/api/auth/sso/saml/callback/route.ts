@@ -110,26 +110,38 @@ export async function POST(req: NextRequest) {
         validatedResponse.email
     );
 
-    if (!linkResult) {
-        console.warn('[SSO-SAML] Identity linking failed', {
+    if (linkResult.status === 'rejected') {
+        const reasonMessages: Record<string, string> = {
+            cross_tenant: 'Cross-tenant login attempt blocked',
+            domain_mismatch: 'Email domain not allowed for this SSO provider',
+            no_user: 'No matching account found. Contact your administrator.',
+            no_membership: 'No matching account found. Contact your administrator.',
+            subject_conflict: 'Identity conflict detected. Contact your administrator.',
+            jit_disabled: 'No matching account found. Contact your administrator.',
+            no_email: 'Identity provider did not return an email',
+        };
+        console.warn('[SSO-SAML] Identity linking rejected', {
             tenantId: tenant.id,
             providerId: provider.id,
             email: validatedResponse.email,
             nameId: validatedResponse.nameId,
+            reason: linkResult.reason,
         });
         return redirectToLogin(
             req,
-            'no_account',
-            'No matching account found. Contact your administrator.'
+            linkResult.reason,
+            reasonMessages[linkResult.reason] || 'Login failed'
         );
     }
+
+    const linkedUserId = linkResult.userId;
 
     // ── Load membership for session ──
     const membership = await prisma.tenantMembership.findUnique({
         where: {
             tenantId_userId: {
                 tenantId: tenant.id,
-                userId: linkResult.userId,
+                userId: linkedUserId,
             },
         },
     });
@@ -139,7 +151,7 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-        where: { id: linkResult.userId },
+        where: { id: linkedUserId },
         select: { id: true, email: true, name: true },
     });
 

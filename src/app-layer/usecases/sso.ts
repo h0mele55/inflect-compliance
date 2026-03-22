@@ -64,7 +64,14 @@ export async function upsertTenantSsoConfig(
         isEnabled: input.isEnabled,
         isEnforced: input.isEnforced,
         emailDomains: input.emailDomains,
-        configJson: input.config,
+        configJson: {
+            ...input.config,
+            // Persist JIT settings alongside IdP config
+            _jit: {
+                allowJitProvisioning: input.allowJitProvisioning,
+                jitDefaultRole: input.jitDefaultRole,
+            },
+        },
     });
 }
 
@@ -214,88 +221,204 @@ export async function resolveSsoByDomain(
     };
 }
 
-// ─── Identity Linking ────────────────────────────────────────────────
+// ─── Identity Linking ────────────────────────────────────────────
+
+/**
+ * Result type for linkExternalIdentity — provides explicit rejection reasons.
+ */
+export type LinkResult =
+    | { status: 'linked'; userId: string; isNewLink: boolean }
+    | { status: 'jit_created'; userId: string }
+    | { status: 'rejected'; reason: LinkRejectionReason };
+
+export type LinkRejectionReason =
+    | 'cross_tenant'       // Existing link belongs to different tenant
+    | 'domain_mismatch'    // Email domain not in provider's allowed domains
+    | 'no_user'            // No local user found
+    | 'no_membership'      // User exists but has no tenant membership
+    | 'subject_conflict'   // User linked to a different subject for same provider
+    | 'jit_disabled'       // Would need JIT but it's turned off
+    | 'no_email';          // IdP didn't provide an email
+
+/**
+ * Validate an email against a provider's allowed domains.
+ * Returns true if:
+ *   - provider has no domain restrictions (emailDomains is empty)
+ *   - email's domain is in the allowed list
+ */
+export function validateEmailAgainstDomains(
+    email: string,
+    emailDomains: string[]
+): boolean {
+    if (emailDomains.length === 0) return true;
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (!domain) return false;
+    return emailDomains.some((d) => d.toLowerCase() === domain);
+}
 
 /**
  * Link an external identity to a local user during SSO callback.
  *
- * Resolution order:
- * 1. Check for existing link by (providerId, externalSubject)
- * 2. If no link, match by email → User → TenantMembership
- * 3. If user found with membership, create link
- * 4. If no user/membership found, reject (no auto-provisioning)
+ * Hardened resolution with explicit safety checks:
+ * 1. Validate email against provider's allowed domains
+ * 2. Check for existing link by (providerId, externalSubject)
+ * 3. Verify cross-tenant safety
+ * 4. If no link, match by email → User → TenantMembership
+ * 5. If no user/membership found, attempt JIT provisioning if enabled
+ * 6. Never auto-provision ADMIN role via JIT
  *
- * Returns the userId if successful, null if no matching user found.
+ * Returns explicit status with rejection reasons for audit logging.
  */
 export async function linkExternalIdentity(
     tenantId: string,
     providerId: string,
     externalSubject: string,
     email: string
-): Promise<{ userId: string; isNewLink: boolean } | null> {
-    // 1. Check for existing link
+): Promise<LinkResult> {
+    if (!email) {
+        return { status: 'rejected', reason: 'no_email' };
+    }
+
+    const normalizedEmail = email.toLowerCase();
+
+    // Load provider config for domain validation and JIT settings
+    const provider = await prisma.tenantIdentityProvider.findFirst({
+        where: { id: providerId, tenantId },
+    });
+
+    // ── Step 1: Domain validation ──
+    if (provider) {
+        if (!validateEmailAgainstDomains(normalizedEmail, provider.emailDomains)) {
+            return { status: 'rejected', reason: 'domain_mismatch' };
+        }
+    }
+
+    // ── Step 2: Check for existing link ──
     const existingLink = await IdentityLinkRepo.findByProviderAndSubject(
         providerId,
         externalSubject
     );
 
     if (existingLink) {
-        // Verify the link belongs to the correct tenant
+        // ── Step 3: Cross-tenant safety ──
         if (existingLink.tenantId !== tenantId) {
-            // Cross-tenant attack — reject
-            return null;
+            return { status: 'rejected', reason: 'cross_tenant' };
         }
         await IdentityLinkRepo.updateLastLogin(existingLink.id);
-        return { userId: existingLink.userId, isNewLink: false };
+        return { status: 'linked', userId: existingLink.userId, isNewLink: false };
     }
 
-    // 2. No existing link — try to match by email
+    // ── Step 4: Match by email ──
     const user = await prisma.user.findUnique({
-        where: { email: email.toLowerCase() },
+        where: { email: normalizedEmail },
         select: { id: true },
     });
 
-    if (!user) return null;
-
-    // 3. Verify user has membership in this tenant
-    const membership = await prisma.tenantMembership.findUnique({
-        where: {
-            tenantId_userId: {
-                tenantId,
-                userId: user.id,
+    if (user) {
+        // Check tenant membership
+        const membership = await prisma.tenantMembership.findUnique({
+            where: {
+                tenantId_userId: { tenantId, userId: user.id },
             },
-        },
-    });
+        });
 
-    if (!membership) return null;
+        if (!membership) {
+            return { status: 'rejected', reason: 'no_membership' };
+        }
 
-    // 4. Check if user already has a different link for this provider
-    const existingUserLink = await IdentityLinkRepo.findByUserAndProvider(
-        user.id,
-        providerId
-    );
+        // Check for subject conflict
+        const existingUserLink = await IdentityLinkRepo.findByUserAndProvider(
+            user.id,
+            providerId
+        );
 
-    if (existingUserLink) {
-        // User already linked with a different subject — this is suspicious
-        // Don't overwrite the existing link
-        return null;
+        if (existingUserLink) {
+            return { status: 'rejected', reason: 'subject_conflict' };
+        }
+
+        // Create link for existing user
+        await IdentityLinkRepo.linkIdentity({
+            userId: user.id,
+            tenantId,
+            providerId,
+            externalSubject,
+            emailAtLinkTime: normalizedEmail,
+        });
+
+        return { status: 'linked', userId: user.id, isNewLink: true };
     }
 
-    // 5. Create the identity link
-    await IdentityLinkRepo.linkIdentity({
-        userId: user.id,
-        tenantId,
-        providerId,
-        externalSubject,
-        emailAtLinkTime: email.toLowerCase(),
+    // ── Step 5: JIT provisioning ──
+    const jitConfig = extractJitConfig(provider);
+
+    if (!jitConfig.allowJitProvisioning) {
+        return { status: 'rejected', reason: 'jit_disabled' };
+    }
+
+    // JIT: create user + membership + link in a transaction
+    // SAFETY: JIT role is always READER or EDITOR — never ADMIN
+    const safeRole = jitConfig.jitDefaultRole === 'EDITOR' ? 'EDITOR' : 'READER';
+
+    const newUser = await prisma.$transaction(async (tx) => {
+        // Create user
+        const created = await tx.user.create({
+            data: {
+                email: normalizedEmail,
+                name: normalizedEmail.split('@')[0],
+            },
+        });
+
+        // Create membership
+        await tx.tenantMembership.create({
+            data: {
+                tenantId,
+                userId: created.id,
+                role: safeRole as 'READER' | 'EDITOR',
+            },
+        });
+
+        // Create identity link
+        await tx.userIdentityLink.create({
+            data: {
+                userId: created.id,
+                tenantId,
+                providerId,
+                externalSubject,
+                emailAtLinkTime: normalizedEmail,
+            },
+        });
+
+        return created;
     });
 
-    return { userId: user.id, isNewLink: true };
+    return { status: 'jit_created', userId: newUser.id };
+}
+
+/**
+ * Extract JIT provisioning config from provider's configJson.
+ * Returns safe defaults if not configured.
+ */
+function extractJitConfig(provider: { configJson: unknown } | null): {
+    allowJitProvisioning: boolean;
+    jitDefaultRole: string;
+} {
+    if (!provider) return { allowJitProvisioning: false, jitDefaultRole: 'READER' };
+    const config = provider.configJson as Record<string, unknown>;
+    const jit = config?._jit as Record<string, unknown> | undefined;
+    return {
+        allowJitProvisioning: jit?.allowJitProvisioning === true,
+        jitDefaultRole: jit?.jitDefaultRole === 'EDITOR' ? 'EDITOR' : 'READER',
+    };
 }
 
 /**
  * Check if local login is allowed for a user in a specific tenant.
  * Returns false if SSO is enforced AND the user is not a break-glass admin.
+ *
+ * Break-glass criteria:
+ *   1. User has ADMIN role in tenant
+ *   2. User has a local passwordHash set
+ *   Both conditions must be true.
  */
 export async function isLocalLoginAllowed(
     tenantId: string,
@@ -322,6 +445,78 @@ export async function isLocalLoginAllowed(
     });
 
     return !!user?.passwordHash;
+}
+
+/**
+ * Pre-login enforcement check for the credentials/local login path.
+ * Given an email, resolves all tenant memberships and checks if any
+ * has SSO enforced.
+ *
+ * Returns:
+ *   - { allowed: true } — local login permitted
+ *   - { allowed: false, tenantSlug, providerName } — must use SSO
+ *   - { allowed: true } — break-glass admin
+ */
+export async function checkSsoEnforcementForEmail(
+    email: string
+): Promise<{
+    allowed: boolean;
+    enforced?: {
+        tenantSlug: string;
+        tenantName: string;
+        providerName: string;
+        providerId: string;
+        providerType: string;
+    };
+}> {
+    const normalizedEmail = email.toLowerCase();
+
+    // Find user
+    const user = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        select: {
+            id: true,
+            passwordHash: true,
+            tenantMemberships: {
+                include: {
+                    tenant: { select: { id: true, slug: true, name: true } },
+                },
+            },
+        },
+    });
+
+    if (!user) return { allowed: true }; // User doesn't exist yet — let normal auth handle it
+
+    // Check each membership for SSO enforcement
+    for (const membership of user.tenantMemberships) {
+        const enforcedProvider = await prisma.tenantIdentityProvider.findFirst({
+            where: {
+                tenantId: membership.tenantId,
+                isEnabled: true,
+                isEnforced: true,
+            },
+        });
+
+        if (enforcedProvider) {
+            // SSO is enforced in this tenant — check break-glass
+            const isBreakGlass = membership.role === 'ADMIN' && !!user.passwordHash;
+
+            if (!isBreakGlass) {
+                return {
+                    allowed: false,
+                    enforced: {
+                        tenantSlug: membership.tenant.slug,
+                        tenantName: membership.tenant.name,
+                        providerName: enforcedProvider.name,
+                        providerId: enforcedProvider.id,
+                        providerType: enforcedProvider.type,
+                    },
+                };
+            }
+        }
+    }
+
+    return { allowed: true };
 }
 
 // ─── Identity Link Admin ────────────────────────────────────────────

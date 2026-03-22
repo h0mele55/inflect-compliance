@@ -81,6 +81,10 @@ export const UpsertSsoConfigInput = z.object({
     emailDomains: z.array(EmailDomainSchema).default([]),
     /** IdP-specific configuration — will be validated by type */
     config: z.record(z.unknown()),
+    /** Allow JIT (just-in-time) provisioning of users whose email matches allowed domains */
+    allowJitProvisioning: z.boolean().default(false),
+    /** Default role for JIT-provisioned users (restricted to safe roles) */
+    jitDefaultRole: z.enum(['READER', 'EDITOR']).default('READER'),
 }).superRefine((data, ctx) => {
     // Validate config shape based on provider type
     if (data.type === 'SAML') {

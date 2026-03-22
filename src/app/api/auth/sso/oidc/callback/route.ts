@@ -135,26 +135,38 @@ export async function GET(req: NextRequest) {
         claims.email
     );
 
-    if (!linkResult) {
-        console.warn('[SSO] Identity linking failed — no matching user/membership', {
+    if (linkResult.status === 'rejected') {
+        const reasonMessages: Record<string, string> = {
+            cross_tenant: 'Cross-tenant login attempt blocked',
+            domain_mismatch: 'Email domain not allowed for this SSO provider',
+            no_user: 'No matching account found. Contact your administrator.',
+            no_membership: 'No matching account found. Contact your administrator.',
+            subject_conflict: 'Identity conflict detected. Contact your administrator.',
+            jit_disabled: 'No matching account found. Contact your administrator.',
+            no_email: 'Identity provider did not return an email',
+        };
+        console.warn('[SSO] Identity linking rejected', {
             tenantId: tenant.id,
             providerId: provider.id,
             email: claims.email,
             sub: claims.sub,
+            reason: linkResult.reason,
         });
         return redirectToLogin(
             req,
-            'no_account',
-            'No matching account found. Contact your administrator.'
+            linkResult.reason,
+            reasonMessages[linkResult.reason] || 'Login failed'
         );
     }
+
+    const linkedUserId = linkResult.userId;
 
     // ── Load user and membership for session ──
     const membership = await prisma.tenantMembership.findUnique({
         where: {
             tenantId_userId: {
                 tenantId: tenant.id,
-                userId: linkResult.userId,
+                userId: linkedUserId,
             },
         },
     });
@@ -164,7 +176,7 @@ export async function GET(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-        where: { id: linkResult.userId },
+        where: { id: linkedUserId },
         select: { id: true, email: true, name: true },
     });
 
