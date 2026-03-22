@@ -60,6 +60,39 @@ export async function updateTenantMfaPolicy(
         throw new Error('Only admins can update MFA policy');
     }
 
+    // ── Anti-lockout safeguard ───────────────────────────────────────
+    // If switching to REQUIRED, verify at least one admin has MFA enrolled.
+    // This prevents all admins from being locked out.
+    if (input.mfaPolicy === 'REQUIRED') {
+        const adminMemberships = await prisma.tenantMembership.findMany({
+            where: {
+                tenantId: ctx.tenantId,
+                role: 'ADMIN',
+            },
+            select: { userId: true },
+        });
+
+        const adminUserIds = adminMemberships.map(m => m.userId);
+
+        if (adminUserIds.length > 0) {
+            const enrolledAdminCount = await prisma.userMfaEnrollment.count({
+                where: {
+                    userId: { in: adminUserIds },
+                    tenantId: ctx.tenantId,
+                    type: 'TOTP',
+                    isVerified: true,
+                },
+            });
+
+            if (enrolledAdminCount === 0) {
+                throw new Error(
+                    'Cannot enable REQUIRED MFA: at least one admin must be enrolled in MFA first. ' +
+                    'Please set up MFA for your account before enabling this policy.',
+                );
+            }
+        }
+    }
+
     const settings = await prisma.tenantSecuritySettings.upsert({
         where: { tenantId: ctx.tenantId },
         create: {
@@ -78,6 +111,7 @@ export async function updateTenantMfaPolicy(
         sessionMaxAgeMinutes: settings.sessionMaxAgeMinutes,
     };
 }
+
 
 // ─── Get User MFA Status ────────────────────────────────────────────
 

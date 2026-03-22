@@ -4,16 +4,19 @@ import prisma from '@/lib/prisma';
 import { decryptTotpSecret, verifyTotpCode } from '@/lib/security/totp-crypto';
 import { VerifyMfaInput } from '@/app-layer/schemas/mfa.schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { checkRateLimit, resetRateLimit, MFA_VERIFY_LIMIT } from '@/lib/security/rate-limit';
+import { logEvent } from '@/app-layer/events/audit';
 
 /**
  * POST /api/t/[tenantSlug]/security/mfa/challenge/verify
  *
  * Verifies a TOTP code during the MFA challenge (login flow).
- * On success, clears the mfaPending flag by triggering a session update.
+ * On success, clears the mfaPending flag by updating lastChallengeAt.
  *
- * This is distinct from the enrollment verify endpoint:
- * - enrollment/verify: first-time setup verification
- * - challenge/verify: login-time challenge for enrolled users
+ * Hardened with:
+ * - Rate limiting (5 attempts per 15 min, 5 min lockout)
+ * - Audit logging (MFA_CHALLENGE_PASSED / MFA_CHALLENGE_FAILED)
+ * - Generic error messages (no enumeration)
  *
  * Body: { code: "123456" }
  */
@@ -33,18 +36,34 @@ export const POST = withApiErrorHandling(async (
         return NextResponse.json({ error: 'No tenant context' }, { status: 400 });
     }
 
+    // ── Rate Limit Check ────────────────────────────────────────────
+    const rateLimitKey = `mfa-challenge:${userId}`;
+    const rateCheck = checkRateLimit(rateLimitKey, MFA_VERIFY_LIMIT);
+
+    if (!rateCheck.allowed) {
+        const retrySeconds = Math.ceil(rateCheck.retryAfterMs / 1000);
+        return NextResponse.json(
+            {
+                success: false,
+                error: `Too many verification attempts. Please try again in ${retrySeconds} seconds.`,
+                retryAfterMs: rateCheck.retryAfterMs,
+            },
+            { status: 429 },
+        );
+    }
+
     // Parse body
     let body: unknown;
     try {
         body = await req.json();
     } catch {
-        return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
     const parsed = VerifyMfaInput.safeParse(body);
     if (!parsed.success) {
         return NextResponse.json(
-            { error: 'Invalid code format', details: parsed.error.flatten() },
+            { error: 'Invalid code format' },
             { status: 400 },
         );
     }
@@ -62,7 +81,7 @@ export const POST = withApiErrorHandling(async (
 
     if (!enrollment || !enrollment.isVerified) {
         return NextResponse.json(
-            { error: 'No verified MFA enrollment found' },
+            { error: 'MFA not configured. Please set up MFA first.' },
             { status: 400 },
         );
     }
@@ -77,39 +96,66 @@ export const POST = withApiErrorHandling(async (
     const isValid = verifyTotpCode(secret, parsed.data.code);
 
     if (!isValid) {
+        // Audit: failed challenge
+        try {
+            await logEvent(prisma, {
+                tenantId,
+                userId,
+                role: 'READER' as const,
+                permissions: { canAdmin: false, canWrite: false, canRead: true, canAudit: false, canExport: false },
+                requestId: crypto.randomUUID(),
+            }, {
+                action: 'MFA_CHALLENGE_FAILED',
+                entityType: 'User',
+                entityId: userId,
+                details: `MFA challenge failed. ${rateCheck.remaining} attempts remaining.`,
+            });
+        } catch { /* audit is best-effort */ }
+
         return NextResponse.json({
             success: false,
-            error: 'Invalid TOTP code',
+            error: 'Invalid code. Please check your authenticator app and try again.',
+            remaining: rateCheck.remaining,
         });
     }
 
-    // MFA challenge passed — update session to clear mfaPending.
-    // Since we use JWT sessions, we increment sessionVersion by 0 (noop DB write)
-    // to force token refresh on next request, which will re-evaluate mfaPending.
-    // Actually, we need a mechanism to clear mfaPending in the token.
-    // The cleanest approach: set a server-side MFA completion marker that
-    // the JWT callback can check. We'll use a cookie with a signed challenge token.
-    //
-    // Alternative: store the MFA completion timestamp on the enrollment record,
-    // and have the JWT callback check it on subsequent requests.
+    // ── Success ─────────────────────────────────────────────────────
+    // Reset rate limit on success
+    resetRateLimit(rateLimitKey);
+
+    // Update lastChallengeAt — JWT callback will detect this and clear mfaPending
     await prisma.userMfaEnrollment.update({
         where: { id: enrollment.id },
         data: { lastChallengeAt: new Date() },
     });
 
-    // Set a short-lived MFA-cleared cookie that the JWT callback can detect.
-    // This cookie signals that MFA was just completed for this session.
+    // Audit: passed challenge
+    try {
+        await logEvent(prisma, {
+            tenantId,
+            userId,
+            role: 'READER' as const,
+            permissions: { canAdmin: false, canWrite: false, canRead: true, canAudit: false, canExport: false },
+            requestId: crypto.randomUUID(),
+        }, {
+            action: 'MFA_CHALLENGE_PASSED',
+            entityType: 'User',
+            entityId: userId,
+            details: 'MFA challenge passed successfully.',
+        });
+    } catch { /* audit is best-effort */ }
+
     const response = NextResponse.json({
         success: true,
         message: 'MFA verification successful',
     });
 
-    // Set mfa-cleared cookie (httpOnly, same-site, 5 min expiry for the callback to pick up)
+    // Set mfa-cleared cookie for JWT callback to detect
     response.cookies.set('mfa-cleared', userId, {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        maxAge: 300, // 5 minutes — enough for the JWT callback to refresh
+        maxAge: 300,
         secure: process.env.NODE_ENV === 'production',
     });
 
