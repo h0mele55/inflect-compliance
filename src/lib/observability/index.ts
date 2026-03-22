@@ -3,7 +3,7 @@
  *
  * Public API:
  *   Context: runWithRequestContext, getRequestContext, getRequestId, mergeRequestContext
- *   Logger:  logger, log, extractErrorMeta
+ *   Logger:  logger, log, extractErrorMeta, createChildLogger, pinoInstance
  */
 
 export {
@@ -18,5 +18,7 @@ export {
     logger,
     log,
     extractErrorMeta,
+    createChildLogger,
+    pinoInstance,
 } from './logger';
 export type { LogLevel, LogFields } from './logger';
