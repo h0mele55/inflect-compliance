@@ -5,8 +5,6 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { withValidatedBody } from '@/lib/validation/route';
 import { VerifyMfaInput } from '@/app-layer/schemas/mfa.schemas';
 import { checkRateLimit, resetRateLimit, MFA_ENROLL_VERIFY_LIMIT } from '@/lib/security/rate-limit';
-import { logEvent } from '@/app-layer/events/audit';
-import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/t/[tenantSlug]/security/mfa/enroll/verify
@@ -14,7 +12,7 @@ import { prisma } from '@/lib/prisma';
  * Verifies a TOTP code against the user's pending enrollment.
  * If valid, marks the enrollment as verified.
  *
- * Hardened with rate limiting (10 attempts per 15 min).
+ * Rate limited: 10 attempts per 15 min.
  *
  * Body: { code: "123456" }
  */
@@ -41,16 +39,6 @@ export const POST = withApiErrorHandling(withValidatedBody(
         const result = await verifyMfaEnrollment(ctx, body);
 
         if (!result.success) {
-            // Audit: enrollment verification failed
-            try {
-                await logEvent(prisma, ctx, {
-                    action: 'MFA_ENROLLMENT_VERIFY_FAILED',
-                    entityType: 'User',
-                    entityId: ctx.userId,
-                    details: `Enrollment verification failed. ${rateCheck.remaining} attempts remaining.`,
-                });
-            } catch { /* best-effort */ }
-
             return NextResponse.json({
                 success: false,
                 error: 'Invalid TOTP code. Please try again.',
@@ -60,16 +48,6 @@ export const POST = withApiErrorHandling(withValidatedBody(
 
         // Success — reset rate limit
         resetRateLimit(rateLimitKey);
-
-        // Audit: enrollment verified
-        try {
-            await logEvent(prisma, ctx, {
-                action: 'MFA_ENROLLED',
-                entityType: 'User',
-                entityId: ctx.userId,
-                details: 'MFA enrollment verified and activated.',
-            });
-        } catch { /* best-effort */ }
 
         return NextResponse.json({
             success: true,

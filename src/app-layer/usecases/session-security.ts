@@ -13,6 +13,8 @@
  */
 import { prisma } from '@/lib/prisma';
 import type { RequestContext } from '../types';
+import { forbidden, notFound } from '@/lib/errors/types';
+import { logEvent } from '../events/audit';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -41,7 +43,7 @@ export async function revokeUserSessions(
     // Non-admins can only revoke their own sessions
     if (effectiveUserId !== ctx.userId) {
         if (!ctx.permissions.canAdmin) {
-            throw new Error('Only admins can revoke other users\' sessions');
+            throw forbidden('Only admins can revoke other users\' sessions');
         }
 
         // Verify target user is in the same tenant
@@ -55,7 +57,7 @@ export async function revokeUserSessions(
         });
 
         if (!membership) {
-            throw new Error('Target user is not a member of this tenant');
+            throw notFound('Target user is not a member of this tenant');
         }
     }
 
@@ -64,6 +66,17 @@ export async function revokeUserSessions(
         data: { sessionVersion: { increment: 1 } },
         select: { id: true, sessionVersion: true },
     });
+
+    // Audit
+    const action = effectiveUserId === ctx.userId ? 'CURRENT_SESSION_REVOKED' : 'SESSIONS_REVOKED_FOR_USER';
+    try {
+        await logEvent(prisma, ctx, {
+            action,
+            entityType: 'User',
+            entityId: effectiveUserId,
+            details: `Sessions revoked. New sessionVersion: ${updated.sessionVersion}`,
+        });
+    } catch { /* audit is best-effort */ }
 
     return {
         userId: updated.id,
@@ -92,7 +105,7 @@ export async function revokeAllTenantSessions(
     ctx: RequestContext,
 ): Promise<BulkRevocationResult> {
     if (!ctx.permissions.canAdmin) {
-        throw new Error('Only admins can revoke all tenant sessions');
+        throw forbidden('Only admins can revoke all tenant sessions');
     }
 
     // Get all user IDs in this tenant
@@ -112,6 +125,16 @@ export async function revokeAllTenantSessions(
         where: { id: { in: userIds } },
         data: { sessionVersion: { increment: 1 } },
     });
+
+    // Audit
+    try {
+        await logEvent(prisma, ctx, {
+            action: 'ALL_TENANT_SESSIONS_REVOKED',
+            entityType: 'Tenant',
+            entityId: ctx.tenantId,
+            details: `Revoked sessions for ${result.count} users.`,
+        });
+    } catch { /* audit is best-effort */ }
 
     return { usersAffected: result.count };
 }

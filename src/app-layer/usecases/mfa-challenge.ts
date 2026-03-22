@@ -1,0 +1,104 @@
+/**
+ * MFA Challenge Usecase
+ *
+ * Handles TOTP challenge verification during the login flow.
+ * This is separate from enrollment verification — challenge is for
+ * enrolled users at login time.
+ *
+ * Audit events: MFA_CHALLENGE_PASSED, MFA_CHALLENGE_FAILED
+ */
+import { prisma } from '@/lib/prisma';
+import { decryptTotpSecret, verifyTotpCode } from '@/lib/security/totp-crypto';
+import { logEvent } from '../events/audit';
+import type { RequestContext } from '../types';
+import { badRequest, internal } from '@/lib/errors/types';
+import { env } from '@/env';
+
+export interface MfaChallengeResult {
+    success: boolean;
+    message: string;
+    remaining?: number;
+}
+
+/**
+ * Verifies a TOTP code during the MFA login challenge.
+ * On success, updates lastChallengeAt so JWT callback can clear mfaPending.
+ */
+export async function verifyMfaChallenge(
+    userId: string,
+    tenantId: string,
+    code: string,
+    remaining: number,
+): Promise<MfaChallengeResult> {
+    // Look up enrollment
+    const enrollment = await prisma.userMfaEnrollment.findUnique({
+        where: {
+            userId_tenantId_type: {
+                userId,
+                tenantId,
+                type: 'TOTP',
+            },
+        },
+    });
+
+    if (!enrollment || !enrollment.isVerified) {
+        throw badRequest('MFA not configured. Please set up MFA first.');
+    }
+
+    // Decrypt and verify
+    const authSecret = env.AUTH_SECRET;
+    if (!authSecret) {
+        throw internal('Server configuration error');
+    }
+
+    const secret = decryptTotpSecret(enrollment.secretEncrypted, authSecret);
+    const isValid = verifyTotpCode(secret, code);
+
+    // Build a minimal audit context (challenge route doesn't have full RequestContext)
+    const auditCtx: RequestContext = {
+        tenantId,
+        userId,
+        role: 'READER' as const,
+        permissions: { canAdmin: false, canWrite: false, canRead: true, canAudit: false, canExport: false },
+        requestId: crypto.randomUUID(),
+    };
+
+    if (!isValid) {
+        // Audit: failed challenge
+        try {
+            await logEvent(prisma, auditCtx, {
+                action: 'MFA_CHALLENGE_FAILED',
+                entityType: 'User',
+                entityId: userId,
+                details: `MFA challenge failed. ${remaining} attempts remaining.`,
+            });
+        } catch { /* audit is best-effort */ }
+
+        return {
+            success: false,
+            message: 'Invalid code. Please check your authenticator app and try again.',
+            remaining,
+        };
+    }
+
+    // Success — update lastChallengeAt
+    await prisma.userMfaEnrollment.update({
+        where: { id: enrollment.id },
+        data: { lastChallengeAt: new Date() },
+    });
+
+    // Audit: passed challenge
+    try {
+        await logEvent(prisma, auditCtx, {
+            action: 'MFA_CHALLENGE_PASSED',
+            entityType: 'User',
+            entityId: userId,
+            details: 'MFA challenge passed successfully.',
+        });
+    } catch { /* audit is best-effort */ }
+
+    return {
+        success: true,
+        message: 'MFA verification successful',
+    };
+}

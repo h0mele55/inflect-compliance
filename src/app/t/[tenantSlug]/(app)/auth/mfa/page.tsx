@@ -139,7 +139,7 @@ export default function MfaChallengePage() {
                         value={code}
                         onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                         onKeyDown={handleKeyDown}
-                        className="input text-center text-2xl font-mono tracking-[0.4em] w-48 py-3"
+                        className="input text-center text-2xl font-mono tracking-[0.4em] w-full sm:w-48 py-3"
                         id="mfa-challenge-input"
                         autoFocus
                         autoComplete="one-time-code"

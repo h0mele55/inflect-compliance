@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma';
 import type { RequestContext } from '../types';
 import type { UpdateMfaPolicyInputType } from '../schemas/mfa.schemas';
 import type { MfaPolicy } from '@prisma/client';
+import { forbidden, badRequest } from '@/lib/errors/types';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ export async function updateTenantMfaPolicy(
     input: UpdateMfaPolicyInputType,
 ): Promise<TenantSecuritySettingsResult> {
     if (!ctx.permissions.canAdmin) {
-        throw new Error('Only admins can update MFA policy');
+        throw forbidden('Only admins can update MFA policy');
     }
 
     // ── Anti-lockout safeguard ───────────────────────────────────────
@@ -85,7 +86,7 @@ export async function updateTenantMfaPolicy(
             });
 
             if (enrolledAdminCount === 0) {
-                throw new Error(
+                throw badRequest(
                     'Cannot enable REQUIRED MFA: at least one admin must be enrolled in MFA first. ' +
                     'Please set up MFA for your account before enabling this policy.',
                 );

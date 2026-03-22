@@ -18,6 +18,8 @@ import {
     decryptTotpSecret,
     verifyTotpCode,
 } from '@/lib/security/totp-crypto';
+import { badRequest, forbidden, internal } from '@/lib/errors/types';
+import { env } from '@/env';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -113,11 +115,11 @@ export async function verifyMfaEnrollment(
     });
 
     if (!enrollment) {
-        throw new Error('No MFA enrollment found. Start enrollment first.');
+        throw badRequest('No MFA enrollment found. Start enrollment first.');
     }
 
     if (enrollment.isVerified) {
-        throw new Error('MFA is already verified for this account.');
+        throw badRequest('MFA is already verified for this account.');
     }
 
     // Decrypt secret and verify code
@@ -155,7 +157,7 @@ export async function removeMfaEnrollment(
 
     // Non-admins can only remove their own enrollment
     if (effectiveUserId !== ctx.userId && !ctx.permissions.canAdmin) {
-        throw new Error('Only admins can remove other users\' MFA enrollment');
+        throw forbidden('Only admins can remove other users\' MFA enrollment');
     }
 
     const result = await prisma.userMfaEnrollment.deleteMany({
@@ -172,9 +174,9 @@ export async function removeMfaEnrollment(
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function getAuthSecret(): string {
-    const secret = process.env.AUTH_SECRET;
+    const secret = env.AUTH_SECRET;
     if (!secret) {
-        throw new Error('AUTH_SECRET environment variable is required for MFA operations');
+        throw internal('AUTH_SECRET environment variable is required for MFA operations');
     }
     return secret;
 }

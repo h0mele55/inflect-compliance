@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
-import { ShieldCheck, QrCode, Copy, CheckCircle, XCircle, Trash2, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, QrCode, Copy, CheckCircle, XCircle, Trash2, AlertTriangle, X } from 'lucide-react';
 
 interface MfaStatus {
     isEnrolled: boolean;
@@ -150,7 +150,9 @@ export default function UserMfaPage() {
                 <div className="glass-card p-4 border border-red-500/50 bg-red-500/10 flex items-center gap-2">
                     <XCircle className="w-4 h-4 text-red-400 shrink-0" />
                     <span className="text-sm text-red-300">{error}</span>
-                    <button onClick={() => setError(null)} className="ml-auto text-xs text-slate-400 hover:text-white">✕</button>
+                    <button onClick={() => setError(null)} className="ml-auto text-xs text-slate-400 hover:text-white">
+                        <X className="w-4 h-4" />
+                    </button>
                 </div>
             )}
 
@@ -244,8 +246,8 @@ export default function UserMfaPage() {
                     <div className="flex flex-col items-center gap-4 py-4">
                         <div className="bg-white p-4 rounded-xl">
                             {/* Simple QR fallback: render as a monospace URI block */}
-                            <div className="w-48 h-48 flex items-center justify-center">
-                                <QrCode className="w-32 h-32 text-slate-800" />
+                            <div className="w-full sm:w-48 h-48 flex items-center justify-center">
+                                <QrCode className="w-full sm:w-32 h-32 text-slate-800" />
                             </div>
                         </div>
                         <p className="text-xs text-slate-500">
@@ -284,7 +286,7 @@ export default function UserMfaPage() {
                                 placeholder="000000"
                                 value={code}
                                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                className="input text-center text-lg font-mono tracking-[0.3em] w-40"
+                                className="input text-center text-lg font-mono tracking-[0.3em] w-full sm:w-40"
                                 id="mfa-code-input"
                                 autoFocus
                             />

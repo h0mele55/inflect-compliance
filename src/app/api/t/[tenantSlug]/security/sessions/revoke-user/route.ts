@@ -4,13 +4,12 @@ import { revokeUserSessions } from '@/app-layer/usecases/session-security';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { withValidatedBody } from '@/lib/validation/route';
 import { RevokeSessionsInput } from '@/app-layer/schemas/mfa.schemas';
-import { logEvent } from '@/app-layer/events/audit';
-import { prisma } from '@/lib/prisma';
 
 /**
  * POST /api/t/[tenantSlug]/security/sessions/revoke-user
  *
  * Admin-only: revoke sessions for a specific user in this tenant.
+ * Audit logging is handled by the session-security usecase.
  * Body: { targetUserId: "..." }
  */
 export const POST = withApiErrorHandling(withValidatedBody(
@@ -26,14 +25,6 @@ export const POST = withApiErrorHandling(withValidatedBody(
         }
 
         const result = await revokeUserSessions(ctx, body.targetUserId);
-
-        // Audit trail
-        await logEvent(prisma, ctx, {
-            action: 'SESSIONS_REVOKED_FOR_USER',
-            entityType: 'User',
-            entityId: body.targetUserId,
-            details: `Admin ${ctx.userId} revoked sessions for user ${body.targetUserId}. New sessionVersion: ${result.newSessionVersion}`,
-        });
 
         return NextResponse.json({
             success: true,

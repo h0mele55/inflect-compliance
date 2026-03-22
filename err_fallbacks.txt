@@ -1,0 +1,45 @@
+
+[test-setup] Database URL: postgresql:***@127.0.0.1:5433/inflect_compliance
+[test-setup] Running migrations...
+[test-setup] Migrations complete
+  console.error
+    Forbidden 'process.env' usage found in C:\Users\Lenovo\.gemini\antigravity\scratch\inflect-compliance\src\app-layer\usecases\mfa-enrollment.ts
+
+    [0m [90m 39 |[39m             [90m// Look for `process.env.Something`[39m
+     [90m 40 |[39m             [36mif[39m (content[33m.[39mincludes([32m'process.env.'[39m)) {
+    [31m[1m>[22m[39m[90m 41 |[39m                 console[33m.[39merror([32m`Forbidden 'process.env' usage found in ${file}`[39m)[33m;[39m
+     [90m    |[39m                         [31m[1m^[22m[39m
+     [90m 42 |[39m                 foundErrors [33m=[39m [36mtrue[39m[33m;[39m
+     [90m 43 |[39m             }
+     [90m 44 |[39m[0m
+
+      at Object.<anonymous> (tests/unit/no-fallbacks.test.ts:41:25)
+
+
+[test-setup] WARNING: DATABASE_URL does not look like a test database!
+FAIL tests/unit/no-fallbacks.test.ts
+  Static Analysis: No process.env fallbacks
+    × should not contain forbidden process.env or secret fallback patterns in src (113 ms)
+
+  ● Static Analysis: No process.env fallbacks › should not contain forbidden process.env or secret fallback patterns in src
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+    [0m [90m 50 |[39m         }
+     [90m 51 |[39m
+    [31m[1m>[22m[39m[90m 52 |[39m         expect(foundErrors)[33m.[39mtoBe([36mfalse[39m)[33m;[39m
+     [90m    |[39m                             [31m[1m^[22m[39m
+     [90m 53 |[39m     })[33m;[39m
+     [90m 54 |[39m })[33m;[39m
+     [90m 55 |[39m[0m
+
+      at Object.<anonymous> (tests/unit/no-fallbacks.test.ts:52:29)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        0.454 s, estimated 1 s
+Ran all test suites matching /tests\\unit\\no-fallbacks.test.ts/i.

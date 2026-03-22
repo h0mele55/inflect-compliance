@@ -100,7 +100,7 @@ export default function AdminSecurityPage() {
     };
 
     const handleRevokeAllTenant = async () => {
-        if (!confirm('⚠️ This will sign out ALL users in your organization. Are you sure?')) return;
+        if (!confirm('WARNING: This will sign out ALL users in your organization. Are you sure?')) return;
         setRevoking(true);
         setError(null);
         try {
