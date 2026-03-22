@@ -1,6 +1,7 @@
 'use client'; // Error boundaries must be Client Components
 
 import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
 
 /**
  * Global Error Boundary for the Next.js App Router.
@@ -15,9 +16,10 @@ export default function GlobalError({
     reset: () => void;
 }) {
     useEffect(() => {
-        // Here we could easily integrate Sentry, Datadog, etc.
-        // For security, Next.js strips sensitive details from `error.message` in production.
-        console.error('[Global App Error]', error);
+        // Report to Sentry with error digest for server/client correlation
+        Sentry.captureException(error, {
+            tags: { digest: error.digest || 'none' },
+        });
     }, [error]);
 
     return (

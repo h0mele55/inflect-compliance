@@ -6,6 +6,7 @@
  *   Logger:   logger, log, extractErrorMeta, createChildLogger, pinoInstance
  *   Tracing:  getTracer, traceUsecase, traceOperation
  *   Metrics:  recordRequestMetrics, recordRequestError
+ *   Sentry:   initSentry, captureError, setSentryContext
  *   Bootstrap: initTelemetry, isTelemetryInitialized
  */
 
@@ -36,6 +37,12 @@ export {
     recordRequestMetrics,
     recordRequestError,
 } from './metrics';
+
+export {
+    initSentry,
+    captureError,
+    setSentryContext,
+} from './sentry';
 
 export {
     initTelemetry,

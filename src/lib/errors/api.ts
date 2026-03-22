@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { toApiErrorResponse } from './types';
-import { runWithRequestContext } from '@/lib/observability/context';
+import { runWithRequestContext, getRequestContext } from '@/lib/observability/context';
 import { logger, extractErrorMeta } from '@/lib/observability/logger';
 import { getTracer } from '@/lib/observability/tracing';
 import { recordRequestMetrics, recordRequestError } from '@/lib/observability/metrics';
+import { captureError } from '@/lib/observability/sentry';
 import { SpanStatusCode } from '@opentelemetry/api';
 
 // Depending on the Node.js / Edge runtime version, crypto.randomUUID() is natively available globally.
@@ -112,6 +113,18 @@ export function withApiErrorHandling<Context = any>(
                         // ── Metrics ──
                         recordRequestMetrics({ method, route, status, durationMs });
                         recordRequestError({ method, route, errorCode: payload.error.code });
+
+                        // ── Sentry error capture (5xx only — skips 4xx) ──
+                        const reqCtx = getRequestContext();
+                        captureError(error, {
+                            requestId,
+                            route,
+                            method,
+                            status,
+                            tenantId: reqCtx?.tenantId,
+                            userId: reqCtx?.userId,
+                            errorCode: payload.error.code,
+                        });
 
                         // ── Request failed ──
                         logger.error(`request failed ${status} ${method} ${route}`, {
