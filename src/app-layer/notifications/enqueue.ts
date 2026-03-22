@@ -10,6 +10,7 @@
 import type { PrismaTx } from '@/lib/db-context';
 import type { EmailNotificationType } from '@prisma/client';
 import { isNotificationsEnabled } from './settings';
+import { logger } from '@/lib/observability/logger';
 import {
     buildTaskAssignedEmail,
     buildEvidenceExpiringEmail,
@@ -63,7 +64,7 @@ export async function enqueueEmail(
     const enabled = await isNotificationsEnabled(db, tenantId);
     if (!enabled) {
         if (requestId) {
-            console.log(`[notifications] Skipped — disabled for tenant ${tenantId} (requestId=${requestId})`);
+            logger.debug('notification skipped — disabled for tenant', { component: 'notifications' });
         }
         return null;
     }
@@ -89,7 +90,7 @@ export async function enqueueEmail(
         });
 
         if (requestId) {
-            console.log(`[notifications] Enqueued ${type} email to ${toEmail} (requestId=${requestId}, dedupeKey=${dedupeKey})`);
+            logger.debug('notification enqueued', { component: 'notifications', type });
         }
 
         return { id: record.id, dedupeKey };
@@ -97,7 +98,7 @@ export async function enqueueEmail(
         // Prisma P2002 = unique constraint violation → duplicate, skip silently
         if (isPrismaUniqueConstraintError(error)) {
             if (requestId) {
-                console.log(`[notifications] Skipped duplicate ${type} email to ${toEmail} (requestId=${requestId}, dedupeKey=${dedupeKey})`);
+                logger.debug('notification skipped — duplicate', { component: 'notifications', type });
             }
             return null;
         }

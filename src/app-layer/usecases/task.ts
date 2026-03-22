@@ -5,6 +5,7 @@ import { logEvent } from '../events/audit';
 import { enqueueEmail } from '../notifications/enqueue';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
+import { logger } from '@/lib/observability/logger';
 import type { PrismaTx } from '@/lib/db-context';
 
 // ─── Type-Specific Validation ───
@@ -233,7 +234,7 @@ async function enqueueTaskAssignedNotification(
         });
     } catch (err) {
         // Fire-and-forget — never break the task operation
-        console.warn('[notifications] Failed to enqueue task assignment email:', err);
+        logger.warn('failed to enqueue task assignment email', { component: 'notifications' });
     }
 }
 

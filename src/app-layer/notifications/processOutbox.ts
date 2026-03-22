@@ -11,6 +11,7 @@
 import { prisma } from '@/lib/prisma';
 import { sendEmail } from '@/lib/mailer';
 import { getTenantNotificationSettings } from './settings';
+import { logger } from '@/lib/observability/logger';
 
 export interface ProcessOutboxOptions {
     /** Max emails to process in one run. Default: 50 */
@@ -102,10 +103,10 @@ export async function processOutbox(
 
             if (newStatus === 'FAILED') {
                 failed++;
-                console.error(`[notifications] Email permanently failed after ${maxAttempts} attempts: ${row.dedupeKey}`, errorMessage);
+                logger.error('email permanently failed', { component: 'notifications', dedupeKey: row.dedupeKey, attempts: maxAttempts });
             } else {
                 skipped++;
-                console.warn(`[notifications] Email attempt ${newAttempts} failed, will retry: ${row.dedupeKey}`, errorMessage);
+                logger.warn('email attempt failed, will retry', { component: 'notifications', dedupeKey: row.dedupeKey, attempt: newAttempts });
             }
         }
     }

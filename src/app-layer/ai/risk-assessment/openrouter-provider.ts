@@ -9,6 +9,7 @@ import type { RiskAssessmentInput, RiskSuggestionOutput, RiskSuggestionProvider 
 import { buildRiskAssessmentPrompt } from './prompt-builder';
 import { RiskSuggestionOutputSchema } from './schemas';
 import { StubRiskSuggestionProvider } from './stub-provider';
+import { logger } from '@/lib/observability/logger';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'anthropic/claude-3.5-sonnet';
@@ -29,7 +30,7 @@ export class OpenRouterRiskSuggestionProvider implements RiskSuggestionProvider 
         try {
             return await this.callApi(input);
         } catch (error) {
-            console.error('[AI Risk] OpenRouter API call failed, using fallback:', error);
+            logger.error('OpenRouter API call failed, using fallback', { component: 'ai' });
             return this.fallback.generateSuggestions(input);
         }
     }

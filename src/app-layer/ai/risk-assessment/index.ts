@@ -12,6 +12,7 @@ import type { RiskSuggestionProvider } from './types';
 import { StubRiskSuggestionProvider } from './stub-provider';
 import { OpenRouterRiskSuggestionProvider } from './openrouter-provider';
 import { env } from '@/env';
+import { logger } from '@/lib/observability/logger';
 
 export function getProvider(): RiskSuggestionProvider {
     const providerName = env.AI_RISK_PROVIDER?.toLowerCase() ?? 'stub';
@@ -20,7 +21,7 @@ export function getProvider(): RiskSuggestionProvider {
         case 'openrouter': {
             const apiKey = env.OPENROUTER_API_KEY;
             if (!apiKey) {
-                console.warn('[AI Risk] OPENROUTER_API_KEY not set, falling back to baseline template provider');
+                logger.warn('OPENROUTER_API_KEY not set, falling back to baseline template provider', { component: 'ai' });
                 return new StubRiskSuggestionProvider(/* isFallbackMode */ true);
             }
             const model = env.OPENROUTER_MODEL ?? undefined;

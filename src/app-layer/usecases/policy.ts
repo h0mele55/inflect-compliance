@@ -8,6 +8,7 @@ import { logEvent } from '../events/audit';
 import { enqueueEmail } from '../notifications/enqueue';
 import { notFound, badRequest, forbidden, conflict } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
+import { logger } from '@/lib/observability/logger';
 
 // ─── Slug helper ───
 
@@ -314,7 +315,7 @@ export async function requestPolicyApproval(ctx: RequestContext, policyId: strin
                 });
             }
         } catch (err) {
-            console.warn('[notifications] Failed to enqueue policy approval email:', err);
+            logger.warn('failed to enqueue policy approval email', { component: 'notifications' });
         }
 
         return approval;
@@ -390,7 +391,7 @@ export async function decidePolicyApproval(ctx: RequestContext, approvalId: stri
                 });
             }
         } catch (err) {
-            console.warn('[notifications] Failed to enqueue policy decision email:', err);
+            logger.warn('failed to enqueue policy decision email', { component: 'notifications' });
         }
 
         return result;

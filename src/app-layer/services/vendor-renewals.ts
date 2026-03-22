@@ -7,6 +7,7 @@
 
 import prisma from '@/lib/prisma';
 import { logEvent } from '../events/audit';
+import { logger } from '@/lib/observability/logger';
 
 export interface DueVendor {
     id: string;
@@ -69,7 +70,7 @@ export async function findDueVendorsAndEmitEvents(): Promise<DueVendor[]> {
                 : item.type === 'RENEWAL_OVERDUE' ? 'VENDOR_RENEWAL_OVERDUE'
                     : 'VENDOR_RENEWAL_DUE';
 
-        console.log(`[VendorJob] ${action}: ${item.name} (tenant: ${item.tenantId}, due: ${item.dueDate.toISOString()})`);
+        logger.info('vendor due event', { component: 'job', action, vendorName: item.name, dueDate: item.dueDate.toISOString() });
     }
 
     return results;

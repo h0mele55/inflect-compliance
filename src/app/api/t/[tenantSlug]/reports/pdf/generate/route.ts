@@ -21,6 +21,7 @@ import { runInTenantContext } from '@/lib/db-context';
 import { generatePathKey, streamWriteFile } from '@/lib/storage';
 import { FEATURES } from '@/lib/entitlements';
 import { requireFeature } from '@/lib/entitlements-server';
+import { logger } from '@/lib/observability/logger';
 
 const GenerateSchema = z.object({
     type: z.nativeEnum(ReportType),
@@ -81,7 +82,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
                 return NextResponse.json({ error: 'Unknown report type' }, { status: 400 });
         }
     } catch (genErr) {
-        console.error('[PDF GENERATION ERROR]', genErr);
+        logger.error('PDF generation failed', { component: 'report', reportType: body.type });
         throw genErr;
     }
 
