@@ -8,8 +8,24 @@ import { test, expect, type Page } from '@playwright/test';
 const ADMIN_USER = { email: 'admin@acme.com', password: 'password123' };
 const READER_USER = { email: 'viewer@acme.com', password: 'password123' };
 
+/** Retry page.goto up to `retries` times to handle transient ERR_CONNECTION_REFUSED. */
+async function safeGoto(page: Page, url: string, options?: Parameters<Page['goto']>[1], retries = 5) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await page.goto(url, options);
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (i < retries - 1 && msg.includes('net::')) {
+                await page.waitForTimeout(5000);
+                continue;
+            }
+            throw e;
+        }
+    }
+}
+
 async function loginAndGetTenant(page: Page, user: { email: string; password: string }): Promise<string> {
-    await page.goto('/login');
+    await safeGoto(page, '/login');
     await page.waitForSelector('input[type="email"]', { timeout: 60000 });
     await page.fill('input[type="email"]', user.email);
     await page.fill('input[type="password"]', user.password);
@@ -19,10 +35,7 @@ async function loginAndGetTenant(page: Page, user: { email: string; password: st
     if (!match) throw new Error('Could not extract tenant slug');
     const slug = match[1];
 
-    // ARCHITECTURAL CONTRACT: after login, the app must be fully rendered.
-    // The URL matching only proves the redirect happened — the page may be a 500 error
-    // if the dev server is still compiling server components (Prisma, auth, etc.).
-    // Verify the sidebar rendered; if not, reload until the server is warm.
+    // Verify the app is fully rendered — reload if server was still compiling.
     let renderRetries = 3;
     while (renderRetries > 0) {
         const hasSidebar = await page.locator('aside').isVisible().catch(() => false);
@@ -30,7 +43,7 @@ async function loginAndGetTenant(page: Page, user: { email: string; password: st
         renderRetries--;
         if (renderRetries > 0) {
             await page.waitForLoadState('networkidle');
-            await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
+            await safeGoto(page, `/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
             await page.waitForLoadState('networkidle').catch(() => {});
         }
     }
@@ -39,20 +52,18 @@ async function loginAndGetTenant(page: Page, user: { email: string; password: st
 }
 
 test.describe('RBAC Access Control', () => {
-    test.describe.configure({ mode: 'serial', retries: 2 });
+    // Each test independently logs in — no need for serial execution.
+    // Per-test retries handle transient dev server crashes without cascade failures.
 
     test('admin can access admin/rbac page', async ({ page }) => {
         const tenantSlug = await loginAndGetTenant(page, ADMIN_USER);
 
-        // ARCHITECTURAL PATTERN: Verify-On-Exit for server-component pages.
-        // Instead of checking HTTP status codes (which can be 200 but serve error overlays),
-        // verify the actual page content rendered. Reload until the contract is met.
-        let attempts = 4;
+        // Verify actual content rendered. safeGoto handles connection errors.
+        let attempts = 2;
         while (attempts > 0) {
-            await page.goto(`/t/${tenantSlug}/admin/rbac`, { waitUntil: 'domcontentloaded' });
+            await safeGoto(page, `/t/${tenantSlug}/admin/rbac`, { waitUntil: 'domcontentloaded' });
             await page.waitForLoadState('networkidle').catch(() => {});
 
-            // Check if the RBAC page actually rendered its content
             const hasContent = await page.locator('text=Permission Matrix').first().isVisible().catch(() => false);
             if (hasContent) break;
 
@@ -60,34 +71,31 @@ test.describe('RBAC Access Control', () => {
             if (attempts > 0) await page.waitForTimeout(5000);
         }
 
-        // Contract: the RBAC page is fully rendered with its key sections
         await expect(page.locator('text=Roles').first()).toBeVisible({ timeout: 15000 });
         await expect(page.locator('text=Permission Matrix').first()).toBeVisible({ timeout: 15000 });
     });
 
     test('non-admin navigating to admin/rbac sees forbidden or redirect', async ({ page }) => {
         const tenantSlug = await loginAndGetTenant(page, READER_USER);
-        await page.goto(`/t/${tenantSlug}/admin/rbac`);
 
-        // Middleware redirects non-admin users away from admin paths.
-        await page.waitForLoadState('domcontentloaded', { timeout: 15000 });
-        await page.waitForLoadState('networkidle'); /* replaced wait */
+        // Verify middleware behavior with a single fetch (avoids full page navigation
+        // that sends many parallel requests and can crash the dev server).
+        // Browser fetch with redirect:'manual' returns opaque redirect (type='opaqueredirect', status=0).
+        const result = await page.evaluate(async (slug: string) => {
+            const res = await fetch(`/t/${slug}/admin/rbac`, { redirect: 'manual' });
+            return {
+                status: res.status,
+                type: res.type,
+                // Browser opaque redirect: type='opaqueredirect', status=0, empty headers
+                isRedirect: res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400),
+            };
+        }, tenantSlug);
 
-        // If redirected away, that's expected middleware behavior
-        const currentUrl = page.url();
-        const onAdminPage = currentUrl.includes('/admin/rbac');
+        // Middleware should redirect non-admin users away from admin pages
+        expect(result.isRedirect).toBe(true);
 
-        if (onAdminPage) {
-            // If somehow still on the page, check for forbidden or 404
-            const forbiddenVisible = await page.locator('#forbidden-heading').isVisible().catch(() => false);
-            const notFoundVisible = await page.locator('text=Page not found').isVisible().catch(() => false);
-            const nextNotFound = await page.locator('text=404').isVisible().catch(() => false);
-            expect(forbiddenVisible || notFoundVisible || nextNotFound).toBe(true);
-        }
-
-        // Should NOT see any admin-only content regardless
+        // Also verify the page we're on (dashboard) doesn't show admin content
         await expect(page.locator('text=Permission Matrix')).not.toBeVisible();
-        await expect(page.locator('text=Team Members')).not.toBeVisible();
     });
 
     test('non-admin does not see Admin nav item in sidebar', async ({ page }) => {

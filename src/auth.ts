@@ -306,13 +306,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
 
             if (typeof token.sessionVersion === 'number' && token.userId) {
-                const currentUser = await prisma.user.findUnique({
-                    where: { id: token.userId as string },
-                    select: { sessionVersion: true },
-                });
-                if (currentUser && currentUser.sessionVersion > (token.sessionVersion as number)) {
-                    // Session has been revoked — return empty token to force sign-out
-                    return { ...token, error: 'SessionRevoked' };
+                // Throttle: only re-check session version every 5 minutes to avoid
+                // a Prisma DB call on every single middleware-intercepted request.
+                const SESSION_CHECK_INTERVAL = 300; // seconds
+                const now = Math.floor(Date.now() / 1000);
+                const lastChecked = (token.sessionVersionCheckedAt as number) || 0;
+                if (now - lastChecked >= SESSION_CHECK_INTERVAL) {
+                    try {
+                        const currentUser = await prisma.user.findUnique({
+                            where: { id: token.userId as string },
+                            select: { sessionVersion: true },
+                        });
+                        if (currentUser && currentUser.sessionVersion > (token.sessionVersion as number)) {
+                            return { ...token, error: 'SessionRevoked' };
+                        }
+                        token.sessionVersionCheckedAt = now;
+                    } catch {
+                        // If session version check fails, don't invalidate the session — fail open
+                    }
                 }
             }
 

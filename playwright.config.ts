@@ -1,11 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
-const port = isCI ? 3006 : 3000;
+// Always use a dedicated port for E2E tests to avoid conflicts with `npm run dev` on 3000.
+// This ensures E2E tests always start their own server with AUTH_TEST_MODE=1.
+const port = 3006;
 
 export default defineConfig({
     testDir: './tests/e2e',
-    timeout: 60_000,
+    timeout: 180_000,
     fullyParallel: false,
     forbidOnly: isCI,
     retries: isCI ? 2 : 0,

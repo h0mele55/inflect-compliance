@@ -74,7 +74,13 @@ const authMiddleware = auth(async (req) => {
             if (isApiRoute(pathname)) {
                 return forbiddenJson('Admin access required');
             }
-            return NextResponse.redirect(new URL('/', req.nextUrl.origin));
+            // Redirect to tenant dashboard instead of root / to avoid redirect chain.
+            // Extract tenant slug from URL: /t/:slug/admin/...
+            const slugMatch = pathname.match(/^\/t\/([^/]+)\//);
+            const redirectTo = slugMatch
+                ? new URL(`/t/${slugMatch[1]}/dashboard`, req.nextUrl.origin)
+                : new URL('/', req.nextUrl.origin);
+            return NextResponse.redirect(redirectTo);
         }
     }
 

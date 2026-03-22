@@ -10,7 +10,7 @@ async function doLogin(page: Page) {
     await page.fill('input[type="email"]', 'admin@acme.com');
     await page.fill('input[type="password"]', 'password123');
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard', { timeout: 15000 });
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
 }
 
 test.describe('AI-Assisted Risk Assessment', () => {

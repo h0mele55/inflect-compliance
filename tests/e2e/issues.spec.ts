@@ -2,8 +2,24 @@ import { test, expect, Page } from '@playwright/test';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
+/** Retry page.goto up to `retries` times to handle transient ERR_CONNECTION_REFUSED. */
+async function safeGoto(page: Page, url: string, options?: Parameters<Page['goto']>[1], retries = 5) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await page.goto(url, options);
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (i < retries - 1 && msg.includes('net::')) {
+                await page.waitForTimeout(5000);
+                continue;
+            }
+            throw e;
+        }
+    }
+}
+
 async function loginAndGetTenant(page: Page): Promise<string> {
-    await page.goto('/login');
+    await safeGoto(page, '/login');
     await page.waitForSelector('input[type="email"]', { timeout: 60000 });
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
@@ -14,7 +30,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
     if (!match) throw new Error('Could not extract tenant slug from ' + url.pathname);
     const slug = match[1];
 
-    // VERIFY-ON-EXIT: confirm the page actually rendered.
+    // Verify the app is fully rendered — reload if server was still compiling.
     let renderRetries = 3;
     while (renderRetries > 0) {
         const hasSidebar = await page.locator('aside').isVisible().catch(() => false);
@@ -22,7 +38,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
         renderRetries--;
         if (renderRetries > 0) {
             await page.waitForLoadState('networkidle');
-            await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
+            await safeGoto(page, `/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
             await page.waitForLoadState('networkidle').catch(() => {});
         }
     }
@@ -34,7 +50,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
 async function gotoAndVerify(page: Page, url: string, contentSelector: string, maxAttempts = 3) {
     let attempts = maxAttempts;
     while (attempts > 0) {
-        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await safeGoto(page, url, { waitUntil: 'domcontentloaded' });
         await page.waitForLoadState('networkidle').catch(() => {});
         const rendered = await page.locator(contentSelector).first().isVisible().catch(() => false);
         if (rendered) return;
@@ -90,11 +106,15 @@ test.describe('Issue Management', () => {
         await page.click(`text=E2E Issue ${uniqueId}`);
         await page.waitForSelector('#task-title', { timeout: 10000 });
 
-        // Change status to TRIAGED
+        // Wait for permissions to hydrate and status select to appear
+        await page.waitForSelector('#task-status-select', { timeout: 10000 });
+        // Change status to TRIAGED — this triggers an async POST then re-fetch
         await page.selectOption('#task-status-select', 'TRIAGED');
-        await page.waitForLoadState('networkidle');
 
-        // Reload and verify
+        // Wait for the React component to reflect the change (POST + fetchTask completes)
+        await expect(page.locator('#task-status')).toContainText('Triaged', { timeout: 15000 });
+
+        // Reload and verify persistence
         await page.reload();
         await page.waitForSelector('#task-status', { timeout: 10000 });
         await expect(page.locator('#task-status')).toContainText('Triaged');
@@ -200,7 +220,7 @@ test.describe('Issue Management', () => {
 
     test('reader user sees view-only issues', async ({ page }) => {
         // Login as reader
-        await page.goto('/login');
+        await safeGoto(page, '/login');
         await page.waitForSelector('input[type="email"]', { timeout: 60000 });
         await page.fill('input[type="email"]', 'viewer@acme.com');
         await page.fill('input[type="password"]', 'password123');
@@ -218,7 +238,7 @@ test.describe('Issue Management', () => {
             renderRetries--;
             if (renderRetries > 0) {
                 await page.waitForLoadState('networkidle');
-                await page.goto(`/t/${tenantSlug}/dashboard`, { waitUntil: 'domcontentloaded' });
+                await safeGoto(page, `/t/${tenantSlug}/dashboard`, { waitUntil: 'domcontentloaded' });
                 await page.waitForLoadState('networkidle').catch(() => {});
             }
         }
@@ -231,7 +251,7 @@ test.describe('Issue Management', () => {
 
     test('legacy /issues URL redirects to /tasks', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await page.goto(`/t/${tenantSlug}/issues`);
+        await safeGoto(page, `/t/${tenantSlug}/issues`);
         await page.waitForURL(`**/tasks`, { timeout: 15000 });
         await expect(page.url()).toContain('/tasks');
     });
