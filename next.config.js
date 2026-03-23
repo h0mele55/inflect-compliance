@@ -22,6 +22,9 @@ const defaultOptions = {
             // Sentry — optional error reporting
             '@sentry/nextjs',
             '@sentry/node',
+            // AWS SDK — native HTTP client, credential resolution
+            '@aws-sdk/client-s3',
+            '@aws-sdk/s3-request-presigner',
         ],
     },
     async headers() {

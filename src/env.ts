@@ -44,6 +44,14 @@ export const env = createEnv({
         FILE_MAX_SIZE_BYTES: z.coerce.number().optional(),
         FILE_ALLOWED_MIME: z.string().optional(),
 
+        // Cloud Storage (S3/R2/MinIO)
+        STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+        S3_BUCKET: z.string().optional(),
+        S3_REGION: z.string().optional(),
+        S3_ENDPOINT: z.string().optional(),
+        S3_ACCESS_KEY_ID: z.string().optional(),
+        S3_SECRET_ACCESS_KEY: z.string().optional(),
+
         // Security / CORS
         CORS_ALLOWED_ORIGINS: z.string().default(""),
 
@@ -108,6 +116,14 @@ export const env = createEnv({
         FILE_STORAGE_ROOT: process.env.FILE_STORAGE_ROOT,
         FILE_MAX_SIZE_BYTES: process.env.FILE_MAX_SIZE_BYTES,
         FILE_ALLOWED_MIME: process.env.FILE_ALLOWED_MIME,
+
+        STORAGE_PROVIDER: process.env.STORAGE_PROVIDER,
+        S3_BUCKET: process.env.S3_BUCKET,
+        S3_REGION: process.env.S3_REGION,
+        S3_ENDPOINT: process.env.S3_ENDPOINT,
+        S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
+        S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+
         CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
         SMTP_HOST: process.env.SMTP_HOST,
         SMTP_PORT: process.env.SMTP_PORT,
