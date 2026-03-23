@@ -97,13 +97,16 @@ test.describe('Control Tests (Test-of-Control)', () => {
 
         // Click the test plan name to go to detail page
         await page.click(`text=Access Review ${uid}`);
-        await page.waitForSelector('#test-plan-title', { timeout: 10000 });
+        // The test plan detail route may need cold compilation — wait for data to load
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#test-plan-title', { timeout: 30000 });
         await expect(page.locator('#test-plan-title')).toContainText(`Access Review ${uid}`);
 
         // Create a run
         await page.click('#create-test-run-btn');
-        await page.waitForSelector('#test-run-title', { timeout: 10000 });
-        await expect(page.locator('#test-run-status')).toContainText('PLANNED');
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#test-run-title', { timeout: 30000 });
+        await expect(page.locator('#test-run-status')).toContainText('PLANNED', { timeout: 10000 });
     });
 
     test('complete test run as PASS and link evidence', async ({ page }) => {
