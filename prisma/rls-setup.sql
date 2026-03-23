@@ -644,4 +644,36 @@ DROP POLICY IF EXISTS allow_all ON "PolicyVersion";
 -- QuestionnaireQuestion — template child
 -- RiskTemplate        — global template library
 
+
+-- ═══════════════════════════════════════════════════════════════════
+-- 5) Superuser bypass — allow non-app_user roles (postgres) full access
+-- ═══════════════════════════════════════════════════════════════════
+-- FORCE ROW LEVEL SECURITY applies policies even to table owners.
+-- The auth layer (NextAuth JWT) queries TenantMembership etc. without
+-- a tenant context because it's discovering the tenant from the user's
+-- membership. This bypass allows those queries while withTenantDb()
+-- (SET LOCAL ROLE app_user) still enforces tenant_isolation.
+
+DO $$
+DECLARE
+    tbl TEXT;
+BEGIN
+    FOR tbl IN
+        SELECT c.relname
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public'
+          AND c.relkind = 'r'
+          AND c.relforcerowsecurity = true
+        ORDER BY c.relname
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS superuser_bypass ON %I', tbl);
+        EXECUTE format(
+            'CREATE POLICY superuser_bypass ON %I USING (current_setting(''role'') != ''app_user'')',
+            tbl
+        );
+    END LOOP;
+END
+$$;
+
 SELECT 'RLS setup complete — all tenant-scoped tables covered!' AS result;
