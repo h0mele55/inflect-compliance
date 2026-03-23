@@ -16,6 +16,7 @@ export {
     // Factory
     getStorageProvider,
     resetStorageProvider,
+    getProviderByName,
     // Path utils
     generatePathKey,
     buildTenantObjectKey,

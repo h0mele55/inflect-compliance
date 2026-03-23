@@ -471,12 +471,16 @@ export async function downloadEvidenceFile(ctx: RequestContext, fileId: string) 
             }),
         });
 
-        // ─── Provider-dispatched download ───
-        const storage = getStorageProvider();
+        // ─── Dual-read: dispatch by record's storage provider ───
+        // During migration, old files may be on 'local' while app is configured for 's3'.
+        // Always read from the backend that stored the file.
+        const recordProvider = (fileRecord.storageProvider || 'local') as import('@/lib/storage/types').StorageProviderType;
+        const { getProviderByName } = await import('@/lib/storage/index');
+        const readProvider = getProviderByName(recordProvider);
 
-        if (storage.name === 's3') {
+        if (readProvider.name === 's3') {
             // S3: return presigned download URL (client-side redirect)
-            const downloadUrl = await storage.createSignedDownloadUrl(fileRecord.pathKey, {
+            const downloadUrl = await readProvider.createSignedDownloadUrl(fileRecord.pathKey, {
                 expiresIn: 300, // 5 minutes
                 downloadFilename: fileRecord.originalName,
             });
@@ -493,7 +497,7 @@ export async function downloadEvidenceFile(ctx: RequestContext, fileId: string) 
         // Local: stream file through the server
         return {
             mode: 'stream' as const,
-            stream: storage.readStream(fileRecord.pathKey),
+            stream: readProvider.readStream(fileRecord.pathKey),
             originalName: fileRecord.originalName,
             mimeType: fileRecord.mimeType,
             sizeBytes: fileRecord.sizeBytes,

@@ -67,6 +67,43 @@ export function resetStorageProvider(): void {
     _provider = null;
 }
 
+// ─── Provider Cache (by name) ───
+
+const _providerCache = new Map<string, StorageProvider>();
+
+/**
+ * Get a provider instance by name, regardless of the configured default.
+ * Used for dual-read during migration: reads from the backend that stored the file.
+ *
+ * @example
+ *   const readProvider = getProviderByName(fileRecord.storageProvider);
+ *   const stream = readProvider.readStream(fileRecord.pathKey);
+ */
+export function getProviderByName(name: StorageProviderType): StorageProvider {
+    const cached = _providerCache.get(name);
+    if (cached) return cached;
+
+    let provider: StorageProvider;
+    switch (name) {
+        case 's3': {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { S3StorageProvider } = require('./s3-provider');
+            provider = new S3StorageProvider();
+            break;
+        }
+        case 'local':
+        default: {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { LocalStorageProvider } = require('./local-provider');
+            provider = new LocalStorageProvider();
+            break;
+        }
+    }
+
+    _providerCache.set(name, provider);
+    return provider;
+}
+
 // ─── Path Generation ───
 
 /**
