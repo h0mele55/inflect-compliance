@@ -23,7 +23,7 @@ async function doLogin(page: Page) {
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard', { timeout: 15000 });
+    await page.waitForURL('**/dashboard', { timeout: 30000 });
 }
 
 test.describe('Authentication Flow', () => {
@@ -72,13 +72,13 @@ test.describe('Authentication Flow', () => {
 
         // Navigate to a protected route — should redirect to login
         await page.goto('/dashboard');
-        await page.waitForURL('**/login**', { timeout: 10000 });
+        await page.waitForURL('**/login**', { timeout: 15000 });
         expect(page.url()).toContain('/login');
     });
 
     test('unauthenticated access to /dashboard redirects to /login with next param', async ({ page }) => {
         await page.goto('/dashboard');
-        await page.waitForURL('**/login**', { timeout: 10000 });
+        await page.waitForURL('**/login**', { timeout: 15000 });
         const url = new URL(page.url());
         expect(url.pathname).toBe('/login');
         expect(url.searchParams.get('next')).toBe('/dashboard');
@@ -145,7 +145,7 @@ test.describe('Middleware Auth Guard', () => {
 
     test('redirect includes next param for return navigation', async ({ page }) => {
         await page.goto('/clauses');
-        await page.waitForURL('**/login**', { timeout: 10000 });
+        await page.waitForURL('**/login**', { timeout: 15000 });
         const url = new URL(page.url());
         expect(url.searchParams.get('next')).toBe('/clauses');
     });

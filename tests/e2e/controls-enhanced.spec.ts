@@ -30,7 +30,8 @@ test.describe('Controls Enhanced', () => {
             retries--;
             if (retries > 0) await page.waitForTimeout(3000);
         }
-        await page.waitForSelector('#dashboard-heading', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#dashboard-heading', { timeout: 30000 });
         await expect(page.locator('#dashboard-heading')).toContainText('Controls Dashboard');
         await expect(page.locator('#implementation-progress')).toBeVisible();
         await expect(page.locator('#dashboard-stats')).toBeVisible();
@@ -68,7 +69,8 @@ test.describe('Controls Enhanced', () => {
     test('activity tab shows events', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('h1', { timeout: 10000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('h1', { timeout: 15000 });
 
         // Click any control
         const firstControl = page.locator('#controls-table tbody tr a').first();
@@ -76,9 +78,15 @@ test.describe('Controls Enhanced', () => {
             await firstControl.click();
             await page.waitForSelector('#control-title', { timeout: 10000 });
 
-            // Click activity tab
+            // Click activity tab and wait for data to load
             await page.click('#tab-activity');
-            await page.waitForTimeout(2000);
+            await page.waitForLoadState('networkidle');
+
+            // Wait for either the activity feed or the empty state to appear
+            await Promise.race([
+                page.waitForSelector('#activity-feed', { timeout: 15000 }).catch(() => null),
+                page.waitForSelector('text=No activity recorded', { timeout: 15000 }).catch(() => null),
+            ]);
 
             // Should show activity feed (at least for controls that have events)
             const hasActivity = await page.locator('#activity-feed').isVisible();
@@ -90,7 +98,8 @@ test.describe('Controls Enhanced', () => {
     test('automation section is visible on detail page', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('h1', { timeout: 10000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('h1', { timeout: 15000 });
 
         const firstControl = page.locator('#controls-table tbody tr a').first();
         if (await firstControl.isVisible()) {

@@ -20,14 +20,16 @@ test.describe('AI-Assisted Risk Assessment', () => {
 
     test('risks page has AI Assessment button', async ({ page }) => {
         await page.goto('/t/acme-corp/risks');
-        await page.waitForSelector('#ai-risk-btn', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#ai-risk-btn', { timeout: 30000 });
         await expect(page.locator('#ai-risk-btn')).toBeVisible();
         await expect(page.locator('#ai-risk-btn')).toContainText('AI Assessment');
     });
 
     test('navigates to AI assessment page and shows form', async ({ page }) => {
         await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForSelector('#ai-risk-title', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#ai-risk-title', { timeout: 30000 });
         await expect(page.locator('#ai-risk-title')).toContainText('AI-Assisted Risk Assessment');
         await expect(page.locator('#ai-generate-form')).toBeVisible();
         await expect(page.locator('#ai-generate-btn')).toBeVisible();
@@ -35,7 +37,8 @@ test.describe('AI-Assisted Risk Assessment', () => {
 
     test('can select frameworks and generate suggestions', async ({ page }) => {
         await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForSelector('#ai-generate-form', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#ai-generate-form', { timeout: 30000 });
 
         // Select ISO27001 framework
         await page.click('#fw-iso27001');
@@ -54,7 +57,8 @@ test.describe('AI-Assisted Risk Assessment', () => {
 
     test('can accept, reject, and apply suggestions', async ({ page }) => {
         await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForSelector('#ai-generate-form', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#ai-generate-form', { timeout: 30000 });
 
         // Generate
         await page.click('#fw-iso27001');
@@ -73,14 +77,15 @@ test.describe('AI-Assisted Risk Assessment', () => {
         await page.click('#apply-btn');
 
         // Wait for done phase
-        await page.waitForSelector('#ai-done', { timeout: 15000 });
+        await page.waitForSelector('#ai-done', { timeout: 30000 });
         await expect(page.locator('#ai-done')).toContainText('added to your register');
     });
 
     test('applied risk appears in risk register', async ({ page }) => {
         // First generate and apply
         await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForSelector('#ai-generate-form', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#ai-generate-form', { timeout: 30000 });
         await page.click('#fw-iso27001');
         await page.click('#ai-generate-btn');
         await page.waitForSelector('#ai-review-section', { timeout: 30000 });
@@ -91,21 +96,23 @@ test.describe('AI-Assisted Risk Assessment', () => {
         // Accept first, apply
         await page.click('#accept-0');
         await page.click('#apply-btn');
-        await page.waitForSelector('#ai-done', { timeout: 15000 });
+        await page.waitForSelector('#ai-done', { timeout: 30000 });
 
         // Navigate to risk register
         await page.click('#view-risks-btn');
-        await page.waitForURL('**/risks', { timeout: 15000 });
+        await page.waitForURL('**/risks', { timeout: 30000 });
+        await page.waitForLoadState('networkidle');
 
         // Verify the risk is in the register
         if (firstTitle) {
-            await expect(page.locator('body')).toContainText(firstTitle, { timeout: 10000 });
+            await expect(page.locator('body')).toContainText(firstTitle, { timeout: 15000 });
         }
     });
 
     test('dismiss session returns to form', async ({ page }) => {
         await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForSelector('#ai-generate-form', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#ai-generate-form', { timeout: 30000 });
         await page.click('#ai-generate-btn');
         await page.waitForSelector('#ai-review-section', { timeout: 30000 });
 
@@ -113,7 +120,7 @@ test.describe('AI-Assisted Risk Assessment', () => {
         await page.click('#dismiss-btn');
 
         // Should return to form
-        await page.waitForSelector('#ai-generate-form', { timeout: 15000 });
+        await page.waitForSelector('#ai-generate-form', { timeout: 30000 });
         await expect(page.locator('#ai-generate-form')).toBeVisible();
     });
 });

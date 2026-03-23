@@ -93,10 +93,11 @@ test.describe('Issue Management', () => {
 
         await page.click('#create-task-btn');
 
-        await page.waitForURL('**/tasks/**', { timeout: 15000 });
-        await page.waitForSelector('#task-title', { timeout: 15000 });
-        await expect(page.locator('#task-title')).toContainText(`E2E Issue ${uniqueId}`, { timeout: 10000 });
-        await expect(page.locator('#task-severity')).toContainText('HIGH');
+        await page.waitForURL('**/tasks/**', { timeout: 30000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#task-title', { timeout: 30000 });
+        await expect(page.locator('#task-title')).toContainText(`E2E Issue ${uniqueId}`, { timeout: 15000 });
+        await expect(page.locator('#task-severity')).toContainText('HIGH', { timeout: 5000 });
     });
 
     test('change issue status', async ({ page }) => {

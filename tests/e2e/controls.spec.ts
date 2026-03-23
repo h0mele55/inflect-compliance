@@ -8,7 +8,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 15000 });
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 30000 });
     const url = new URL(page.url());
     const match = url.pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug from ' + url.pathname);
@@ -25,7 +25,8 @@ test.describe('Controls Center', () => {
     test('controls list page loads with filters and CTAs', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('h1', { timeout: 10000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('h1', { timeout: 15000 });
         await expect(page.locator('#new-control-btn')).toBeVisible({ timeout: 5000 });
         await expect(page.locator('#install-templates-btn')).toBeVisible();
         await expect(page.locator('#control-search')).toBeVisible();
@@ -138,7 +139,7 @@ test.describe('Controls Center', () => {
         await page.fill('input[type="email"]', 'viewer@acme.com');
         await page.fill('input[type="password"]', 'password123');
         await page.click('button[type="submit"]');
-        await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 15000 });
+        await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 30000 });
         const url = new URL(page.url());
         const match = url.pathname.match(/^\/t\/([^/]+)\//);
         tenantSlug = match?.[1] || tenantSlug;

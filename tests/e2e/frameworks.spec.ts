@@ -34,6 +34,7 @@ test.describe('Framework Coverage UI', () => {
 
     test('frameworks page loads', async () => {
         await page.goto(`/t/${tenantSlug}/frameworks`);
+        await page.waitForLoadState('networkidle');
         await page.waitForSelector('#frameworks-heading', { timeout: 60000 });
         await expect(page.locator('#frameworks-heading')).toContainText('Compliance Frameworks');
     });
@@ -103,6 +104,7 @@ test.describe('Framework Coverage UI', () => {
 
     test('install wizard loads', async () => {
         await page.goto(`/t/${tenantSlug}/frameworks/ISO27001/install`);
+        await page.waitForLoadState('networkidle');
         await page.waitForSelector('#install-wizard-heading', { timeout: 15000 }).catch(() => null);
         const heading = page.locator('#install-wizard-heading');
         if (!await heading.isVisible().catch(() => false)) { test.skip(); return; }
@@ -139,6 +141,7 @@ test.describe('Framework Coverage UI', () => {
 
     test('coverage report page loads', async () => {
         await page.goto(`/t/${tenantSlug}/frameworks/ISO27001/coverage`);
+        await page.waitForLoadState('networkidle');
         await page.waitForSelector('#coverage-report-heading', { timeout: 15000 }).catch(() => null);
         const heading = page.locator('#coverage-report-heading');
         if (!await heading.isVisible().catch(() => false)) { test.skip(); return; }
