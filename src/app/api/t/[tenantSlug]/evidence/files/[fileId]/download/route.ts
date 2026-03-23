@@ -1,18 +1,36 @@
 /**
  * GET /api/t/[tenantSlug]/evidence/files/[fileId]/download
- * Secure file download: tenant-scoped, role-gated, streams file with correct headers.
+ * 
+ * Secure file download: tenant-scoped, role-gated.
+ * - S3 provider: responds with 302 redirect to presigned URL
+ * - Local provider: streams file with correct headers
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { downloadEvidenceFile } from '@/app-layer/usecases/evidence';
 import { withApiErrorHandling } from '@/lib/errors/api';
-import { Readable } from 'stream';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; fileId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const result = await downloadEvidenceFile(ctx, params.fileId);
 
-    // Convert Node.js ReadStream to Web ReadableStream
+    // Sanitize filename for Content-Disposition
+    const safeName = result.originalName
+        .replace(/[^\x20-\x7E]/g, '_')
+        .replace(/"/g, "'");
+
+    // ─── S3: redirect to presigned URL ───
+    if (result.mode === 'redirect') {
+        return NextResponse.redirect(result.downloadUrl, {
+            status: 302,
+            headers: {
+                'Cache-Control': 'private, no-cache, no-store',
+                'X-Content-SHA256': result.sha256,
+            },
+        });
+    }
+
+    // ─── Local: stream file through server ───
     const nodeStream = result.stream;
     const webStream = new ReadableStream({
         start(controller) {
@@ -24,11 +42,6 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
             nodeStream.destroy();
         },
     });
-
-    // Sanitize filename for Content-Disposition
-    const safeName = result.originalName
-        .replace(/[^\x20-\x7E]/g, '_')
-        .replace(/"/g, "'");
 
     return new NextResponse(webStream, {
         status: 200,

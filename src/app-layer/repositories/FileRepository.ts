@@ -11,6 +11,9 @@ export class FileRepository {
             mimeType: string;
             sizeBytes: number;
             sha256: string;
+            storageProvider?: string;
+            bucket?: string | null;
+            domain?: string;
         },
     ) {
         return (db as any).fileRecord.create({            // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -23,6 +26,9 @@ export class FileRepository {
                 sha256: data.sha256,
                 status: 'PENDING',
                 uploadedByUserId: ctx.userId,
+                storageProvider: data.storageProvider || 'local',
+                bucket: data.bucket || null,
+                domain: data.domain || 'general',
             },
         });
     }

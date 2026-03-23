@@ -283,15 +283,16 @@ export async function getEvidenceMetrics(ctx: RequestContext) {
 
 import { FileRepository } from '../repositories/FileRepository';
 import {
-    generatePathKey,
-    streamWriteFile,
-    streamReadFile,
-    deleteStoredFile,
+    getStorageProvider,
+    buildTenantObjectKey,
+    assertTenantKey,
     isAllowedMime,
     isAllowedSize,
     FILE_MAX_SIZE_BYTES,
 } from '@/lib/storage';
+import type { StorageDomain } from '@/lib/storage';
 import { Readable } from 'stream';
+import { env } from '@/env';
 
 /**
  * Upload a file and create an Evidence record of type FILE in one flow.
@@ -308,6 +309,7 @@ export async function uploadEvidenceFile(
         owner?: string | null;
         reviewCycle?: string | null;
         nextReviewDate?: string | null;
+        domain?: StorageDomain;
     },
 ) {
     assertCanWrite(ctx);
@@ -321,15 +323,17 @@ export async function uploadEvidenceFile(
         throw badRequest('FILE_TOO_LARGE', `File exceeds maximum size of ${FILE_MAX_SIZE_BYTES} bytes`);
     }
 
+    const storage = getStorageProvider();
     const originalName = file.name || 'unnamed';
-    const pathKey = generatePathKey(ctx.tenantId, originalName);
+    const domain = metadata.domain || 'evidence';
+    const pathKey = buildTenantObjectKey(ctx.tenantId, domain, originalName);
 
-    // Stream to disk with incremental SHA-256
+    // Write through the storage abstraction (local or S3)
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const readable = Readable.from(buffer);
 
-    const writeResult = await streamWriteFile(pathKey, readable);
+    const writeResult = await storage.write(pathKey, readable, { mimeType });
 
     // Create FileRecord + Evidence in a transaction
     return runInTenantContext(ctx, async (db) => {
@@ -339,18 +343,21 @@ export async function uploadEvidenceFile(
         let deduplicated = false;
 
         if (existingFile && existingFile.status === 'STORED') {
-            // Reuse existing FileRecord — delete the new file from disk
+            // Reuse existing FileRecord — delete the new file
             fileRecordId = existingFile.id;
             deduplicated = true;
-            try { await deleteStoredFile(pathKey); } catch { /* best effort */ }
+            try { await storage.delete(pathKey); } catch { /* best effort */ }
         } else {
-            // Create new FileRecord
+            // Create new FileRecord with cloud storage metadata
             const fileRecord = await FileRepository.createPending(db, ctx, {
                 pathKey,
                 originalName,
                 mimeType,
                 sizeBytes: writeResult.sizeBytes,
                 sha256: writeResult.sha256,
+                storageProvider: storage.name,
+                bucket: env.S3_BUCKET || null,
+                domain,
             });
             await FileRepository.markStored(db, ctx, fileRecord.id);
             fileRecordId = fileRecord.id;
@@ -384,6 +391,7 @@ export async function uploadEvidenceFile(
                 sizeBytes: writeResult.sizeBytes,
                 sha256: writeResult.sha256,
                 deduplicated,
+                storageProvider: storage.name,
             }),
         });
 
@@ -397,6 +405,7 @@ export async function uploadEvidenceFile(
                 sha256: writeResult.sha256,
                 status: 'STORED',
                 deduplicated,
+                storageProvider: storage.name,
             },
         };
     });
@@ -430,20 +439,20 @@ export async function downloadEvidenceFile(ctx: RequestContext, fileId: string) 
         if (!fileRecord) throw notFound('File not found');
         if (fileRecord.status !== 'STORED') throw notFound('File is not available for download');
 
+        // Tenant isolation guard
+        assertTenantKey(fileRecord.pathKey, ctx.tenantId);
+
         // ─── Strict Policy: control-aware access ───
-        // Find evidence linked to this FileRecord
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const evidence = await (db.evidence as any).findFirst({
             where: { tenantId: ctx.tenantId, fileRecordId: fileId },
             select: { id: true, controlId: true, deletedAt: true },
         });
 
-        // Block download of soft-deleted evidence
         if (evidence?.deletedAt) {
             throw notFound('Evidence has been deleted');
         }
 
-        // READER/AUDITOR: must be linked to a control
         if (!ctx.permissions.canWrite) {
             if (!evidence?.controlId) {
                 throw forbidden('You can only download evidence that is linked to a control. Contact an admin to link this evidence.');
@@ -458,11 +467,33 @@ export async function downloadEvidenceFile(ctx: RequestContext, fileId: string) 
                 originalName: fileRecord.originalName,
                 role: ctx.role,
                 controlLinked: !!evidence?.controlId,
+                storageProvider: fileRecord.storageProvider || 'local',
             }),
         });
 
+        // ─── Provider-dispatched download ───
+        const storage = getStorageProvider();
+
+        if (storage.name === 's3') {
+            // S3: return presigned download URL (client-side redirect)
+            const downloadUrl = await storage.createSignedDownloadUrl(fileRecord.pathKey, {
+                expiresIn: 300, // 5 minutes
+                downloadFilename: fileRecord.originalName,
+            });
+            return {
+                mode: 'redirect' as const,
+                downloadUrl,
+                originalName: fileRecord.originalName,
+                mimeType: fileRecord.mimeType,
+                sizeBytes: fileRecord.sizeBytes,
+                sha256: fileRecord.sha256,
+            };
+        }
+
+        // Local: stream file through the server
         return {
-            stream: streamReadFile(fileRecord.pathKey),
+            mode: 'stream' as const,
+            stream: storage.readStream(fileRecord.pathKey),
             originalName: fileRecord.originalName,
             mimeType: fileRecord.mimeType,
             sizeBytes: fileRecord.sizeBytes,
