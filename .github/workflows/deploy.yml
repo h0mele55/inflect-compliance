@@ -1,7 +1,12 @@
 # ───────────────────────────────────────────────────────────────
 #  Deploy — automated staging + manual production
 #  Triggers: push to main (staging), manual dispatch (production)
-#  Requires: GitHub Environments with secrets configured.
+#
+#  REQUIRED GITHUB CONFIGURATION:
+#  - Environment "staging" with secrets: DEPLOY_HOST, DEPLOY_USER,
+#    DEPLOY_SSH_KEY, DEPLOY_PATH and optional variable: STAGING_URL
+#  - Environment "production" with secrets: DEPLOY_HOST, DEPLOY_USER,
+#    DEPLOY_SSH_KEY, DEPLOY_PATH and optional variable: PRODUCTION_URL
 # ───────────────────────────────────────────────────────────────
 name: Deploy
 
@@ -114,7 +119,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
     environment:
       name: staging
-      url: ${{ vars.STAGING_URL || 'https://staging.example.com' }}
+      url: https://staging.example.com
     timeout-minutes: 10
 
     steps:
@@ -122,13 +127,15 @@ jobs:
 
       - name: Deploy to staging
         uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.DEPLOY_PATH }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -euo pipefail
-            cd ${{ secrets.DEPLOY_PATH || '/opt/inflect-compliance' }}
+            cd "${APP_PATH:-/opt/inflect-compliance}"
             
             # Pull latest image
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -165,7 +172,7 @@ jobs:
       github.event.inputs.environment == 'production'
     environment:
       name: production
-      url: ${{ vars.PRODUCTION_URL || 'https://app.example.com' }}
+      url: https://app.example.com
     timeout-minutes: 10
 
     steps:
@@ -173,13 +180,15 @@ jobs:
 
       - name: Deploy to production
         uses: appleboy/ssh-action@v1
+        env:
+          APP_PATH: ${{ secrets.DEPLOY_PATH }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             set -euo pipefail
-            cd ${{ secrets.DEPLOY_PATH || '/opt/inflect-compliance' }}
+            cd "${APP_PATH:-/opt/inflect-compliance}"
             
             # Pull latest image
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}

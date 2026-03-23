@@ -40,6 +40,8 @@ describe('Static Analysis: No process.env fallbacks', () => {
             if (file.includes('diagnostics') && file.includes('route.ts')) continue;
             // AV webhook uses process.env for webhook auth that must run before env validation
             if (file.includes('av-webhook') && file.includes('route.ts')) continue;
+            // Encryption module reads DATA_ENCRYPTION_KEY directly (must work before env validation)
+            if (file.endsWith('encryption.ts') && file.includes('security')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 
