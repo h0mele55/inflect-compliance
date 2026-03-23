@@ -18,7 +18,11 @@ export {
     resetStorageProvider,
     // Path utils
     generatePathKey,
+    buildTenantObjectKey,
     sanitizeFileName,
+    // Key guards
+    assertTenantKey,
+    parseTenantKey,
     // Validation
     FILE_MAX_SIZE_BYTES,
     FILE_ALLOWED_MIME,
@@ -37,6 +41,8 @@ export type {
     UploadUrlOptions,
     SignedUploadTarget,
 } from './storage/types';
+
+export type { StorageDomain } from './storage/index';
 
 // ─── Legacy re-exports (delegate to local provider) ───
 

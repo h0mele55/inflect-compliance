@@ -1126,6 +1126,12 @@ model FileRecord {
   updatedAt        DateTime         @updatedAt
   storedAt         DateTime?
 
+  // ─── Cloud Storage Fields ───
+  storageProvider  String           @default("local")  // "local" | "s3"
+  bucket           String?                             // S3 bucket name (null for local)
+  domain           String           @default("general") // evidence | reports | exports | temp | general
+  scanStatus       String           @default("PENDING") // PENDING | CLEAN | INFECTED | SKIPPED
+
   tenant     Tenant @relation(fields: [tenantId], references: [id])
   uploadedBy User   @relation("FileUploader", fields: [uploadedByUserId], references: [id])
   evidence   Evidence[]
@@ -1133,6 +1139,7 @@ model FileRecord {
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
+  @@index([tenantId, scanStatus])
 }
 
 model EvidenceReview {
