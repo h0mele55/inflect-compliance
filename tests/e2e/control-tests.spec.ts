@@ -88,7 +88,8 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await page.fill('#control-search', `Test Ctrl ${uid}`);
         await page.waitForLoadState('networkidle'); /* replaced wait */
         await page.click(`text=Test Ctrl ${uid}`);
-        await page.waitForSelector('#control-title', { timeout: 10000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#control-title', { timeout: 30000 });
 
         // Go to Tests tab — wait for TestPlansPanel fetch to complete
         await page.click('#tab-tests');

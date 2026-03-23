@@ -56,8 +56,10 @@ test.describe('Onboarding Wizard', () => {
     test('admin starts onboarding and sees the wizard', async ({ page }) => {
         const slug = await loginAsAdmin(page);
         await gotoAndVerify(page, `/t/${slug}/onboarding`);
+        await page.waitForLoadState('networkidle');
 
         // Should see the welcome screen or the wizard
+        await page.waitForTimeout(2000); // Allow React hydration to complete
         const pageContent = await page.textContent('body');
         const hasWizard = pageContent?.includes('Setup Wizard') || pageContent?.includes('set up your workspace');
         expect(hasWizard).toBeTruthy();

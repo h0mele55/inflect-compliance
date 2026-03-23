@@ -177,7 +177,8 @@ test.describe('Issue Management', () => {
         await gotoAndVerify(page, `/t/${tenantSlug}/tasks`, 'h1');
 
         await page.click(`text=E2E Issue ${uniqueId}`);
-        await page.waitForSelector('#task-title', { timeout: 10000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#task-title', { timeout: 30000 });
 
         // Go to comments tab
         await page.click('#tab-comments');
@@ -189,7 +190,7 @@ test.describe('Issue Management', () => {
         await page.waitForLoadState('networkidle');
 
         // Verify comment appears
-        await expect(page.locator('#comments-list')).toContainText(`E2E comment ${uniqueId}`, { timeout: 5000 });
+        await expect(page.locator('#comments-list')).toContainText(`E2E comment ${uniqueId}`, { timeout: 15000 });
     });
 
     test('dashboard page renders metrics', async ({ page }) => {

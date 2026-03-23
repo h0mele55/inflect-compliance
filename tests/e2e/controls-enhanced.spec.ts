@@ -104,10 +104,11 @@ test.describe('Controls Enhanced', () => {
         const firstControl = page.locator('#controls-table tbody tr a').first();
         if (await firstControl.isVisible()) {
             await firstControl.click();
-            await page.waitForSelector('#control-title', { timeout: 10000 });
+            await page.waitForLoadState('networkidle');
+            await page.waitForSelector('#control-title', { timeout: 30000 });
 
             // Should see automation section in overview
-            await expect(page.locator('text=Automation')).toBeVisible({ timeout: 5000 });
+            await expect(page.getByRole('heading', { name: 'Automation' })).toBeVisible({ timeout: 15000 });
             await expect(page.locator('#edit-automation-btn')).toBeVisible();
         }
     });

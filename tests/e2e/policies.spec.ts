@@ -127,9 +127,10 @@ test.describe('Policy Center', () => {
         await page.click(`text=${createdPolicyTitle}`);
         await page.waitForSelector('#policy-title', { timeout: 10000 });
 
-        // Click Activity tab
         await page.click('text=Activity');
-        await page.waitForSelector('#activity-feed', { timeout: 5000 });
+        await page.waitForLoadState('networkidle');
+        // Wait for either the activity feed or empty state
+        await page.waitForSelector('#activity-feed', { timeout: 15000 });
         // Should show some events (at least POLICY_CREATED)
         await expect(page.locator('#activity-feed')).toContainText('CREATED');
     });

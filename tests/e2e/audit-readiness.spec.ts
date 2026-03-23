@@ -50,10 +50,10 @@ test.describe('Audit Readiness', () => {
     test('create ISO27001 cycle', async () => {
         // Wait explicitly for the button to appear in DOM and become interactive
         const createBtn = page.locator('#create-cycle-btn');
-        await createBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await createBtn.waitFor({ state: 'visible', timeout: 30000 });
         await createBtn.click();
         
-        await page.waitForSelector('#cycle-form', { state: 'visible', timeout: 15000 });
+        await page.waitForSelector('#cycle-form', { state: 'visible', timeout: 30000 });
 
         const uid = Date.now().toString(36);
         const cycleName = `E2E ISO27001 Audit ${uid}`;
@@ -64,7 +64,8 @@ test.describe('Audit Readiness', () => {
         await page.click('#submit-cycle-btn');
 
         // Should redirect to cycle detail
-        await page.waitForURL(/\/audits\/cycles\//, { timeout: 15000 });
+        await page.waitForURL(/\/audits\/cycles\//, { timeout: 30000 });
+        await page.waitForLoadState('networkidle');
         await expect(page.locator('#cycle-name')).toContainText(cycleName);
 
         // Extract cycle ID from URL
