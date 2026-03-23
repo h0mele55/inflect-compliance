@@ -36,7 +36,7 @@ export class FileRepository {
     static async markStored(db: PrismaTx, _ctx: RequestContext, id: string) {
         return (db as any).fileRecord.update({            // eslint-disable-line @typescript-eslint/no-explicit-any
             where: { id },
-            data: { status: 'STORED', storedAt: new Date() },
+            data: { status: 'STORED', storedAt: new Date(), scanStatus: 'PENDING' },
         });
     }
 
@@ -94,6 +94,48 @@ export class FileRepository {
                 status: 'PENDING',
                 createdAt: { lt: olderThan },
             },
+        });
+    }
+
+    // ─── AV Scan Lifecycle ───
+
+    static async updateScanStatus(
+        db: PrismaTx,
+        id: string,
+        scanStatus: 'PENDING' | 'CLEAN' | 'INFECTED' | 'SKIPPED',
+        scanDetails?: string,
+    ) {
+        return (db as any).fileRecord.update({            // eslint-disable-line @typescript-eslint/no-explicit-any
+            where: { id },
+            data: {
+                scanStatus,
+                ...(scanDetails ? { scanDetails } : {}),
+                updatedAt: new Date(),
+            },
+        });
+    }
+
+    static async markScanClean(db: PrismaTx, id: string) {
+        return FileRepository.updateScanStatus(db, id, 'CLEAN');
+    }
+
+    static async markScanInfected(db: PrismaTx, id: string, details?: string) {
+        return FileRepository.updateScanStatus(db, id, 'INFECTED', details);
+    }
+
+    static async findPendingScan(db: PrismaTx, tenantId?: string) {
+        const where: Record<string, unknown> = { scanStatus: 'PENDING', status: 'STORED' };
+        if (tenantId) where.tenantId = tenantId;
+        return (db as any).fileRecord.findMany({          // eslint-disable-line @typescript-eslint/no-explicit-any
+            where,
+            orderBy: { createdAt: 'asc' },
+            take: 100,
+        });
+    }
+
+    static async getByPathKey(db: PrismaTx, pathKey: string) {
+        return (db as any).fileRecord.findFirst({         // eslint-disable-line @typescript-eslint/no-explicit-any
+            where: { pathKey },
         });
     }
 

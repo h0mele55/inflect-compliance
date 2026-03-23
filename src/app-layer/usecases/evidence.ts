@@ -442,6 +442,18 @@ export async function downloadEvidenceFile(ctx: RequestContext, fileId: string) 
         // Tenant isolation guard
         assertTenantKey(fileRecord.pathKey, ctx.tenantId);
 
+        // ─── AV Scan Guard ───
+        const scanMode = env.AV_SCAN_MODE || 'permissive';
+        const scanStatus = fileRecord.scanStatus || 'PENDING';
+
+        if (scanStatus === 'INFECTED') {
+            throw forbidden('This file has been flagged as infected by antivirus scanning and cannot be downloaded.');
+        }
+
+        if (scanMode === 'strict' && scanStatus === 'PENDING') {
+            throw forbidden('This file is pending antivirus scan and cannot be downloaded yet. Please try again later.');
+        }
+
         // ─── Strict Policy: control-aware access ───
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const evidence = await (db.evidence as any).findFirst({

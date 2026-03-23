@@ -1,0 +1,221 @@
+/**
+ * POST /api/storage/av-webhook
+ *
+ * Webhook endpoint for AV scanning results.
+ * Called by external scanning services (ClamAV, Windows Defender ATP, etc.)
+ * after a file has been scanned.
+ *
+ * Authentication: HMAC-SHA256 signature in X-AV-Signature header.
+ * Payload: { fileId, pathKey, status, details?, engine? }
+ *
+ * Status transitions:
+ *   PENDING → CLEAN     (file is safe)
+ *   PENDING → INFECTED  (file contains malware)
+ *   PENDING → SKIPPED   (scan was not performed)
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+import { PrismaClient } from '@prisma/client';
+import { logger } from '@/lib/observability/logger';
+
+const prisma = new PrismaClient();
+
+// ─── Webhook Auth ───
+
+function getWebhookSecret(): string | null {
+    return process.env.AV_WEBHOOK_SECRET || null;
+}
+
+function verifySignature(payload: string, signature: string, secret: string): boolean {
+    const expected = crypto
+        .createHmac('sha256', secret)
+        .update(payload)
+        .digest('hex');
+    // Timing-safe comparison
+    try {
+        return crypto.timingSafeEqual(
+            Buffer.from(signature, 'hex'),
+            Buffer.from(expected, 'hex'),
+        );
+    } catch {
+        return false;
+    }
+}
+
+// ─── Payload Schema ───
+
+interface AVWebhookPayload {
+    /** FileRecord ID */
+    fileId?: string;
+    /** Object key (alternative to fileId) */
+    pathKey?: string;
+    /** Scan result: clean | infected | skipped */
+    status: 'clean' | 'infected' | 'skipped';
+    /** Optional scan details (engine output, threat names) */
+    details?: string;
+    /** Scanning engine name */
+    engine?: string;
+    /** Timestamp of scan completion */
+    scannedAt?: string;
+}
+
+const VALID_STATUSES = ['clean', 'infected', 'skipped'] as const;
+
+// ─── Handler ───
+
+export async function POST(req: NextRequest) {
+    try {
+        const rawBody = await req.text();
+
+        // ─── Authenticate webhook ───
+        const secret = getWebhookSecret();
+        if (secret) {
+            const signature = req.headers.get('x-av-signature') || '';
+            if (!signature || !verifySignature(rawBody, signature, secret)) {
+                logger.warn('AV webhook: invalid signature', { component: 'av-webhook' });
+                return NextResponse.json(
+                    { error: 'Invalid webhook signature' },
+                    { status: 401 }
+                );
+            }
+        } else {
+            // No secret configured — check for development bypass
+            if (process.env.NODE_ENV === 'production') {
+                logger.error('AV webhook: AV_WEBHOOK_SECRET not configured in production', { component: 'av-webhook' });
+                return NextResponse.json(
+                    { error: 'Webhook authentication not configured' },
+                    { status: 500 }
+                );
+            }
+            logger.warn('AV webhook: running without signature verification (dev only)', { component: 'av-webhook' });
+        }
+
+        // ─── Parse and validate payload ───
+        let payload: AVWebhookPayload;
+        try {
+            payload = JSON.parse(rawBody);
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+        }
+
+        if (!payload.status || !VALID_STATUSES.includes(payload.status)) {
+            return NextResponse.json(
+                { error: `Invalid status: must be one of ${VALID_STATUSES.join(', ')}` },
+                { status: 400 }
+            );
+        }
+
+        if (!payload.fileId && !payload.pathKey) {
+            return NextResponse.json(
+                { error: 'Either fileId or pathKey is required' },
+                { status: 400 }
+            );
+        }
+
+        // ─── Lookup file record ───
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let fileRecord: any;
+        if (payload.fileId) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            fileRecord = await (prisma as any).fileRecord.findUnique({
+                where: { id: payload.fileId },
+            });
+        } else if (payload.pathKey) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            fileRecord = await (prisma as any).fileRecord.findFirst({
+                where: { pathKey: payload.pathKey },
+            });
+        }
+
+        if (!fileRecord) {
+            logger.warn('AV webhook: file not found', {
+                component: 'av-webhook',
+                fileId: payload.fileId,
+                pathKey: payload.pathKey,
+            });
+            return NextResponse.json({ error: 'File not found' }, { status: 404 });
+        }
+
+        // ─── Map status ───
+        const scanStatusMap: Record<string, string> = {
+            clean: 'CLEAN',
+            infected: 'INFECTED',
+            skipped: 'SKIPPED',
+        };
+        const scanStatus = scanStatusMap[payload.status];
+
+        // ─── Build scan details ───
+        const scanDetails = JSON.stringify({
+            engine: payload.engine || 'unknown',
+            result: payload.status,
+            details: payload.details || null,
+            receivedAt: new Date().toISOString(),
+        });
+
+        // ─── Update file record ───
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (prisma as any).fileRecord.update({
+            where: { id: fileRecord.id },
+            data: {
+                scanStatus,
+                scanDetails,
+                scannedAt: payload.scannedAt ? new Date(payload.scannedAt) : new Date(),
+            },
+        });
+
+        logger.info('AV webhook: scan result recorded', {
+            component: 'av-webhook',
+            fileId: fileRecord.id,
+            tenantId: fileRecord.tenantId,
+            scanStatus,
+            engine: payload.engine,
+        });
+
+        // ─── Handle infected files ───
+        if (payload.status === 'infected') {
+            logger.warn('AV webhook: INFECTED file detected', {
+                component: 'av-webhook',
+                fileId: fileRecord.id,
+                tenantId: fileRecord.tenantId,
+                pathKey: fileRecord.pathKey,
+                details: payload.details,
+            });
+
+            // Quarantine: mark file as FAILED to prevent downloads
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (prisma as any).fileRecord.update({
+                where: { id: fileRecord.id },
+                data: { status: 'FAILED' },
+            });
+
+            // Log audit event
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (prisma as any).auditEvent.create({
+                data: {
+                    tenantId: fileRecord.tenantId,
+                    userId: fileRecord.uploadedByUserId,
+                    action: 'FILE_QUARANTINED',
+                    entityType: 'FileRecord',
+                    entityId: fileRecord.id,
+                    details: `File quarantined: malware detected by ${payload.engine || 'AV scanner'}. ${payload.details || ''}`,
+                },
+            });
+        }
+
+        return NextResponse.json({
+            success: true,
+            fileId: fileRecord.id,
+            scanStatus,
+        });
+
+    } catch (err) {
+        logger.error('AV webhook: unexpected error', {
+            component: 'av-webhook',
+            err: err instanceof Error ? err : new Error(String(err)),
+        });
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        );
+    }
+}

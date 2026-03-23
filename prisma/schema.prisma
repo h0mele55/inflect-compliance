@@ -1131,6 +1131,8 @@ model FileRecord {
   bucket           String?                             // S3 bucket name (null for local)
   domain           String           @default("general") // evidence | reports | exports | temp | general
   scanStatus       String           @default("PENDING") // PENDING | CLEAN | INFECTED | SKIPPED
+  scanDetails      String?          @db.Text            // AV scan result details (JSON)
+  scannedAt        DateTime?                            // When scan completed
 
   tenant     Tenant @relation(fields: [tenantId], references: [id])
   uploadedBy User   @relation("FileUploader", fields: [uploadedByUserId], references: [id])

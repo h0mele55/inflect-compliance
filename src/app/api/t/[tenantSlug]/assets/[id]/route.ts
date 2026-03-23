@@ -17,6 +17,8 @@ export const PUT = withApiErrorHandling(withValidatedBody(UpdateAssetSchema, asy
     return NextResponse.json({ success: true, asset });
 }));
 
+export const PATCH = PUT;
+
 export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
     await deleteAsset(ctx, params.id);

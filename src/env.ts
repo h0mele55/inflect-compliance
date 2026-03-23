@@ -52,6 +52,10 @@ export const env = createEnv({
         S3_ACCESS_KEY_ID: z.string().optional(),
         S3_SECRET_ACCESS_KEY: z.string().optional(),
 
+        // AV Scanning
+        AV_WEBHOOK_SECRET: z.string().optional(),          // HMAC secret for webhook auth
+        AV_SCAN_MODE: z.enum(["strict", "permissive", "disabled"]).default("permissive"),
+
         // Security / CORS
         CORS_ALLOWED_ORIGINS: z.string().default(""),
 
@@ -123,6 +127,9 @@ export const env = createEnv({
         S3_ENDPOINT: process.env.S3_ENDPOINT,
         S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID,
         S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+
+        AV_WEBHOOK_SECRET: process.env.AV_WEBHOOK_SECRET,
+        AV_SCAN_MODE: process.env.AV_SCAN_MODE,
 
         CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
         SMTP_HOST: process.env.SMTP_HOST,
