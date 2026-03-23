@@ -11,7 +11,10 @@ import { runInTenantContext } from '@/lib/db-context';
 import { notFound } from '@/lib/errors/types';
 import { withDeleted, SOFT_DELETE_MODELS } from '@/lib/soft-delete';
 
-type SoftDeletableModel = 'Asset' | 'Risk' | 'Control' | 'Evidence' | 'Policy';
+type SoftDeletableModel =
+    | 'Asset' | 'Risk' | 'Control' | 'Evidence' | 'Policy'
+    | 'Vendor' | 'FileRecord' | 'Task' | 'Finding'
+    | 'Audit' | 'AuditCycle' | 'AuditPack';
 
 /**
  * Restore a soft-deleted entity (set deletedAt = null).
