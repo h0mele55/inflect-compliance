@@ -1,6 +1,16 @@
 # ───────────────────────────────────────────────────────────────
 #  CI — Enterprise-grade pipeline
-#  Jobs: quality · build · e2e · security
+#  Jobs: lint · typecheck · test · build · e2e · security · docker
+#
+#  Job graph:
+#    lint ─────────────┐
+#    typecheck ────────┤
+#    test (jest) ──────┼──→ (PR merge gate)
+#    build ────────────┤
+#      ├──→ e2e ───────┤
+#      └──→ docker ────┘
+#    security ─────────┘
+#
 #  Runs on PRs and pushes to main.
 # ───────────────────────────────────────────────────────────────
 name: CI
@@ -22,10 +32,7 @@ permissions:
 env:
   NODE_VERSION: "20"
   SKIP_ENV_VALIDATION: "1"
-  # ── Test database ──
-  DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
-  DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
-  # ── Dummy secrets (CI-only) ──
+  # ── Dummy secrets (CI-only — no real credentials) ──
   AUTH_SECRET: ci-auth-secret-that-is-long-enough
   JWT_SECRET: ci-jwt-secret-that-is-long-enough
   NEXTAUTH_SECRET: ci-auth-secret-that-is-long-enough
@@ -42,12 +49,69 @@ env:
 
 jobs:
   # ═══════════════════════════════════════════════════════════════
-  #  Job 1: Quality — lint, typecheck, unit/integration, guards
+  #  Job 1: Lint — ESLint + Next.js lint rules
+  #  Fast, no DB needed. Fails immediately on lint errors.
   # ═══════════════════════════════════════════════════════════════
-  quality:
-    name: "Quality: Lint · Types · Tests · Guards"
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run ESLint
+        run: npm run lint
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 2: Typecheck — TypeScript strict compilation
+  #  Fast, no DB needed. Catches type errors early.
+  # ═══════════════════════════════════════════════════════════════
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run tsc --noEmit
+        run: npm run typecheck
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 3: Test — Jest unit + integration + architectural guards
+  #  Needs Postgres for integration tests.
+  # ═══════════════════════════════════════════════════════════════
+  test:
+    name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    env:
+      DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
 
     services:
       postgres:
@@ -78,14 +142,7 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      # ── Static analysis ──
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      # ── Quality gates (blocking) ──
+      # ── Quality gate: migrations must exist ──
       - name: "Gate: Prisma migrations exist"
         run: |
           COUNT=$(find prisma/migrations -name "migration.sql" 2>/dev/null | wc -l)
@@ -95,13 +152,15 @@ jobs:
           fi
           echo "✓ Found $COUNT migration(s)"
 
-      # ── DB-backed tests ──
+      # ── Apply schema to test DB ──
       - name: Apply Prisma migrations
         run: npx prisma migrate deploy
 
+      # ── Jest: unit + integration tests ──
       - name: "Run tests: unit + integration"
         run: npm run test:ci
 
+      # ── Architectural guard tests ──
       - name: "Run tests: architectural guards"
         run: npx jest tests/guards/ --runInBand --forceExit --no-coverage
 
@@ -111,7 +170,7 @@ jobs:
         run: npm run test:coverage || true
         continue-on-error: true
 
-      - name: Upload coverage
+      - name: Upload coverage artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
@@ -121,10 +180,11 @@ jobs:
         continue-on-error: true
 
   # ═══════════════════════════════════════════════════════════════
-  #  Job 2: Build — production build verification
+  #  Job 4: Build — production build verification
+  #  No DB needed. Verifies `next build` succeeds cleanly.
   # ═══════════════════════════════════════════════════════════════
   build:
-    name: "Build: Production"
+    name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -147,7 +207,7 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Upload build output on failure
+      - name: Upload build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -157,13 +217,20 @@ jobs:
         continue-on-error: true
 
   # ═══════════════════════════════════════════════════════════════
-  #  Job 3: E2E — Playwright browser tests
+  #  Job 5: E2E — Playwright browser tests
+  #  Needs: build (validates app compiles before expensive E2E)
   # ═══════════════════════════════════════════════════════════════
   e2e:
-    name: "E2E: Playwright"
+    name: E2E
     needs: [build]
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+
+    env:
+      AUTH_TEST_MODE: "1"
+      NODE_ENV: production
+      DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
 
     services:
       postgres:
@@ -179,10 +246,6 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
-
-    env:
-      AUTH_TEST_MODE: "1"
-      NODE_ENV: production
 
     steps:
       - uses: actions/checkout@v4
@@ -257,10 +320,10 @@ jobs:
         continue-on-error: true
 
   # ═══════════════════════════════════════════════════════════════
-  #  Job 4: Security — supply chain and dependency checks
+  #  Job 6: Security — supply chain and dependency checks
   # ═══════════════════════════════════════════════════════════════
   security:
-    name: "Security: Audit & Review"
+    name: Security
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -293,10 +356,11 @@ jobs:
         continue-on-error: true
 
   # ═══════════════════════════════════════════════════════════════
-  #  Job 5: Docker — verify Dockerfile builds correctly
+  #  Job 7: Docker — verify Dockerfile builds correctly
+  #  Needs: build (no point testing Docker if app doesn't compile)
   # ═══════════════════════════════════════════════════════════════
   docker:
-    name: "Docker: Build Verification"
+    name: Docker
     needs: [build]
     runs-on: ubuntu-latest
     timeout-minutes: 15

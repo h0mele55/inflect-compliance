@@ -9,11 +9,14 @@ graph LR
   subgraph "CI Workflow (ci.yml)"
     Q["Quality<br/>lint · types · tests · guards"]
     B["Build<br/>next build"]
-    S["Security<br/>npm audit · dep review"]
-    E["E2E<br/>Playwright"]
-    D["Docker<br/>build verification"]
+    L["Lint"]
+    T["Typecheck"]
+    J["Test<br/>(jest + guards)"]
+    B["Build"]
+    S["Security"]
+    E["E2E<br/>(Playwright)"]
+    D["Docker"]
     
-    Q --> E
     B --> E
     B --> D
   end
@@ -21,8 +24,8 @@ graph LR
   subgraph "Deploy Workflow (deploy.yml)"
     G["Gate<br/>CI must pass"]
     I["Build Image<br/>GHCR push"]
-    DS["Deploy Staging<br/>auto on main"]
-    DP["Deploy Production<br/>manual + approval"]
+    DS["Deploy Staging<br/>(auto)"]
+    DP["Deploy Production<br/>(manual)"]
     
     G --> I
     I --> DS
@@ -30,19 +33,21 @@ graph LR
   end
 ```
 
-**Quality**, **Build**, and **Security** run in parallel. **E2E** waits for Build. **Docker** waits for Build.
+**Lint**, **Typecheck**, **Test**, **Build**, and **Security** all run in parallel. **E2E** and **Docker** wait for Build to pass.
 
 ## Workflows
 
 ### CI (`ci.yml`)
 
-| Job | Trigger | Blocks merge? | What it does |
-|---|---|---|---|
-| Quality | PR + push to main | ✅ Yes | Lint, typecheck, Jest tests, guard tests |
-| Build | PR + push to main | ✅ Yes | `next build` (production) |
-| E2E | After Build passes | ✅ Yes | Playwright against `next start` with Postgres |
-| Security | PR + push to main | ⚠️ Advisory | `npm audit`, dependency-review-action |
-| Docker | After Build passes | ✅ Yes | Dockerfile build verification |
+| Job | Trigger | Needs Postgres? | Blocks merge? | What it does |
+|---|---|---|---|---|
+| Lint | PR + push | No | ✅ Yes | `next lint` (ESLint) |
+| Typecheck | PR + push | No | ✅ Yes | `tsc --noEmit` |
+| Test | PR + push | ✅ Yes | ✅ Yes | Jest (unit + integration) + architectural guard tests |
+| Build | PR + push | No | ✅ Yes | `next build` (production) |
+| E2E | After Build | ✅ Yes | ✅ Yes | Playwright against `next start` |
+| Security | PR + push | No | ⚠️ Advisory | `npm audit`, dependency-review-action |
+| Docker | After Build | No | ✅ Yes | Dockerfile build verification |
 
 ### Deploy (`deploy.yml`)
 
@@ -104,7 +109,7 @@ Configure on `main` branch (GitHub → Settings → Branches):
 | Setting | Value |
 |---|---|
 | Require pull request reviews | 1 reviewer minimum |
-| Require status checks | `Quality`, `Build`, `E2E`, `Docker` |
+| Require status checks | `Lint`, `Typecheck`, `Test`, `Build`, `E2E`, `Docker` |
 | Require branches to be up to date | ✅ |
 | Require linear history | Recommended |
 | Include administrators | ✅ |
