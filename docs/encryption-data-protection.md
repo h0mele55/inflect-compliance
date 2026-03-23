@@ -281,3 +281,107 @@ Use this checklist to verify encryption posture in each deployment environment.
 | **Sensitive** | Evidence content, policy text | ❌ (volume only) | ✅ Volume/provider |
 | **Business** | Controls, risks, assets, tasks | ❌ | ✅ Volume/provider |
 | **System** | Audit logs, sessions, tokens | ❌ | ✅ Volume/provider |
+
+---
+
+## Soft-Delete Model
+
+### Protected entities (12 models)
+
+| Model | deletedAt | deletedByUserId | retentionUntil |
+|---|---|---|---|
+| Asset | ✅ | ✅ | ✅ |
+| Risk | ✅ | ✅ | ✅ |
+| Control | ✅ | ✅ | ✅ |
+| Evidence | ✅ | ✅ | ✅ |
+| Policy | ✅ | ✅ | ✅ |
+| Vendor | ✅ | ✅ | ✅ |
+| FileRecord | ✅ | ✅ | ✅ |
+| Task | ✅ | ✅ | — |
+| Finding | ✅ | ✅ | — |
+| Audit | ✅ | ✅ | — |
+| AuditCycle | ✅ | ✅ | — |
+| AuditPack | ✅ | ✅ | — |
+
+### Behavior
+
+- **Default delete** → Sets `deletedAt = now()`, record remains in DB
+- **Default reads** → Auto-filter `deletedAt IS NULL` via Prisma middleware
+- **withDeleted()** → Opt-out of auto-filter for admin/recovery views
+- **Hard delete** → Only via raw SQL (purge jobs), never via normal Prisma calls
+
+### Non-protected entities (intentional hard-delete)
+
+Junction/link tables (e.g., `riskControl`, `controlAsset`, `taskLink`, `vendorDocument`, `auditorPackAccess`) use hard-delete by design — they represent relationships, not business entities.
+
+---
+
+## Data Lifecycle (Purge Model)
+
+```
+Active → retentionUntil elapsed → runRetentionSweep → Soft-Deleted
+                                                       ↓ 90+ days
+                                                  purgeSoftDeletedOlderThan → Hard-Deleted
+
+Evidence → retention elapsed → Archived (isArchived=true)
+                                ↓ 365+ days
+                           purgeExpiredEvidenceOlderThan → Hard-Deleted
+```
+
+| Job | Grace Period | Audit Event | Scope |
+|---|---|---|---|
+| `runRetentionSweep` | — | `DATA_EXPIRED` | Per-tenant |
+| `purgeSoftDeletedOlderThan` | 90 days (default) | `DATA_PURGED` | Per-tenant, all 12 models |
+| `purgeExpiredEvidenceOlderThan` | 365 days (default) | `DATA_PURGED` | Per-tenant |
+
+All jobs support `dryRun: true` for preview without side effects.
+
+---
+
+## Cleanup Status
+
+### Plaintext email lookups (dual-write)
+
+The PII middleware maintains **dual-write**: both the original plaintext column (`email`) and the encrypted column (`emailEncrypted`) are populated on every write. This is a deliberate migration-period strategy.
+
+**Current state**: Several code paths still use `where: { email: ... }` for lookups:
+
+| File | Usage | Risk |
+|---|---|---|
+| `auth.ts` | OAuth sign-in callback, JWT enrichment | Low — dual-write ensures plaintext column is populated |
+| `sso.ts` | Identity linking, SSO enforcement check | Low — same dual-write guarantee |
+| `audit-readiness.ts` | Auditor invitation (compound unique) | Low — compound key `tenantId_email` |
+| `audit-hardening.ts` | Auditor account lookup by email | Low — dual-write |
+| `seed/route.ts` | Dev seed script lookup | None — dev-only path |
+
+> [!NOTE]
+> These plaintext lookups **work correctly** because the dual-write strategy ensures the `email` column is always populated alongside `emailEncrypted` and `emailHash`. Migration to `emailHash`-based lookups is a future optimization, not a security regression.
+
+### Sensitive value logging
+
+Full codebase scan confirms: **no PII values are logged**. All logger calls reference descriptive strings (e.g., "email permanently failed") rather than actual email addresses, names, or phone numbers.
+
+### Delete flow verification
+
+All 12 critical entity models are intercepted by `SOFT_DELETE_MODELS` in the soft-delete middleware. Hard-deletes only occur on junction/link tables (intentional) and via raw SQL in purge jobs (audited).
+
+---
+
+## Key Rotation & Future Work
+
+### Key rotation caveats
+
+1. **DATA_ENCRYPTION_KEY rotation** requires running `scripts/backfill-encryption.ts` after setting the new key — all existing encrypted values must be re-encrypted under the new key
+2. During rotation, there is a brief window where new writes use the new key but old reads may fail if the backfill hasn't completed — the middleware's `decryptField` catch block falls back to the plaintext column during this window
+3. **AUTH_SECRET** and **JWT_SECRET** rotation invalidates all existing sessions immediately — users must re-authenticate
+
+### Future work (non-blocking)
+
+| Item | Priority | Description |
+|---|---|---|
+| Migrate `where: { email }` to `emailHash` | Low | Convert remaining plaintext email lookups to use hash-based lookups; requires schema changes to make `emailHash` a unique index |
+| Drop plaintext PII columns | Low | After all lookups use `emailHash`, the plaintext `email`/`name` columns can be made nullable or removed; requires coordinated migration |
+| Cron scheduling for purge jobs | Medium | Wire `runRetentionSweep` and `purgeSoftDeletedOlderThan` into a job scheduler (cron, Railway scheduled tasks) |
+| Multi-key envelope encryption | Low | Support key rotation without full re-encryption via envelope encryption (per-record DEK wrapped by KEK) |
+| Evidence content encryption | Medium | Extend column encryption to evidence `content` field if requirements expand beyond volume-level protection |
+
