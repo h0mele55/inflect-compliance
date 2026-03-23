@@ -11,12 +11,24 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { getAuditContext } from './audit-context';
 
 // ─── Models that support soft delete ───
+// Must match SOFT_DELETE_TARGETS in src/lib/security/classification.ts
 export const SOFT_DELETE_MODELS = new Set([
+    // P0 — already had deletedAt
     'Asset',
     'Risk',
     'Control',
     'Evidence',
     'Policy',
+    // P1 — added in soft-delete rollout migration
+    'Vendor',
+    'FileRecord',
+    // P2
+    'Task',
+    'Finding',
+    // P3
+    'Audit',
+    'AuditCycle',
+    'AuditPack',
 ]);
 
 // ─── Read actions that should filter out deleted records ───

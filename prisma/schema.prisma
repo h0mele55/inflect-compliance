@@ -630,6 +630,9 @@ model Task {
   reviewerUserId  String?
   controlId       String?          // optional FK to Control
   metadataJson    Json?            // extensible metadata (findingSource, controlGapType, remediationPlan, etc.)
+  deletedAt       DateTime?
+  deletedByUserId String?
+  retentionUntil  DateTime?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -651,6 +654,7 @@ model Task {
   @@index([tenantId, assigneeUserId])
   @@index([tenantId, dueAt])
   @@index([tenantId, controlId])
+  @@index([tenantId, deletedAt])
 }
 
 model TaskLink {
@@ -725,6 +729,7 @@ model Asset {
   updatedAt         DateTime     @updatedAt
   deletedAt         DateTime?
   deletedByUserId   String?
+  retentionUntil    DateTime?
 
   tenant      Tenant          @relation(fields: [tenantId], references: [id])
   ownerUser   User?           @relation("AssetOwner", fields: [ownerUserId], references: [id])
@@ -767,6 +772,7 @@ model Risk {
   updatedAt       DateTime           @updatedAt
   deletedAt       DateTime?
   deletedByUserId String?
+  retentionUntil  DateTime?
 
   tenant   Tenant        @relation(fields: [tenantId], references: [id])
   controls RiskControl[]
@@ -882,6 +888,7 @@ model Control {
   updatedAt     DateTime       @updatedAt
   deletedAt     DateTime?
   deletedByUserId String?
+  retentionUntil  DateTime?
 
   tenant                 Tenant?             @relation(fields: [tenantId], references: [id])
   owner                  User?               @relation("ControlOwner", fields: [ownerUserId], references: [id])
@@ -1137,6 +1144,10 @@ model FileRecord {
   scanDetails      String?          @db.Text            // AV scan result details (JSON)
   scannedAt        DateTime?                            // When scan completed
 
+  deletedAt        DateTime?
+  deletedByUserId  String?
+  retentionUntil   DateTime?
+
   tenant     Tenant @relation(fields: [tenantId], references: [id])
   uploadedBy User   @relation("FileUploader", fields: [uploadedByUserId], references: [id])
   evidence   Evidence[]
@@ -1145,6 +1156,7 @@ model FileRecord {
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
   @@index([tenantId, scanStatus])
+  @@index([tenantId, deletedAt])
 }
 
 model EvidenceReview {
@@ -1235,6 +1247,7 @@ model Policy {
   updatedAt            DateTime     @updatedAt
   deletedAt            DateTime?
   deletedByUserId      String?
+  retentionUntil       DateTime?
 
   tenant         Tenant              @relation(fields: [tenantId], references: [id])
   currentVersion PolicyVersion?      @relation("CurrentVersion", fields: [currentVersionId], references: [id])
@@ -1343,6 +1356,8 @@ model Audit {
   auditees    String?
   departments String?
   status      AuditStatus @default(PLANNED)
+  deletedAt    DateTime?
+  deletedByUserId String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -1352,6 +1367,7 @@ model Audit {
 
 
   @@index([tenantId])
+  @@index([tenantId, deletedAt])
 }
 
 model AuditChecklistItem {
@@ -1384,6 +1400,8 @@ model Finding {
   verificationNotes String?         @db.Text
   verifiedBy        String?
   verifiedAt        DateTime?
+  deletedAt         DateTime?
+  deletedByUserId   String?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -1393,6 +1411,7 @@ model Finding {
   evidenceLinks FindingEvidence[]
 
   @@index([tenantId])
+  @@index([tenantId, deletedAt])
 }
 
 model FindingEvidence {
@@ -1598,6 +1617,9 @@ model Vendor {
   certificationsJson Json?            // string[] e.g. ["SOC2","ISO27001"]
   enrichmentLastRunAt DateTime?
   enrichmentStatus  String?           // PENDING | SUCCESS | FAILED | NOT_RUN
+  deletedAt         DateTime?
+  deletedByUserId   String?
+  retentionUntil    DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -1618,6 +1640,7 @@ model Vendor {
   @@index([tenantId, criticality])
   @@index([tenantId, nextReviewAt])
   @@index([tenantId, contractRenewalAt])
+  @@index([tenantId, deletedAt])
 }
 
 model VendorContact {
@@ -1856,6 +1879,8 @@ model AuditCycle {
   periodEndAt      DateTime?
   status           AuditCycleStatus @default(PLANNING)
   createdByUserId  String
+  deletedAt        DateTime?
+  deletedByUserId  String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
@@ -1864,6 +1889,7 @@ model AuditCycle {
   packs     AuditPack[]
 
   @@index([tenantId, frameworkKey, status])
+  @@index([tenantId, deletedAt])
 }
 
 model AuditPack {
@@ -1875,6 +1901,8 @@ model AuditPack {
   frozenAt       DateTime?
   frozenByUserId String?
   notes          String?         @db.Text
+  deletedAt       DateTime?
+  deletedByUserId String?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -1886,6 +1914,7 @@ model AuditPack {
   auditorAccess AuditorPackAccess[]
 
   @@index([tenantId, auditCycleId])
+  @@index([tenantId, deletedAt])
 }
 
 model AuditPackItem {
