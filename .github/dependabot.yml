@@ -1,0 +1,57 @@
+# ───────────────────────────────────────────────────────────────
+#  Dependabot — automated dependency updates
+# ───────────────────────────────────────────────────────────────
+version: 2
+updates:
+  # ── npm (weekly) ──
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:00"
+      timezone: Europe/Sofia
+    open-pull-requests-limit: 10
+    reviewers:
+      - h0mele55
+    labels:
+      - dependencies
+      - automated
+    # Group updates to reduce PR noise
+    groups:
+      # Production deps — review carefully
+      production:
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      # Dev deps — lower risk
+      dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      # Major versions — always individual PRs (handled by default)
+    # Ignore known-noisy packages
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-patch"]
+
+  # ── GitHub Actions (monthly) ──
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    reviewers:
+      - h0mele55
+    labels:
+      - dependencies
+      - ci
+    groups:
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

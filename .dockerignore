@@ -1,22 +1,53 @@
-node_modules
-.next
+# ─── Docker build context exclusions ─────────────────────────
+# Keep the build context small and fast.
+
+# Version control
 .git
+.gitignore
+
+# CI/CD
 .github
-tests
-coverage
-test-results
-playwright-report
-tmp
-uploads
-*.log
+
+# Dependencies (installed in-container)
+node_modules
+
+# Build output (rebuilt in-container)
+.next
+out
+
+# Tests
+tests/
+test-results/
+playwright-report/
+coverage/
+jest.config.*
+playwright.config.*
+
+# Dev tooling
+.vscode/
+.idea/
+.agents/
+.gemini/
+
+# Documentation
+docs/
+README.md
+ARCHITECTURE.md
+
+# Environment files (secrets — never bake into image)
 .env*
 !.env.staging.example
 !.env.test.example
 !.env.e2e.example
 !.env.example
+
+# Docker-compose (not needed inside image)
+docker-compose*.yml
+
+# Temporary / CI artifacts
+*.log
+tmp/
+uploads/
 jest*.txt
 jest*.json
-docker-compose*.yml
-docs
-README.md
-ARCHITECTURE.md
+err_*.txt
