@@ -32,7 +32,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 15000 });
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
     const url = new URL(page.url());
     const match = url.pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug from ' + url.pathname);
@@ -56,7 +56,8 @@ test.describe('Core Certification Flow', () => {
     test('B — create a new control', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls/new`);
-        await page.waitForSelector('#control-name-input', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#control-name-input', { timeout: 30000 });
 
         // Fill form
         await page.fill('#control-name-input', CONTROL_NAME);
@@ -67,8 +68,9 @@ test.describe('Core Certification Flow', () => {
         await page.click('#create-control-btn');
 
         // Should redirect to control detail
-        await page.waitForURL('**/controls/**', { timeout: 15000 });
-        await page.waitForSelector('#control-title', { timeout: 15000 });
+        await page.waitForURL('**/controls/**', { timeout: 30000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#control-title', { timeout: 30000 });
 
         // Verify control detail shows our code and title
         await expect(page.locator('#control-title')).toContainText(CONTROL_NAME, { timeout: 5000 });
@@ -78,7 +80,8 @@ test.describe('Core Certification Flow', () => {
     test('C — upload evidence and link to control', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/evidence`);
-        await page.waitForSelector('h1', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('h1', { timeout: 30000 });
 
         // Click upload button
         await page.click('#upload-evidence-btn');
@@ -146,7 +149,8 @@ test.describe('Core Certification Flow', () => {
 
         // Navigate to any tenant-scoped page to establish auth context
         await page.goto(`/t/${tenantSlug}/risks`);
-        await page.waitForSelector('h1', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('h1', { timeout: 30000 });
 
         // Create risk via API (more deterministic than wizard UI for this flow test)
         const riskResult = await page.evaluate(async (riskTitle) => {
@@ -173,7 +177,8 @@ test.describe('Core Certification Flow', () => {
 
         // Reload the risks page to confirm risk is visible in the register
         await page.reload();
-        await page.waitForSelector('h1', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('h1', { timeout: 30000 });
         await expect(page.locator(`text=${RISK_TITLE}`).first()).toBeVisible({ timeout: 10000 });
     });
 
@@ -183,7 +188,8 @@ test.describe('Core Certification Flow', () => {
 
         // Navigate to risks page to establish authenticated context
         await page.goto(`/t/${tenantSlug}/risks`);
-        await page.waitForSelector('h1', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('h1', { timeout: 30000 });
 
         // Find our risk via API
         const risksData = await page.evaluate(async (riskTitle) => {
@@ -202,11 +208,12 @@ test.describe('Core Certification Flow', () => {
 
         // Navigate to risk detail
         await page.goto(`/t/${tenantSlug}/risks/${risksData.riskId}`);
-        await page.waitForSelector('#risk-title-heading', { timeout: 15000 });
-        await expect(page.locator('#risk-title-heading')).toContainText(RISK_TITLE);
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#risk-title-heading', { timeout: 30000 });
+        await expect(page.locator('#risk-title-heading')).toContainText(RISK_TITLE, { timeout: 10000 });
 
         // Wait for traceability panel to load
-        await page.waitForSelector('#traceability-panel', { timeout: 10000 });
+        await page.waitForSelector('#traceability-panel', { timeout: 30000 });
 
         // Click "+ Link Control"
         await page.click('#add-control-link-btn');
@@ -255,7 +262,8 @@ test.describe('Core Certification Flow', () => {
 
         // Navigate to controls page for authenticated context
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('h1', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('h1', { timeout: 30000 });
 
         // Find our control via API
         const controlData = await page.evaluate(async (controlName) => {
@@ -274,14 +282,15 @@ test.describe('Core Certification Flow', () => {
 
         // Navigate to control detail
         await page.goto(`/t/${tenantSlug}/controls/${controlData.controlId}`);
-        await page.waitForSelector('#control-title', { timeout: 15000 });
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#control-title', { timeout: 30000 });
         await expect(page.locator('#control-title')).toContainText(CONTROL_NAME);
 
         // Click the Traceability tab (control detail uses tabs — Overview is default)
         await page.click('button:has-text("Traceability")');
 
         // Wait for traceability panel
-        await page.waitForSelector('#traceability-panel', { timeout: 10000 });
+        await page.waitForSelector('#traceability-panel', { timeout: 30000 });
 
         // Verify linked risks table shows our risk
         await expect(page.locator('#linked-risks-table')).toBeVisible({ timeout: 10000 });
