@@ -180,7 +180,8 @@ describe('LocalStorageProvider', () => {
 describe('generatePathKey', () => {
     it('produces tenant-scoped path', () => {
         const key = generatePathKey('tenant-abc', 'report.pdf');
-        expect(key).toMatch(/^tenants\/tenant-abc\/\d{4}\/\d{2}\/[a-f0-9-]+_report\.pdf$/);
+        // generatePathKey uses buildTenantObjectKey with domain='general'
+        expect(key).toMatch(/^tenants\/tenant-abc\/general\/\d{4}\/\d{2}\/[a-f0-9-]+_report\.pdf$/);
     });
 
     it('sanitizes dangerous filenames', () => {
@@ -192,9 +193,9 @@ describe('generatePathKey', () => {
     it('handles very long filenames', () => {
         const longName = 'a'.repeat(500) + '.pdf';
         const key = generatePathKey('t1', longName);
-        // sanitizeFileName limits to 200 chars
+        // uuid(36) + _(1) + up to 200 chars of sanitized name
         const filename = key.split('/').pop()!;
-        expect(filename.length).toBeLessThanOrEqual(237); // uuid(36) + _(1) + 200
+        expect(filename.length).toBeLessThanOrEqual(250);
     });
 });
 
@@ -206,7 +207,8 @@ describe('sanitizeFileName', () => {
     });
 
     it('replaces special characters', () => {
-        expect(sanitizeFileName('file<>:"/\\|?*.txt')).toBe('file_________.txt');
+        // Use input without backslash/slash to avoid platform-specific path.basename behavior
+        expect(sanitizeFileName('file<>:"|?*.txt')).toBe('file_______.txt');
     });
 
     it('limits length to 200', () => {

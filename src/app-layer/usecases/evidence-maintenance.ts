@@ -9,7 +9,7 @@
  * RLS enforcement via the app_user role + app.tenant_id session variable.
  */
 import { withTenantDb } from '@/lib/db-context';
-import { deleteStoredFile } from '@/lib/storage';
+import { getProviderByName } from '@/lib/storage';
 
 /**
  * Find FILE evidence not linked to any control after N minutes.
@@ -77,7 +77,8 @@ export async function cleanupFailedOrPendingUploads(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         for (const record of pending as any[]) {
             try {
-                await deleteStoredFile(record.pathKey);
+                const provider = getProviderByName((record.storageProvider || 'local') as 'local' | 's3');
+                await provider.delete(record.pathKey);
             } catch { /* best effort */ }
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

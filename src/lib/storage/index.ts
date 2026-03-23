@@ -34,11 +34,24 @@ let _provider: StorageProvider | null = null;
 /**
  * Get the configured storage provider (singleton).
  * Default: 'local' if STORAGE_PROVIDER is not set.
+ *
+ * PRODUCTION GUARD: Logs a warning if local provider is used in production.
+ * All production deployments should use cloud storage ('s3').
  */
 export function getStorageProvider(): StorageProvider {
     if (_provider) return _provider;
 
     const providerType = (env.STORAGE_PROVIDER || 'local') as StorageProviderType;
+
+    // Production guard: warn (not fail) if local is used in production.
+    // This allows migration windows while ensuring visibility.
+    if (providerType === 'local' && env.NODE_ENV === 'production') {
+        console.warn(
+            '[STORAGE] ⚠️  WARNING: Using local filesystem storage in production. ' +
+            'Set STORAGE_PROVIDER=s3 for cloud storage. ' +
+            'Local storage is intended for development/test only.'
+        );
+    }
 
     switch (providerType) {
         case 's3': {

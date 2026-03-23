@@ -18,7 +18,7 @@ import { generateRiskRegisterPdf } from '@/app-layer/reports/pdf/riskRegister';
 import { generateGapAnalysisPdf } from '@/app-layer/reports/pdf/gapAnalysis';
 import { logEvent } from '@/app-layer/events/audit';
 import { runInTenantContext } from '@/lib/db-context';
-import { generatePathKey, streamWriteFile } from '@/lib/storage';
+import { getStorageProvider, buildTenantObjectKey } from '@/lib/storage';
 import { FEATURES } from '@/lib/entitlements';
 import { requireFeature } from '@/lib/entitlements-server';
 import { logger } from '@/lib/observability/logger';
@@ -104,11 +104,17 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
 
     // ─── Save to FileRecord (if requested) ───
     if (body.saveToFileRecord) {
-        const pathKey = generatePathKey(ctx.tenantId, fileName);
-        const writeResult = await streamWriteFile(pathKey, pdfBuffer);
+        const storage = getStorageProvider();
+        const pathKey = buildTenantObjectKey(ctx.tenantId, 'reports', fileName);
+        const { Readable } = await import('stream');
+        const writeResult = await storage.write(pathKey, Readable.from(pdfBuffer), {
+            mimeType: 'application/pdf',
+        });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const fileRecord = await runInTenantContext(ctx, (db) =>
-            db.fileRecord.create({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (db as any).fileRecord.create({
                 data: {
                     tenantId: ctx.tenantId,
                     pathKey,
@@ -119,9 +125,12 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
                     status: 'STORED',
                     uploadedByUserId: ctx.userId,
                     storedAt: new Date(),
+                    storageProvider: storage.name,
+                    domain: 'reports',
+                    scanStatus: 'SKIPPED',
                 },
             })
-        );
+        ) as { id: string };
 
         return NextResponse.json({
             fileId: fileRecord.id,

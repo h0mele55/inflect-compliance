@@ -13,7 +13,7 @@ import {
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest, forbidden } from '@/lib/errors/types';
-import { getFile, uploadFile } from '@/lib/storage';
+import { getStorageProvider, buildTenantObjectKey } from '@/lib/storage';
 import crypto from 'crypto';
 
 // ─── Evidence Integrity ───
@@ -29,16 +29,25 @@ export async function verifyFileIntegrity(
 ): Promise<{ fileName: string; computedHash: string; matches: boolean | null; fileSize: number }> {
     assertCanViewPack(ctx);
 
-    const fileData = await getFile(fileName);
-    if (!fileData) throw notFound('File not found');
+    const storage = getStorageProvider();
+    const stream = storage.readStream(fileName);
 
-    const computedHash = computeFileHash(fileData.buffer);
+    // Hash incrementally from stream
+    const hash = crypto.createHash('sha256');
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        hash.update(buf);
+        chunks.push(buf);
+    }
+    const computedHash = hash.digest('hex');
+    const totalSize = chunks.reduce((s, c) => s + c.length, 0);
 
     return {
         fileName,
         computedHash,
         matches: expectedHash ? computedHash === expectedHash : null,
-        fileSize: fileData.buffer.length,
+        fileSize: totalSize,
     };
 }
 
@@ -61,13 +70,15 @@ export async function storeExportArtifact(
     if (!pack) throw notFound('Pack not found');
     if (pack.status === 'DRAFT') throw badRequest('Cannot attach exports to a DRAFT pack');
 
-    // Create a File object from content
+    // Create buffer and compute hash
     const buffer = Buffer.from(content, 'utf-8');
     const hash = computeFileHash(buffer);
 
-    // Save as physical file via storage
-    const blob = new File([buffer], filename, { type: mimeType });
-    const uploaded = await uploadFile(blob);
+    // Write via storage abstraction
+    const storage = getStorageProvider();
+    const pathKey = buildTenantObjectKey(ctx.tenantId, 'exports', filename);
+    const { Readable } = await import('stream');
+    await storage.write(pathKey, Readable.from(buffer), { mimeType });
 
     // Add as AuditPackItem
     await runInTenantContext(ctx, (tdb) =>
@@ -76,10 +87,10 @@ export async function storeExportArtifact(
                 tenantId: ctx.tenantId,
                 auditPackId: packId,
                 entityType: 'FILE',
-                entityId: uploaded.fileName,
+                entityId: pathKey,
                 snapshotJson: JSON.stringify({
                     originalFilename: filename,
-                    storedFilename: uploaded.fileName,
+                    storedFilename: pathKey,
                     sha256: hash,
                     size: buffer.length,
                     mimeType,
@@ -99,7 +110,7 @@ export async function storeExportArtifact(
         })
     );
 
-    return { fileName: uploaded.fileName, hash };
+    return { fileName: pathKey, hash };
 }
 
 // ─── Pack Cloning (Retest) ───
