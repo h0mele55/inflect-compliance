@@ -5,7 +5,24 @@ const withNextIntl = createNextIntlPlugin('./src/i18n.ts');
 const defaultOptions = {
     // Other experimental or default options
     experimental: {
-        serverComponentsExternalPackages: ['pdfkit'],
+        serverComponentsExternalPackages: [
+            'pdfkit',
+            // Pino & transports — use native worker_threads / dynamic require
+            'pino',
+            'pino-pretty',
+            'thread-stream',
+            // OpenTelemetry — heavy native instrumentation modules
+            '@opentelemetry/api',
+            '@opentelemetry/resources',
+            '@opentelemetry/sdk-trace-node',
+            '@opentelemetry/sdk-metrics',
+            '@opentelemetry/exporter-trace-otlp-http',
+            '@opentelemetry/exporter-metrics-otlp-http',
+            '@opentelemetry/semantic-conventions',
+            // Sentry — optional error reporting
+            '@sentry/nextjs',
+            '@sentry/node',
+        ],
     },
     async headers() {
         return [

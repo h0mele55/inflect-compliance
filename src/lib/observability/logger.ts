@@ -57,21 +57,16 @@ const logLevel = (typeof process !== 'undefined' && process.env?.LOG_LEVEL) || (
 // In production/test, emit raw JSON to stdout for log aggregators.
 function buildTransport(): pino.TransportSingleOptions | undefined {
     if (!isDev) return undefined;
-    try {
-        // Verify pino-pretty is available (devDependency only)
-        require.resolve('pino-pretty');
-        return {
-            target: 'pino-pretty',
-            options: {
-                colorize: true,
-                ignore: 'pid,hostname',
-                translateTime: 'HH:MM:ss.l',
-            },
-        };
-    } catch {
-        // pino-pretty not installed — fall through to raw JSON
-        return undefined;
-    }
+    // pino-pretty is externalized via next.config.js (serverComponentsExternalPackages)
+    // so we can reference it directly without triggering webpack warnings.
+    return {
+        target: 'pino-pretty',
+        options: {
+            colorize: true,
+            ignore: 'pid,hostname',
+            translateTime: 'HH:MM:ss.l',
+        },
+    };
 }
 
 const transport = buildTransport();
