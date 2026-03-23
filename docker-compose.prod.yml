@@ -15,12 +15,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-inflect_production}
     volumes:
       - prod-pgdata:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp:size=256M        # Temp files never hit persistent disk
+      - /run/postgresql:size=16M
+    shm_size: '256m'           # Shared memory for Postgres
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inflect} -d ${POSTGRES_DB:-inflect_production}"]
       interval: 5s
       timeout: 5s
       retries: 10
-    # No ports exposed — only accessible from app container
+    # Security: no ports exposed — only accessible from app via internal network
+    # Encryption at rest: use LUKS/dm-crypt on the host volume (see docs/encryption-data-protection.md)
     networks:
       - internal
 
@@ -45,6 +50,11 @@ services:
       UPLOAD_DIR: /data/uploads
     volumes:
       - prod-uploads:/data/uploads
+    # Security: run read-only filesystem where possible
+    read_only: true
+    tmpfs:
+      - /tmp:size=128M
+      - /app/.next/cache:size=512M
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
       interval: 15s

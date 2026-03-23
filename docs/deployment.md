@@ -51,6 +51,7 @@ curl http://localhost:3000/api/health | jq .
 | `MICROSOFT_CLIENT_ID` | ✅ | OAuth provider |
 | `MICROSOFT_CLIENT_SECRET` | ✅ | OAuth provider |
 | `UPLOAD_DIR` | ✅ | Set to `/data/uploads` (Docker) |
+| `DATA_ENCRYPTION_KEY` | ✅ (prod) | ≥32 chars, `openssl rand -base64 48`. See [encryption docs](encryption-data-protection.md) |
 | `CORS_ALLOWED_ORIGINS` | Optional | Comma-separated origins |
 
 ## Docker Compose (Self-hosted / VPS)
@@ -248,3 +249,6 @@ docker compose -f docker-compose.prod.yml exec app \
 - [x] Rate limiting on auth endpoints
 - [x] Test credentials disabled in production
 - [x] File upload: mime/size validation + path traversal protection
+- [x] PII column-level encryption (AES-256-GCM) — see [encryption docs](encryption-data-protection.md)
+- [ ] Volume/disk encryption enabled (self-hosted) — see [encryption docs](encryption-data-protection.md)
+- [ ] Backup encryption (GPG) configured — see [encryption docs](encryption-data-protection.md)
