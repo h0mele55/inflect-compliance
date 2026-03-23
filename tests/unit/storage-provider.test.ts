@@ -104,7 +104,9 @@ describe('LocalStorageProvider', () => {
 
             const head = await provider.head(key);
             expect(head.sizeBytes).toBe(content.length);
-            expect(head.lastModified).toBeInstanceOf(Date);
+            // Use duck-typing check because Jest module sandboxing can cause Date
+            // constructor identity mismatches across contexts.
+            expect(typeof head.lastModified!.getTime).toBe('function');
         });
 
         it('throws for non-existent file', async () => {

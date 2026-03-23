@@ -15,10 +15,10 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { logger } from '@/lib/observability/logger';
 
-const prisma = new PrismaClient();
+// Use shared prisma instance to ensure audit middleware is active
 
 // ─── Webhook Auth ───
 

@@ -55,7 +55,8 @@ describe('File Storage — Path Sanitization', () => {
 describe('File Storage — Path Generation', () => {
     test('generatePathKey includes tenant, year, month, uuid, and sanitized name', () => {
         const key = generatePathKey('tenant-abc', 'report.pdf');
-        expect(key).toMatch(/^tenants\/tenant-abc\/\d{4}\/\d{2}\/[0-9a-f-]+_report\.pdf$/);
+        // generatePathKey uses buildTenantObjectKey with domain='general'
+        expect(key).toMatch(/^tenants\/tenant-abc\/general\/\d{4}\/\d{2}\/[0-9a-f-]+_report\.pdf$/);
     });
 
     test('generatePathKey generates unique keys', () => {
@@ -234,8 +235,9 @@ describe('File Storage — FileRecord Lifecycle', () => {
         const parts = pathKey.split('/');
         expect(parts[0]).toBe('tenants');
         expect(parts[1]).toBe('tenant-123');
-        expect(parts[2]).toMatch(/^\d{4}$/); // year
-        expect(parts[3]).toMatch(/^\d{2}$/); // month
-        expect(parts[4]).toMatch(/^[0-9a-f-]+_report\.pdf$/); // uuid_name
+        expect(parts[2]).toBe('general');     // domain
+        expect(parts[3]).toMatch(/^\d{4}$/); // year
+        expect(parts[4]).toMatch(/^\d{2}$/); // month
+        expect(parts[5]).toMatch(/^[0-9a-f-]+_report\.pdf$/); // uuid_name
     });
 });

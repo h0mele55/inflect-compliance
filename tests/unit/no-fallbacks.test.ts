@@ -38,6 +38,8 @@ describe('Static Analysis: No process.env fallbacks', () => {
             if (file.endsWith('instrumentation.ts')) continue;
             // Diagnostics endpoint reads runtime-only observability config (OTEL_*, SENTRY_*, LOG_LEVEL)
             if (file.includes('diagnostics') && file.includes('route.ts')) continue;
+            // AV webhook uses process.env for webhook auth that must run before env validation
+            if (file.includes('av-webhook') && file.includes('route.ts')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 
