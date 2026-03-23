@@ -3,6 +3,7 @@ import { env } from '@/env';
 import { getAuditContext } from './audit-context';
 import { redactSensitiveFields, extractChangedFields } from './audit-redact';
 import { registerSoftDeleteMiddleware } from './soft-delete';
+import { piiEncryptionMiddleware } from './security/pii-middleware';
 
 // ─── Write actions to intercept ───
 const WRITE_ACTIONS = new Set([
@@ -198,8 +199,11 @@ if (env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 // $use is NOT supported in Edge Runtime, so we guard with a typeof check.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 if (typeof (globalThis as any).EdgeRuntime === 'undefined' && !globalForPrisma.prismaAuditMiddlewareRegistered) {
-    // Soft-delete middleware MUST be registered BEFORE audit middleware
-    // so audit sees the transformed operations (delete → update)
+    // Middleware execution order (Prisma processes in reverse registration order for writes):
+    //   1. PII encryption — populates *Encrypted/*Hash columns on write, decrypts on read
+    //   2. Soft-delete — transforms delete → update before audit sees it
+    //   3. Audit — logs the final transformed operation
+    prisma.$use(piiEncryptionMiddleware);
     registerSoftDeleteMiddleware(prisma);
     registerAuditMiddleware(prisma);
     globalForPrisma.prismaAuditMiddlewareRegistered = true;

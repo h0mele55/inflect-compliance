@@ -483,8 +483,11 @@ model User {
   id            String    @id @default(cuid())
   tenantId      String? // @deprecated — use TenantMembership instead
   email         String    @unique
+  emailEncrypted String?  @db.Text  // AES-256-GCM ciphertext of email
+  emailHash      String?  @unique   // HMAC-SHA256 for login/lookup
   passwordHash  String?
   name          String?
+  nameEncrypted  String?  @db.Text  // AES-256-GCM ciphertext of name
   emailVerified DateTime?
   image         String?
   role          Role      @default(READER) // @deprecated — use TenantMembership.role
@@ -1618,15 +1621,19 @@ model Vendor {
 }
 
 model VendorContact {
-  id        String   @id @default(cuid())
-  tenantId  String
-  vendorId  String
-  name      String
-  email     String?
-  title     String?
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String   @id @default(cuid())
+  tenantId         String
+  vendorId         String
+  name             String
+  nameEncrypted    String?  @db.Text  // AES-256-GCM
+  email            String?
+  emailEncrypted   String?  @db.Text  // AES-256-GCM
+  emailHash        String?            // HMAC-SHA256 for lookup
+  title            String?
+  phone            String?
+  phoneEncrypted   String?  @db.Text  // AES-256-GCM
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
   vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
@@ -1917,17 +1924,21 @@ model AuditPackShare {
 }
 
 model AuditorAccount {
-  id        String        @id @default(cuid())
-  tenantId  String
-  email     String
-  name      String?
-  status    AuditorStatus @default(INVITED)
-  createdAt DateTime      @default(now())
+  id               String        @id @default(cuid())
+  tenantId         String
+  email            String
+  emailEncrypted   String?       @db.Text  // AES-256-GCM
+  emailHash        String?                 // HMAC-SHA256 for lookup
+  name             String?
+  nameEncrypted    String?       @db.Text  // AES-256-GCM
+  status           AuditorStatus @default(INVITED)
+  createdAt        DateTime      @default(now())
 
   tenant     Tenant              @relation(fields: [tenantId], references: [id])
   packAccess AuditorPackAccess[]
 
   @@unique([tenantId, email])
+  @@index([emailHash])
 }
 
 model AuditorPackAccess {
@@ -2047,20 +2058,21 @@ model ControlTestStep {
 // ─── Email Notification Outbox ───
 
 model NotificationOutbox {
-  id         String                 @id @default(cuid())
-  tenantId   String
-  type       EmailNotificationType
-  toEmail    String
-  subject    String
-  bodyText   String                 @db.Text
-  bodyHtml   String?                @db.Text
-  status     EmailOutboxStatus      @default(PENDING)
-  attempts   Int                    @default(0)
-  lastError  String?                @db.Text
-  sendAfter  DateTime               @default(now())
-  createdAt  DateTime               @default(now())
-  sentAt     DateTime?
-  dedupeKey  String                 @unique  // tenantId:type:email:entityId:YYYY-MM-DD
+  id                String                 @id @default(cuid())
+  tenantId          String
+  type              EmailNotificationType
+  toEmail           String
+  toEmailEncrypted  String?                @db.Text  // AES-256-GCM
+  subject           String
+  bodyText          String                 @db.Text
+  bodyHtml          String?                @db.Text
+  status            EmailOutboxStatus      @default(PENDING)
+  attempts          Int                    @default(0)
+  lastError         String?                @db.Text
+  sendAfter         DateTime               @default(now())
+  createdAt         DateTime               @default(now())
+  sentAt            DateTime?
+  dedupeKey         String                 @unique  // tenantId:type:email:entityId:YYYY-MM-DD
 
   tenant     Tenant @relation(fields: [tenantId], references: [id])
 
@@ -2167,15 +2179,17 @@ model TenantIdentityProvider {
 // ─── Enterprise SSO: External Identity Links ───
 
 model UserIdentityLink {
-  id              String    @id @default(cuid())
-  userId          String
-  tenantId        String
-  providerId      String
-  externalSubject String    // IdP's unique subject identifier (SAML NameID / OIDC sub claim)
-  emailAtLinkTime String    // Email address at time of first SSO login
-  lastLoginAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                          String    @id @default(cuid())
+  userId                      String
+  tenantId                    String
+  providerId                  String
+  externalSubject             String    // IdP's unique subject identifier (SAML NameID / OIDC sub claim)
+  emailAtLinkTime             String    // Email address at time of first SSO login
+  emailAtLinkTimeEncrypted    String?   @db.Text  // AES-256-GCM
+  emailAtLinkTimeHash         String?             // HMAC-SHA256 for lookup
+  lastLoginAt                 DateTime?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
   user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant   Tenant                 @relation(fields: [tenantId], references: [id])
