@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantCtx } from '@/app-layer/context';
+import { requireAdminCtx } from '@/lib/auth/require-admin';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { findOrCreateCustomer, createCheckoutSession } from '@/lib/stripe';
 import { env } from '@/env';
@@ -15,12 +15,7 @@ const CheckoutBody = z.object({
  * Admin-only.
  */
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
-
-    // Admin-only guard
-    if (ctx.role !== 'ADMIN') {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const ctx = await requireAdminCtx(params, req);
 
     const body = CheckoutBody.parse(await req.json());
     const appUrl = env.APP_URL || `https://${req.headers.get('host') || 'localhost:3000'}`;

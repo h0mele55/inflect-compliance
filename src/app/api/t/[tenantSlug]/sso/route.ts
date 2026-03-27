@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantCtx } from '@/app-layer/context';
+import { requireAdminCtx } from '@/lib/auth/require-admin';
 import {
     getTenantSsoConfig,
     upsertTenantSsoConfig,
@@ -13,7 +13,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 /**
  * Tenant-scoped SSO configuration routes.
  *
- * These routes use getTenantCtx (slug-based tenant resolution)
+ * These routes use requireAdminCtx (slug-based tenant resolution)
  * instead of getLegacyCtx (session-based). This aligns with the
  * /api/t/[tenantSlug]/* pattern used by the admin UI pages.
  *
@@ -24,7 +24,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
  * GET /api/t/[tenantSlug]/sso — list SSO providers (ADMIN only)
  */
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
+    const ctx = await requireAdminCtx(params, req);
     const providers = await getTenantSsoConfig(ctx);
     // Strip secrets from configJson before sending to client
     const safe = providers.map((p) => ({
@@ -38,7 +38,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
  * POST /api/t/[tenantSlug]/sso — create or update SSO provider (ADMIN only)
  */
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
+    const ctx = await requireAdminCtx(params, req);
     const body = await req.json();
     const parsed = UpsertSsoConfigInput.parse(body);
     const provider = await upsertTenantSsoConfig(ctx, parsed);
@@ -50,7 +50,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
  * Body: { id: string, action: 'enable' | 'disable' | 'enforce' | 'unenforce' }
  */
 export const PATCH = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
+    const ctx = await requireAdminCtx(params, req);
     const { id, action } = await req.json() as { id: string; action: string };
 
     let result;
@@ -78,7 +78,7 @@ export const PATCH = withApiErrorHandling(async (req: NextRequest, { params }: {
  * Body: { id: string }
  */
 export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
+    const ctx = await requireAdminCtx(params, req);
     const { id } = await req.json() as { id: string };
     await deleteTenantSsoConfig(ctx, id);
     return NextResponse.json({ ok: true });

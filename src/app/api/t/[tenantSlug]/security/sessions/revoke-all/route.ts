@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantCtx } from '@/app-layer/context';
+import { requireAdminCtx } from '@/lib/auth/require-admin';
 import { revokeAllTenantSessions } from '@/app-layer/usecases/session-security';
 import { withApiErrorHandling } from '@/lib/errors/api';
 
@@ -13,7 +13,7 @@ export const POST = withApiErrorHandling(async (
     req: NextRequest,
     { params }: { params: { tenantSlug: string } },
 ) => {
-    const ctx = await getTenantCtx(params, req);
+    const ctx = await requireAdminCtx(params, req);
     const result = await revokeAllTenantSessions(ctx);
 
     return NextResponse.json({

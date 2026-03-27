@@ -10,9 +10,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes, createHash } from 'crypto';
-import { getTenantCtx } from '@/app-layer/context';
+import { requireAdminCtx } from '@/lib/auth/require-admin';
 import { withApiErrorHandling } from '@/lib/errors/api';
-import { forbidden } from '@/lib/errors/types';
 import prisma from '@/lib/prisma';
 
 /**
@@ -20,8 +19,7 @@ import prisma from '@/lib/prisma';
  * Returns token metadata only (never the actual token value).
  */
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
-    if (!ctx.permissions.canAdmin) throw forbidden('Admin only');
+    const ctx = await requireAdminCtx(params, req);
 
     const tokens = await prisma.tenantScimToken.findMany({
         where: { tenantId: ctx.tenantId },
@@ -50,8 +48,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
  * Returns the plaintext token ONCE. It is stored as a SHA-256 hash.
  */
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
-    if (!ctx.permissions.canAdmin) throw forbidden('Admin only');
+    const ctx = await requireAdminCtx(params, req);
 
     const body = await req.json() as { label?: string };
     const label = body.label || 'SCIM Token';
@@ -81,8 +78,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
  * DELETE — revoke a SCIM token (admin only).
  */
 export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
-    if (!ctx.permissions.canAdmin) throw forbidden('Admin only');
+    const ctx = await requireAdminCtx(params, req);
 
     const { tokenId } = await req.json() as { tokenId: string };
     if (!tokenId) {

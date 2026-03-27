@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantCtx } from '@/app-layer/context';
+import { requireAdminCtx } from '@/lib/auth/require-admin';
 import { revokeUserSessions } from '@/app-layer/usecases/session-security';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { withValidatedBody } from '@/lib/validation/route';
@@ -15,7 +15,7 @@ import { RevokeSessionsInput } from '@/app-layer/schemas/mfa.schemas';
 export const POST = withApiErrorHandling(withValidatedBody(
     RevokeSessionsInput,
     async (req: NextRequest, { params }: { params: { tenantSlug: string } }, body) => {
-        const ctx = await getTenantCtx(params, req);
+        const ctx = await requireAdminCtx(params, req);
 
         if (!body.targetUserId) {
             return NextResponse.json(

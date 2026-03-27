@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
+import { requireAdminCtx } from '@/lib/auth/require-admin';
 import { getTenantSecuritySettings, updateTenantMfaPolicy } from '@/app-layer/usecases/mfa';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { withValidatedBody } from '@/lib/validation/route';
@@ -27,7 +28,7 @@ export const GET = withApiErrorHandling(async (
 export const PUT = withApiErrorHandling(withValidatedBody(
     UpdateMfaPolicyInput,
     async (req: NextRequest, { params }: { params: { tenantSlug: string } }, body) => {
-        const ctx = await getTenantCtx(params, req);
+        const ctx = await requireAdminCtx(params, req);
         const result = await updateTenantMfaPolicy(ctx, body);
         return NextResponse.json(result);
     },

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantCtx } from '@/app-layer/context';
+import { requireAdminCtx } from '@/lib/auth/require-admin';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { listBillingEvents } from '@/lib/entitlements-server';
 
@@ -9,11 +9,7 @@ import { listBillingEvents } from '@/lib/entitlements-server';
  * Query params: ?limit=20
  */
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
-
-    if (ctx.role !== 'ADMIN') {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const ctx = await requireAdminCtx(params, req);
 
     const url = new URL(req.url);
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 100);

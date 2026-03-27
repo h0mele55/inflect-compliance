@@ -10,9 +10,8 @@
  * Secrets are NEVER returned after creation — only a masked status.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantCtx } from '@/app-layer/context';
+import { requireAdminCtx } from '@/lib/auth/require-admin';
 import { withApiErrorHandling } from '@/lib/errors/api';
-import { forbidden } from '@/lib/errors/types';
 import {
     listIntegrationConnections,
     upsertIntegrationConnection,
@@ -28,8 +27,7 @@ import { registry } from '@/app-layer/integrations/registry';
  * Secrets are never included. Returns provider metadata too.
  */
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
-    if (!ctx.permissions.canAdmin) throw forbidden('Admin only');
+    const ctx = await requireAdminCtx(params, req);
 
     const connections = await listIntegrationConnections(ctx) as Array<Record<string, unknown>>;
 
@@ -53,8 +51,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
  * Secrets are encrypted before storage. Plaintext is never persisted.
  */
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
-    if (!ctx.permissions.canAdmin) throw forbidden('Admin only');
+    const ctx = await requireAdminCtx(params, req);
 
     const body = await req.json() as {
         id?: string;
@@ -108,8 +105,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
  * Tests connectivity without saving changes.
  */
 export const PUT = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
-    if (!ctx.permissions.canAdmin) throw forbidden('Admin only');
+    const ctx = await requireAdminCtx(params, req);
 
     const body = await req.json() as {
         connectionId?: string;
@@ -149,8 +145,7 @@ export const PUT = withApiErrorHandling(async (req: NextRequest, { params }: { p
  * DELETE — disable an integration connection.
  */
 export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await getTenantCtx(params, req);
-    if (!ctx.permissions.canAdmin) throw forbidden('Admin only');
+    const ctx = await requireAdminCtx(params, req);
 
     const { connectionId } = await req.json() as { connectionId: string };
     if (!connectionId) {
