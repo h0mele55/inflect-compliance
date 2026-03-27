@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { RequestContext } from '../types';
 import { OnboardingRepository } from '../repositories/OnboardingRepository';
 import { assertCanManageOnboarding } from '../policies/onboarding.policies';

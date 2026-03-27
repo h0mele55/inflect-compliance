@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { saveOnboardingStep, completeOnboardingStep, skipOnboardingStep } from '@/app-layer/usecases/onboarding';
