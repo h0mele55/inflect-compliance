@@ -1,0 +1,166 @@
+# Security Hardening — Operations Guide
+
+> **Epic scope**: middleware hardening, CORS, OAuth token encryption, admin session posture, fail-closed MFA, CSP refinement.
+
+---
+
+## 1. Security Headers
+
+All responses have production-grade security headers via `src/lib/security/headers.ts`:
+
+| Header | Value (Production) |
+|---|---|
+| Strict-Transport-Security | `max-age=31536000; includeSubDomains; preload` |
+| X-Frame-Options | `DENY` |
+| X-Content-Type-Options | `nosniff` |
+| Referrer-Policy | `strict-origin-when-cross-origin` |
+| Permissions-Policy | `camera=(), microphone=(), geolocation=(), browsing-topics=()` |
+| Cross-Origin-Opener-Policy | `same-origin` |
+| Cross-Origin-Resource-Policy | `same-origin` |
+
+**Target**: securityheaders.com A+ rating.
+
+---
+
+## 2. CORS Policy
+
+**Module**: `src/lib/security/cors.ts`
+
+| Environment | Behavior |
+|---|---|
+| Production | Fail-closed — only `CORS_ALLOWED_ORIGINS` env var origins allowed |
+| Staging | Same as production — no wildcards |
+| Development | Allows `localhost:*` dev origins |
+
+**No wildcard** `Access-Control-Allow-Origin: *` is ever set.
+
+---
+
+## 3. OAuth Token Encryption
+
+### Architecture
+- **Encryption**: AES-256-GCM with HKDF key derivation (`src/lib/security/encryption.ts`)
+- **Middleware**: PII middleware (`src/lib/security/pii-middleware.ts`) transparently encrypts/decrypts
+- **Fields**: `access_token` → `accessTokenEncrypted`, `refresh_token` → `refreshTokenEncrypted`
+
+### Write Paths (all auto-encrypted by middleware)
+| Path | Prisma Action |
+|---|---|
+| OAuth sign-in (PrismaAdapter) | `create` |
+| Manual sign-in callback | `create` |
+| Token refresh (JWT callback) | `updateMany` |
+
+### Read Paths (auto-decrypted by middleware)
+The PII middleware decrypts encrypted columns on `findUnique`, `findFirst`, `findMany`. If an encrypted column is `null` (pre-backfill row), the plaintext column is used as fallback.
+
+### Backfill Migration
+```bash
+# 1. Audit (dry-run, no writes)
+npx tsx scripts/backfill-token-encryption.ts
+
+# 2. Encrypt existing rows
+npx tsx scripts/backfill-token-encryption.ts --execute
+
+# 3. Verify (rerun dry-run, should show 0 remaining)
+npx tsx scripts/backfill-token-encryption.ts
+
+# 4. Remove plaintext (after confidence period)
+npx tsx scripts/backfill-token-encryption.ts --execute --null-plaintext
+```
+
+**Safety**: per-row roundtrip verification, per-row error isolation, idempotent reruns.
+
+### Deprecation Path
+After the backfill completes and plaintext columns are nulled:
+1. Remove plaintext `access_token` / `refresh_token` from `PII_FIELD_MAP` mapping
+2. Drop plaintext columns in a future migration
+3. Remove fallback read path in PII middleware
+
+---
+
+## 4. Admin Session / Cookie Posture
+
+### Why not SameSite=strict globally?
+Auth.js v5 has one global cookie config. `SameSite=strict` globally breaks OAuth redirect flows (provider redirects are treated as cross-site navigations).
+
+### Chosen Architecture
+**Sec-Fetch-Site header validation** (`src/lib/security/admin-session-guard.ts`):
+- Admin API routes block `cross-site` requests (equivalent to SameSite=strict for the routes that matter)
+- Direct navigation (`none`) is allowed for safe methods (GET/HEAD)
+- Missing header (curl, old browsers) is allowed — auth token is still required
+
+This is integrated in `src/middleware.ts` after the admin role check.
+
+---
+
+## 5. Fail-Closed MFA
+
+### Schema
+```prisma
+model TenantSecuritySettings {
+  mfaFailClosed  Boolean @default(false)
+}
+```
+
+### Behavior
+| mfaFailClosed | MFA Dependency Failure | Token Error |
+|---|---|---|
+| `false` (default) | Fail open — allow through | none |
+| `true` | Fail closed — deny access | `MfaDependencyFailure` |
+
+Both MFA check points in `src/auth.ts` JWT callback respect this setting:
+1. **Sign-in MFA check** — sets `mfaPending=true` + `error='MfaDependencyFailure'`
+2. **Challenge completion check** — keeps `mfaPending=true` (access denied)
+
+The `mfaFailClosed` flag is cached in the JWT token so subsequent requests don't need to re-read settings.
+
+### Enabling
+Set `mfaFailClosed: true` in the tenant's `TenantSecuritySettings` record via admin API or direct DB update.
+
+---
+
+## 6. CSP Strategy & Rollout
+
+### Current Policy (production)
+```
+script-src  'self' 'nonce-X' 'strict-dynamic'
+style-src   'self' 'nonce-X' https://fonts.googleapis.com
+```
+
+**No `unsafe-inline`** in production for either scripts or styles.
+
+### Rollout
+```bash
+# Step 1: Report-only mode (observe violations without blocking)
+CSP_REPORT_ONLY=true
+
+# Step 2: Monitor violations
+GET /api/security/csp-report  # Returns recent violation summary
+
+# Step 3: Enforce (block violations)
+CSP_REPORT_ONLY=false  # or unset (default = enforce)
+```
+
+### Development-Only Exceptions
+| Directive | Exception | Reason |
+|---|---|---|
+| `script-src` | `'unsafe-eval'` | Next.js HMR/Fast Refresh |
+| `style-src` | `'unsafe-inline'` | Next.js HMR style injection ([#39706](https://github.com/vercel/next.js/issues/39706)) |
+
+These exceptions are **never present in production**.
+
+---
+
+## Key Files
+
+| File | Purpose |
+|---|---|
+| `src/lib/security/headers.ts` | Security response headers |
+| `src/lib/security/cors.ts` | CORS policy |
+| `src/lib/security/csp.ts` | CSP builder + report-only toggle |
+| `src/lib/security/encryption.ts` | AES-256-GCM encryption primitives |
+| `src/lib/security/pii-middleware.ts` | Prisma middleware for transparent PII encryption |
+| `src/lib/security/admin-session-guard.ts` | Admin Sec-Fetch-Site CSRF protection |
+| `src/auth.ts` | JWT callback with fail-closed MFA |
+| `src/middleware.ts` | Centralized middleware (headers, CORS, CSP, admin guard) |
+| `scripts/backfill-token-encryption.ts` | Token encryption backfill script |
