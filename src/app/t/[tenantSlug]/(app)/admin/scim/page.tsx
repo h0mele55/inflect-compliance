@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
-import { RequirePermission } from '@/components/require-permission';
-import { CloudCog, Plus, Trash2, Copy, Check, AlertTriangle, Clock, ExternalLink, ShieldOff } from 'lucide-react';
+import { CloudCog, Plus, Trash2, Copy, Check, AlertTriangle, Clock, ExternalLink } from 'lucide-react';
 
 interface ScimToken {
     id: string;
@@ -85,13 +84,6 @@ export default function ScimAdminPage() {
     const revokedTokens = state?.tokens.filter(t => t.revokedAt) || [];
 
     return (
-        <RequirePermission resource="admin" action="manage" fallback={
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-                <ShieldOff className="w-12 h-12 text-slate-600 mb-4" />
-                <h1 className="text-xl font-semibold text-white mb-2">Permission denied</h1>
-                <p className="text-sm text-slate-400">You do not have permission to access SCIM provisioning settings.</p>
-            </div>
-        }>
         <div className="space-y-6 animate-fadeIn max-w-4xl">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -288,6 +280,5 @@ export default function ScimAdminPage() {
                 </div>
             </div>
         </div>
-        </RequirePermission>
     );
 }

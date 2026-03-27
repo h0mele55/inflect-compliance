@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
-import { RequirePermission } from '@/components/require-permission';
 import { ArrowLeft, Plus, Trash2, CheckCircle, XCircle, Loader2, Link2, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 
@@ -166,7 +165,6 @@ export default function AdminIntegrationsPage() {
     const selectedProvider = providers.find(p => p.id === formProvider);
 
     return (
-        <RequirePermission resource="admin" action="manage">
             <div className="space-y-6 animate-fadeIn">
                 <div className="flex items-center gap-3">
                     <Link href={tenantHref('/admin')} className="btn btn-secondary btn-sm">
@@ -414,6 +412,5 @@ export default function AdminIntegrationsPage() {
                     </div>
                 )}
             </div>
-        </RequirePermission>
     );
 }

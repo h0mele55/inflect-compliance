@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { ServerForbiddenPage } from '@/components/ForbiddenPage';
 import { auth } from '@/auth';
 import { resolveTenantContext } from '@/lib/tenant-context';
 import { getPermissionsForRole, type PermissionSet } from '@/lib/permissions';
@@ -11,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Admin-only RBAC overview page.
- * Server-side guard: resolves membership and checks admin.manage permission.
+ * Authorization: handled by centralized admin layout guard.
  * Shows: permission matrix by role, current tenant members + roles.
  */
 export default async function RbacPage({
@@ -32,10 +31,7 @@ export default async function RbacPage({
         redirect(`/t/${tenantSlug}/dashboard`);
     }
 
-    // Check admin.manage permission — non-admins see forbidden page
-    if (!tenantCtx.appPermissions.admin.manage) {
-        return <ServerForbiddenPage tenantSlug={tenantSlug} />;
-    }
+
 
     // ─── Data fetching ───
     const members = await prisma.tenantMembership.findMany({

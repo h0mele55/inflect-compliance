@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
-import { RequirePermission } from '@/components/require-permission';
 import { Shield, CreditCard, KeyRound, ShieldCheck, Users, CloudCog, Plug } from 'lucide-react';
 import Link from 'next/link';
 
@@ -29,8 +28,7 @@ export default function AdminPage() {
             <div className="flex gap-2">
                 <button onClick={() => setTab('log')} className={`btn ${tab === 'log' ? 'btn-primary' : 'btn-secondary'}`}>{t('auditLog')}</button>
                 <button onClick={() => setTab('templates')} className={`btn ${tab === 'templates' ? 'btn-primary' : 'btn-secondary'}`}>{t('policyTemplates')}</button>
-                <RequirePermission resource="admin" action="manage">
-                    <Link
+                <Link
                         href={tenantHref('/admin/members')}
                         className="btn btn-secondary"
                         id="members-pill-btn"
@@ -85,8 +83,7 @@ export default function AdminPage() {
                     >
                         <ShieldCheck className="w-3.5 h-3.5" />
                         Security &amp; MFA
-                    </Link>
-                </RequirePermission>
+                </Link>
             </div>
 
             {tab === 'log' ? (

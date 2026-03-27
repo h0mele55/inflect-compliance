@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { resolveTenantContext } from '@/lib/tenant-context';
-import { ServerForbiddenPage } from '@/components/ForbiddenPage';
 import prisma from '@/lib/prisma';
 import { BillingActions } from './BillingActions';
 import { BillingEventLog } from './BillingEventLog';
@@ -29,9 +28,7 @@ export default async function BillingPage({
         notFound();
     }
 
-    if (!tenantCtx.appPermissions.admin.manage) {
-        return <ServerForbiddenPage tenantSlug={tenantSlug} />;
-    }
+
 
     // Fetch billing account
     const billingAccount = await prisma.billingAccount.findUnique({

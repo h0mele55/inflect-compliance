@@ -65,15 +65,33 @@ test.describe('Admin Area Regression', () => {
         await expect(page.getByText('Setup Guide')).toBeVisible({ timeout: 5000 });
     });
 
-    // ── 3. Non-admin access blocked ──
-    test('non-admin cannot access SCIM page', async ({ page }) => {
-        const slug = await loginAndGetTenant(page, READER_USER);
-        await safeGoto(page, `/t/${slug}/admin/scim`, { waitUntil: 'domcontentloaded' });
+    // ── 3. Non-admin access blocked on ALL admin subpages ──
+    const adminSubpages = [
+        '', // root admin page
+        '/members',
+        '/rbac',
+        '/sso',
+        '/scim',
+        '/security',
+        '/integrations',
+        '/billing',
+    ];
 
-        // Should be redirected away from admin area or see forbidden
-        const url = page.url();
-        const notOnScim = !url.includes('/admin/scim');
-        const hasError = await page.getByText(/permission|forbidden|denied/i).isVisible().catch(() => false);
-        expect(notOnScim || hasError).toBeTruthy();
-    });
+    for (const subpage of adminSubpages) {
+        const label = subpage || '(root)';
+        test(`non-admin cannot access admin${label} page`, async ({ page }) => {
+            const slug = await loginAndGetTenant(page, READER_USER);
+            await safeGoto(page, `/t/${slug}/admin${subpage}`, { waitUntil: 'domcontentloaded' });
+
+            // Middleware should redirect non-admin to dashboard.
+            // If it doesn't (edge case), the admin layout guard shows
+            // the ForbiddenPage with "Access Denied" / "Permission denied".
+            const url = page.url();
+            const notOnAdmin = !url.includes('/admin');
+            const hasForbidden = await page.locator('#forbidden-heading').isVisible().catch(() => false);
+            const hasPermissionText = await page.getByText(/permission|forbidden|denied|access/i).isVisible().catch(() => false);
+
+            expect(notOnAdmin || hasForbidden || hasPermissionText).toBeTruthy();
+        });
+    }
 });
