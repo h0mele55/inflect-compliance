@@ -4,12 +4,27 @@
  * Architecture:
  *   middleware.ts → generateNonce() → buildCspHeader(nonce)
  *                → sets x-csp-nonce request header  (server components read it)
- *                → sets Content-Security-Policy response header
+ *                → sets Content-Security-Policy[-Report-Only] response header
  *
  * Next.js integration:
  *   The root layout reads the nonce from headers() and passes it through.
  *   Next.js automatically tags its own <script> and <link> tags with the nonce
  *   when it is present on the request headers.
+ *
+ * Rollout strategy:
+ *   1. Set CSP_REPORT_ONLY=true → Content-Security-Policy-Report-Only (observe)
+ *   2. Monitor /api/security/csp-report for violations
+ *   3. Set CSP_REPORT_ONLY=false (or unset) → Content-Security-Policy (enforce)
+ *
+ * unsafe-inline status:
+ *   - script-src: NO unsafe-inline in any environment
+ *     Uses 'strict-dynamic' + nonce for all scripts. Next.js propagates the nonce
+ *     to its own script tags automatically.
+ *   - style-src: NO unsafe-inline in production/staging
+ *     In development only, 'unsafe-inline' is required because Next.js HMR/Fast
+ *     Refresh injects style tags that do not carry the nonce. This is a known
+ *     Next.js limitation (https://github.com/vercel/next.js/issues/39706).
+ *   - script-src dev: 'unsafe-eval' required for Next.js HMR/Fast Refresh eval().
  */
 
 // Edge-compatible crypto — works in both Node.js and Edge Runtime
@@ -47,7 +62,9 @@ export interface CspDirectives {
     'frame-ancestors': string[];
     'form-action': string[];
     'worker-src'?: string[];
+    'manifest-src'?: string[];
     'report-uri'?: string[];
+    'report-to'?: string[];
     'upgrade-insecure-requests'?: true;
 }
 
@@ -66,6 +83,36 @@ export const CSP_REPORT_PATH = '/api/security/csp-report';
  * Report-To group name for the Reporting API.
  */
 export const CSP_REPORT_GROUP = 'csp-endpoint';
+
+/**
+ * The response header name for the CSP policy.
+ * - Content-Security-Policy: enforced (violations are blocked)
+ * - Content-Security-Policy-Report-Only: report-only (violations reported, not blocked)
+ */
+export const CSP_HEADER_ENFORCE = 'Content-Security-Policy';
+export const CSP_HEADER_REPORT_ONLY = 'Content-Security-Policy-Report-Only';
+
+/**
+ * Determine the correct CSP header name based on the report-only setting.
+ *
+ * @param reportOnly - If true, use report-only mode; otherwise enforce
+ * @returns The appropriate header name
+ */
+export function getCspHeaderName(reportOnly: boolean): string {
+    return reportOnly ? CSP_HEADER_REPORT_ONLY : CSP_HEADER_ENFORCE;
+}
+
+/**
+ * Check whether CSP report-only mode is enabled.
+ *
+ * Reads from CSP_REPORT_ONLY environment variable.
+ * Any truthy value ('true', '1', 'yes') enables report-only mode.
+ * Default: false (enforce mode).
+ */
+export function isCspReportOnly(envValue?: string): boolean {
+    if (!envValue) return false;
+    return ['true', '1', 'yes'].includes(envValue.toLowerCase().trim());
+}
 
 /**
  * Build the full Content-Security-Policy header string.
@@ -88,7 +135,9 @@ export function buildCspHeader(nonce: string, isDev = false): string {
             `'nonce-${nonce}'`,
             // Google Fonts stylesheet
             'https://fonts.googleapis.com',
-            // In dev, Next.js injects styles that may not carry the nonce
+            // In dev, Next.js injects styles that may not carry the nonce.
+            // This is a known Next.js limitation:
+            // https://github.com/vercel/next.js/issues/39706
             ...(isDev ? ["'unsafe-inline'"] : []),
         ],
         'img-src': ["'self'", 'data:', 'https:'],
@@ -104,7 +153,13 @@ export function buildCspHeader(nonce: string, isDev = false): string {
         'base-uri': ["'self'"],
         'frame-ancestors': ["'none'"],
         'form-action': ["'self'"],
+        // Workers: restrict to same-origin
+        'worker-src': ["'self'", 'blob:'],
+        // PWA manifest
+        'manifest-src': ["'self'"],
+        // Violation reporting — both legacy and modern endpoints
         'report-uri': [CSP_REPORT_PATH],
+        'report-to': [CSP_REPORT_GROUP],
     };
 
     // Only add upgrade-insecure-requests in production

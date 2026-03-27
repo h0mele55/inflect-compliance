@@ -12,7 +12,7 @@ import {
     unauthorizedJson,
     forbiddenJson,
 } from '@/lib/auth/guard';
-import { generateNonce, buildCspHeader, CSP_NONCE_HEADER, CSP_REPORT_PATH, CSP_REPORT_GROUP } from '@/lib/security/csp';
+import { generateNonce, buildCspHeader, CSP_NONCE_HEADER, CSP_REPORT_PATH, CSP_REPORT_GROUP, getCspHeaderName, isCspReportOnly } from '@/lib/security/csp';
 import { applySecurityHeaders } from '@/lib/security/headers';
 import { resolveCorsConfig, isOriginAllowed, applyCorsHeaders, CORS_PREFLIGHT_HEADERS } from '@/lib/security/cors';
 import { shouldBlockAdminRequest } from '@/lib/security/admin-session-guard';
@@ -136,6 +136,8 @@ export default async function middleware(req: any, ctx: any) {
     const nonce = generateNonce();
     const isDev = env.NODE_ENV === 'development';
     const cspHeader = buildCspHeader(nonce, isDev);
+    const cspReportOnly = isCspReportOnly(process.env.CSP_REPORT_ONLY);
+    const cspHeaderName = getCspHeaderName(cspReportOnly);
 
     // ── Request ID (reuse from upstream or generate) ──
     const requestId = req.headers.get('x-request-id') || crypto.randomUUID();
@@ -162,7 +164,7 @@ export default async function middleware(req: any, ctx: any) {
             preflightHeaders.set(key, value);
         }
         preflightHeaders.set('x-request-id', requestId);
-        preflightHeaders.set('Content-Security-Policy', cspHeader);
+        preflightHeaders.set(cspHeaderName, cspHeader);
         applySecurityHeaders(preflightHeaders, isProduction);
         return new NextResponse(null, { status: 204, headers: preflightHeaders });
     }
@@ -176,7 +178,7 @@ export default async function middleware(req: any, ctx: any) {
     applySecurityHeaders(res.headers, isProduction);
 
     // ── Inject CSP + Report-To + request ID on every response ──
-    res.headers.set('Content-Security-Policy', cspHeader);
+    res.headers.set(cspHeaderName, cspHeader);
     res.headers.set('x-request-id', requestId);
 
     // Report-To header for the modern Reporting API (report-to CSP directive)

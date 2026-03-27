@@ -40,8 +40,11 @@ describe('CSP Middleware Integration (structural)', () => {
         expect(source).toContain('buildCspHeader(nonce');
     });
 
-    it('sets Content-Security-Policy response header', () => {
-        expect(source).toContain("'Content-Security-Policy'");
+    it('sets CSP response header using dynamic header name', () => {
+        // Middleware uses getCspHeaderName() to dynamically choose between
+        // Content-Security-Policy and Content-Security-Policy-Report-Only
+        expect(source).toContain('getCspHeaderName');
+        expect(source).toContain('cspHeaderName');
     });
 
     it('passes nonce via CSP_NONCE_HEADER on request headers', () => {
