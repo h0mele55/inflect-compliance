@@ -22,18 +22,20 @@ function readFile(relativePath: string): string {
 
 describe('RBAC Guardrail Scans', () => {
     describe('Admin route guards', () => {
-        test('admin/rbac page has server-side admin permission check', () => {
-            const content = readFile('app/t/[tenantSlug]/(app)/admin/rbac/page.tsx');
-            // Must check admin.manage permission
-            expect(content).toMatch(/appPermissions\.admin\.manage/);
-            // Must render forbidden or notFound on unauthorized
-            expect(content).toMatch(/ServerForbiddenPage|notFound/);
-        });
-
-        test('admin page has RequirePermission guard on RBAC button', () => {
-            const content = readFile('app/t/[tenantSlug]/(app)/admin/page.tsx');
+        test('admin layout guard exists and uses RequirePermission', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/admin/layout.tsx');
+            // Centralized layout guard must use RequirePermission with admin resource
             expect(content).toMatch(/RequirePermission/);
             expect(content).toMatch(/resource="admin"/);
+            // Must render ForbiddenPage for unauthorized access
+            expect(content).toMatch(/ForbiddenPage/);
+        });
+
+        test('admin/rbac page does NOT have redundant per-page guard (uses layout)', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/admin/rbac/page.tsx');
+            // Should NOT contain per-page guard — layout handles authorization
+            expect(content).not.toMatch(/ServerForbiddenPage/);
+            expect(content).not.toMatch(/RequirePermission/);
         });
     });
 
