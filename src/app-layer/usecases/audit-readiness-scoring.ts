@@ -98,6 +98,13 @@ export async function computeReadiness(ctx: RequestContext, cycleId: string): Pr
             entityType: 'AuditCycle',
             entityId: cycleId,
             details: JSON.stringify({ score: result.score, frameworkKey: cycle.frameworkKey }),
+            detailsJson: {
+                category: 'custom',
+                event: 'readiness_computed',
+                score: result.score,
+                frameworkKey: cycle.frameworkKey,
+                gapCount: result.gaps.length,
+            },
         })
     );
 
@@ -451,6 +458,12 @@ export async function exportReadinessJson(ctx: RequestContext, cycleId: string):
             entityType: 'AuditCycle',
             entityId: cycleId,
             details: JSON.stringify({ format: 'readiness.json', score: result.score }),
+            detailsJson: {
+                category: 'custom',
+                event: 'audit_export_generated',
+                format: 'readiness.json',
+                score: result.score,
+            },
         })
     );
     return result;
@@ -471,6 +484,12 @@ export async function exportUnmappedCsv(ctx: RequestContext, cycleId: string): P
             entityType: 'AuditCycle',
             entityId: cycleId,
             details: JSON.stringify({ format: 'unmapped.csv', count: unmapped.length }),
+            detailsJson: {
+                category: 'custom',
+                event: 'audit_export_generated',
+                format: 'unmapped.csv',
+                count: unmapped.length,
+            },
         })
     );
 
@@ -492,6 +511,12 @@ export async function exportControlGapsCsv(ctx: RequestContext, cycleId: string)
             entityType: 'AuditCycle',
             entityId: cycleId,
             details: JSON.stringify({ format: 'control-gaps.csv', count: gapItems.length }),
+            detailsJson: {
+                category: 'custom',
+                event: 'audit_export_generated',
+                format: 'control-gaps.csv',
+                count: gapItems.length,
+            },
         })
     );
 

@@ -107,6 +107,13 @@ export async function storeExportArtifact(
             entityType: 'AuditPack',
             entityId: packId,
             details: JSON.stringify({ filename, hash, size: buffer.length }),
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'AuditPack',
+                operation: 'export_generated',
+                after: { filename, hash, size: buffer.length },
+                summary: `Audit export generated: ${filename}`,
+            },
         })
     );
 
@@ -213,6 +220,17 @@ export async function clonePackForRetest(
                 itemsCopied: itemsToClone.length,
                 retestIssuesAdded: retestIssues.filter(i => !existingIssueIds.has(i.id)).length,
             }),
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'AuditPack',
+                operation: 'cloned',
+                after: {
+                    sourcePackId,
+                    itemsCopied: itemsToClone.length,
+                    retestIssuesAdded: retestIssues.filter(i => !existingIssueIds.has(i.id)).length,
+                },
+                summary: `Pack cloned from ${sourcePackId}`,
+            },
         })
     );
 
@@ -223,6 +241,11 @@ export async function clonePackForRetest(
                 entityType: 'AuditPack',
                 entityId: clonedPack.id,
                 details: JSON.stringify({ issueCount: retestIssues.length }),
+                detailsJson: {
+                    category: 'custom',
+                    event: 'retest_requested',
+                    issueCount: retestIssues.length,
+                },
             })
         );
     }

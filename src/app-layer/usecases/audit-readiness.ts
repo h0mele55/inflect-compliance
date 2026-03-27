@@ -47,7 +47,7 @@ export async function createAuditCycle(
                 createdByUserId: ctx.userId,
             },
         });
-        await logEvent(tdb, ctx, { action: 'AUDIT_CYCLE_CREATED', entityType: 'AuditCycle', entityId: cycle.id, details: JSON.stringify({ frameworkKey: data.frameworkKey, name: data.name }) });
+        await logEvent(tdb, ctx, { action: 'AUDIT_CYCLE_CREATED', entityType: 'AuditCycle', entityId: cycle.id, details: JSON.stringify({ frameworkKey: data.frameworkKey, name: data.name }), detailsJson: { category: 'entity_lifecycle', entityName: 'AuditCycle', operation: 'created', after: { frameworkKey: data.frameworkKey, name: data.name }, summary: `Audit cycle created: ${data.name}` } });
         return cycle;
     });
 }
@@ -94,7 +94,7 @@ export async function updateAuditCycle(
                 ...(data.periodEndAt !== undefined && { periodEndAt: data.periodEndAt ? new Date(data.periodEndAt) : null }),
             },
         });
-        await logEvent(tdb, ctx, { action: 'AUDIT_CYCLE_UPDATED', entityType: 'AuditCycle', entityId: cycle.id, details: JSON.stringify(data) });
+        await logEvent(tdb, ctx, { action: 'AUDIT_CYCLE_UPDATED', entityType: 'AuditCycle', entityId: cycle.id, details: JSON.stringify(data), detailsJson: { category: 'entity_lifecycle', entityName: 'AuditCycle', operation: 'updated', changedFields: Object.keys(data).filter(k => data[k as keyof typeof data] !== undefined), summary: 'Audit cycle updated' } });
         return cycle;
     });
 }
@@ -109,7 +109,7 @@ export async function createAuditPack(ctx: RequestContext, auditCycleId: string,
         const pack = await tdb.auditPack.create({
             data: { tenantId: ctx.tenantId, auditCycleId, name },
         });
-        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_CREATED', entityType: 'AuditPack', entityId: pack.id, details: JSON.stringify({ auditCycleId, name }) });
+        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_CREATED', entityType: 'AuditPack', entityId: pack.id, details: JSON.stringify({ auditCycleId, name }), detailsJson: { category: 'entity_lifecycle', entityName: 'AuditPack', operation: 'created', after: { auditCycleId, name }, summary: `Audit pack created: ${name}` } });
         return pack;
     });
 }
@@ -187,7 +187,7 @@ export async function addAuditPackItems(
         const created = result.count;
         const skipped = items.length - created;
 
-        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_UPDATED', entityType: 'AuditPack', entityId: packId, details: JSON.stringify({ created, skipped }) });
+        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_UPDATED', entityType: 'AuditPack', entityId: packId, details: JSON.stringify({ created, skipped }), detailsJson: { category: 'entity_lifecycle', entityName: 'AuditPack', operation: 'updated', after: { itemsCreated: created, itemsSkipped: skipped }, summary: `Audit pack items added: ${created} created, ${skipped} skipped` } });
         return { created, skipped };
     });
 }
@@ -297,7 +297,7 @@ export async function freezeAuditPack(ctx: RequestContext, packId: string) {
             data: { status: 'FROZEN', frozenAt: new Date(), frozenByUserId: ctx.userId },
         });
 
-        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_FROZEN', entityType: 'AuditPack', entityId: packId, details: JSON.stringify({ itemCount: pack.items.length }) });
+        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_FROZEN', entityType: 'AuditPack', entityId: packId, details: JSON.stringify({ itemCount: pack.items.length }), detailsJson: { category: 'status_change', entityName: 'AuditPack', fromStatus: 'DRAFT', toStatus: 'FROZEN', reason: `Pack frozen with ${pack.items.length} items` } });
 
         return { frozenPack: result, itemCount: pack.items.length };
     });
@@ -371,7 +371,7 @@ export async function generateShareLink(ctx: RequestContext, packId: string, exp
             },
         });
 
-        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_SHARED', entityType: 'AuditPack', entityId: packId, details: JSON.stringify({ expiresAt }) });
+        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_SHARED', entityType: 'AuditPack', entityId: packId, details: JSON.stringify({ expiresAt }), detailsJson: { category: 'access', operation: 'permission_changed', detail: `Pack shared${expiresAt ? ` until ${expiresAt}` : ' (no expiry)'}` } });
     });
 
     return { token, expiresAt: expiresAt || null };
@@ -384,7 +384,7 @@ export async function revokeShare(ctx: RequestContext, shareId: string) {
         if (!share) throw notFound('Share not found');
         if (share.revokedAt) throw badRequest('Share already revoked');
         await tdb.auditPackShare.update({ where: { id: shareId }, data: { revokedAt: new Date() } });
-        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_REVOKED', entityType: 'AuditPackShare', entityId: shareId, details: 'Share revoked' });
+        await logEvent(tdb, ctx, { action: 'AUDIT_PACK_REVOKED', entityType: 'AuditPackShare', entityId: shareId, details: 'Share revoked', detailsJson: { category: 'access', operation: 'permission_changed', detail: 'Share link revoked' } });
         return { revoked: true };
     });
 }
@@ -425,7 +425,7 @@ export async function inviteAuditor(ctx: RequestContext, email: string, name?: s
             create: { tenantId: ctx.tenantId, email, name, status: 'INVITED' },
             update: { name, status: 'ACTIVE' },
         });
-        await logEvent(tdb, ctx, { action: 'AUDITOR_INVITED', entityType: 'AuditorAccount', entityId: auditor.id, details: JSON.stringify({ email }) });
+        await logEvent(tdb, ctx, { action: 'AUDITOR_INVITED', entityType: 'AuditorAccount', entityId: auditor.id, details: JSON.stringify({ email }), detailsJson: { category: 'access', operation: 'permission_changed', targetUserId: auditor.id, detail: `Auditor invited: ${email}` } });
         return auditor;
     });
 }
@@ -442,7 +442,7 @@ export async function grantAuditorAccess(ctx: RequestContext, auditorId: string,
             await tdb.auditorPackAccess.create({ data: { auditorId, auditPackId: packId } });
         } catch { throw badRequest('Auditor already has access to this pack'); }
 
-        await logEvent(tdb, ctx, { action: 'AUDITOR_GRANTED', entityType: 'AuditorPackAccess', entityId: `${auditorId}_${packId}`, details: JSON.stringify({ email: auditor.email }) });
+        await logEvent(tdb, ctx, { action: 'AUDITOR_GRANTED', entityType: 'AuditorPackAccess', entityId: `${auditorId}_${packId}`, details: JSON.stringify({ email: auditor.email }), detailsJson: { category: 'access', operation: 'permission_changed', targetUserId: auditorId, detail: `Auditor granted access to pack ${packId}` } });
         return { granted: true };
     });
 }
@@ -451,7 +451,7 @@ export async function revokeAuditorAccess(ctx: RequestContext, auditorId: string
     assertCanManageAuditors(ctx);
     return runInTenantContext(ctx, async (tdb) => {
         await tdb.auditorPackAccess.deleteMany({ where: { auditorId, auditPackId: packId } });
-        await logEvent(tdb, ctx, { action: 'AUDITOR_REVOKED', entityType: 'AuditorPackAccess', entityId: `${auditorId}_${packId}`, details: 'Auditor access revoked' });
+        await logEvent(tdb, ctx, { action: 'AUDITOR_REVOKED', entityType: 'AuditorPackAccess', entityId: `${auditorId}_${packId}`, details: 'Auditor access revoked', detailsJson: { category: 'access', operation: 'permission_changed', targetUserId: auditorId, detail: `Auditor access revoked from pack ${packId}` } });
         return { revoked: true };
     });
 }

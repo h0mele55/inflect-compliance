@@ -107,6 +107,7 @@ export async function createTask(ctx: RequestContext, input: {
             entityType: 'Task',
             entityId: task.id,
             details: `Created task ${task.key}: ${task.title}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Task', operation: 'created', summary: 'TASK_CREATED' },
             metadata: { type: input.type, severity: input.severity, priority: input.priority },
         });
 
@@ -140,6 +141,7 @@ export async function updateTask(ctx: RequestContext, taskId: string, patch: {
             entityType: 'Task',
             entityId: taskId,
             details: 'Updated task fields',
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Task', operation: 'updated', summary: 'TASK_UPDATED' },
             metadata: patch,
         });
         return task;
@@ -165,6 +167,7 @@ export async function setTaskStatus(ctx: RequestContext, taskId: string, status:
             entityType: 'Task',
             entityId: taskId,
             details: `Status changed to ${status}`,
+            detailsJson: { category: 'status_change', entityName: 'Task', fromStatus: null, toStatus: 'TASK_STATUS_CHANGED' },
             metadata: { status, resolution },
         });
         return task;
@@ -183,6 +186,7 @@ export async function assignTask(ctx: RequestContext, taskId: string, assigneeUs
             entityType: 'Task',
             entityId: taskId,
             details: assigneeUserId ? `Assigned to ${assigneeUserId}` : 'Unassigned',
+            detailsJson: { category: 'custom', event: 'task_assigned' },
             metadata: { assigneeUserId },
         });
 
@@ -254,6 +258,7 @@ export async function addTaskLink(ctx: RequestContext, taskId: string, entityTyp
             entityType: 'Task',
             entityId: taskId,
             details: `Linked to ${entityType} ${entityId}`,
+            detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Task' },
             metadata: { entityType, entityId, relation },
         });
         return link;
@@ -270,6 +275,7 @@ export async function removeTaskLink(ctx: RequestContext, linkId: string) {
             entityType: 'Task',
             entityId: linkId,
             details: 'Removed task link',
+            detailsJson: { category: 'relationship', operation: 'unlinked', sourceEntity: 'Task' },
         });
         return result;
     });
@@ -291,6 +297,7 @@ export async function addTaskComment(ctx: RequestContext, taskId: string, body: 
             entityType: 'Task',
             entityId: taskId,
             details: 'Comment added',
+            detailsJson: { category: 'custom', event: 'task_comment_added' },
             metadata: { commentId: comment.id },
         });
         return comment;
@@ -351,6 +358,7 @@ export async function bulkAssignTasks(ctx: RequestContext, taskIds: string[], as
                 entityType: 'Task',
                 entityId: id,
                 details: assigneeUserId ? `Bulk assigned to ${assigneeUserId}` : 'Bulk unassigned',
+                detailsJson: { category: 'custom', event: 'task_assigned' },
                 metadata: { assigneeUserId, bulk: true },
             });
         }
@@ -368,6 +376,7 @@ export async function bulkSetTaskStatus(ctx: RequestContext, taskIds: string[], 
                 entityType: 'Task',
                 entityId: id,
                 details: `Bulk status changed to ${status}`,
+                detailsJson: { category: 'status_change', entityName: 'Task', fromStatus: null, toStatus: 'TASK_STATUS_CHANGED' },
                 metadata: { status, resolution, bulk: true },
             });
         }
@@ -385,6 +394,7 @@ export async function bulkSetTaskDueDate(ctx: RequestContext, taskIds: string[],
                 entityType: 'Task',
                 entityId: id,
                 details: `Bulk due date set to ${dueAt || 'none'}`,
+                detailsJson: { category: 'entity_lifecycle', entityName: 'Task', operation: 'updated', summary: 'TASK_UPDATED' },
                 metadata: { dueAt, bulk: true },
             });
         }

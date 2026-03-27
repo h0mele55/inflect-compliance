@@ -54,6 +54,13 @@ export async function createFinding(ctx: RequestContext, data: {
             entityType: 'Finding',
             entityId: finding.id,
             details: `Created finding: ${finding.title}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Finding',
+                operation: 'created',
+                after: { title: finding.title, severity: data.severity, type: data.type },
+                summary: `Created finding: ${finding.title}`,
+            },
         });
 
         return finding;
@@ -101,13 +108,28 @@ export async function updateFinding(ctx: RequestContext, id: string, data: {
                 entityType: 'Finding',
                 entityId: id,
                 details: `${oldFinding.status} → ${data.status}`,
+                detailsJson: {
+                    category: 'status_change',
+                    entityName: 'Finding',
+                    fromStatus: oldFinding.status,
+                    toStatus: data.status,
+                    reason: data.verificationNotes || undefined,
+                },
             });
         } else {
             await logEvent(db, ctx, {
                 action: 'UPDATE',
                 entityType: 'Finding',
                 entityId: id,
-                details: JSON.stringify(data),
+                details: `Finding updated`,
+                detailsJson: {
+                    category: 'entity_lifecycle',
+                    entityName: 'Finding',
+                    operation: 'updated',
+                    changedFields: Object.keys(data).filter(k => data[k as keyof typeof data] !== undefined),
+                    after: { title: data.title, severity: data.severity, owner: data.owner },
+                    summary: 'Finding updated',
+                },
             });
         }
 

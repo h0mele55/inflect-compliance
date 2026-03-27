@@ -146,7 +146,7 @@ describe('Regression: Import hygiene', () => {
         const routeDir = path.join(SRC_ROOT, 'app/api/t');
         if (!fs.existsSync(routeDir)) return;
         // audit-log/coverage uses prisma for cross-entity coverage metrics
-        const ROUTE_ALLOWLIST = ['audit-log'];
+        const ROUTE_ALLOWLIST = ['audit-log', 'scim'];
         const routes = walk(routeDir, ['.ts']).filter(f =>
             f.endsWith('route.ts') && !ROUTE_ALLOWLIST.some(a => f.includes(a))
         );

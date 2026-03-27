@@ -189,6 +189,13 @@ async function executeAssetCreation(ctx: RequestContext, allData: StepData): Pro
                 entityType: 'Asset',
                 entityId: ctx.tenantId,
                 details: `Onboarding created ${created} assets (${skipped} already existed)`,
+                detailsJson: {
+                    category: 'custom',
+                    event: 'onboarding_assets_created',
+                    created,
+                    skipped,
+                    assetNames,
+                },
                 metadata: { created, skipped, assetNames },
             });
         }
@@ -277,6 +284,14 @@ async function executeRiskGeneration(ctx: RequestContext, allData: StepData): Pr
                 entityType: 'Risk',
                 entityId: ctx.tenantId,
                 details: `Onboarding generated ${created} starter risks (${skipped} already existed)`,
+                detailsJson: {
+                    category: 'custom',
+                    event: 'onboarding_risks_generated',
+                    created,
+                    skipped,
+                    selectedFrameworks,
+                    assetTypes: [...assetTypes],
+                },
                 metadata: { created, skipped, selectedFrameworks, assetTypes: [...assetTypes] },
             });
         }
@@ -330,6 +345,12 @@ async function executeTeamSetup(ctx: RequestContext, allData: StepData): Promise
                 entityType: 'Task',
                 entityId: ctx.tenantId,
                 details: `Onboarding created ${created} starter tasks (${skipped} already existed)`,
+                detailsJson: {
+                    category: 'custom',
+                    event: 'onboarding_tasks_created',
+                    created,
+                    skipped,
+                },
                 metadata: { created, skipped },
             });
         }

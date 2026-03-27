@@ -50,6 +50,13 @@ export async function restoreEntity(
             entityType: model,
             entityId: id,
             details: `${model} restored from soft-delete`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: model,
+                operation: 'restored',
+                before: { deletedAt: record.deletedAt.toISOString() },
+                summary: `${model} restored from soft-delete`,
+            },
             metadata: { previousDeletedAt: record.deletedAt },
         });
 
@@ -94,6 +101,12 @@ export async function purgeEntity(
             entityType: model,
             entityId: id,
             details: `${model} permanently purged`,
+            detailsJson: {
+                category: 'data_lifecycle',
+                operation: 'purged',
+                model,
+                reason: 'Manual purge via admin action',
+            },
         });
 
         return { success: true, purged: true };

@@ -123,16 +123,45 @@ test.describe('Policy Center', () => {
 
     test('activity feed tab loads', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await gotoAndVerify(page, `/t/${tenantSlug}/policies`, 'h1');
-        await page.click(`text=${createdPolicyTitle}`);
-        await page.waitForSelector('#policy-title', { timeout: 10000 });
 
-        await page.click('text=Activity');
+        // Create a policy inline so this test is self-sufficient when run alone
+        if (!createdPolicyTitle) {
+            createdPolicyTitle = `E2E Activity Policy ${Date.now().toString(36)}`;
+            await gotoAndVerify(page, `/t/${tenantSlug}/policies/new`, '#policy-title-input');
+            await page.fill('#policy-title-input', createdPolicyTitle);
+            await page.fill('#policy-content-input', '# Activity Test Policy\n\nCreated for activity feed test.');
+            await page.click('#create-policy-btn');
+            await page.waitForURL('**/policies/**', { timeout: 10000 });
+            await page.waitForSelector('#policy-title', { timeout: 15000 });
+        } else {
+            await gotoAndVerify(page, `/t/${tenantSlug}/policies`, 'h1');
+            await page.click(`text=${createdPolicyTitle}`);
+            await page.waitForSelector('#policy-title', { timeout: 10000 });
+        }
+
+        await page.click('#tab-activity');
         await page.waitForLoadState('networkidle');
-        // Wait for either the activity feed or empty state
-        await page.waitForSelector('#activity-feed', { timeout: 15000 });
-        // Should show some events (at least POLICY_CREATED)
-        await expect(page.locator('#activity-feed')).toContainText('CREATED');
+
+        // The activity API route may need JIT compilation on first visit (dev server),
+        // so give it extra time. Retry once if the element doesn't appear.
+        let feedVisible = false;
+        for (let attempt = 0; attempt < 2 && !feedVisible; attempt++) {
+            try {
+                await page.waitForSelector('#activity-feed', { timeout: 30000 });
+                feedVisible = true;
+            } catch {
+                // Retry: reload and re-click the Activity tab
+                await page.reload({ waitUntil: 'networkidle' });
+                await page.waitForSelector('#policy-title', { timeout: 15000 });
+                await page.click('#tab-activity');
+                await page.waitForLoadState('networkidle');
+            }
+        }
+
+        // Should show the activity feed (CREATED event or empty state)
+        await expect(page.locator('#activity-feed')).toBeVisible({ timeout: 10000 });
+        // The POLICY_CREATED event action is rendered as "CREATED" in the UI
+        await expect(page.locator('#activity-feed')).toContainText('CREATED', { timeout: 10000 });
     });
 
     test('policy detail shows role-gated action buttons', async ({ page }) => {

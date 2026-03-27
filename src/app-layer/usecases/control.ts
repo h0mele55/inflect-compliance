@@ -82,6 +82,7 @@ export async function createControl(ctx: RequestContext, data: {
             entityType: 'Control',
             entityId: control.id,
             details: `Created control: ${control.code || control.name}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'created', after: { code: control.code, name: control.name }, summary: `Created control: ${control.code || control.name}` },
         });
 
         return control;
@@ -123,6 +124,7 @@ export async function updateControl(ctx: RequestContext, id: string, data: {
             entityType: 'Control',
             entityId: id,
             details: JSON.stringify(data),
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'updated', changedFields: Object.keys(data).filter(k => data[k as keyof typeof data] !== undefined), summary: 'Control updated' },
         });
 
         return control;
@@ -147,6 +149,7 @@ export async function setControlStatus(ctx: RequestContext, id: string, status: 
             entityType: 'Control',
             entityId: id,
             details: `Status changed: ${oldStatus} → ${status}`,
+            detailsJson: { category: 'status_change', entityName: 'Control', fromStatus: oldStatus, toStatus: status },
         });
         return control;
     });
@@ -180,6 +183,7 @@ export async function setControlApplicability(
             entityType: 'Control',
             entityId: controlId,
             details: `Applicability changed: ${oldApplicability} → ${applicability}`,
+            detailsJson: { category: 'status_change', entityName: 'Control', fromStatus: oldApplicability || 'APPLICABLE', toStatus: applicability, reason: justification || undefined },
             metadata: { oldApplicability, newApplicability: applicability, justification },
         });
 
@@ -209,6 +213,7 @@ export async function setControlOwner(ctx: RequestContext, id: string, ownerUser
             entityType: 'Control',
             entityId: id,
             details: `Owner set to: ${ownerUserId || 'none'}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'updated', changedFields: ['ownerUserId'], after: { ownerUserId }, summary: `Owner set to: ${ownerUserId || 'none'}` },
         });
         return control;
     });
@@ -234,6 +239,7 @@ export async function addContributor(ctx: RequestContext, controlId: string, use
             entityType: 'Control',
             entityId: controlId,
             details: `Contributor added: ${userId}`,
+            detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Control', sourceId: controlId, targetEntity: 'User', targetId: userId, relation: 'contributor' },
         });
         return result;
     });
@@ -250,6 +256,7 @@ export async function removeContributor(ctx: RequestContext, controlId: string, 
             entityType: 'Control',
             entityId: controlId,
             details: `Contributor removed: ${userId}`,
+            detailsJson: { category: 'relationship', operation: 'unlinked', sourceEntity: 'Control', sourceId: controlId, targetEntity: 'User', targetId: userId, relation: 'contributor' },
         });
         return { success: true };
     });
@@ -275,6 +282,7 @@ export async function createControlTask(ctx: RequestContext, controlId: string, 
             entityType: 'Control',
             entityId: controlId,
             details: `Task created: ${data.title}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'ControlTask', operation: 'created', after: { title: data.title, controlId }, summary: `Task created: ${data.title}` },
         });
         return task;
     });
@@ -292,6 +300,7 @@ export async function updateControlTask(ctx: RequestContext, taskId: string, dat
             entityType: 'Control',
             entityId: task.controlId,
             details: `Task ${action === 'CONTROL_TASK_COMPLETED' ? 'completed' : 'updated'}: ${task.title}`,
+            detailsJson: data.status ? { category: 'status_change', entityName: 'ControlTask', fromStatus: null, toStatus: data.status } : { category: 'entity_lifecycle', entityName: 'ControlTask', operation: 'updated', changedFields: Object.keys(data), summary: `Task updated: ${task.title}` },
         });
         return task;
     });
@@ -326,6 +335,7 @@ export async function linkEvidence(ctx: RequestContext, controlId: string, data:
             entityType: 'Control',
             entityId: controlId,
             details: `Evidence linked: ${data.kind}${data.url ? ` (${data.url})` : ''}`,
+            detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Control', sourceId: controlId, targetEntity: 'Evidence', targetId: data.fileId || 'url', relation: data.kind },
         });
         return link;
     });
@@ -342,6 +352,7 @@ export async function unlinkEvidence(ctx: RequestContext, controlId: string, lin
             entityType: 'Control',
             entityId: controlId,
             details: `Evidence link removed: ${linkId}`,
+            detailsJson: { category: 'relationship', operation: 'unlinked', sourceEntity: 'Control', sourceId: controlId, targetEntity: 'EvidenceLink', targetId: linkId },
         });
         return { success: true };
     });
@@ -447,6 +458,7 @@ export async function installControlsFromTemplate(ctx: RequestContext, templateI
                 entityType: 'Control',
                 entityId: control.id,
                 details: `Installed control from template: ${template.code} — ${template.title}`,
+                detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'created', after: { code: template.code, name: template.title, templateId, tasksCreated, requirementsLinked }, summary: `Installed from template: ${template.code}` },
                 metadata: { templateId, tasksCreated, requirementsLinked },
             });
 
@@ -539,6 +551,7 @@ export async function markControlTestCompleted(ctx: RequestContext, controlId: s
             entityType: 'Control',
             entityId: controlId,
             details: `Test completed. Next due: ${nextDue ? nextDue.toISOString().slice(0, 10) : 'N/A (ad hoc)'}`,
+            detailsJson: { category: 'custom', event: 'test_completed', lastTested: now.toISOString(), nextDueAt: nextDue?.toISOString() ?? null },
             metadata: { lastTested: now.toISOString(), nextDueAt: nextDue?.toISOString() ?? null },
         });
 
@@ -709,6 +722,7 @@ export async function deleteControl(ctx: RequestContext, id: string) {
             entityType: 'Control',
             entityId: id,
             details: `Control soft-deleted: ${control.code || control.name}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'deleted', summary: `Control soft-deleted: ${control.code || control.name}` },
         });
         return { success: true };
     });

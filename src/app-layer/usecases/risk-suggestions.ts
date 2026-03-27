@@ -113,6 +113,7 @@ export async function generateRiskSuggestions(
                 entityType: 'RiskSuggestionSession',
                 entityId: session.id,
                 details: `AI generation FAILED: ${err instanceof Error ? err.message : 'Unknown error'}`,
+                detailsJson: { category: 'entity_lifecycle', entityName: 'RiskSuggestionSession', operation: 'created', summary: 'AI_RISK_SUGGESTIONS_GENERATED' },
                 metadata: {
                     success: false,
                     provider: provider.providerName,
@@ -170,6 +171,7 @@ export async function generateRiskSuggestions(
             entityType: 'RiskSuggestionSession',
             entityId: session.id,
             details: `Generated ${items.length} risk suggestions using ${output.provider}/${output.modelName}. ${output.isFallback ? 'FALLBACK mode (baseline templates).' : 'AI model used.'}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'RiskSuggestionSession', operation: 'created', summary: 'AI_RISK_SUGGESTIONS_GENERATED' },
             metadata: {
                 success: true,
                 provider: output.provider,
@@ -299,6 +301,7 @@ export async function applySession(ctx: RequestContext, sessionId: string, input
             entityType: 'RiskSuggestionSession',
             entityId: session.id,
             details: `Applied ${createdRisks.length} risk suggestions, rejected ${session.items.length - createdRisks.length}`,
+            detailsJson: { category: 'custom', event: 'ai_risk_suggestions_applied' },
             metadata: {
                 acceptedCount: createdRisks.length,
                 rejectedCount: session.items.length - createdRisks.length,
@@ -339,6 +342,7 @@ export async function dismissSession(ctx: RequestContext, sessionId: string) {
             entityType: 'RiskSuggestionSession',
             entityId: session.id,
             details: `Risk suggestion session dismissed. Provider: ${session.provider}, items: ${session.modelName ?? 'unknown'}`,
+            detailsJson: { category: 'custom', event: 'ai_risk_suggestions_dismissed' },
             metadata: {
                 sessionProvider: session.provider,
                 sessionModel: session.modelName,

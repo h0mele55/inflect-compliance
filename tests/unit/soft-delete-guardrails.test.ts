@@ -11,7 +11,11 @@ const SRC_DIR = path.join(__dirname, '..', '..', 'src');
 const PRISMA_FILE = path.join(__dirname, '..', '..', 'src', 'lib', 'prisma.ts');
 const SOFT_DELETE_FILE = path.join(__dirname, '..', '..', 'src', 'lib', 'soft-delete.ts');
 
-const SOFT_DELETE_MODELS = ['Asset', 'Risk', 'Control', 'Evidence', 'Policy'];
+const SOFT_DELETE_MODELS = [
+    'Asset', 'Risk', 'Control', 'Evidence', 'Policy',
+    'Vendor', 'FileRecord', 'Task', 'Finding',
+    'Audit', 'AuditCycle', 'AuditPack',
+];
 
 /** Recursively collect .ts/.tsx files from a directory */
 function collectFiles(dir: string, extensions = ['.ts', '.tsx']): string[] {
@@ -79,6 +83,8 @@ describe('Soft-Delete CI Guardrails', () => {
         const APPROVED_RAW_DELETE_FILES = new Set([
             'soft-delete-operations.ts', // purgeEntity uses raw DELETE
             'retention-purge.ts',         // purgeSoftDeletedOlderThan uses raw DELETE
+            'data-lifecycle.ts',          // purgeSoftDeletedOlderThan + purgeExpiredEvidence use raw DELETE
+            'soft-delete-lifecycle.ts',   // purgeSoftDeleted uses raw DELETE
         ]);
 
         const violations: string[] = [];
@@ -112,12 +118,12 @@ describe('Soft-Delete CI Guardrails', () => {
         expect(softDeleteIdx).toBeLessThan(auditIdx);
     });
 
-    test('SOFT_DELETE_MODELS allowlist has exactly 5 models', () => {
+    test('SOFT_DELETE_MODELS allowlist has exactly 12 models', () => {
         const content = fs.readFileSync(SOFT_DELETE_FILE, 'utf-8');
         // Count the models in the Set
-        const modelMatches = content.match(/'(Asset|Risk|Control|Evidence|Policy)'/g);
+        const modelMatches = content.match(/'(Asset|Risk|Control|Evidence|Policy|Vendor|FileRecord|Task|Finding|Audit|AuditCycle|AuditPack)'/g);
         expect(modelMatches).not.toBeNull();
-        expect(new Set(modelMatches).size).toBe(5);
+        expect(new Set(modelMatches).size).toBe(12);
     });
 
     test('withDeleted helper is exported from soft-delete.ts', () => {

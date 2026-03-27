@@ -81,6 +81,7 @@ export async function createRisk(ctx: RequestContext, data: {
             entityType: 'Risk',
             entityId: risk.id,
             details: `Created risk: ${risk.title} (score: ${inherentScore})`,
+            detailsJson: { category: 'custom', event: 'create' },
         });
 
         return risk;
@@ -138,6 +139,7 @@ export async function createRiskFromTemplate(ctx: RequestContext, templateId: st
             entityType: 'Risk',
             entityId: risk.id,
             details: `Created risk from template: ${risk.title} (score: ${score})`,
+            detailsJson: { category: 'custom', event: 'create' },
         });
 
         return risk;
@@ -197,6 +199,7 @@ export async function updateRisk(ctx: RequestContext, id: string, data: {
             entityType: 'Risk',
             entityId: id,
             details: JSON.stringify(data),
+            detailsJson: { category: 'custom', event: 'update' },
         });
 
         return risk;
@@ -215,6 +218,7 @@ export async function deleteRisk(ctx: RequestContext, id: string) {
             entityType: 'Risk',
             entityId: id,
             details: 'Risk soft-deleted',
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Risk', operation: 'deleted', summary: 'SOFT_DELETE' },
         });
 
         return { success: true };
@@ -253,6 +257,7 @@ export async function linkControlToRisk(ctx: RequestContext, riskId: string, con
             entityType: 'RiskControl',
             entityId: rc.id,
             details: `Mapped control ${controlId} to risk ${riskId}`,
+            detailsJson: { category: 'custom', event: 'create' },
         });
 
         return rc;

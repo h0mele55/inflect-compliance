@@ -73,6 +73,7 @@ export async function linkEvidenceWithHash(
             entityType: 'ControlTestEvidenceLink',
             entityId: link.id,
             details: JSON.stringify({
+            detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'ControlTestEvidenceLink' },
                 testRunId: runId,
                 kind: input.kind,
                 sha256Hash,
@@ -282,6 +283,7 @@ export async function snapshotTestRun(ctx: RequestContext, runId: string, packId
             entityType: 'AuditPackItem',
             entityId: item.id,
             details: JSON.stringify({ runId, packId, result: run.result }),
+            detailsJson: { category: 'custom', event: 'test_run_snapshot_added_to_pack' },
         });
 
         return item;

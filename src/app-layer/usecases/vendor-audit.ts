@@ -31,6 +31,7 @@ export async function createEvidenceBundle(ctx: RequestContext, vendorId: string
             entityType: 'Vendor',
             entityId: vendorId,
             details: `Evidence bundle "${input.name}" created`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'VendorEvidenceBundle', operation: 'created', after: { name: input.name, vendorId }, summary: `Evidence bundle "${input.name}" created` },
             metadata: { bundleId: bundle.id },
         });
         return bundle;
@@ -102,6 +103,7 @@ export async function freezeBundle(ctx: RequestContext, bundleId: string) {
             entityType: 'Vendor',
             entityId: bundle.vendorId,
             details: `Evidence bundle "${bundle.name}" frozen with ${bundle.items.length} items`,
+            detailsJson: { category: 'status_change', entityName: 'VendorEvidenceBundle', fromStatus: 'DRAFT', toStatus: 'FROZEN', reason: `Frozen with ${bundle.items.length} items` },
             metadata: { bundleId, itemCount: bundle.items.length },
         });
 
@@ -157,6 +159,7 @@ export async function addSubprocessor(ctx: RequestContext, vendorId: string, inp
             entityType: 'Vendor',
             entityId: vendorId,
             details: `Subprocessor "${sub.name}" added`,
+            detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Vendor', sourceId: vendorId, targetEntity: 'Vendor', targetId: sub.id, relation: 'subprocessor' },
             metadata: { relationId: rel.id, subprocessorId: sub.id },
         });
         return rel;
@@ -174,6 +177,7 @@ export async function removeSubprocessor(ctx: RequestContext, relationId: string
             entityType: 'Vendor',
             entityId: rel.primaryVendorId,
             details: 'Subprocessor relationship removed',
+            detailsJson: { category: 'relationship', operation: 'unlinked', sourceEntity: 'Vendor', sourceId: rel.primaryVendorId, targetEntity: 'Vendor', targetId: rel.subprocessorVendorId, relation: 'subprocessor' },
             metadata: { relationId },
         });
         return { deleted: true };

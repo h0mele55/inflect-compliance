@@ -191,6 +191,7 @@ export async function installPack(ctx: RequestContext, packKey: string) {
             entityType: 'Framework',
             entityId: pack.frameworkId,
             details: `Pack "${pack.name}" installed: ${controlsCreated} controls, ${tasksCreated} tasks, ${mappingsCreated} mappings`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'FrameworkPack', operation: 'created', after: { packKey, controlsCreated, tasksCreated, mappingsCreated }, summary: `Pack "${pack.name}" installed` },
             metadata: { packKey, controlsCreated, tasksCreated, mappingsCreated },
         });
 
@@ -422,6 +423,7 @@ export async function installSingleTemplate(ctx: RequestContext, templateCode: s
             entityType: 'Control',
             entityId: control.id,
             details: `Template "${tmpl.code}" installed: 1 control, ${tasksCreated} tasks, ${mappingsCreated} mappings`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'created', summary: 'TEMPLATE_INSTALLED' },
             metadata: { templateCode: tmpl.code, tasksCreated, mappingsCreated },
         });
 
@@ -487,6 +489,7 @@ export async function bulkMapControls(
             entityType: 'Framework',
             entityId: fw.id,
             details: `Bulk mapped ${created} new + ${existing} existing control↔requirement links`,
+            detailsJson: { category: 'custom', event: 'bulk_requirements_mapped' },
             metadata: { frameworkKey, created, existing },
         });
 
@@ -578,6 +581,7 @@ export async function bulkInstallTemplates(
             entityType: 'ControlTemplate',
             entityId: 'bulk',
             details: `Bulk installed ${controlsCreated} controls, ${tasksCreated} tasks, ${mappingsCreated} mappings (${skipped} skipped)`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'ControlTemplate', operation: 'created', summary: 'BULK_TEMPLATES_INSTALLED' },
             metadata: { controlsCreated, tasksCreated, mappingsCreated, skipped },
         });
 

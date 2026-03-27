@@ -51,6 +51,7 @@ export async function createVendor(ctx: RequestContext, input: {
             entityType: 'Vendor',
             entityId: vendor.id,
             details: `Vendor "${vendor.name}" created`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Vendor', operation: 'created', after: { name: vendor.name, status: vendor.status, criticality: vendor.criticality }, summary: `Vendor "${vendor.name}" created` },
             metadata: { name: vendor.name, status: vendor.status, criticality: vendor.criticality },
         });
         return vendor;
@@ -70,6 +71,7 @@ export async function updateVendor(ctx: RequestContext, vendorId: string, patch:
             entityType: 'Vendor',
             entityId: vendor.id,
             details: `Vendor "${vendor.name}" updated`,
+            detailsJson: action === 'VENDOR_STATUS_CHANGED' ? { category: 'status_change', entityName: 'Vendor', fromStatus: previousStatus, toStatus: patch.status as string } : { category: 'entity_lifecycle', entityName: 'Vendor', operation: 'updated', changedFields: Object.keys(patch), summary: `Vendor "${vendor.name}" updated` },
             metadata: { fields: Object.keys(patch) },
         });
         return vendor;
@@ -100,6 +102,7 @@ export async function addVendorDocument(ctx: RequestContext, vendorId: string, d
             entityType: 'Vendor',
             entityId: vendorId,
             details: `Document "${doc.title || doc.type}" added to vendor`,
+            detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Vendor', sourceId: vendorId, targetEntity: 'VendorDocument', targetId: doc.id, relation: doc.type },
             metadata: { docId: doc.id, type: doc.type },
         });
         return doc;
@@ -116,6 +119,7 @@ export async function removeVendorDocument(ctx: RequestContext, docId: string) {
             entityType: 'Vendor',
             entityId: doc.vendorId,
             details: `Document "${doc.title || doc.type}" removed`,
+            detailsJson: { category: 'relationship', operation: 'unlinked', sourceEntity: 'Vendor', sourceId: doc.vendorId, targetEntity: 'VendorDocument', targetId: doc.id },
             metadata: { docId: doc.id },
         });
         return doc;
@@ -136,6 +140,13 @@ export async function startVendorAssessment(ctx: RequestContext, vendorId: strin
             entityType: 'Vendor',
             entityId: vendorId,
             details: `Assessment started with template "${template.name}"`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'VendorAssessment',
+                operation: 'created',
+                after: { assessmentId: assessment.id, templateKey, templateName: template.name },
+                summary: `Assessment started with template "${template.name}"`,
+            },
             metadata: { assessmentId: assessment.id, templateKey },
         });
         return assessment;
@@ -189,6 +200,7 @@ export async function saveAssessmentAnswers(ctx: RequestContext, assessmentId: s
             entityType: 'Vendor',
             entityId: assessment.vendorId,
             details: `Assessment scored: ${score} (${riskRating})`,
+            detailsJson: { category: 'custom', event: 'assessment_scored', assessmentId, score, percentScore, riskRating },
             metadata: { assessmentId, score, percentScore, riskRating },
         });
 
@@ -207,6 +219,7 @@ export async function submitVendorAssessment(ctx: RequestContext, assessmentId: 
             entityType: 'Vendor',
             entityId: assessment.vendorId,
             details: 'Assessment submitted for review',
+            detailsJson: { category: 'status_change', entityName: 'VendorAssessment', fromStatus: 'DRAFT', toStatus: 'IN_REVIEW' },
             metadata: { assessmentId },
         });
         return assessment;
@@ -225,6 +238,7 @@ export async function decideVendorAssessment(ctx: RequestContext, assessmentId: 
             entityType: 'Vendor',
             entityId: assessment.vendorId,
             details: `Assessment ${decision.toLowerCase()}`,
+            detailsJson: { category: 'status_change', entityName: 'VendorAssessment', fromStatus: 'IN_REVIEW', toStatus: decision, reason: notes || undefined },
             metadata: { assessmentId, decision, notes },
         });
         return assessment;
@@ -259,6 +273,7 @@ export async function setVendorReviewDates(ctx: RequestContext, vendorId: string
             entityType: 'Vendor',
             entityId: vendor.id,
             details: 'Vendor review dates updated',
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Vendor', operation: 'updated', changedFields: Object.keys(dates), after: dates, summary: 'Vendor review dates updated' },
             metadata: { nextReviewAt: dates.nextReviewAt, contractRenewalAt: dates.contractRenewalAt },
         });
         return vendor;
@@ -285,6 +300,7 @@ export async function addVendorLink(ctx: RequestContext, vendorId: string, data:
             entityType: 'Vendor',
             entityId: vendorId,
             details: `Linked ${data.entityType} ${data.entityId} as ${data.relation || 'RELATED'}`,
+            detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Vendor', sourceId: vendorId, targetEntity: data.entityType, targetId: data.entityId, relation: data.relation || 'RELATED' },
             metadata: { linkId: link.id, entityType: data.entityType, entityId: data.entityId },
         });
         return link;
@@ -339,6 +355,7 @@ export async function enrichVendor(ctx: RequestContext, vendorId: string) {
                 entityType: 'Vendor',
                 entityId: vendorId,
                 details: `Vendor enriched via ${provider.name}`,
+                detailsJson: { category: 'custom', event: 'vendor_enriched', provider: provider.name, enrichedFields: Object.keys(result).filter(k => (result as Record<string, unknown>)[k]) },
                 metadata: { provider: provider.name, fields: Object.keys(result).filter(k => (result as Record<string, unknown>)[k]) },
             });
 
@@ -439,6 +456,7 @@ export async function updateVendorStatusWithGate(ctx: RequestContext, vendorId: 
             entityType: 'Vendor',
             entityId: vendorId,
             details: `Vendor status changed from ${vendor.status} to ${newStatus}`,
+            detailsJson: { category: 'status_change', entityName: 'Vendor', fromStatus: vendor.status, toStatus: newStatus },
             metadata: { from: vendor.status, to: newStatus },
         });
 

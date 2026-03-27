@@ -104,6 +104,13 @@ export async function runDuePlanning(ctx: RequestContext) {
             entityType: 'ControlTestPlan',
             entityId: 'batch',
             details: JSON.stringify({ checked: duePlans.length, created: created.length, runIds: created }),
+            detailsJson: {
+                category: 'custom',
+                event: 'due_planning_executed',
+                checked: duePlans.length,
+                created: created.length,
+                runIds: created,
+            },
         });
 
         return {

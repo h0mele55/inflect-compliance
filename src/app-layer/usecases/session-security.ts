@@ -75,6 +75,7 @@ export async function revokeUserSessions(
             entityType: 'User',
             entityId: effectiveUserId,
             details: `Sessions revoked. New sessionVersion: ${updated.sessionVersion}`,
+            detailsJson: { category: 'custom', event: 'unknown' },
         });
     } catch { /* audit is best-effort */ }
 
@@ -133,6 +134,7 @@ export async function revokeAllTenantSessions(
             entityType: 'Tenant',
             entityId: ctx.tenantId,
             details: `Revoked sessions for ${result.count} users.`,
+            detailsJson: { category: 'access', operation: 'all_tenant_sessions_revoked', detail: 'ALL_TENANT_SESSIONS_REVOKED' },
         });
     } catch { /* audit is best-effort */ }
 

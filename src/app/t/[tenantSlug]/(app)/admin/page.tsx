@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { RequirePermission } from '@/components/require-permission';
-import { Shield, CreditCard, KeyRound, ShieldCheck } from 'lucide-react';
+import { Shield, CreditCard, KeyRound, ShieldCheck, Users, CloudCog, Plug } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminPage() {
@@ -31,6 +31,14 @@ export default function AdminPage() {
                 <button onClick={() => setTab('templates')} className={`btn ${tab === 'templates' ? 'btn-primary' : 'btn-secondary'}`}>{t('policyTemplates')}</button>
                 <RequirePermission resource="admin" action="manage">
                     <Link
+                        href={tenantHref('/admin/members')}
+                        className="btn btn-secondary"
+                        id="members-pill-btn"
+                    >
+                        <Users className="w-3.5 h-3.5" />
+                        Members &amp; Roles
+                    </Link>
+                    <Link
                         href={tenantHref('/admin/rbac')}
                         className="btn btn-secondary"
                         id="rbac-pill-btn"
@@ -53,6 +61,22 @@ export default function AdminPage() {
                     >
                         <KeyRound className="w-3.5 h-3.5" />
                         SSO &amp; Identity
+                    </Link>
+                    <Link
+                        href={tenantHref('/admin/scim')}
+                        className="btn btn-secondary"
+                        id="scim-pill-btn"
+                    >
+                        <CloudCog className="w-3.5 h-3.5" />
+                        SCIM Provisioning
+                    </Link>
+                    <Link
+                        href={tenantHref('/admin/integrations')}
+                        className="btn btn-secondary"
+                        id="integrations-pill-btn"
+                    >
+                        <Plug className="w-3.5 h-3.5" />
+                        Integrations
                     </Link>
                     <Link
                         href={tenantHref('/admin/security')}

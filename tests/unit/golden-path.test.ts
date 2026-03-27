@@ -2,29 +2,28 @@
  * Golden-path integration test and event writer contract tests.
  *
  * Proves:
- * 1. logEvent always includes requestId in output
- * 2. logEvent enforces tenantId and userId
- * 3. The full golden path: usecase → repo → tenant-scoped row + event
+ * 1. logEvent delegates to appendAuditEntry with correct fields
+ * 2. logEvent enforces tenantId and userId from RequestContext
+ * 3. logEvent sanitizes metadata and includes requestId
+ * 4. logEvent passes detailsJson through to appendAuditEntry
+ * 5. The full golden path: policy check → event emission
  */
 
-import { logEvent, AuditEventPayload } from '@/app-layer/events/audit';
 import type { RequestContext } from '@/app-layer/types';
-import type { PrismaTx } from '@/lib/db-context';
 
-// ─── Mock PrismaTx ───
+// ─── Mock appendAuditEntry BEFORE importing logEvent ───
 
-function createMockDb(): PrismaTx & { _created: any[] } {
-    const created: any[] = [];
-    return {
-        _created: created,
-        auditLog: {
-            create: jest.fn(async ({ data }: any) => {
-                created.push(data);
-                return { id: 'audit-1', ...data };
-            }),
-        },
-    } as any;
-}
+const appendAuditEntryCalls: any[] = [];
+
+jest.mock('@/lib/audit', () => ({
+    appendAuditEntry: jest.fn(async (input: any) => {
+        appendAuditEntryCalls.push(input);
+        return { id: 'audit-1', entryHash: 'hash-abc', previousHash: null };
+    }),
+}));
+
+// Import AFTER mock is set up
+import { logEvent } from '@/app-layer/events/audit';
 
 function createCtx(overrides: Partial<RequestContext> = {}): RequestContext {
     return {
@@ -44,92 +43,114 @@ function createCtx(overrides: Partial<RequestContext> = {}): RequestContext {
     };
 }
 
+beforeEach(() => {
+    appendAuditEntryCalls.length = 0;
+});
+
 describe('Central Event Writer Contract', () => {
     it('logEvent always includes requestId in output', async () => {
-        const db = createMockDb();
         const ctx = createCtx({ requestId: 'req-abc-456' });
 
-        await logEvent(db, ctx, {
+        await logEvent({} as any, ctx, {
             action: 'TEST_ACTION',
             entityType: 'TestEntity',
             entityId: 'entity-1',
             details: 'Test event',
         });
 
-        expect(db._created).toHaveLength(1);
-        const logged = db._created[0];
-        // requestId must appear in the details field (our event writer embeds it)
+        expect(appendAuditEntryCalls).toHaveLength(1);
+        const logged = appendAuditEntryCalls[0];
+        // requestId is passed directly to appendAuditEntry
+        expect(logged.requestId).toBe('req-abc-456');
+        // Also embedded in combined details text
         expect(logged.details).toContain('req-abc-456');
         expect(logged.details).toContain('requestId');
     });
 
     it('logEvent enforces tenantId from ctx', async () => {
-        const db = createMockDb();
         const ctx = createCtx({ tenantId: 'tenant-specific-id' });
 
-        await logEvent(db, ctx, {
+        await logEvent({} as any, ctx, {
             action: 'TEST_ACTION',
             entityType: 'TestEntity',
             entityId: 'entity-1',
         });
 
-        const logged = db._created[0];
+        const logged = appendAuditEntryCalls[0];
         expect(logged.tenantId).toBe('tenant-specific-id');
     });
 
     it('logEvent enforces userId from ctx', async () => {
-        const db = createMockDb();
         const ctx = createCtx({ userId: 'user-specific-id' });
 
-        await logEvent(db, ctx, {
+        await logEvent({} as any, ctx, {
             action: 'TEST_ACTION',
             entityType: 'TestEntity',
             entityId: 'entity-1',
         });
 
-        const logged = db._created[0];
+        const logged = appendAuditEntryCalls[0];
         expect(logged.userId).toBe('user-specific-id');
     });
 
     it('logEvent includes safe metadata without leaking secrets', async () => {
-        const db = createMockDb();
         const ctx = createCtx();
 
-        await logEvent(db, ctx, {
+        await logEvent({} as any, ctx, {
             action: 'TEST_ACTION',
             entityType: 'TestEntity',
             entityId: 'entity-1',
             metadata: { key: 'value', nested: { deep: true } },
         });
 
-        const logged = db._created[0];
+        const logged = appendAuditEntryCalls[0];
         expect(logged.details).toContain('key');
         expect(logged.details).toContain('value');
+        // metadataJson should contain the sanitized metadata
+        expect(logged.metadataJson).toEqual({ key: 'value', nested: { deep: true } });
     });
 
     it('logEvent works without optional fields', async () => {
-        const db = createMockDb();
         const ctx = createCtx();
 
-        await logEvent(db, ctx, {
+        await logEvent({} as any, ctx, {
             action: 'MINIMAL_ACTION',
             entityType: 'TestEntity',
             entityId: 'entity-1',
         });
 
-        const logged = db._created[0];
+        const logged = appendAuditEntryCalls[0];
         expect(logged.action).toBe('MINIMAL_ACTION');
         expect(logged.entity).toBe('TestEntity');
         expect(logged.entityId).toBe('entity-1');
         expect(logged.tenantId).toBe('tenant-test-1');
         expect(logged.userId).toBe('user-test-1');
     });
+
+    it('logEvent passes detailsJson through to appendAuditEntry', async () => {
+        const ctx = createCtx();
+        const detailsJson = {
+            category: 'entity_lifecycle',
+            entityName: 'Control',
+            operation: 'created',
+            summary: 'Test control created',
+        };
+
+        await logEvent({} as any, ctx, {
+            action: 'CONTROL_CREATED',
+            entityType: 'Control',
+            entityId: 'ctrl-1',
+            details: 'Created control',
+            detailsJson,
+        });
+
+        const logged = appendAuditEntryCalls[0];
+        expect(logged.detailsJson).toEqual(detailsJson);
+    });
 });
 
 describe('Golden Path: Usecase → Repo → Event', () => {
     it('a usecase should enforce policy, write tenant-scoped data, and emit event', async () => {
-        // This test simulates the full golden path without a real DB
-        const db = createMockDb();
         const ctx = createCtx({ role: 'EDITOR', permissions: { canRead: true, canWrite: true, canAdmin: false, canAudit: false, canExport: true } });
 
         // Simulate: policy check (assertCanWrite passes for EDITOR)
@@ -137,7 +158,7 @@ describe('Golden Path: Usecase → Repo → Event', () => {
         expect(() => assertCanWrite(ctx)).not.toThrow();
 
         // Simulate: event emission
-        await logEvent(db, ctx, {
+        await logEvent({} as any, ctx, {
             action: 'GOLDEN_PATH_TEST',
             entityType: 'TestEntity',
             entityId: 'golden-1',
@@ -145,8 +166,8 @@ describe('Golden Path: Usecase → Repo → Event', () => {
         });
 
         // Verify: event was written with correct tenant and request correlation
-        expect(db._created).toHaveLength(1);
-        const event = db._created[0];
+        expect(appendAuditEntryCalls).toHaveLength(1);
+        const event = appendAuditEntryCalls[0];
         expect(event.tenantId).toBe(ctx.tenantId);
         expect(event.userId).toBe(ctx.userId);
         expect(event.details).toContain(ctx.requestId);

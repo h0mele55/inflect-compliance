@@ -49,6 +49,7 @@ export async function createIssue(ctx: RequestContext, input: {
             entityType: 'Issue',
             entityId: issue.id,
             details: `Created issue: ${issue.title}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Issue', operation: 'created', summary: 'ISSUE_CREATED' },
             metadata: { type: input.type, severity: input.severity, priority: input.priority },
         });
         return issue;
@@ -73,6 +74,7 @@ export async function updateIssue(ctx: RequestContext, issueId: string, patch: {
             entityType: 'Issue',
             entityId: issueId,
             details: `Updated issue fields`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Issue', operation: 'updated', summary: 'ISSUE_UPDATED' },
             metadata: patch,
         });
         return issue;
@@ -91,6 +93,7 @@ export async function setIssueStatus(ctx: RequestContext, issueId: string, statu
             entityType: 'Issue',
             entityId: issueId,
             details: `Status changed to ${status}`,
+            detailsJson: { category: 'status_change', entityName: 'Issue', fromStatus: null, toStatus: 'ISSUE_STATUS_CHANGED' },
             metadata: { status, resolution },
         });
         return issue;
@@ -109,6 +112,7 @@ export async function assignIssue(ctx: RequestContext, issueId: string, assignee
             entityType: 'Issue',
             entityId: issueId,
             details: assigneeUserId ? `Assigned to ${assigneeUserId}` : 'Unassigned',
+            detailsJson: { category: 'custom', event: 'issue_assigned' },
             metadata: { assigneeUserId },
         });
         return issue;
@@ -131,6 +135,7 @@ export async function addIssueLink(ctx: RequestContext, issueId: string, entityT
             entityType: 'Issue',
             entityId: issueId,
             details: `Linked to ${entityType} ${entityId}`,
+            detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Issue' },
             metadata: { entityType, entityId, relation },
         });
         return link;
@@ -147,6 +152,7 @@ export async function removeIssueLink(ctx: RequestContext, linkId: string) {
             entityType: 'Issue',
             entityId: linkId,
             details: `Removed issue link`,
+            detailsJson: { category: 'relationship', operation: 'unlinked', sourceEntity: 'Issue' },
         });
         return result;
     });
@@ -168,6 +174,7 @@ export async function addIssueComment(ctx: RequestContext, issueId: string, body
             entityType: 'Issue',
             entityId: issueId,
             details: `Comment added`,
+            detailsJson: { category: 'custom', event: 'issue_comment_added' },
             metadata: { commentId: comment.id },
         });
         return comment;
@@ -231,6 +238,7 @@ export async function bulkAssign(ctx: RequestContext, issueIds: string[], assign
                 entityType: 'Issue',
                 entityId: id,
                 details: assigneeUserId ? `Bulk assigned to ${assigneeUserId}` : 'Bulk unassigned',
+                detailsJson: { category: 'custom', event: 'issue_assigned' },
                 metadata: { assigneeUserId, bulk: true },
             });
         }
@@ -248,6 +256,7 @@ export async function bulkSetStatus(ctx: RequestContext, issueIds: string[], sta
                 entityType: 'Issue',
                 entityId: id,
                 details: `Bulk status changed to ${status}`,
+                detailsJson: { category: 'status_change', entityName: 'Issue', fromStatus: null, toStatus: 'ISSUE_STATUS_CHANGED' },
                 metadata: { status, resolution, bulk: true },
             });
         }
@@ -265,6 +274,7 @@ export async function bulkSetDueDate(ctx: RequestContext, issueIds: string[], du
                 entityType: 'Issue',
                 entityId: id,
                 details: `Bulk due date set to ${dueAt || 'none'}`,
+                detailsJson: { category: 'entity_lifecycle', entityName: 'Issue', operation: 'updated', summary: 'ISSUE_UPDATED' },
                 metadata: { dueAt, bulk: true },
             });
         }
@@ -293,6 +303,7 @@ export async function findOverdueIssuesAndEmitEvents(ctx: RequestContext) {
                 entityType: 'Issue',
                 entityId: issue.id,
                 details: `Issue is overdue (due ${issue.dueAt?.toISOString()})`,
+                detailsJson: { category: 'custom', event: 'issue_overdue' },
                 metadata: { dueAt: issue.dueAt, assigneeUserId: issue.assigneeUserId },
             });
         }
@@ -344,6 +355,7 @@ export async function createBundle(ctx: RequestContext, issueId: string, name: s
             entityType: 'Issue',
             entityId: issueId,
             details: `Evidence bundle "${name}" created`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Issue', operation: 'created', summary: 'BUNDLE_CREATED' },
             metadata: { bundleId: bundle.id, name },
         });
         return bundle;
@@ -360,6 +372,7 @@ export async function freezeBundle(ctx: RequestContext, bundleId: string) {
             entityType: 'Issue',
             entityId: bundle.issueId,
             details: `Evidence bundle "${bundle.name}" frozen — now immutable`,
+            detailsJson: { category: 'status_change', entityName: 'Issue', fromStatus: null, toStatus: 'BUNDLE_FROZEN' },
             metadata: { bundleId: bundle.id },
         });
         return bundle;

@@ -74,6 +74,11 @@ export async function verifyMfaChallenge(
                 entityType: 'User',
                 entityId: userId,
                 details: `MFA challenge failed. ${remaining} attempts remaining.`,
+                detailsJson: {
+                    category: 'access',
+                    operation: 'login',
+                    detail: `MFA challenge failed. ${remaining} attempts remaining.`,
+                },
             });
         } catch { /* audit is best-effort */ }
 
@@ -98,6 +103,11 @@ export async function verifyMfaChallenge(
             entityType: 'User',
             entityId: userId,
             details: 'MFA challenge passed successfully.',
+            detailsJson: {
+                category: 'access',
+                operation: 'login',
+                detail: 'MFA challenge passed successfully.',
+            },
         });
     } catch { /* audit is best-effort */ }
 

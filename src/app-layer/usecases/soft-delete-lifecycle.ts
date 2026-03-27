@@ -14,6 +14,7 @@
  *   - restore is less sensitive but still requires appropriate permissions
  */
 import { SOFT_DELETE_MODELS, withDeleted } from '@/lib/soft-delete';
+import { badRequest, notFound } from '@/lib/errors/types';
 
 
 
@@ -36,7 +37,7 @@ export async function restoreSoftDeleted(
     const { model, id } = input;
 
     if (!SOFT_DELETE_MODELS.has(model)) {
-        throw new Error(`Model "${model}" does not support soft-delete`);
+        throw badRequest(`Model "${model}" does not support soft-delete`);
     }
 
     const delegate = getDelegate(tx, model);
@@ -47,7 +48,7 @@ export async function restoreSoftDeleted(
     }));
 
     if (!existing) {
-        throw new Error(`No soft-deleted ${model} found with id "${id}"`);
+        throw notFound(`No soft-deleted ${model} found with id "${id}"`);
     }
 
     // Clear soft-delete fields
@@ -77,7 +78,7 @@ export async function purgeSoftDeleted(
     const { model, id } = input;
 
     if (!SOFT_DELETE_MODELS.has(model)) {
-        throw new Error(`Model "${model}" does not support soft-delete`);
+        throw badRequest(`Model "${model}" does not support soft-delete`);
     }
 
     const delegate = getDelegate(tx, model);
@@ -88,7 +89,7 @@ export async function purgeSoftDeleted(
     }));
 
     if (!existing) {
-        throw new Error(`No soft-deleted ${model} found with id "${id}". Only soft-deleted records can be purged.`);
+        throw notFound(`No soft-deleted ${model} found with id "${id}". Only soft-deleted records can be purged.`);
     }
 
     // Hard delete via raw SQL to bypass the soft-delete middleware
@@ -113,7 +114,7 @@ export async function listSoftDeleted(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any[]> {
     if (!SOFT_DELETE_MODELS.has(model)) {
-        throw new Error(`Model "${model}" does not support soft-delete`);
+        throw badRequest(`Model "${model}" does not support soft-delete`);
     }
 
     const delegate = getDelegate(tx, model);
@@ -136,7 +137,7 @@ function getDelegate(tx: any, model: string): any {
     const key = model.charAt(0).toLowerCase() + model.slice(1);
     const delegate = tx[key];
     if (!delegate) {
-        throw new Error(`Prisma delegate not found for model "${model}"`);
+        throw badRequest(`Prisma delegate not found for model "${model}"`);
     }
     return delegate;
 }

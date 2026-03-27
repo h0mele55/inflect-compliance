@@ -336,6 +336,7 @@ export default function PolicyDetailPage() {
                 {tabItems.map(t => (
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     <button key={t} onClick={() => setTab(t as any)}
+                        id={`tab-${t}`}
                         className={`px-4 py-2.5 text-sm font-medium transition border-b-2 ${tab === t ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-400 hover:text-slate-200'
                             }`}>{tabLabels[t]}</button>
                 ))}

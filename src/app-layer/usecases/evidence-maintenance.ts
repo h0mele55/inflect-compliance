@@ -34,10 +34,12 @@ export async function reconcileUnlinkedEvidence(
         });
 
         if (unlinked.length > 0) {
-            await db.auditLog.createMany({
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                data: unlinked.map((ev: any) => ({
+            const { appendAuditEntry } = require('@/lib/audit/audit-writer');
+            for (const ev of unlinked) {
+                await appendAuditEntry({
                     tenantId,
+                    userId: null,
+                    actorType: 'JOB',
                     entity: 'Evidence',
                     entityId: ev.id,
                     action: 'EVIDENCE_UNLINKED_WARNING',
@@ -46,8 +48,8 @@ export async function reconcileUnlinkedEvidence(
                         fileName: ev.fileName,
                         unlinkedSince: ev.createdAt,
                     }),
-                })),
-            });
+                });
+            }
         }
 
         return { flagged: unlinked.length, items: unlinked };
@@ -127,16 +129,18 @@ export async function detectBrokenEvidence(tenantId: string) {
         }
 
         if (broken.length > 0) {
-            await db.auditLog.createMany({
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                data: broken.map((b: any) => ({
+            const { appendAuditEntry } = require('@/lib/audit/audit-writer');
+            for (const b of broken) {
+                await appendAuditEntry({
                     tenantId,
+                    userId: null,
+                    actorType: 'JOB',
                     entity: 'Evidence',
                     entityId: b.id,
                     action: 'EVIDENCE_BROKEN_DETECTED',
                     details: JSON.stringify({ title: b.title, reason: b.reason }),
-                })),
-            });
+                });
+            }
         }
 
         return { broken: broken.length, items: broken };

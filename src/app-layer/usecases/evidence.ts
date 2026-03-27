@@ -87,6 +87,13 @@ export async function createEvidence(ctx: RequestContext, data: {
             entityType: 'Evidence',
             entityId: evidence.id,
             details: `Created evidence: ${evidence.title}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Evidence',
+                operation: 'created',
+                after: { title: evidence.title, type: data.type },
+                summary: `Created evidence: ${evidence.title}`,
+            },
         });
 
         return evidence;
@@ -120,7 +127,15 @@ export async function updateEvidence(ctx: RequestContext, id: string, data: {
             action: 'UPDATE',
             entityType: 'Evidence',
             entityId: id,
-            details: JSON.stringify(data),
+            details: `Evidence updated`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Evidence',
+                operation: 'updated',
+                changedFields: Object.keys(data).filter(k => data[k as keyof typeof data] !== undefined),
+                after: { title: data.title, category: data.category },
+                summary: 'Evidence updated',
+            },
         });
 
         return evidence;
@@ -171,6 +186,13 @@ export async function reviewEvidence(ctx: RequestContext, id: string, data: { ac
             entityType: 'Evidence',
             entityId: id,
             details: `Evidence ${action}: ${comment || ''}`,
+            detailsJson: {
+                category: 'status_change',
+                entityName: 'Evidence',
+                fromStatus: evidence.status,
+                toStatus: action,
+                reason: comment || undefined,
+            },
         });
 
         return { success: true, status: newStatus };
@@ -195,6 +217,13 @@ export async function deleteEvidence(ctx: RequestContext, id: string) {
             entityType: 'Evidence',
             entityId: id,
             details: `Evidence soft-deleted: ${evidence.title}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Evidence',
+                operation: 'deleted',
+                before: { title: evidence.title },
+                summary: `Evidence soft-deleted: ${evidence.title}`,
+            },
         });
         return { success: true };
     });
@@ -384,15 +413,22 @@ export async function uploadEvidenceFile(
             action: eventAction,
             entityType: 'Evidence',
             entityId: evidence.id,
-            details: JSON.stringify({
-                fileRecordId,
-                originalName,
-                mimeType,
-                sizeBytes: writeResult.sizeBytes,
-                sha256: writeResult.sha256,
-                deduplicated,
-                storageProvider: storage.name,
-            }),
+            details: `File uploaded: ${originalName}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Evidence',
+                operation: 'created',
+                after: {
+                    fileRecordId,
+                    originalName,
+                    mimeType,
+                    sizeBytes: writeResult.sizeBytes,
+                    sha256: writeResult.sha256,
+                    deduplicated,
+                    storageProvider: storage.name,
+                },
+                summary: `File uploaded: ${originalName}`,
+            },
         });
 
         return {
@@ -475,12 +511,13 @@ export async function downloadEvidenceFile(ctx: RequestContext, fileId: string) 
             action: 'EVIDENCE_DOWNLOADED',
             entityType: 'FileRecord',
             entityId: fileId,
-            details: JSON.stringify({
-                originalName: fileRecord.originalName,
-                role: ctx.role,
-                controlLinked: !!evidence?.controlId,
-                storageProvider: fileRecord.storageProvider || 'local',
-            }),
+            details: `Evidence file downloaded: ${fileRecord.originalName}`,
+            detailsJson: {
+                category: 'access',
+                operation: 'login',
+                detail: `Evidence downloaded: ${fileRecord.originalName}`,
+                targetUserId: ctx.userId,
+            },
         });
 
         // ─── Dual-read: dispatch by record's storage provider ───

@@ -14,6 +14,13 @@ enum Role {
   AUDITOR
 }
 
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  DEACTIVATED
+  REMOVED
+}
+
 enum ClauseStatus {
   NOT_STARTED
   IN_PROGRESS
@@ -444,6 +451,11 @@ model Tenant {
   identityLinks          UserIdentityLink[]
   securitySettings       TenantSecuritySettings?
   mfaEnrollments         UserMfaEnrollment[]
+  invites                TenantInvite[]
+  scimTokens             TenantScimToken[]
+  integrationConnections IntegrationConnection[]
+  integrationExecutions  IntegrationExecution[]
+  integrationWebhookEvents IntegrationWebhookEvent[]
 }
 
 // ─── Tenant Onboarding Wizard ───
@@ -466,17 +478,23 @@ model TenantOnboarding {
 // ─── Tenant Membership (user <-> tenant join with role) ───
 
 model TenantMembership {
-  id        String   @id @default(cuid())
-  tenantId  String
-  userId    String
-  role      Role     @default(READER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String           @id @default(cuid())
+  tenantId        String
+  userId          String
+  role            Role             @default(READER)
+  status          MembershipStatus @default(ACTIVE)
+  invitedByUserId String?
+  invitedAt       DateTime?
+  deactivatedAt   DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  user   User   @relation(fields: [userId], references: [id])
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  user      User   @relation(fields: [userId], references: [id])
+  invitedBy User?  @relation("MembershipInviter", fields: [invitedByUserId], references: [id])
 
   @@unique([tenantId, userId])
+  @@index([tenantId, status])
 }
 
 model User {
@@ -540,6 +558,8 @@ model User {
   riskSuggestionSessions          RiskSuggestionSession[]    @relation("SuggestionSessionCreator")
   identityLinks                   UserIdentityLink[]
   mfaEnrollments                  UserMfaEnrollment[]
+  invitedMemberships              TenantMembership[]        @relation("MembershipInviter")
+  invitesSent                     TenantInvite[]
 }
 
 // ─── Auth.js Models ───
@@ -906,6 +926,7 @@ model Control {
   requirementLinks       ControlRequirementLink[]
   testPlans              ControlTestPlan[]
   testRuns               ControlTestRun[]
+  integrationExecutions  IntegrationExecution[]
 
   @@index([tenantId, code])
   @@index([tenantId])
@@ -1177,14 +1198,19 @@ model AuditLog {
   id           String   @id @default(cuid())
   tenantId     String
   userId       String?
+  actorType    String   @default("USER") // USER | SYSTEM | JOB
   entity       String // e.g., "Asset", "Risk", "Control"
   entityId     String
   action       String // "CREATE", "UPDATE", "DELETE", "STATUS_CHANGE", "UPSERT", etc.
-  details      String?  @db.Text
+  details      String?  @db.Text          // Legacy free-form text (retained for backward compat)
+  detailsJson  Json?                      // Structured canonical payload (replaces details)
   requestId    String?  // Correlation ID from request context
   recordIds    Json?    // For *Many operations: array of affected IDs or count metadata
   metadataJson Json?    // Structured context: { model, action, source, ... }
   diffJson     Json?    // For updates: { changedFields, before?, after? }
+  previousHash String?                    // SHA-256 hex of previous entry's entryHash (per-tenant chain)
+  entryHash    String?                    // SHA-256 hex of this entry's canonical form
+  version      Int      @default(1)       // Schema version for forward-compat hashing
   createdAt    DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -1194,6 +1220,7 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([tenantId, entity])
   @@index([tenantId, action])
+  @@index([tenantId, entryHash])
 }
 
 // ─── Notifications ───
@@ -2262,4 +2289,126 @@ model UserMfaEnrollment {
   @@unique([userId, tenantId, type])
   @@index([userId])
   @@index([tenantId])
+}
+
+// ─── Tenant Invitations ───
+
+model TenantInvite {
+  id          String    @id @default(cuid())
+  tenantId    String
+  email       String
+  role        Role      @default(READER)
+  token       String    @unique  // URL-safe random token
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  invitedBy User   @relation(fields: [invitedById], references: [id])
+
+  @@unique([tenantId, email])
+  @@index([token])
+  @@index([tenantId])
+}
+
+// ─── SCIM Provisioning Tokens ───
+
+model TenantScimToken {
+  id          String    @id @default(cuid())
+  tenantId    String
+  label       String    // Human-readable label: "Okta SCIM", "Azure AD Provisioning"
+  tokenHash   String    @unique  // SHA-256 hash of the bearer token
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+// ─── Integration Framework ───
+
+enum IntegrationExecutionStatus {
+  PENDING
+  RUNNING
+  PASSED
+  FAILED
+  ERROR
+}
+
+model IntegrationConnection {
+  id               String   @id @default(cuid())
+  tenantId         String
+  provider         String   // e.g. "github", "aws", "azure"
+  name             String   // Human-readable: "Acme GitHub Org"
+  isEnabled        Boolean  @default(true)
+  configJson       Json     @default("{}")
+  secretEncrypted  String?  @db.Text  // AES-256-GCM encrypted credentials
+  lastTestedAt     DateTime?
+  lastTestStatus   String?  // "ok" | "error" | null
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  executions IntegrationExecution[]
+
+  @@unique([tenantId, provider, name])
+  @@index([tenantId])
+  @@index([tenantId, provider])
+}
+
+model IntegrationExecution {
+  id               String                     @id @default(cuid())
+  tenantId         String
+  connectionId     String?
+  provider         String                     // e.g. "github"
+  automationKey    String                     // e.g. "github.branch_protection"
+  controlId        String?
+  status           IntegrationExecutionStatus @default(PENDING)
+  resultJson       Json?                      // provider-specific result payload
+  evidenceId       String?                    // if evidence was auto-created
+  errorMessage     String?    @db.Text
+  durationMs       Int?
+  triggeredBy      String     @default("scheduled") // "scheduled" | "manual" | "webhook"
+  jobRunId         String?                    // correlates cron batch runs
+  executedAt       DateTime   @default(now())
+  completedAt      DateTime?
+  createdAt        DateTime   @default(now())
+
+  tenant     Tenant                @relation(fields: [tenantId], references: [id])
+  connection IntegrationConnection? @relation(fields: [connectionId], references: [id])
+  control    Control?              @relation(fields: [controlId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, automationKey])
+  @@index([tenantId, controlId])
+  @@index([tenantId, status])
+  @@index([jobRunId])
+}
+
+model IntegrationWebhookEvent {
+  id            String    @id @default(cuid())
+  tenantId      String?
+  provider      String    // e.g. "github"
+  eventType     String?   // e.g. "push", "branch_protection_rule"
+  payloadJson   Json      // raw webhook body
+  headersJson   Json?     // selected headers for verification replay
+  payloadHash   String?   // SHA-256 of raw body for replay deduplication
+  status        String    @default("received") // "received" | "processed" | "ignored" | "error"
+  errorMessage  String?   @db.Text
+  processedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  receivedAt    DateTime  @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([provider, receivedAt])
+  @@index([provider, payloadHash, createdAt]) // dedup lookup
+  @@index([status])
 }

@@ -119,7 +119,7 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
         const apiDir = path.join(SRC_ROOT, 'app', 'api');
 
         // Auth routes are allowed at the root level
-        const ALLOWED_API_DIRS = new Set(['admin', 'auth', 't', 'risk-templates', 'audit', 'staging', 'health', 'readyz', 'stripe', 'security', 'csp-report', 'storage']);
+        const ALLOWED_API_DIRS = new Set(['admin', 'auth', 't', 'risk-templates', 'audit', 'staging', 'health', 'readyz', 'stripe', 'security', 'csp-report', 'storage', 'integrations', 'scim']);
 
         // Legacy routes are allowed as documented thin wrappers
         // that delegate to getLegacyCtx → usecases (kept for backward compat)

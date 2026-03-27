@@ -202,6 +202,11 @@ export async function completeTestRun(ctx: RequestContext, runId: string, input:
                     entityType: 'ControlTestRun',
                     entityId: runId,
                     details: `Failed to create follow-up task: ${taskErr instanceof Error ? taskErr.message : String(taskErr)}`,
+                    detailsJson: {
+                        category: 'custom',
+                        event: 'task_creation_failed',
+                        error: taskErr instanceof Error ? taskErr.message : String(taskErr),
+                    },
                 });
             }
         }
@@ -243,7 +248,14 @@ export async function retestFromRun(ctx: RequestContext, runId: string) {
             action: 'TEST_RETEST_CREATED',
             entityType: 'ControlTestRun',
             entityId: newRun.id,
-            details: JSON.stringify({ originalRunId: runId, testPlanId: plan.id }),
+            details: `Retest created from run ${runId}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'ControlTestRun',
+                operation: 'created',
+                after: { originalRunId: runId, testPlanId: plan.id },
+                summary: `Retest created from run ${runId}`,
+            },
         });
 
         return newRun;
@@ -380,6 +392,12 @@ export async function createAutomatedTestRun(
                     entityType: 'ControlTestRun',
                     entityId: run.id,
                     details: `Failed to create follow-up task: ${taskErr instanceof Error ? taskErr.message : String(taskErr)}`,
+                    detailsJson: {
+                        category: 'custom',
+                        event: 'task_creation_failed',
+                        error: taskErr instanceof Error ? taskErr.message : String(taskErr),
+                        automated: true,
+                    },
                 });
             }
         }
@@ -394,12 +412,20 @@ export async function createAutomatedTestRun(
             action: 'AUTOMATED_TEST_RUN_CREATED',
             entityType: 'ControlTestRun',
             entityId: run.id,
-            details: JSON.stringify({
-                testPlanId: plan.id,
-                result: input.result,
-                integrationResultId: input.integrationResultId,
-                evidenceCount: input.evidenceLinks?.length || 0,
-            }),
+            details: `Automated test run: ${input.result}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'ControlTestRun',
+                operation: 'created',
+                after: {
+                    testPlanId: plan.id,
+                    result: input.result,
+                    integrationResultId: input.integrationResultId,
+                    evidenceCount: input.evidenceLinks?.length || 0,
+                    automated: true,
+                },
+                summary: `Automated test run: ${input.result}`,
+            },
         });
 
         return completedRun;

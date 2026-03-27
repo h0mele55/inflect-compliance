@@ -80,6 +80,13 @@ export async function createAudit(ctx: RequestContext, data: {
             entityType: 'Audit',
             entityId: audit.id,
             details: `Created audit: ${audit.title}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Audit',
+                operation: 'created',
+                after: { title: audit.title, status: 'PLANNED', generateChecklist: !!data.generateChecklist },
+                summary: `Created audit: ${audit.title}`,
+            },
         });
 
         return audit;
@@ -124,6 +131,13 @@ export async function updateAudit(ctx: RequestContext, id: string, data: {
             entityType: 'Audit',
             entityId: id,
             details: JSON.stringify(data),
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Audit',
+                operation: 'updated',
+                changedFields: Object.keys(data).filter(k => data[k as keyof typeof data] !== undefined),
+                summary: 'Audit updated',
+            },
         });
 
         return audit;

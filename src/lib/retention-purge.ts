@@ -47,18 +47,26 @@ export async function purgeSoftDeletedOlderThan(days: number): Promise<PurgeResu
         totalPurged += result;
     }
 
-    // Log the purge event to AuditLog (system-level, no tenantId)
+    // Log the purge event via hash-chained writer
     if (totalPurged > 0) {
         try {
-            const id = require('crypto').randomUUID().replace(/-/g, '').substring(0, 25);
-            await prisma.$executeRawUnsafe(
-                `INSERT INTO "AuditLog" ("id", "tenantId", "userId", "entity", "entityId", "action", "details", "metadataJson", "createdAt")
-                 SELECT $1, t."id", NULL, 'System', 'retention-purge', 'PURGE_EXECUTED', $2, $3::jsonb, NOW()
-                 FROM "Tenant" t LIMIT 1`,
-                'c' + id,
-                `Retention purge: ${totalPurged} records older than ${days} days`,
-                JSON.stringify({ totalPurged, perModel, cutoffDate: cutoff.toISOString(), days }),
+            // Get first tenant for system-level event
+            const firstTenant: Array<{ id: string }> = await prisma.$queryRawUnsafe(
+                `SELECT "id" FROM "Tenant" LIMIT 1`
             );
+            if (firstTenant.length > 0) {
+                const { appendAuditEntry } = require('./audit/audit-writer');
+                await appendAuditEntry({
+                    tenantId: firstTenant[0].id,
+                    userId: null,
+                    actorType: 'JOB',
+                    entity: 'System',
+                    entityId: 'retention-purge',
+                    action: 'PURGE_EXECUTED',
+                    details: `Retention purge: ${totalPurged} records older than ${days} days`,
+                    metadataJson: { totalPurged, perModel, cutoffDate: cutoff.toISOString(), days },
+                });
+            }
         } catch {
             // Best effort — don't fail the purge if audit log fails
             console.warn('[retention-purge] Failed to write audit log');

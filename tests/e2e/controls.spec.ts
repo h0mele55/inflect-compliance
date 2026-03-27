@@ -53,9 +53,21 @@ test.describe('Controls Center', () => {
 
     test('open control → create task → mark done', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        // Navigate directly to the control detail page
-        await page.goto(controlDetailPath);
-        await page.waitForSelector('#control-title', { timeout: 15000 });
+
+        // Create a control inline so this test is self-sufficient when run alone
+        if (!controlDetailPath) {
+            await page.goto(`/t/${tenantSlug}/controls/new`);
+            await page.waitForSelector('#control-name-input', { timeout: 15000 });
+            const taskUniqueId = Date.now().toString(36);
+            await page.fill('#control-name-input', `Task Test ${taskUniqueId}`);
+            await page.fill('#control-code-input', `TSK-${taskUniqueId}`);
+            await page.click('#create-control-btn');
+            await page.waitForSelector('#control-title', { timeout: 15000 });
+            controlDetailPath = new URL(page.url()).pathname;
+        } else {
+            await page.goto(controlDetailPath);
+            await page.waitForSelector('#control-title', { timeout: 15000 });
+        }
 
         // Go to tasks tab
         await page.click('#tab-tasks');

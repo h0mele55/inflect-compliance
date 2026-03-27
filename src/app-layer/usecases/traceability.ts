@@ -28,7 +28,7 @@ export async function mapControlToRisk(ctx: RequestContext, controlId: string, r
     assertCanManage(ctx);
     return runInTenantContext(ctx, async (db) => {
         const link = await ControlRiskRepository.link(db, ctx.tenantId, controlId, riskId, rationale || null, ctx.userId);
-        await logEvent(db, ctx, { action: 'CONTROL_RISK_LINKED', entityType: 'Control', entityId: controlId, details: `Linked to risk ${riskId}`, metadata: { riskId, rationale } });
+        await logEvent(db, ctx, { action: 'CONTROL_RISK_LINKED', entityType: 'Control', entityId: controlId, details: `Linked to risk ${riskId}`, detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Control', sourceId: controlId, targetEntity: 'Risk', targetId: riskId, relation: 'mitigates' }, metadata: { riskId, rationale } });
         return link;
     });
 }
@@ -37,7 +37,7 @@ export async function unmapControlFromRisk(ctx: RequestContext, controlId: strin
     assertCanManage(ctx);
     return runInTenantContext(ctx, async (db) => {
         await ControlRiskRepository.unlink(db, ctx.tenantId, controlId, riskId);
-        await logEvent(db, ctx, { action: 'CONTROL_RISK_UNLINKED', entityType: 'Control', entityId: controlId, details: `Unlinked from risk ${riskId}`, metadata: { riskId } });
+        await logEvent(db, ctx, { action: 'CONTROL_RISK_UNLINKED', entityType: 'Control', entityId: controlId, details: `Unlinked from risk ${riskId}`, detailsJson: { category: 'relationship', operation: 'unlinked', sourceEntity: 'Control', sourceId: controlId, targetEntity: 'Risk', targetId: riskId, relation: 'mitigates' }, metadata: { riskId } });
     });
 }
 
@@ -57,7 +57,7 @@ export async function mapAssetToControl(ctx: RequestContext, assetId: string, co
     assertCanManage(ctx);
     return runInTenantContext(ctx, async (db) => {
         const link = await AssetControlRepository.link(db, ctx.tenantId, assetId, controlId, coverageType || null, rationale || null, ctx.userId);
-        await logEvent(db, ctx, { action: 'ASSET_CONTROL_LINKED', entityType: 'Asset', entityId: assetId, details: `Linked to control ${controlId}`, metadata: { controlId, coverageType } });
+        await logEvent(db, ctx, { action: 'ASSET_CONTROL_LINKED', entityType: 'Asset', entityId: assetId, details: `Linked to control ${controlId}`, detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Asset', sourceId: assetId, targetEntity: 'Control', targetId: controlId, relation: coverageType || 'FULL' }, metadata: { controlId, coverageType } });
         return link;
     });
 }
@@ -66,7 +66,7 @@ export async function unmapAssetFromControl(ctx: RequestContext, assetId: string
     assertCanManage(ctx);
     return runInTenantContext(ctx, async (db) => {
         await AssetControlRepository.unlink(db, ctx.tenantId, assetId, controlId);
-        await logEvent(db, ctx, { action: 'ASSET_CONTROL_UNLINKED', entityType: 'Asset', entityId: assetId, details: `Unlinked from control ${controlId}`, metadata: { controlId } });
+        await logEvent(db, ctx, { action: 'ASSET_CONTROL_UNLINKED', entityType: 'Asset', entityId: assetId, details: `Unlinked from control ${controlId}`, detailsJson: { category: 'relationship', operation: 'unlinked', sourceEntity: 'Asset', sourceId: assetId, targetEntity: 'Control', targetId: controlId }, metadata: { controlId } });
     });
 }
 
@@ -86,7 +86,7 @@ export async function mapAssetToRisk(ctx: RequestContext, assetId: string, riskI
     assertCanManage(ctx);
     return runInTenantContext(ctx, async (db) => {
         const link = await AssetRiskRepository.link(db, ctx.tenantId, assetId, riskId, exposureLevel || null, rationale || null, ctx.userId);
-        await logEvent(db, ctx, { action: 'ASSET_RISK_LINKED', entityType: 'Asset', entityId: assetId, details: `Linked to risk ${riskId}`, metadata: { riskId, exposureLevel } });
+        await logEvent(db, ctx, { action: 'ASSET_RISK_LINKED', entityType: 'Asset', entityId: assetId, details: `Linked to risk ${riskId}`, detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Asset', sourceId: assetId, targetEntity: 'Risk', targetId: riskId, relation: exposureLevel || 'DIRECT' }, metadata: { riskId, exposureLevel } });
         return link;
     });
 }
@@ -95,7 +95,7 @@ export async function unmapAssetFromRisk(ctx: RequestContext, assetId: string, r
     assertCanManage(ctx);
     return runInTenantContext(ctx, async (db) => {
         await AssetRiskRepository.unlink(db, ctx.tenantId, assetId, riskId);
-        await logEvent(db, ctx, { action: 'ASSET_RISK_UNLINKED', entityType: 'Asset', entityId: assetId, details: `Unlinked from risk ${riskId}`, metadata: { riskId } });
+        await logEvent(db, ctx, { action: 'ASSET_RISK_UNLINKED', entityType: 'Asset', entityId: assetId, details: `Unlinked from risk ${riskId}`, detailsJson: { category: 'relationship', operation: 'unlinked', sourceEntity: 'Asset', sourceId: assetId, targetEntity: 'Risk', targetId: riskId }, metadata: { riskId } });
     });
 }
 

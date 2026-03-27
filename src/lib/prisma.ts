@@ -155,23 +155,35 @@ function registerAuditMiddleware(client: PrismaClient): void {
             // Build diff for update/upsert
             const diffJson = buildDiffJson(params.action, updateData, result);
 
-            // Use $executeRawUnsafe with parameterized values to bypass middleware recursion
-            const id = generateCuid();
-            await client.$executeRawUnsafe(
-                `INSERT INTO "AuditLog" ("id", "tenantId", "userId", "entity", "entityId", "action", "details", "requestId", "recordIds", "metadataJson", "diffJson", "createdAt")
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, NOW())`,
-                id,
+            // Build structured detailsJson for entity_lifecycle events
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const detailsJson: Record<string, any> = {
+                category: 'entity_lifecycle',
+                entityName: model,
+                operation: action.toLowerCase(),
+            };
+            if (diffJson) {
+                detailsJson.changedFields = diffJson.changedFields;
+                detailsJson.after = diffJson.after;
+            }
+            detailsJson.summary = `${action} ${model}${entityId !== 'unknown' ? ` ${entityId}` : ''}`;
+
+            // Use hash-chained writer for integrity
+            const { appendAuditEntry } = require('./audit/audit-writer');
+            await appendAuditEntry({
                 tenantId,
-                actorUserId,
-                model,
+                userId: actorUserId,
+                actorType: 'SYSTEM',
+                entity: model,
                 entityId,
                 action,
-                null,
+                details: null,
                 requestId,
-                recordIds ? JSON.stringify(recordIds) : null,
-                JSON.stringify(metadataJson),
-                diffJson ? JSON.stringify(diffJson) : null,
-            );
+                recordIds,
+                metadataJson,
+                diffJson,
+                detailsJson,
+            });
         } catch (auditError) {
             // Best effort — never break the original operation
             if (env.NODE_ENV === 'development') {

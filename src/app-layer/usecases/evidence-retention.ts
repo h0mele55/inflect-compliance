@@ -72,6 +72,14 @@ export async function updateEvidenceRetention(
                 retentionPolicy: updateData.retentionPolicy,
                 retentionDays: updateData.retentionDays,
             }),
+            detailsJson: {
+                category: 'data_lifecycle',
+                operation: 'retention_updated',
+                model: 'Evidence',
+                retentionUntil: updateData.retentionUntil ? String(updateData.retentionUntil) : null,
+                retentionPolicy: updateData.retentionPolicy,
+                retentionDays: updateData.retentionDays,
+            },
         });
 
         return updated;
@@ -149,6 +157,12 @@ export async function archiveEvidence(ctx: RequestContext, evidenceId: string) {
             entityType: 'Evidence',
             entityId: evidenceId,
             details: JSON.stringify({ title: evidence.title, reason: 'manual' }),
+            detailsJson: {
+                category: 'data_lifecycle',
+                operation: 'archived',
+                model: 'Evidence',
+                reason: 'manual',
+            },
         });
 
         return updated;
@@ -180,6 +194,11 @@ export async function unarchiveEvidence(ctx: RequestContext, evidenceId: string)
             entityType: 'Evidence',
             entityId: evidenceId,
             details: JSON.stringify({ title: evidence.title }),
+            detailsJson: {
+                category: 'data_lifecycle',
+                operation: 'unarchived',
+                model: 'Evidence',
+            },
         });
 
         return updated;

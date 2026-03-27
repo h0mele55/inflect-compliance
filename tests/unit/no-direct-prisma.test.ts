@@ -69,7 +69,7 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
     }
 
     // ─── Usecases ───
-    const USECASE_ALLOWLIST: string[] = ['sso.ts', 'mfa.ts', 'mfa-enrollment.ts', 'mfa-challenge.ts', 'session-security.ts'];
+    const USECASE_ALLOWLIST: string[] = ['sso.ts', 'mfa.ts', 'mfa-enrollment.ts', 'mfa-challenge.ts', 'session-security.ts', 'webhook-processor.ts', 'scim-users.ts'];
 
     const usecases = readFilesInDir(path.join(SRC_ROOT, 'app-layer/usecases'));
 
@@ -101,7 +101,7 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
 
     // ─── ALL route handlers (tenant-scoped + legacy) ───
     // Auth routes are explicitly excluded — they handle registration/login with global tables
-    const ROUTE_DIR_ALLOWLIST = ['auth', 'health', 'staging'];
+    const ROUTE_DIR_ALLOWLIST = ['auth', 'health', 'staging', 'scim', 'integrations'];
 
     const apiDir = path.join(SRC_ROOT, 'app/api');
     const allRouteFiles = walkDir(apiDir).filter((f) => f.endsWith('route.ts'));

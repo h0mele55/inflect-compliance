@@ -25,6 +25,13 @@ export async function updateClauseProgress(ctx: RequestContext, id: string, data
             entityType: 'ClauseProgress',
             entityId: progress.id,
             details: `Status: ${data.status}`,
+            detailsJson: {
+                category: 'status_change',
+                entityName: 'ClauseProgress',
+                fromStatus: null,
+                toStatus: data.status,
+                reason: data.notes || undefined,
+            },
         });
 
         return progress;

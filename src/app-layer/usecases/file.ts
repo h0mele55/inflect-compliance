@@ -40,6 +40,11 @@ export async function downloadFile(ctx: RequestContext, fileName: string) {
                     entityType: 'File',
                     entityId: fileName,
                     details: `Downloaded file via presigned URL: ${fileRecord.originalName}`,
+                    detailsJson: {
+                        category: 'access',
+                        operation: 'login',
+                        detail: `File downloaded: ${fileRecord.originalName}`,
+                    },
                 });
                 return {
                     mode: 'redirect' as const,
@@ -69,6 +74,11 @@ export async function downloadFile(ctx: RequestContext, fileName: string) {
                 entityType: 'File',
                 entityId: fileName,
                 details: `Downloaded file: ${safeName}`,
+                detailsJson: {
+                    category: 'access',
+                    operation: 'login',
+                    detail: `File downloaded: ${safeName}`,
+                },
             });
 
             // Collect stream into buffer for legacy compat

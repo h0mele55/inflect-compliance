@@ -11,7 +11,7 @@ export type PermissionSet = {
     frameworks: { view: boolean; install: boolean };
     audits: { view: boolean; manage: boolean; freeze: boolean; share: boolean };
     reports: { view: boolean; export: boolean };
-    admin: { view: boolean; manage: boolean };
+    admin: { view: boolean; manage: boolean; members: boolean; sso: boolean; scim: boolean };
 };
 
 /**
@@ -36,7 +36,7 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 frameworks: { view: true, install: true },
                 audits: { view: true, manage: true, freeze: true, share: true },
                 reports: { view: true, export: true },
-                admin: { view: true, manage: true },
+                admin: { view: true, manage: true, members: true, sso: true, scim: true },
             };
         case 'EDITOR':
             return {
@@ -52,7 +52,7 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 frameworks: { view: true, install: false },
                 audits: { view: true, manage: false, freeze: false, share: false },
                 reports: { view: true, export: true },
-                admin: { view: false, manage: false },
+                admin: { view: false, manage: false, members: false, sso: false, scim: false },
             };
         case 'AUDITOR':
             return {
@@ -69,7 +69,7 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 // Auditors can view and maybe export/share depending on policy, but let's keep view/share
                 audits: { view: true, manage: false, freeze: false, share: true },
                 reports: { view: true, export: true },
-                admin: { view: false, manage: false },
+                admin: { view: false, manage: false, members: false, sso: false, scim: false },
             };
         case 'READER':
         default:
@@ -84,7 +84,7 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 frameworks: { view: true, install: false },
                 audits: { view: true, manage: false, freeze: false, share: false },
                 reports: { view: true, export: false },
-                admin: { view: false, manage: false },
+                admin: { view: false, manage: false, members: false, sso: false, scim: false },
             };
     }
 }

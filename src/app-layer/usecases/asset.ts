@@ -53,6 +53,13 @@ export async function createAsset(ctx: RequestContext, data: any) {
             entityType: 'Asset',
             entityId: asset.id,
             details: `Created asset: ${asset.name}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Asset',
+                operation: 'created',
+                after: { name: asset.name, type: data.type, classification: data.classification },
+                summary: `Created asset: ${asset.name}`,
+            },
         });
 
         return asset;
@@ -85,7 +92,15 @@ export async function updateAsset(ctx: RequestContext, id: string, data: any) {
             action: 'UPDATE',
             entityType: 'Asset',
             entityId: id,
-            details: JSON.stringify(data),
+            details: `Asset updated`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Asset',
+                operation: 'updated',
+                changedFields: Object.keys(data).filter(k => data[k] !== undefined),
+                after: { name: data.name, type: data.type, classification: data.classification },
+                summary: `Asset updated`,
+            },
         });
 
         return asset;
@@ -104,6 +119,12 @@ export async function deleteAsset(ctx: RequestContext, id: string) {
             entityType: 'Asset',
             entityId: id,
             details: 'Asset soft-deleted',
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Asset',
+                operation: 'deleted',
+                summary: 'Asset soft-deleted',
+            },
         });
 
         return { success: true };

@@ -196,12 +196,23 @@ describe('Soft-Delete Middleware', () => {
 
     describe('SOFT_DELETE_MODELS allowlist', () => {
         test('contains exactly the expected models', () => {
+            // P0 models
             expect(SOFT_DELETE_MODELS.has('Asset')).toBe(true);
             expect(SOFT_DELETE_MODELS.has('Risk')).toBe(true);
             expect(SOFT_DELETE_MODELS.has('Control')).toBe(true);
             expect(SOFT_DELETE_MODELS.has('Evidence')).toBe(true);
             expect(SOFT_DELETE_MODELS.has('Policy')).toBe(true);
-            expect(SOFT_DELETE_MODELS.size).toBe(5);
+            // P1 models
+            expect(SOFT_DELETE_MODELS.has('Vendor')).toBe(true);
+            expect(SOFT_DELETE_MODELS.has('FileRecord')).toBe(true);
+            // P2 models
+            expect(SOFT_DELETE_MODELS.has('Task')).toBe(true);
+            expect(SOFT_DELETE_MODELS.has('Finding')).toBe(true);
+            // P3 models
+            expect(SOFT_DELETE_MODELS.has('Audit')).toBe(true);
+            expect(SOFT_DELETE_MODELS.has('AuditCycle')).toBe(true);
+            expect(SOFT_DELETE_MODELS.has('AuditPack')).toBe(true);
+            expect(SOFT_DELETE_MODELS.size).toBe(12);
         });
 
         test('does NOT include ephemeral models', () => {

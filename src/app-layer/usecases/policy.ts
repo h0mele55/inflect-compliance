@@ -120,6 +120,13 @@ export async function createPolicy(ctx: RequestContext, data: {
             entityType: 'Policy',
             entityId: policy.id,
             details: `Created policy: ${policy.title}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Policy',
+                operation: 'created',
+                after: { title: policy.title, slug: policy.slug, category: data.category || null },
+                summary: `Created policy: ${policy.title}`,
+            },
         });
 
         return policy;
@@ -171,6 +178,13 @@ export async function createPolicyFromTemplate(ctx: RequestContext, templateId: 
             entityType: 'Policy',
             entityId: policy.id,
             details: `Created from template: ${template.title}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Policy',
+                operation: 'created',
+                after: { title, templateId: template.id, templateTitle: template.title },
+                summary: `Created from template: ${template.title}`,
+            },
             metadata: { templateId: template.id },
         });
 
@@ -216,6 +230,13 @@ export async function createPolicyVersion(ctx: RequestContext, policyId: string,
             entityType: 'Policy',
             entityId: policyId,
             details: `Version ${version.versionNumber} created`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'PolicyVersion',
+                operation: 'created',
+                after: { versionId: version.id, versionNumber: version.versionNumber, contentType: data.contentType },
+                summary: `Version ${version.versionNumber} created`,
+            },
             metadata: { versionId: version.id, versionNumber: version.versionNumber },
         });
 
@@ -252,6 +273,14 @@ export async function updatePolicyMetadata(ctx: RequestContext, policyId: string
             entityType: 'Policy',
             entityId: policyId,
             details: `Metadata updated`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Policy',
+                operation: 'updated',
+                changedFields: Object.keys(data).filter(k => data[k as keyof typeof data] !== undefined),
+                after: data,
+                summary: 'Policy metadata updated',
+            },
             metadata: data,
         });
 
@@ -284,6 +313,13 @@ export async function requestPolicyApproval(ctx: RequestContext, policyId: strin
             entityType: 'Policy',
             entityId: policyId,
             details: `Approval requested for version ${version.versionNumber}`,
+            detailsJson: {
+                category: 'status_change',
+                entityName: 'Policy',
+                fromStatus: policy.status,
+                toStatus: 'IN_REVIEW',
+                reason: `Approval requested for version ${version.versionNumber}`,
+            },
             metadata: { versionId, approvalId: approval.id },
         });
 
@@ -359,6 +395,13 @@ export async function decidePolicyApproval(ctx: RequestContext, approvalId: stri
             entityType: 'Policy',
             entityId: approval.policyId,
             details: `Policy ${decision.decision.toLowerCase()}`,
+            detailsJson: {
+                category: 'status_change',
+                entityName: 'Policy',
+                fromStatus: 'IN_REVIEW',
+                toStatus: decision.decision === 'APPROVED' ? 'APPROVED' : 'DRAFT',
+                reason: decision.comment || undefined,
+            },
             metadata: { approvalId, decision: decision.decision, comment: decision.comment },
         });
 
@@ -422,6 +465,13 @@ export async function publishPolicy(ctx: RequestContext, policyId: string, versi
             entityType: 'Policy',
             entityId: policyId,
             details: `Published version ${version.versionNumber}`,
+            detailsJson: {
+                category: 'status_change',
+                entityName: 'Policy',
+                fromStatus: policy.status,
+                toStatus: 'PUBLISHED',
+                reason: `Published version ${version.versionNumber}`,
+            },
             metadata: { versionId, versionNumber: version.versionNumber },
         });
 
@@ -443,6 +493,12 @@ export async function archivePolicy(ctx: RequestContext, policyId: string) {
             entityType: 'Policy',
             entityId: policyId,
             details: `Policy archived: ${policy.title}`,
+            detailsJson: {
+                category: 'status_change',
+                entityName: 'Policy',
+                fromStatus: policy.status,
+                toStatus: 'ARCHIVED',
+            },
         });
 
         return { success: true };
@@ -467,6 +523,13 @@ export async function deletePolicy(ctx: RequestContext, id: string) {
             entityType: 'Policy',
             entityId: id,
             details: `Policy soft-deleted: ${policy.title}`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'Policy',
+                operation: 'deleted',
+                before: { title: policy.title, status: policy.status },
+                summary: `Policy soft-deleted: ${policy.title}`,
+            },
         });
         return { success: true };
     });
