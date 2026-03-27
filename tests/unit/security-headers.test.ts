@@ -1,59 +1,73 @@
-import * as fs from 'fs';
-import * as path from 'path';
-
 /**
- * Security headers test.
+ * Unit tests for src/lib/security/headers.ts
  *
- * Validates that next.config.js sets all required static security headers
- * and that CSP is NOT set statically (it's set dynamically in middleware).
+ * Verifies security header values for both production and non-production.
  */
-describe('Security Headers (next.config.js)', () => {
-    const configPath = path.resolve(__dirname, '../../next.config.js');
-    let configSource: string;
+import { getSecurityHeaders, applySecurityHeaders } from '@/lib/security/headers';
 
-    beforeAll(() => {
-        configSource = fs.readFileSync(configPath, 'utf-8');
+describe('getSecurityHeaders', () => {
+    describe('production', () => {
+        const headers = getSecurityHeaders(true);
+
+        test('sets HSTS with max-age 1 year, includeSubDomains, preload', () => {
+            expect(headers['Strict-Transport-Security']).toBe(
+                'max-age=31536000; includeSubDomains; preload'
+            );
+        });
+
+        test('sets X-Frame-Options to DENY', () => {
+            expect(headers['X-Frame-Options']).toBe('DENY');
+        });
+
+        test('sets X-Content-Type-Options to nosniff', () => {
+            expect(headers['X-Content-Type-Options']).toBe('nosniff');
+        });
+
+        test('sets Referrer-Policy to strict-origin-when-cross-origin', () => {
+            expect(headers['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
+        });
+
+        test('sets Permissions-Policy to deny sensitive APIs', () => {
+            expect(headers['Permissions-Policy']).toContain('camera=()');
+            expect(headers['Permissions-Policy']).toContain('microphone=()');
+            expect(headers['Permissions-Policy']).toContain('geolocation=()');
+        });
+
+        test('sets Cross-Origin-Opener-Policy to same-origin', () => {
+            expect(headers['Cross-Origin-Opener-Policy']).toBe('same-origin');
+        });
+
+        test('sets Cross-Origin-Resource-Policy to same-origin', () => {
+            expect(headers['Cross-Origin-Resource-Policy']).toBe('same-origin');
+        });
     });
 
-    it('sets X-Frame-Options DENY', () => {
-        expect(configSource).toContain('X-Frame-Options');
-        expect(configSource).toContain('DENY');
-    });
+    describe('non-production', () => {
+        const headers = getSecurityHeaders(false);
 
-    it('sets X-Content-Type-Options nosniff', () => {
-        expect(configSource).toContain('X-Content-Type-Options');
-        expect(configSource).toContain('nosniff');
-    });
+        test('sets HSTS max-age to 0', () => {
+            expect(headers['Strict-Transport-Security']).toBe('max-age=0');
+        });
 
-    it('sets Referrer-Policy', () => {
-        expect(configSource).toContain('Referrer-Policy');
-        expect(configSource).toContain('strict-origin-when-cross-origin');
+        test('still sets all other security headers', () => {
+            expect(headers['X-Frame-Options']).toBe('DENY');
+            expect(headers['X-Content-Type-Options']).toBe('nosniff');
+            expect(headers['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
+        });
     });
+});
 
-    it('sets Cross-Origin-Opener-Policy', () => {
-        expect(configSource).toContain('Cross-Origin-Opener-Policy');
-        expect(configSource).toContain('same-origin');
-    });
+describe('applySecurityHeaders', () => {
+    test('applies all headers to a Headers object', () => {
+        const h = new Headers();
+        applySecurityHeaders(h, true);
 
-    it('sets Cross-Origin-Resource-Policy', () => {
-        expect(configSource).toContain('Cross-Origin-Resource-Policy');
-    });
-
-    it('sets Strict-Transport-Security', () => {
-        expect(configSource).toContain('Strict-Transport-Security');
-    });
-
-    it('sets Permissions-Policy', () => {
-        expect(configSource).toContain('Permissions-Policy');
-    });
-
-    it('does NOT set CSP statically (CSP is in middleware)', () => {
-        // Verify the config does not have a header entry with key 'Content-Security-Policy'
-        // The string may appear in comments, so we check for the key-value pattern
-        expect(configSource).not.toMatch(/key:\s*['"]Content-Security-Policy['"]/);
-    });
-
-    it('has a comment noting CSP is in middleware', () => {
-        expect(configSource).toContain('middleware');
+        expect(h.get('X-Frame-Options')).toBe('DENY');
+        expect(h.get('X-Content-Type-Options')).toBe('nosniff');
+        expect(h.get('Strict-Transport-Security')).toContain('max-age=31536000');
+        expect(h.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+        expect(h.get('Permissions-Policy')).toContain('camera=()');
+        expect(h.get('Cross-Origin-Opener-Policy')).toBe('same-origin');
+        expect(h.get('Cross-Origin-Resource-Policy')).toBe('same-origin');
     });
 });

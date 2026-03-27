@@ -13,6 +13,8 @@ import {
     forbiddenJson,
 } from '@/lib/auth/guard';
 import { generateNonce, buildCspHeader, CSP_NONCE_HEADER, CSP_REPORT_PATH, CSP_REPORT_GROUP } from '@/lib/security/csp';
+import { applySecurityHeaders } from '@/lib/security/headers';
+import { resolveCorsConfig, isOriginAllowed, applyCorsHeaders, CORS_PREFLIGHT_HEADERS } from '@/lib/security/cors';
 
 /**
  * Edge middleware: centralized auth guard + CSP for ALL routes.
@@ -132,25 +134,23 @@ export default async function middleware(req: any, ctx: any) {
 
     const origin = req.headers.get('origin') ?? '';
 
-    // Parse allowed origins from env or default to localhost for dev
-    const allowedOrigins = env.CORS_ALLOWED_ORIGINS
-        ? env.CORS_ALLOWED_ORIGINS.split(',').map(o => o.trim())
-        : [];
-
-    const isAllowedOrigin = allowedOrigins.includes(origin) || origin.startsWith('http://localhost:');
+    // ── CORS Policy — environment-aware, fail-closed in production ──
+    const corsConfig = resolveCorsConfig(env.CORS_ALLOWED_ORIGINS, env.NODE_ENV);
+    const isAllowedOrigin = isOriginAllowed(origin, corsConfig);
+    const isProduction = env.NODE_ENV === 'production';
 
     // ── CORS Preflight for APIs ──
     if (pathname.startsWith('/api/') && req.method === 'OPTIONS') {
         const preflightHeaders = new Headers();
         if (isAllowedOrigin && origin) {
-            preflightHeaders.set('Access-Control-Allow-Origin', origin);
-            preflightHeaders.set('Access-Control-Allow-Credentials', 'true');
+            applyCorsHeaders(preflightHeaders, origin);
         }
-        preflightHeaders.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-        preflightHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-forwarded-for, x-request-id, user-agent');
-        preflightHeaders.set('Access-Control-Max-Age', '86400');
+        for (const [key, value] of Object.entries(CORS_PREFLIGHT_HEADERS)) {
+            preflightHeaders.set(key, value);
+        }
         preflightHeaders.set('x-request-id', requestId);
         preflightHeaders.set('Content-Security-Policy', cspHeader);
+        applySecurityHeaders(preflightHeaders, isProduction);
         return new NextResponse(null, { status: 204, headers: preflightHeaders });
     }
 
@@ -158,6 +158,9 @@ export default async function middleware(req: any, ctx: any) {
     const res = await authMiddleware(req, ctx) || NextResponse.next({
         request: { headers: requestHeaders },
     });
+
+    // ── Security Headers — applied to ALL responses ──
+    applySecurityHeaders(res.headers, isProduction);
 
     // ── Inject CSP + Report-To + request ID on every response ──
     res.headers.set('Content-Security-Policy', cspHeader);
@@ -173,11 +176,9 @@ export default async function middleware(req: any, ctx: any) {
     // Reporting-Endpoints header (newer alternative, Chrome 96+)
     res.headers.set('Reporting-Endpoints', `${CSP_REPORT_GROUP}="${CSP_REPORT_PATH}"`);
 
-    // ── Apply CORS Headers to API responses ──
+    // ── Apply CORS Headers to API responses (environment-locked) ──
     if (pathname.startsWith('/api/') && isAllowedOrigin && origin) {
-        res.headers.set('Access-Control-Allow-Origin', origin);
-        res.headers.set('Access-Control-Allow-Credentials', 'true');
-        res.headers.append('Vary', 'Origin');
+        applyCorsHeaders(res.headers, origin);
     }
 
     return res;
