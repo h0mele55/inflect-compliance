@@ -47,6 +47,11 @@ const PII_FIELD_MAP: Record<string, Array<{
     UserIdentityLink: [
         { plain: 'emailAtLinkTime', encrypted: 'emailAtLinkTimeEncrypted', hash: 'emailAtLinkTimeHash' },
     ],
+    // OAuth tokens — encrypted at rest, no lookup hash needed
+    Account: [
+        { plain: 'access_token', encrypted: 'accessTokenEncrypted' },
+        { plain: 'refresh_token', encrypted: 'refreshTokenEncrypted' },
+    ],
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -117,7 +122,7 @@ export const piiEncryptionMiddleware: Prisma.Middleware = async (params, next) =
     }
 
     // ─── Encrypt on write ───
-    if (params.action === 'create' || params.action === 'update' || params.action === 'upsert') {
+    if (params.action === 'create' || params.action === 'update' || params.action === 'upsert' || params.action === 'updateMany') {
         if (params.action === 'upsert') {
             if (params.args.create && typeof params.args.create === 'object') {
                 encryptOnWrite(params.args.create as Record<string, unknown>, fields);
