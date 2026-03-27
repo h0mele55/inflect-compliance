@@ -9,6 +9,10 @@ export const env = createEnv({
     server: {
         NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
         DATABASE_URL: z.string().url(),
+        // Direct connection to Postgres (bypasses PgBouncer).
+        // Used by Prisma for migrations, schema push, and introspection.
+        // Falls back to DATABASE_URL if not set (non-pooled environments).
+        DIRECT_DATABASE_URL: z.string().url().optional(),
 
         // NextAuth
         NEXTAUTH_URL: z.preprocess(
@@ -102,6 +106,7 @@ export const env = createEnv({
     runtimeEnv: {
         NODE_ENV: process.env.NODE_ENV,
         DATABASE_URL: process.env.DATABASE_URL,
+        DIRECT_DATABASE_URL: process.env.DIRECT_DATABASE_URL,
         NEXTAUTH_URL: process.env.NEXTAUTH_URL,
         AUTH_URL: process.env.AUTH_URL,
         AUTH_SECRET: process.env.AUTH_SECRET,

@@ -5,10 +5,47 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: inflect_compliance
+    # Postgres is only directly accessible on port 5434 (for migrations).
+    # Application traffic goes through PgBouncer on port 5433.
     ports:
-      - '5433:5432'
+      - '5434:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inflect_compliance"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  pgbouncer:
+    image: edoburu/pgbouncer:1.23.1-p2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # ── Connection to upstream Postgres ──
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: inflect_compliance
+      # ── Pool configuration ──
+      POOL_MODE: transaction
+      DEFAULT_POOL_SIZE: "25"
+      MAX_CLIENT_CONN: "200"
+      MAX_DB_CONNECTIONS: "50"
+      # ── Auth ──
+      AUTH_TYPE: scram-sha-256
+      # ── Monitoring ──
+      STATS_PERIOD: "60"
+      ADMIN_USERS: postgres
+    ports:
+      - '5433:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
 volumes:
   pgdata:

@@ -2,6 +2,10 @@
 # Usage: docker compose -f docker-compose.prod.yml up -d --build
 #
 # Requires: .env.production (copy from .env.production.example)
+#
+# Connection architecture:
+#   App → PgBouncer (pooled, transaction mode) → Postgres
+#   Migrations → Postgres (direct, via DIRECT_DATABASE_URL)
 # ────────────────────────────────────────────────────────────
 services:
   # ── Postgres ──
@@ -24,8 +28,38 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    # Security: no ports exposed — only accessible from app via internal network
+    # Security: no ports exposed — only accessible from PgBouncer via internal network
     # Encryption at rest: use LUKS/dm-crypt on the host volume (see docs/encryption-data-protection.md)
+    networks:
+      - internal
+
+  # ── PgBouncer (connection pooler) ──
+  pgbouncer:
+    image: edoburu/pgbouncer:1.23.1-p2
+    container_name: inflect-prod-pgbouncer
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: ${POSTGRES_USER:-inflect}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: ${POSTGRES_DB:-inflect_production}
+      POOL_MODE: transaction
+      DEFAULT_POOL_SIZE: "25"
+      MAX_CLIENT_CONN: "200"
+      MAX_DB_CONNECTIONS: "50"
+      AUTH_TYPE: scram-sha-256
+      STATS_PERIOD: "60"
+      ADMIN_USERS: ${POSTGRES_USER:-inflect}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${POSTGRES_USER:-inflect}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No ports exposed to host — only accessible from app via internal network
     networks:
       - internal
 
@@ -37,7 +71,7 @@ services:
     container_name: inflect-prod-app
     restart: always
     depends_on:
-      db:
+      pgbouncer:
         condition: service_healthy
     ports:
       - "${APP_PORT:-3000}:3000"
@@ -45,7 +79,10 @@ services:
       - .env.production
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-inflect}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-inflect_production}?schema=public
+      # Runtime queries go through PgBouncer (pooled, transaction mode)
+      DATABASE_URL: postgresql://${POSTGRES_USER:-inflect}:${POSTGRES_PASSWORD}@pgbouncer:5432/${POSTGRES_DB:-inflect_production}?schema=public&pgbouncer=true
+      # Migrations/introspection use direct Postgres connection (bypasses PgBouncer)
+      DIRECT_DATABASE_URL: postgresql://${POSTGRES_USER:-inflect}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-inflect_production}?schema=public
       FILE_STORAGE_ROOT: /data/uploads
       UPLOAD_DIR: /data/uploads
     volumes:
