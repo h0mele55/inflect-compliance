@@ -15,6 +15,7 @@ import {
 import { generateNonce, buildCspHeader, CSP_NONCE_HEADER, CSP_REPORT_PATH, CSP_REPORT_GROUP } from '@/lib/security/csp';
 import { applySecurityHeaders } from '@/lib/security/headers';
 import { resolveCorsConfig, isOriginAllowed, applyCorsHeaders, CORS_PREFLIGHT_HEADERS } from '@/lib/security/cors';
+import { shouldBlockAdminRequest } from '@/lib/security/admin-session-guard';
 
 /**
  * Edge middleware: centralized auth guard + CSP for ALL routes.
@@ -83,6 +84,18 @@ const authMiddleware = auth(async (req) => {
                 ? new URL(`/t/${slugMatch[1]}/dashboard`, req.nextUrl.origin)
                 : new URL('/', req.nextUrl.origin);
             return NextResponse.redirect(redirectTo);
+        }
+
+        // Admin role confirmed — enforce stricter session posture.
+        // Block cross-site requests to admin API routes (Sec-Fetch-Site check).
+        // This provides equivalent protection to SameSite=strict cookies
+        // without breaking OAuth redirect flows that require SameSite=lax.
+        if (isApiRoute(pathname)) {
+            const secFetchSite = req.headers.get('sec-fetch-site');
+            const method = req.method || 'GET';
+            if (shouldBlockAdminRequest(secFetchSite, method)) {
+                return forbiddenJson('Cross-site admin requests are not allowed');
+            }
         }
     }
 

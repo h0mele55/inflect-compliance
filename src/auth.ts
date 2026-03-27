@@ -207,6 +207,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                             where: { tenantId: activeTenantId },
                         });
                         const policy = secSettings?.mfaPolicy ?? 'DISABLED';
+                        const failClosed = secSettings?.mfaFailClosed ?? false;
+
+                        // Cache fail-closed setting in token for subsequent requests
+                        token.mfaFailClosed = failClosed;
 
                         if (policy === 'REQUIRED' || policy === 'OPTIONAL') {
                             // Check if user has a verified MFA enrollment
@@ -230,7 +234,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                             }
                         }
                     } catch {
-                        // If MFA lookup fails, don't block login — fail open for availability
+                        // MFA dependency failure (DB outage, lookup error)
+                        // Fail-closed: deny access when tenant has opted in
+                        // Fail-open (default): allow through for availability
+                        if (token.mfaFailClosed) {
+                            token.mfaPending = true;
+                            token.error = 'MfaDependencyFailure';
+                        }
                     }
                 }
 
@@ -301,7 +311,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         }
                     }
                 } catch {
-                    // Fail open — don't block access if DB check fails
+                    // MFA challenge completion check failed
+                    // Fail-closed: keep mfaPending=true (deny access)
+                    // Fail-open (default): don't block access
+                    if (token.mfaFailClosed) {
+                        // mfaPending remains true — access is denied
+                        token.error = 'MfaDependencyFailure';
+                    } else {
+                        // Fail open — allow through
+                        token.mfaPending = false;
+                    }
                 }
             }
 

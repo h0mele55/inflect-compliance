@@ -2266,6 +2266,7 @@ model TenantSecuritySettings {
   id                    String    @id @default(cuid())
   tenantId              String    @unique
   mfaPolicy             MfaPolicy @default(DISABLED)
+  mfaFailClosed         Boolean   @default(false)
   sessionMaxAgeMinutes  Int?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
