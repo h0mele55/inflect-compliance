@@ -14,6 +14,11 @@ try {
     dbUrl = match?.[1];
 } catch { /* no .env file */ }
 
+// Fallback to process.env (CI environments set DATABASE_URL directly)
+if (!dbUrl) {
+    dbUrl = process.env.DATABASE_URL;
+}
+
 /**
  * Synchronous DB availability check.
  *

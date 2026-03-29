@@ -13,3 +13,10 @@ process.env.CORS_ALLOWED_ORIGINS = 'http://localhost:3000';
 // so it can still test the actual validation logic.
 // We set this to prevent env loader from crashing other unit tests.
 process.env.SKIP_ENV_VALIDATION = '1';
+
+// Polyfill global fail() for guard tests (removed in newer Jest versions)
+if (typeof globalThis.fail === 'undefined') {
+  globalThis.fail = (message) => {
+    throw new Error(typeof message === 'string' ? message : 'Test failed via fail()');
+  };
+}
