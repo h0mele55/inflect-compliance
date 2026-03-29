@@ -39,6 +39,7 @@ export async function initTelemetry(): Promise<void> {
     const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318';
 
     // Dynamic imports to avoid loading heavy modules when OTel is disabled
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resourcesMod: any = await import('@opentelemetry/resources');
     const Resource = resourcesMod.Resource ?? resourcesMod.default?.Resource;
     const semConvMod = await import('@opentelemetry/semantic-conventions');

@@ -109,6 +109,7 @@ export async function upsertIntegrationConnection(
                 where: { id: input.id },
                 data: {
                     name: input.name,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     configJson: input.configJson as any ?? undefined,
                     ...(secretEncrypted ? { secretEncrypted } : {}),
                     isEnabled: input.isEnabled ?? true,
@@ -137,6 +138,7 @@ export async function upsertIntegrationConnection(
                 tenantId: ctx.tenantId,
                 provider: input.provider,
                 name: input.name,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 configJson: input.configJson as any ?? {},
                 secretEncrypted,
                 isEnabled: input.isEnabled ?? true,
@@ -301,6 +303,7 @@ export async function runAutomationForControl(
                 provider: parsed.provider,
                 automationKey: control.automationKey,
                 controlId: control.id,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 error: errorMessage as any,
             });
 
@@ -331,6 +334,7 @@ export async function runAutomationForControl(
                     data: {
                         tenantId: ctx.tenantId,
                         controlId: control.id,
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         type: evidencePayload.type as any,
                         title: evidencePayload.title,
                         content: evidencePayload.content,
@@ -347,6 +351,7 @@ export async function runAutomationForControl(
             where: { id: execution.id },
             data: {
                 status: result.status,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 resultJson: result.details as any,
                 evidenceId,
                 errorMessage: result.errorMessage,

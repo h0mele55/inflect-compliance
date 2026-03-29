@@ -335,6 +335,7 @@ export async function processIncomingWebhook(input: WebhookInput): Promise<Webho
                             data: {
                                 tenantId: matchedConnection.tenantId,
                                 controlId: control.id,
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 type: 'CONFIGURATION' as any,
                                 title: `[${provider}] Webhook: ${automationKey}`,
                                 content: `Automated evidence from ${provider} webhook event.\nEvent type: ${event.eventType ?? 'unknown'}\nExecution ID: ${execution.id}`,

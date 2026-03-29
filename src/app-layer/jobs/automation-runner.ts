@@ -339,6 +339,7 @@ export async function executeControlAutomation(
             data: {
                 tenantId: control.tenantId,
                 controlId: control.id,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 type: evidencePayload.type as any,
                 title: evidencePayload.title,
                 content: evidencePayload.content,
@@ -354,6 +355,7 @@ export async function executeControlAutomation(
         where: { id: execution.id },
         data: {
             status: result.status,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             resultJson: result.details as any,
             evidenceId,
             errorMessage: result.errorMessage,
