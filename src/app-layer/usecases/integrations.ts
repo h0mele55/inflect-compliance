@@ -109,7 +109,7 @@ export async function upsertIntegrationConnection(
                 where: { id: input.id },
                 data: {
                     name: input.name,
-                    configJson: input.configJson ?? undefined,
+                    configJson: input.configJson as any ?? undefined,
                     ...(secretEncrypted ? { secretEncrypted } : {}),
                     isEnabled: input.isEnabled ?? true,
                 },
@@ -137,7 +137,7 @@ export async function upsertIntegrationConnection(
                 tenantId: ctx.tenantId,
                 provider: input.provider,
                 name: input.name,
-                configJson: input.configJson ?? {},
+                configJson: input.configJson as any ?? {},
                 secretEncrypted,
                 isEnabled: input.isEnabled ?? true,
             },
@@ -301,7 +301,7 @@ export async function runAutomationForControl(
                 provider: parsed.provider,
                 automationKey: control.automationKey,
                 controlId: control.id,
-                error: errorMessage,
+                error: errorMessage as any,
             });
 
             return { execution: { ...execution, status: 'ERROR', errorMessage, durationMs } };
@@ -331,7 +331,7 @@ export async function runAutomationForControl(
                     data: {
                         tenantId: ctx.tenantId,
                         controlId: control.id,
-                        type: evidencePayload.type as string,
+                        type: evidencePayload.type as any,
                         title: evidencePayload.title,
                         content: evidencePayload.content,
                         category: evidencePayload.category ?? 'integration',
@@ -347,7 +347,7 @@ export async function runAutomationForControl(
             where: { id: execution.id },
             data: {
                 status: result.status,
-                resultJson: result.details,
+                resultJson: result.details as any,
                 evidenceId,
                 errorMessage: result.errorMessage,
                 durationMs,

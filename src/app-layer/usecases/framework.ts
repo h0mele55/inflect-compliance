@@ -7,6 +7,7 @@ import { assertCanViewFrameworks, assertCanInstallFrameworkPack } from '../polic
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
+import { prisma } from '@/lib/prisma';
 
 
 // ─── Framework Catalog (global, no tenant filter needed) ───

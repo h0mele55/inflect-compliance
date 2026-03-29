@@ -14,6 +14,7 @@ import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest, forbidden } from '@/lib/errors/types';
 import { getStorageProvider, buildTenantObjectKey } from '@/lib/storage';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
 // ─── Evidence Integrity ───

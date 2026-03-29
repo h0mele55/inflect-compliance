@@ -30,12 +30,12 @@ jest.mock('@/lib/prisma', () => ({
 jest.mock('@/lib/errors/types', () => ({
     forbidden: (msg: string) => {
         const err = new Error(msg);
-        (err as Record<string, unknown>).statusCode = 403;
+        (err as unknown as Record<string, unknown>).statusCode = 403;
         return err;
     },
     notFound: (msg: string) => {
         const err = new Error(msg);
-        (err as Record<string, unknown>).statusCode = 404;
+        (err as unknown as Record<string, unknown>).statusCode = 404;
         return err;
     },
 }));

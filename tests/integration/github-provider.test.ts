@@ -359,7 +359,7 @@ describe('GitHub Branch Protection Provider', () => {
 
     describe('GitHubProvider.handleWebhook', () => {
         const provider = new GitHubProvider();
-        const ctx = { tenantId: 'tenant-1', userId: 'sys', role: 'ADMIN' as const, permissions: { canAdmin: true } };
+        const ctx = { tenantId: 'tenant-1', userId: 'sys', requestId: 'test-req-1', role: 'ADMIN' as const, permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true } };
 
         it('triggers branch_protection check on rule edit', async () => {
             const result = await provider.handleWebhook(ctx, {

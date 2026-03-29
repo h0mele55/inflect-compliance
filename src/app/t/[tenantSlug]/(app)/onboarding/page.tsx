@@ -1,7 +1,7 @@
 import dynamic from 'next/dynamic';
 import { SkeletonCard, SkeletonHeading } from '@/components/ui/skeleton';
 
-export const forceDynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 const OnboardingWizard = dynamic(
     () => import('@/components/onboarding/OnboardingWizard'),

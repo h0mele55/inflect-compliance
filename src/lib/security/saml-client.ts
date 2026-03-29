@@ -74,7 +74,8 @@ export function buildSamlInstance(
     callbackUrl: string,
     issuer: string
 ): SAML {
-    const samlOptions: NodeSamlConfig = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const samlOptions: any = {
         callbackUrl,
         issuer,
         // IdP configuration

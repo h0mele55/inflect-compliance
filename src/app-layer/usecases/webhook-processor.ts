@@ -335,7 +335,7 @@ export async function processIncomingWebhook(input: WebhookInput): Promise<Webho
                             data: {
                                 tenantId: matchedConnection.tenantId,
                                 controlId: control.id,
-                                type: 'CONFIGURATION',
+                                type: 'CONFIGURATION' as any,
                                 title: `[${provider}] Webhook: ${automationKey}`,
                                 content: `Automated evidence from ${provider} webhook event.\nEvent type: ${event.eventType ?? 'unknown'}\nExecution ID: ${execution.id}`,
                                 category: 'integration',
@@ -353,7 +353,7 @@ export async function processIncomingWebhook(input: WebhookInput): Promise<Webho
                 component: 'integrations',
                 provider,
                 eventId: event.id,
-                error: errorMessage,
+                error: err instanceof Error ? err : new Error(String(err)),
             });
 
             await prisma.integrationWebhookEvent.update({

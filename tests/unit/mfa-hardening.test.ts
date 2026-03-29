@@ -99,17 +99,17 @@ describe('Anti-Lockout Safeguards', () => {
     });
 
     it('allows REQUIRED policy when admin is enrolled', () => {
-        const enrolledAdminCount = 1;
+        const enrolledAdminCount: number = 1;
         const policy = 'REQUIRED';
 
-        const wouldBlock = policy === 'REQUIRED' && enrolledAdminCount === 0;
+        const wouldBlock = (policy as string) === 'REQUIRED' && enrolledAdminCount === 0;
         expect(wouldBlock).toBe(false);
     });
 
     it('allows any policy change from REQUIRED to DISABLED/OPTIONAL', () => {
         // These should never be blocked
         for (const policy of ['DISABLED', 'OPTIONAL'] as const) {
-            const wouldBlock = policy === 'REQUIRED' && 0 === 0;
+            const wouldBlock = (policy as string) === 'REQUIRED' && 0 === 0;
             expect(wouldBlock).toBe(false);
         }
     });

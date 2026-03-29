@@ -339,7 +339,7 @@ export async function executeControlAutomation(
             data: {
                 tenantId: control.tenantId,
                 controlId: control.id,
-                type: evidencePayload.type as string,
+                type: evidencePayload.type as any,
                 title: evidencePayload.title,
                 content: evidencePayload.content,
                 category: evidencePayload.category ?? 'integration',
@@ -354,7 +354,7 @@ export async function executeControlAutomation(
         where: { id: execution.id },
         data: {
             status: result.status,
-            resultJson: result.details,
+            resultJson: result.details as any,
             evidenceId,
             errorMessage: result.errorMessage,
             durationMs,

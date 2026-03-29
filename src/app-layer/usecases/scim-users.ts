@@ -91,7 +91,7 @@ async function emitScimAudit(
         // Audit failures must never block SCIM provisioning
         logger.error('SCIM audit event failed', {
             component: 'scim', action, entityId,
-            error: err instanceof Error ? err.message : String(err),
+            error: err instanceof Error ? err : new Error(String(err)),
         });
     }
 }
