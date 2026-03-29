@@ -30,7 +30,7 @@ permissions:
   pull-requests: write   # dependency-review comments
 
 env:
-  NODE_VERSION: "20"
+  NODE_VERSION: "22"
   SKIP_ENV_VALIDATION: "1"
   # ── Dummy secrets (CI-only — no real credentials) ──
   AUTH_SECRET: ci-auth-secret-that-is-long-enough
