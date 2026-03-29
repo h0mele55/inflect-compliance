@@ -27,8 +27,8 @@ export default defineConfig({
     ],
     webServer: {
         command: isCI
-            ? `npx cross-env AUTH_TEST_MODE=1 PORT=${port} npx next start -p ${port}`
-            : `npx cross-env AUTH_TEST_MODE=1 npx next dev -p ${port}`,
+            ? `npx cross-env AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 PORT=${port} npx next start -p ${port}`
+            : `npx cross-env AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 npx next dev -p ${port}`,
         port,
         reuseExistingServer: !isCI,
         timeout: 120_000,

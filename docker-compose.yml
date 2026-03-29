@@ -47,5 +47,35 @@ services:
       timeout: 3s
       retries: 10
 
+  # ── Redis (caching, jobs, async coordination) ──
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports:
+      - '6379:6379'
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # ── ClamAV (antivirus scanning) ──
+  clamav:
+    image: clamav/clamav:1.3
+    ports:
+      - '3310:3310'
+    volumes:
+      - clamav-defs:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s   # ClamAV needs ~2 min to download defs on first boot
+
 volumes:
   pgdata:
+  redisdata:
+  clamav-defs:

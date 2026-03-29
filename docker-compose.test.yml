@@ -18,3 +18,31 @@ services:
       retries: 10
     tmpfs:
       - /var/lib/postgresql/data  # RAM disk — fast, wiped on stop
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: inflect-test-redis
+    command: redis-server --appendonly no --save ""
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    tmpfs:
+      - /data  # RAM disk — fast, wiped on stop
+
+  clamav-test:
+    image: clamav/clamav:1.3
+    container_name: inflect-test-clamav
+    ports:
+      - "3311:3310"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    tmpfs:
+      - /var/lib/clamav  # RAM disk — ephemeral defs for tests

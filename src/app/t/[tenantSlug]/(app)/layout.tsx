@@ -1,89 +1,46 @@
-'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react';
-import { useTranslations } from 'next-intl';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { getQueryClient } from '@/lib/query-client';
-import { Menu } from 'lucide-react';
-import { SidebarContent, MobileDrawer } from '@/components/layout/SidebarNav';
+import { redirect } from 'next/navigation';
+import { auth } from '@/auth';
+import { getTranslations } from 'next-intl/server';
+import { AppShell } from '@/components/layout/AppShell';
+import { ClientProviders } from '@/components/layout/ClientProviders';
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-    const router = useRouter();
-    const { data: session, status } = useSession();
-    const tc = useTranslations('common');
-    const [drawerOpen, setDrawerOpen] = useState(false);
+/**
+ * Tenant app layout — Server Component.
+ *
+ * Responsibilities:
+ *   - Resolve session server-side (via auth())
+ *   - Resolve translations server-side (via getTranslations())
+ *   - Compose client wrappers with minimal, serializable props
+ *
+ * Client boundaries:
+ *   - AppShell: layout chrome (sidebar, drawer, mobile bar, signOut)
+ *   - ClientProviders: data-layer providers (QueryClientProvider)
+ *
+ * Tenant context (tenantId, role, permissions) is provided by the parent
+ * TenantLayout at src/app/t/[tenantSlug]/layout.tsx.
+ */
+export default async function AppLayout({
+    children,
+}: {
+    children: React.ReactNode;
+}) {
+    // Resolve session server-side — no client-side useSession() needed
+    const session = await auth();
+    if (!session?.user) {
+        redirect('/login');
+    }
 
-    // Redirect to login if not authenticated
-    useEffect(() => {
-        if (status === 'unauthenticated') {
-            router.replace('/login');
-        }
-    }, [status, router]);
-
-    const handleLogout = useCallback(async () => {
-        await signOut({ callbackUrl: '/login' });
-    }, []);
-
-    const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-
-    // Auto-close drawer on route change
-    const pathname = usePathname();
-    const prevPathname = useRef(pathname);
-    useEffect(() => {
-        if (prevPathname.current !== pathname) {
-            setDrawerOpen(false);
-            prevPathname.current = pathname;
-        }
-    }, [pathname]);
-
-    if (status === 'loading' || !session) return (
-        <div className="min-h-screen flex items-center justify-center">
-            <div className="animate-pulse text-brand-400">{tc('loading')}</div>
-        </div>
-    );
-
-    const user = session.user;
+    // Resolve translations server-side — passed as plain string to AppShell
+    const tc = await getTranslations('common');
 
     return (
-        <div className="min-h-screen flex">
-            {/* Desktop sidebar — hidden on mobile, visible on md+ */}
-            <aside className="hidden md:flex w-56 bg-slate-900/50 border-r border-slate-700/50 flex-col flex-shrink-0">
-                <SidebarContent user={user} onLogout={handleLogout} />
-            </aside>
-
-            {/* Mobile drawer — only renders overlay on <md */}
-            <MobileDrawer open={drawerOpen} onClose={closeDrawer}>
-                <SidebarContent user={user} onLogout={handleLogout} onNavClick={closeDrawer} />
-            </MobileDrawer>
-
-            {/* Main content */}
-            <main className="flex-1 overflow-auto min-w-0">
-                {/* Mobile top bar — visible on <md only */}
-                <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-2 bg-slate-900/80 backdrop-blur-sm border-b border-slate-700/50">
-                    <button
-                        type="button"
-                        className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
-                        onClick={() => setDrawerOpen(true)}
-                        aria-label="Open navigation menu"
-                        data-testid="nav-toggle"
-                    >
-                        <Menu className="w-5 h-5" />
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center">
-                            <span className="text-white text-[10px] font-bold">IC</span>
-                        </div>
-                        <span className="text-sm font-semibold text-white">{tc('appName')}</span>
-                    </div>
-                </div>
-
-                <QueryClientProvider client={getQueryClient()}>
-                    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-                        {children}
-                    </div>
-                </QueryClientProvider>
-            </main>
-        </div>
+        <AppShell
+            user={{ name: session.user.name }}
+            appName={tc('appName')}
+        >
+            <ClientProviders>
+                {children}
+            </ClientProviders>
+        </AppShell>
     );
 }

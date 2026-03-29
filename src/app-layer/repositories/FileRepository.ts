@@ -1,4 +1,5 @@
 import { PrismaTx } from '@/lib/db-context';
+import { env } from '@/env';
 import { RequestContext } from '../types';
 
 export class FileRepository {
@@ -26,7 +27,7 @@ export class FileRepository {
                 sha256: data.sha256,
                 status: 'PENDING',
                 uploadedByUserId: ctx.userId,
-                storageProvider: data.storageProvider || 'local',
+                storageProvider: data.storageProvider || env.STORAGE_PROVIDER,
                 bucket: data.bucket || null,
                 domain: data.domain || 'general',
             },

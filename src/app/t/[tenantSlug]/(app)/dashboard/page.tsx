@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { getTenantCtx } from '@/app-layer/context';
@@ -13,6 +14,8 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
+import { Skeleton } from '@/components/ui/skeleton';
+import RecentActivityCard from './RecentActivityCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +35,7 @@ export default async function DashboardPage({
 
     // Build tenant context server-side (uses session cookies, no req needed)
     const ctx = await getTenantCtx({ tenantSlug });
-    const { stats, recentActivity } = await getDashboardData(ctx);
+    const { stats } = await getDashboardData(ctx);
 
     const href = (path: string) => `/t/${tenantSlug}${path}`;
 
@@ -145,22 +148,21 @@ export default async function DashboardPage({
                     </div>
                 </div>
 
-                <div className="glass-card p-5">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-3">{t('recentActivity')}</h3>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                        {recentActivity.map((log: any) => (
-                            <div key={log.id} className="flex flex-col sm:flex-row items-start gap-1 sm:gap-2 text-xs">
-                                <span className="text-slate-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</span>
-                                <span className="text-slate-400">
-                                    <span className="text-slate-300 font-medium">{log.user?.name}</span>{' '}
-                                    {log.action.toLowerCase()} {log.entity.toLowerCase()}
-                                </span>
-                            </div>
-                        ))}
-                        {recentActivity.length === 0 && <p className="text-slate-500 text-xs">{t('noRecentActivity')}</p>}
+                <Suspense fallback={
+                    <div className="glass-card p-5 space-y-3">
+                        <Skeleton className="h-4 w-full sm:w-32" />
+                        <div className="space-y-2">
+                            {Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="flex items-start gap-2">
+                                    <Skeleton className="h-3 w-full sm:w-28 shrink-0" />
+                                    <Skeleton className={`h-3 ${i % 2 === 0 ? 'w-full' : 'w-3/4'}`} />
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                }>
+                    <RecentActivityCard tenantSlug={tenantSlug} label={t('recentActivity')} noActivityLabel={t('noRecentActivity')} />
+                </Suspense>
             </div>
         </div>
     );

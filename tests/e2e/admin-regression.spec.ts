@@ -58,11 +58,17 @@ test.describe('Admin Area Regression', () => {
     test('SCIM admin page renders token management', async ({ page }) => {
         const slug = await loginAndGetTenant(page, ADMIN_USER);
         await safeGoto(page, `/t/${slug}/admin/scim`, { waitUntil: 'domcontentloaded' });
+        // Wait for API data to load — #scim-endpoint-url only renders after fetch
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         await expect(page.getByRole('heading', { name: /SCIM Provisioning/i })).toBeVisible({ timeout: 60000 });
-        await expect(page.locator('#scim-endpoint-url')).toBeVisible({ timeout: 5000 });
-        await expect(page.locator('#generate-token-btn')).toBeVisible({ timeout: 5000 });
-        await expect(page.getByText('Setup Guide')).toBeVisible({ timeout: 5000 });
+        // Endpoint URL renders only after the /admin/scim API responds (state !== null)
+        await expect(page.locator('#scim-endpoint-url')).toBeVisible({ timeout: 30000 });
+        await expect(page.locator('#generate-token-btn')).toBeVisible({ timeout: 10000 });
+        // Setup Guide is at the bottom of the page — scroll into view first
+        const setupGuide = page.getByText('Setup Guide');
+        await setupGuide.scrollIntoViewIfNeeded();
+        await expect(setupGuide).toBeVisible({ timeout: 10000 });
     });
 
     // ── 3. Non-admin access blocked on ALL admin subpages ──

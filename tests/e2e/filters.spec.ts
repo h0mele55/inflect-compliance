@@ -63,7 +63,7 @@ test.describe('Filter contract: Controls', () => {
         const searchInput = page.locator('[data-testid="filter-search"]');
         await searchInput.fill('password');
         await searchInput.press('Enter');
-        await expect(page).toHaveURL(/q=password/);
+        await expect(page).toHaveURL(/q=password/, { timeout: 15000 });
     });
 
     test('clear X removes q param', async ({ page }) => {
@@ -71,11 +71,11 @@ test.describe('Filter contract: Controls', () => {
         const searchInput = page.locator('[data-testid="filter-search"]');
         await searchInput.fill('test');
         await searchInput.press('Enter');
-        await expect(page).toHaveURL(/q=test/);
+        await expect(page).toHaveURL(/q=test/, { timeout: 15000 });
 
         // Then clear it
         await page.click('[data-testid="filter-clear-search"]');
-        await expect(page).not.toHaveURL(/q=/);
+        await expect(page).not.toHaveURL(/q=/, { timeout: 15000 });
     });
 
     test('status dropdown updates URL', async ({ page }) => {
@@ -83,18 +83,18 @@ test.describe('Filter contract: Controls', () => {
         await page.click('[data-testid="filter-dd-status"]');
         // Select "Implemented"
         await page.click('text=Implemented');
-        await expect(page).toHaveURL(/status=IMPLEMENTED/);
+        await expect(page).toHaveURL(/status=IMPLEMENTED/, { timeout: 15000 });
     });
 
     test('clear all removes all filter params', async ({ page }) => {
         // Set a filter first
         await page.click('[data-testid="filter-dd-status"]');
         await page.click('text=Implemented');
-        await expect(page).toHaveURL(/status=/);
+        await expect(page).toHaveURL(/status=/, { timeout: 15000 });
 
         // Clear all
         await page.click('[data-testid="filter-clear-all"]');
-        await expect(page).not.toHaveURL(/status=/);
+        await expect(page).not.toHaveURL(/status=/, { timeout: 15000 });
     });
 });
 
@@ -106,24 +106,28 @@ test.describe('Filter contract: Tasks', () => {
 
     test('type dropdown updates URL', async ({ page }) => {
         await page.click('[data-testid="filter-dd-type"]');
-        await page.click('text=Incident');
-        await expect(page).toHaveURL(/type=INCIDENT/);
+        // Wait for dropdown to open, then click the Incident option
+        const option = page.locator('button:has-text("Incident")');
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        await option.click();
+        // router.replace() is async — allow time for URL update
+        await expect(page).toHaveURL(/type=INCIDENT/, { timeout: 15000 });
     });
 
     test('overdue chip toggles URL param', async ({ page }) => {
         // Activate
         await page.click('[data-testid="filter-chip-overdue"]');
-        await expect(page).toHaveURL(/due=overdue/);
+        await expect(page).toHaveURL(/due=overdue/, { timeout: 15000 });
 
         // Deactivate
         await page.click('[data-testid="filter-chip-overdue"]');
-        await expect(page).not.toHaveURL(/due=overdue/);
+        await expect(page).not.toHaveURL(/due=overdue/, { timeout: 15000 });
     });
 
     test('severity dropdown updates URL', async ({ page }) => {
         await page.click('[data-testid="filter-dd-severity"]');
         await page.click('text=Critical');
-        await expect(page).toHaveURL(/severity=CRITICAL/);
+        await expect(page).toHaveURL(/severity=CRITICAL/, { timeout: 15000 });
     });
 });
 
@@ -142,7 +146,7 @@ test.describe('Filter contract: Vendors', () => {
 
     test('review overdue chip works', async ({ page }) => {
         await page.click('[data-testid="filter-chip-review-overdue"]');
-        await expect(page).toHaveURL(/reviewDue=overdue/);
+        await expect(page).toHaveURL(/reviewDue=overdue/, { timeout: 15000 });
     });
 });
 

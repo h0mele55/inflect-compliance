@@ -1,18 +1,18 @@
 import {
     SkeletonPageHeader,
-    SkeletonFilterBar,
+    SkeletonCompactFilterBar,
     SkeletonDataTable,
 } from '@/components/ui/skeleton';
 
 /**
- * Evidence loading skeleton — header + filters + card list.
+ * Evidence loading skeleton — header + compact filter bar + 7-col table.
  */
 export default function EvidenceLoading() {
     return (
         <div className="space-y-6 animate-fadeIn" aria-busy="true" aria-label="Loading evidence">
             <SkeletonPageHeader />
-            <SkeletonFilterBar />
-            <SkeletonDataTable rows={8} cols={6} />
+            <SkeletonCompactFilterBar />
+            <SkeletonDataTable rows={8} cols={7} />
         </div>
     );
 }

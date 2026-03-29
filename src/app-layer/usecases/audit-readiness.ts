@@ -261,7 +261,8 @@ async function createIssueSnapshot(tdb: any, issueId: string, tenantId: string):
 export async function freezeAuditPack(ctx: RequestContext, packId: string) {
     assertCanFreezePack(ctx);
 
-    // Phase 1: Freeze the pack (atomic transaction)
+    // Use an extended transaction timeout (60s) because large packs (500+ items)
+    // require snapshot creation for each item, which exceeds the default 5s timeout.
     const frozenPack = await runInTenantContext(ctx, async (tdb) => {
         const pack = await tdb.auditPack.findFirst({
             where: { id: packId, tenantId: ctx.tenantId },
@@ -300,7 +301,7 @@ export async function freezeAuditPack(ctx: RequestContext, packId: string) {
         await logEvent(tdb, ctx, { action: 'AUDIT_PACK_FROZEN', entityType: 'AuditPack', entityId: packId, details: JSON.stringify({ itemCount: pack.items.length }), detailsJson: { category: 'status_change', entityName: 'AuditPack', fromStatus: 'DRAFT', toStatus: 'FROZEN', reason: `Pack frozen with ${pack.items.length} items` } });
 
         return { frozenPack: result, itemCount: pack.items.length };
-    });
+    }, { timeout: 60000, maxWait: 10000 });
 
     // Phase 2: Attach SoA snapshot as EXPORT_ARTIFACT (best-effort, separate transaction)
     // This runs outside the freeze transaction because getSoA opens its own

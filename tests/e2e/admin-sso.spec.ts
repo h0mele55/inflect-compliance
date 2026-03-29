@@ -59,16 +59,18 @@ test.describe('Admin SSO Configuration', () => {
         const tenantSlug = await loginAndGetTenant(page, ADMIN_USER);
 
         await safeGoto(page, `/t/${tenantSlug}/admin/sso`, { waitUntil: 'domcontentloaded' });
+        // Wait for fetchProviders() — tabs are hidden behind a loading skeleton until API returns
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Page header — wait up to 60s for first cold-compile
         await expect(page.getByRole('heading', { name: /SSO/i })).toBeVisible({ timeout: 60000 });
 
-        // Protocol tabs
-        await expect(page.getByRole('button', { name: 'OIDC' })).toBeVisible({ timeout: 5000 });
-        await expect(page.getByRole('button', { name: /SAML/i })).toBeVisible({ timeout: 5000 });
+        // Protocol tabs — only render after loading=false (API response received)
+        await expect(page.getByRole('button', { name: 'OIDC' })).toBeVisible({ timeout: 30000 });
+        await expect(page.getByRole('button', { name: /SAML/i })).toBeVisible({ timeout: 10000 });
 
         // Save button
-        await expect(page.getByRole('button', { name: /Save Configuration/i })).toBeVisible({ timeout: 5000 });
+        await expect(page.getByRole('button', { name: /Save Configuration/i })).toBeVisible({ timeout: 10000 });
     });
 
     test('admin can switch to SAML tab', async ({ page }) => {

@@ -1,5 +1,11 @@
 #!/usr/bin/env tsx
 /**
+ * @deprecated Use BullMQ instead:
+ *   npx tsx scripts/scheduler.ts   (register schedules, run once on deploy)
+ *   npx tsx scripts/worker.ts      (run worker daemon)
+ *
+ * This script is retained for manual/emergency runs only.
+ *
  * Notification runner — CLI entry point for cron jobs.
  *
  * Usage:

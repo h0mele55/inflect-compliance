@@ -42,9 +42,18 @@ test.describe('Audit Readiness', () => {
     // ─── ISO27001 Flow ───
 
     test('cycles page loads', async () => {
-        await page.goto(`/t/${tenantSlug}/audits/cycles`);
-        await page.waitForLoadState('networkidle');
-        await expect(page.locator('text=Audit Readiness')).toBeVisible({ timeout: 15000 });
+        // Page may need cold-compilation — retry on 500s
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const resp = await page.goto(`/t/${tenantSlug}/audits/cycles`);
+                if (resp && resp.status() < 500) break;
+            } catch {
+                // net:: errors during heavy compilation
+            }
+            if (attempt < 2) await page.waitForTimeout(5000);
+        }
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await expect(page.locator('text=Audit Readiness')).toBeVisible({ timeout: 60000 });
     });
 
     test('create ISO27001 cycle', async () => {
@@ -65,8 +74,10 @@ test.describe('Audit Readiness', () => {
 
         // Should redirect to cycle detail
         await page.waitForURL(/\/audits\/cycles\//, { timeout: 30000 });
-        await page.waitForLoadState('networkidle');
-        await expect(page.locator('#cycle-name')).toContainText(cycleName);
+        await page.waitForLoadState('networkidle').catch(() => {});
+        // Cycle detail page may need cold-compilation
+        await page.waitForSelector('#cycle-name', { timeout: 60000 });
+        await expect(page.locator('#cycle-name')).toContainText(cycleName, { timeout: 15000 });
 
         // Extract cycle ID from URL
         const url = page.url();
@@ -107,10 +118,15 @@ test.describe('Audit Readiness', () => {
     test('freeze the pack', async () => {
         const freezeBtn = page.locator('#freeze-pack-btn');
         if (!await freezeBtn.isVisible().catch(() => false)) { test.skip(); return; }
-        await freezeBtn.click();
 
-        // Wait for status to change
-        await page.waitForTimeout(3000);
+        // Click freeze and wait for the POST API response (large packs take time to snapshot)
+        const [response] = await Promise.all([
+            page.waitForResponse(resp => resp.url().includes('action=freeze') && resp.request().method() === 'POST', { timeout: 60000 }),
+            freezeBtn.click(),
+        ]);
+        expect(response.status()).toBe(200);
+
+        // Wait for the UI to reload pack data and reflect FROZEN status
         await expect(page.locator('#pack-status')).toContainText('FROZEN', { timeout: 15000 });
     });
 

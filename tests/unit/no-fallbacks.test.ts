@@ -42,6 +42,8 @@ describe('Static Analysis: No process.env fallbacks', () => {
             if (file.includes('av-webhook') && file.includes('route.ts')) continue;
             // Encryption module reads DATA_ENCRYPTION_KEY directly (must work before env validation)
             if (file.endsWith('encryption.ts') && file.includes('security')) continue;
+            // Redis connection helper reads REDIS_URL directly (graceful null when unconfigured, pre-env-validation)
+            if (file.endsWith('redis.ts') && file.includes('lib')) continue;
             // Edge middleware reads CSP_REPORT_ONLY before env validation (optional runtime toggle)
             if (file.endsWith('middleware.ts') && !file.includes('pii-middleware')) continue;
 

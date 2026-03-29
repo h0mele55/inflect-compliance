@@ -1,6 +1,6 @@
 import {
     SkeletonPageHeader,
-    SkeletonFilterBar,
+    SkeletonCompactFilterBar,
     SkeletonDataTable,
 } from '@/components/ui/skeleton';
 
@@ -11,14 +11,14 @@ import {
  *
  * Layout matches the real ControlsPage:
  *   - Page header (title + action buttons)
- *   - Filter bar (search + 2 selects)
+ *   - Compact filter bar (search + pill dropdowns)
  *   - Data table (8 columns × 10 rows)
  */
 export default function ControlsLoading() {
     return (
         <div className="space-y-6 animate-fadeIn" aria-busy="true" aria-label="Loading controls">
             <SkeletonPageHeader />
-            <SkeletonFilterBar />
+            <SkeletonCompactFilterBar />
             <SkeletonDataTable rows={10} cols={8} />
         </div>
     );

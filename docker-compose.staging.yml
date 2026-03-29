@@ -54,6 +54,34 @@ services:
       timeout: 5s
       retries: 10
 
+  # ── Redis (caching, jobs, async coordination) ──
+  redis:
+    image: redis:7-alpine
+    container_name: inflect-staging-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - staging-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── ClamAV (antivirus scanning) ──
+  clamav:
+    image: clamav/clamav:1.3
+    container_name: inflect-staging-clamav
+    restart: unless-stopped
+    volumes:
+      - staging-clamav-defs:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
   # ── Next.js App ──
   app:
     build:
@@ -64,6 +92,10 @@ services:
     depends_on:
       pgbouncer:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
     ports:
       - "${APP_PORT:-3000}:3000"
     env_file:
@@ -72,6 +104,10 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-inflect}:${POSTGRES_PASSWORD:-staging_password_change_me}@pgbouncer:5432/${POSTGRES_DB:-inflect_staging}?schema=public&pgbouncer=true
       DIRECT_DATABASE_URL: postgresql://${POSTGRES_USER:-inflect}:${POSTGRES_PASSWORD:-staging_password_change_me}@postgres:5432/${POSTGRES_DB:-inflect_staging}?schema=public
+      REDIS_URL: redis://redis:6379
+      CLAMAV_HOST: clamav:3310
+      AV_SCAN_MODE: strict
+      STORAGE_PROVIDER: s3
       FILE_STORAGE_ROOT: /data/uploads
       UPLOAD_DIR: /data/uploads
     volumes:
@@ -86,5 +122,9 @@ services:
 volumes:
   staging-pgdata:
     name: inflect-staging-pgdata
+  staging-redisdata:
+    name: inflect-staging-redisdata
   staging-uploads:
     name: inflect-staging-uploads
+  staging-clamav-defs:
+    name: inflect-staging-clamav-defs

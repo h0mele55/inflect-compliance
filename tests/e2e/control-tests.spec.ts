@@ -57,14 +57,16 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await page.fill('#control-name-input', `Test Ctrl ${uid}`);
         await page.fill('#control-code-input', `TC-${uid}`);
         await page.click('#create-control-btn');
-        await page.waitForURL('**/controls/**', { timeout: 15000 });
-        await page.waitForSelector('#control-title', { timeout: 15000 });
+        // Wait for navigation to the new control detail page (URL contains a CUID)
+        await page.waitForURL(/\/controls\/[a-z0-9]{20,}/, { timeout: 30000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await page.waitForSelector('#control-title', { timeout: 30000 });
         await expect(page.locator('#control-title')).toContainText(`Test Ctrl ${uid}`, { timeout: 5000 });
 
         // Go to Tests tab — TestPlansPanel fetches data on mount, wait for the API to settle
         await page.click('#tab-tests');
         await page.waitForLoadState('networkidle');
-        await page.waitForSelector('#create-test-plan-btn', { timeout: 15000 });
+        await page.waitForSelector('#create-test-plan-btn', { timeout: 30000 });
 
         // Create a test plan
         await page.click('#create-test-plan-btn');
@@ -94,7 +96,7 @@ test.describe('Control Tests (Test-of-Control)', () => {
         // Go to Tests tab — wait for TestPlansPanel fetch to complete
         await page.click('#tab-tests');
         await page.waitForLoadState('networkidle');
-        await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 30000 });
 
         // Click the test plan name to go to detail page
         await page.click(`text=Access Review ${uid}`);

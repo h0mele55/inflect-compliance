@@ -4,8 +4,13 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantContext, useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
-import TraceabilityPanel from '@/components/TraceabilityPanel';
+import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
+
+const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
+    loading: () => <div className="animate-pulse h-48" aria-busy="true" />,
+    ssr: false,
+});
 
 type Risk = {
     id: string;

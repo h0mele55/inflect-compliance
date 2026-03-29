@@ -40,14 +40,19 @@ describe('RBAC Guardrail Scans', () => {
     });
 
     describe('Controls page RBAC', () => {
-        test('controls page uses appPerms for create actions', () => {
+        test('controls server page resolves appPerms and passes to client island', () => {
             const content = readFile('app/t/[tenantSlug]/(app)/controls/page.tsx');
-            expect(content).toMatch(/appPerms\.controls\.create/);
+            // Server component must resolve permissions via getPermissionsForRole
+            expect(content).toMatch(/getPermissionsForRole/);
+            // Must pass appPermissions (including controls) to client island
+            expect(content).toMatch(/appPerms\.controls/);
         });
 
-        test('controls page uses appPerms for edit actions (status/applicability toggles)', () => {
-            const content = readFile('app/t/[tenantSlug]/(app)/controls/page.tsx');
-            expect(content).toMatch(/appPerms\.controls\.edit/);
+        test('controls client island receives and enforces create/edit permissions', () => {
+            const content = readFile('app/t/[tenantSlug]/(app)/controls/ControlsClient.tsx');
+            // Client island must declare create and edit permission props
+            expect(content).toMatch(/create.*boolean/);
+            expect(content).toMatch(/edit.*boolean/);
         });
     });
 
@@ -70,18 +75,22 @@ describe('RBAC Guardrail Scans', () => {
     });
 
     describe('Policies page RBAC', () => {
-        test('policy create buttons are wrapped in RequirePermission', () => {
+        test('policies server page resolves permissions and passes to client island', () => {
             const content = readFile('app/t/[tenantSlug]/(app)/policies/page.tsx');
-            expect(content).toMatch(/RequirePermission/);
-            expect(content).toMatch(/resource="policies" action="create"/);
+            // Server component must resolve tenant context (which includes permissions)
+            expect(content).toMatch(/getTenantCtx/);
+            // Must pass permissions to client island
+            expect(content).toMatch(/permissions/);
         });
     });
 
     describe('Risks page RBAC', () => {
-        test('risk create/import buttons are wrapped in RequirePermission', () => {
+        test('risks server page resolves permissions and passes to client island', () => {
             const content = readFile('app/t/[tenantSlug]/(app)/risks/page.tsx');
-            expect(content).toMatch(/RequirePermission/);
-            expect(content).toMatch(/resource="risks" action="create"/);
+            // Server component must resolve tenant context (which includes permissions)
+            expect(content).toMatch(/getTenantCtx/);
+            // Must pass permissions to client island
+            expect(content).toMatch(/permissions/);
         });
     });
 

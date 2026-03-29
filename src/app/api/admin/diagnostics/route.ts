@@ -10,7 +10,7 @@
  */
 import { NextResponse } from 'next/server';
 import { withApiErrorHandling } from '@/lib/errors/api';
-import { getLegacyCtx } from '@/lib/auth/context';
+import { getLegacyCtx } from '@/app-layer/context';
 import { forbidden } from '@/lib/errors/types';
 import { isTelemetryInitialized } from '@/lib/observability/instrumentation';
 import { isSentryInitialized } from '@/lib/observability/sentry';

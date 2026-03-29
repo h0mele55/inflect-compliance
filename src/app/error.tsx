@@ -16,10 +16,15 @@ export default function GlobalError({
     reset: () => void;
 }) {
     useEffect(() => {
-        // Report to Sentry with error digest for server/client correlation
-        Sentry.captureException(error, {
-            tags: { digest: error.digest || 'none' },
-        });
+        // Report to Sentry — wrapped in try/catch so the error boundary
+        // itself never crashes (which causes "missing required error components")
+        try {
+            Sentry.captureException(error, {
+                tags: { digest: error.digest || 'none' },
+            });
+        } catch {
+            console.error('[error.tsx] Failed to report to Sentry:', error);
+        }
     }, [error]);
 
     return (

@@ -24,9 +24,28 @@
  */
 import { createHash } from 'crypto';
 import { PrismaClient } from '@prisma/client';
-import { prisma } from '../prisma';
 import { computeEntryHash, toCanonicalTimestamp } from './canonical-hash';
 import type { AuditDetails } from './types';
+
+/**
+ * Lazy getter for the default PrismaClient singleton.
+ *
+ * ARCHITECTURE NOTE: audit-writer.ts MUST NOT import prisma at module scope.
+ * prisma.ts registers the audit middleware that `require()`s this file,
+ * creating a circular dependency:
+ *   prisma.ts → (require) audit-writer.ts → (import) prisma.ts
+ *
+ * Webpack tries to resolve this cycle at compile time and fails with
+ * "Cannot read properties of undefined (reading 'call')" because the
+ * prisma.ts module isn't fully initialized yet when audit-writer.ts loads.
+ *
+ * The lazy getter defers the import to first actual use (at runtime),
+ * by which point both modules are fully initialized.
+ */
+function getDefaultPrisma(): PrismaClient {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('../prisma').prisma;
+}
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -110,7 +129,7 @@ export async function appendAuditEntry(input: AppendAuditInput, client?: PrismaC
         legacyText: input.details || null,
     };
 
-    const db = client || prisma;
+    const db = client || getDefaultPrisma();
 
     return db.$transaction(async (tx) => {
         // 1. Acquire per-tenant advisory lock
@@ -215,7 +234,7 @@ export interface ChainVerificationResult {
  * @returns Verification result with chain validity
  */
 export async function verifyAuditChain(tenantId: string, client?: PrismaClient): Promise<ChainVerificationResult> {
-    const db = client || prisma;
+    const db = client || getDefaultPrisma();
 
     const rows: Array<{
         id: string;

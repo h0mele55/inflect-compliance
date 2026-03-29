@@ -21,9 +21,13 @@ export default function GlobalError({
     reset: () => void;
 }) {
     useEffect(() => {
-        Sentry.captureException(error, {
-            tags: { digest: error.digest || 'none', boundary: 'global' },
-        });
+        try {
+            Sentry.captureException(error, {
+                tags: { digest: error.digest || 'none', boundary: 'global' },
+            });
+        } catch {
+            console.error('[global-error.tsx] Failed to report to Sentry:', error);
+        }
     }, [error]);
 
     return (

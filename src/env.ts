@@ -14,6 +14,10 @@ export const env = createEnv({
         // Falls back to DATABASE_URL if not set (non-pooled environments).
         DIRECT_DATABASE_URL: z.string().url().optional(),
 
+        // Redis (caching, jobs, async coordination)
+        // Optional — app degrades gracefully when Redis is not available.
+        REDIS_URL: z.string().optional(),
+
         // NextAuth
         NEXTAUTH_URL: z.preprocess(
             // This makes Vercel deployments not fail if you don't set NEXTAUTH_URL
@@ -49,7 +53,7 @@ export const env = createEnv({
         FILE_ALLOWED_MIME: z.string().optional(),
 
         // Cloud Storage (S3/R2/MinIO)
-        STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+        STORAGE_PROVIDER: z.enum(["local", "s3"]).default("s3"),
         S3_BUCKET: z.string().optional(),
         S3_REGION: z.string().optional(),
         S3_ENDPOINT: z.string().optional(),
@@ -58,7 +62,8 @@ export const env = createEnv({
 
         // AV Scanning
         AV_WEBHOOK_SECRET: z.string().optional(),          // HMAC secret for webhook auth
-        AV_SCAN_MODE: z.enum(["strict", "permissive", "disabled"]).default("permissive"),
+        AV_SCAN_MODE: z.enum(["strict", "permissive", "disabled"]).default("strict"),
+        CLAMAV_HOST: z.string().optional(),                  // ClamAV daemon host (e.g. clamav:3310)
 
         // Data Protection (Epic 8)
         DATA_ENCRYPTION_KEY: z.string().min(32, "DATA_ENCRYPTION_KEY must be at least 32 characters").optional(),
@@ -107,6 +112,7 @@ export const env = createEnv({
         NODE_ENV: process.env.NODE_ENV,
         DATABASE_URL: process.env.DATABASE_URL,
         DIRECT_DATABASE_URL: process.env.DIRECT_DATABASE_URL,
+        REDIS_URL: process.env.REDIS_URL,
         NEXTAUTH_URL: process.env.NEXTAUTH_URL,
         AUTH_URL: process.env.AUTH_URL,
         AUTH_SECRET: process.env.AUTH_SECRET,
@@ -138,6 +144,7 @@ export const env = createEnv({
 
         AV_WEBHOOK_SECRET: process.env.AV_WEBHOOK_SECRET,
         AV_SCAN_MODE: process.env.AV_SCAN_MODE,
+        CLAMAV_HOST: process.env.CLAMAV_HOST,
 
         DATA_ENCRYPTION_KEY: process.env.DATA_ENCRYPTION_KEY,
 

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { unstable_noStore as noStore } from 'next/cache';
 import { auth } from '@/auth';
-import { resolveTenantContext } from '@/lib/tenant-context';
+import { getTenantServerContext } from '@/lib/server/tenant-context.server';
 import { TenantProvider } from '@/lib/tenant-context-provider';
 import { getTenantPlan } from '@/lib/entitlements-server';
 
@@ -41,29 +41,31 @@ export default async function TenantLayout({
         notFound();
     }
 
-    // Resolve tenant context (throws notFound/forbidden if invalid)
-    let tenantCtx;
+    // Resolve tenant context server-side (throws notFound/forbidden if invalid)
+    let serverCtx;
     try {
-        tenantCtx = await resolveTenantContext({ tenantSlug }, session.user.id);
+        serverCtx = await getTenantServerContext({
+            tenantSlug,
+            userId: session.user.id,
+        });
     } catch {
         notFound();
     }
 
-    const plan = await getTenantPlan(tenantCtx.tenant.id) ?? undefined;
-
-    const tenantValue = {
-        tenantId: tenantCtx.tenant.id,
-        tenantSlug: tenantCtx.tenant.slug,
-        tenantName: tenantCtx.tenant.name,
-        role: tenantCtx.role,
-        plan,
-        permissions: tenantCtx.permissions,
-        appPermissions: tenantCtx.appPermissions,
-    };
+    const plan = await getTenantPlan(serverCtx.tenant.id) ?? undefined;
 
     return (
-        <TenantProvider value={tenantValue}>
+        <TenantProvider value={{
+            tenantId: serverCtx.tenant.id,
+            tenantSlug: serverCtx.tenant.slug,
+            tenantName: serverCtx.tenant.name,
+            role: serverCtx.role,
+            plan,
+            permissions: serverCtx.permissions,
+            appPermissions: serverCtx.appPermissions,
+        }}>
             {children}
         </TenantProvider>
     );
 }
+

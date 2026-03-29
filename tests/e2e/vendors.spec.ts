@@ -66,7 +66,7 @@ test.describe('Vendor Management', () => {
         await page.click('#create-vendor-submit');
 
         await page.waitForURL(/\/vendors\//, { timeout: 60000 });
-        await expect(page.locator('#vendor-detail-name')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('#vendor-detail-name')).toBeVisible({ timeout: 30000 });
         await expect(page.locator('#vendor-detail-name')).toContainText(`E2E Vendor ${uid}`);
     });
 

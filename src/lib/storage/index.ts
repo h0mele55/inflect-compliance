@@ -41,7 +41,7 @@ let _provider: StorageProvider | null = null;
 export function getStorageProvider(): StorageProvider {
     if (_provider) return _provider;
 
-    const providerType = (env.STORAGE_PROVIDER || 'local') as StorageProviderType;
+    const providerType = (env.STORAGE_PROVIDER || 's3') as StorageProviderType;
 
     // Production guard: warn (not fail) if local is used in production.
     // This allows migration windows while ensuring visibility.

@@ -5,6 +5,10 @@ const withNextIntl = createNextIntlPlugin('./src/i18n.ts');
 const defaultOptions = {
     // Other experimental or default options
     experimental: {
+        optimizePackageImports: [
+            'lucide-react',
+            '@tanstack/react-query',
+        ],
         serverComponentsExternalPackages: [
             'pdfkit',
             // Pino & transports — use native worker_threads / dynamic require
@@ -75,6 +79,9 @@ const defaultOptions = {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     ...defaultOptions,
+    // Use a separate build directory for E2E tests to avoid .next cache
+    // contention when multiple dev servers run concurrently.
+    ...(process.env.NEXT_TEST_MODE ? { distDir: '.next-test' } : {}),
     eslint: {
         // Lint runs separately in CI (npm run lint). Don't block builds.
         ignoreDuringBuilds: true,

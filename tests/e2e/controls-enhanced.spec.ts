@@ -23,18 +23,22 @@ test.describe('Controls Enhanced', () => {
     test('dashboard loads and shows metrics', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         // Dev server may return 500 on first load while compiling
-        let retries = 2;
+        let retries = 3;
         while (retries > 0) {
-            const resp = await page.goto(`/t/${tenantSlug}/controls/dashboard`);
-            if (resp && resp.status() < 500) break;
+            try {
+                const resp = await page.goto(`/t/${tenantSlug}/controls/dashboard`);
+                if (resp && resp.status() < 500) break;
+            } catch {
+                // net:: errors during heavy compilation
+            }
             retries--;
-            if (retries > 0) await page.waitForTimeout(3000);
+            if (retries > 0) await page.waitForTimeout(5000);
         }
-        await page.waitForLoadState('networkidle');
-        await page.waitForSelector('#dashboard-heading', { timeout: 30000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await page.waitForSelector('#dashboard-heading', { timeout: 60000 });
         await expect(page.locator('#dashboard-heading')).toContainText('Controls Dashboard');
-        await expect(page.locator('#implementation-progress')).toBeVisible();
-        await expect(page.locator('#dashboard-stats')).toBeVisible();
+        await expect(page.locator('#implementation-progress')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('#dashboard-stats')).toBeVisible({ timeout: 10000 });
     });
 
     test('mark test completed updates last tested', async ({ page }) => {

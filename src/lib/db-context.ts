@@ -57,9 +57,12 @@ export async function withTenantDb<T>(
 export async function runInTenantContext<T>(
     ctx: RequestContext,
     callback: (db: PrismaTx) => Promise<T>,
-    customPrisma?: PrismaClient
+    options?: { customPrisma?: PrismaClient; timeout?: number; maxWait?: number }
 ): Promise<T> {
-    const p = customPrisma || prisma;
+    const p = options?.customPrisma || prisma;
+    const txOptions: { timeout?: number; maxWait?: number } = {};
+    if (options?.timeout) txOptions.timeout = options.timeout;
+    if (options?.maxWait) txOptions.maxWait = options.maxWait;
 
     // Bind full audit context so middleware can access tenantId, userId, requestId
     return runWithAuditContext(
@@ -75,7 +78,7 @@ export async function runInTenantContext<T>(
                 await tx.$executeRaw`SELECT set_config('app.tenant_id', ${ctx.tenantId}, true)`;
                 await tx.$executeRaw`SELECT set_config('app.request_id', ${ctx.requestId}, true)`;
                 return callback(tx);
-            })
+            }, txOptions)
     ) as Promise<T>;
 }
 

@@ -77,15 +77,19 @@ test.describe('Controls Center', () => {
         await page.click('#create-task-btn');
         await page.waitForSelector('#task-title-input', { timeout: 5000 });
         await page.fill('#task-title-input', `E2E Task ${uniqueId}`);
-        await page.click('#submit-task-btn');
+        // Create task — wait for the API response before asserting
+        await Promise.all([
+            page.waitForResponse(resp => resp.url().includes('/tasks') && resp.request().method() === 'POST', { timeout: 15000 }),
+            page.click('#submit-task-btn'),
+        ]);
 
-        // Verify task appears
-        await expect(page.locator('#tasks-table')).toContainText(`E2E Task ${uniqueId}`, { timeout: 5000 });
+        // Verify task appears (refetch + re-render can be slow under load)
+        await expect(page.locator('#tasks-table')).toContainText(`E2E Task ${uniqueId}`, { timeout: 15000 });
 
         // Mark done - wait for the PATCH API call to complete before asserting
         const doneBtn = page.locator('button:has-text("Done")').first();
         await Promise.all([
-            page.waitForResponse(resp => resp.url().includes('/controls/tasks/') && resp.request().method() === 'PATCH', { timeout: 10000 }),
+            page.waitForResponse(resp => resp.url().includes('/tasks/') && resp.request().method() === 'PATCH', { timeout: 10000 }),
             doneBtn.click(),
         ]);
         // Wait for refetch + re-render to show the updated status badge
@@ -135,13 +139,16 @@ test.describe('Controls Center', () => {
         const saveBtn = page.locator('#save-applicability-btn');
         await expect(saveBtn).toBeDisabled();
 
-        // Fill justification and save
+        // Fill justification and save — wait for the API response
         await page.fill('#applicability-justification', 'Not in scope for this compliance cycle');
         await expect(saveBtn).toBeEnabled();
-        await saveBtn.click();
+        await Promise.all([
+            page.waitForResponse(resp => resp.url().includes('/applicability') && resp.request().method() === 'POST', { timeout: 15000 }),
+            saveBtn.click(),
+        ]);
 
-        // Verify N/A badge
-        await expect(page.locator('#control-applicability')).toContainText('Not Applicable', { timeout: 5000 });
+        // Verify N/A badge after refetch
+        await expect(page.locator('#control-applicability')).toContainText('Not Applicable', { timeout: 10000 });
     });
 
     test('reader user sees view-only controls', async ({ page }) => {

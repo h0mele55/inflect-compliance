@@ -10,9 +10,17 @@ const PencilIcon = ({ size = 14 }: { size?: number }) => (
 );
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { extractMutationError } from '@/lib/mutations';
-import TraceabilityPanel from '@/components/TraceabilityPanel';
+import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
-import TestPlansPanel from '@/components/TestPlansPanel';
+
+const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
+    loading: () => <div className="glass-card p-6 animate-pulse h-48" aria-busy="true" />,
+    ssr: false,
+});
+const TestPlansPanel = dynamic(() => import('@/components/TestPlansPanel'), {
+    loading: () => <div className="glass-card p-6 animate-pulse h-48" aria-busy="true" />,
+    ssr: false,
+});
 import type {
     ControlDetailDTO, ControlTaskDTO, EvidenceLinkDTO,
     FrameworkMappingDTO, ContributorDTO, AuditLogEntry,

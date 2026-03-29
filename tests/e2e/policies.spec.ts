@@ -48,6 +48,7 @@ test.describe('Policy Center', () => {
 
     let tenantSlug: string;
     let createdPolicyTitle: string;
+    let createdPolicyPath: string;
     const uniqueId = Date.now().toString(36);
 
     test('policies list page loads with controls', async ({ page }) => {
@@ -75,17 +76,21 @@ test.describe('Policy Center', () => {
         await page.fill('#policy-content-input', '# Test Policy\n\nThis is a test policy created by e2e.');
         await page.click('#create-policy-btn');
 
-        await page.waitForURL('**/policies/**', { timeout: 10000 });
-        await page.waitForSelector('#policy-title', { timeout: 15000 });
+        await page.waitForURL('**/policies/**', { timeout: 30000 });
+        // Policy detail page + API route require JIT compilation on first access
+        await page.waitForSelector('#policy-title', { timeout: 30000 });
         await expect(page.locator('#policy-title')).toContainText(createdPolicyTitle);
         await expect(page.locator('#policy-status')).toContainText('DRAFT');
+        // Capture the detail URL for use in subsequent serial tests
+        createdPolicyPath = new URL(page.url()).pathname;
     });
 
     test('create version via editor and view history', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await gotoAndVerify(page, `/t/${tenantSlug}/policies`, 'h1');
-        await page.click(`text=${createdPolicyTitle}`);
-        await page.waitForSelector('#policy-title', { timeout: 10000 });
+        // Navigate directly to the policy detail page using saved path
+        await page.goto(createdPolicyPath);
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#policy-title', { timeout: 30000 });
 
         await page.click('#new-version-btn');
         await page.waitForSelector('#version-editor', { timeout: 5000 });
@@ -100,9 +105,10 @@ test.describe('Policy Center', () => {
 
     test('create external link version', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await gotoAndVerify(page, `/t/${tenantSlug}/policies`, 'h1');
-        await page.click(`text=${createdPolicyTitle}`);
-        await page.waitForSelector('#policy-title', { timeout: 10000 });
+        // Navigate directly to the policy detail page using saved path
+        await page.goto(createdPolicyPath);
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#policy-title', { timeout: 30000 });
 
         // Open editor
         await page.click('#new-version-btn');
@@ -131,12 +137,14 @@ test.describe('Policy Center', () => {
             await page.fill('#policy-title-input', createdPolicyTitle);
             await page.fill('#policy-content-input', '# Activity Test Policy\n\nCreated for activity feed test.');
             await page.click('#create-policy-btn');
-            await page.waitForURL('**/policies/**', { timeout: 10000 });
-            await page.waitForSelector('#policy-title', { timeout: 15000 });
+            await page.waitForURL('**/policies/**', { timeout: 30000 });
+            await page.waitForSelector('#policy-title', { timeout: 30000 });
+            createdPolicyPath = new URL(page.url()).pathname;
         } else {
-            await gotoAndVerify(page, `/t/${tenantSlug}/policies`, 'h1');
-            await page.click(`text=${createdPolicyTitle}`);
-            await page.waitForSelector('#policy-title', { timeout: 10000 });
+            // Navigate directly to the policy detail page using saved path
+            await page.goto(createdPolicyPath);
+            await page.waitForLoadState('networkidle');
+            await page.waitForSelector('#policy-title', { timeout: 30000 });
         }
 
         await page.click('#tab-activity');
@@ -166,13 +174,10 @@ test.describe('Policy Center', () => {
 
     test('policy detail shows role-gated action buttons', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        await gotoAndVerify(page, `/t/${tenantSlug}/policies`, 'h1');
-
-        // Find and click the created policy
-        const policyLink = page.locator(`text=${createdPolicyTitle}`).first();
-        await policyLink.waitFor({ timeout: 10000 });
-        await policyLink.click();
-        await page.waitForSelector('#policy-title', { timeout: 10000 });
+        // Navigate directly to the policy detail page using saved path
+        await page.goto(createdPolicyPath);
+        await page.waitForLoadState('networkidle');
+        await page.waitForSelector('#policy-title', { timeout: 30000 });
 
         // Admin should see action buttons
         await expect(page.locator('#new-version-btn')).toBeVisible({ timeout: 5000 });

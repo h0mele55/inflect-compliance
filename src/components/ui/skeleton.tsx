@@ -156,3 +156,158 @@ export function SkeletonDataTable({ rows = 8, cols = 8 }: { rows?: number; cols?
         </div>
     );
 }
+
+// ─── Compact filter bar (pill-style) ───
+
+export function SkeletonCompactFilterBar() {
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[180px] max-w-sm">
+                <Skeleton className="h-[34px] w-full rounded-lg" />
+            </div>
+            <Skeleton className="h-[30px] w-24 rounded-full" />
+            <Skeleton className="h-[30px] w-20 rounded-full" />
+        </div>
+    );
+}
+
+// ─── KPI card grids ───
+
+export function SkeletonKpiCard() {
+    return (
+        <div className="glass-card p-5 text-center" aria-hidden="true">
+            <Skeleton className="h-3 w-20 mx-auto" />
+            <Skeleton className="h-8 w-12 mx-auto mt-3" />
+        </div>
+    );
+}
+
+export function SkeletonKpiGrid({ count = 4 }: { count?: number }) {
+    return (
+        <div className={`grid grid-cols-2 ${count === 6 ? 'md:grid-cols-3 lg:grid-cols-6' : 'md:grid-cols-4'} gap-4`}>
+            {Array.from({ length: count }).map((_, i) => (
+                <SkeletonKpiCard key={i} />
+            ))}
+        </div>
+    );
+}
+
+// ─── Dashboard skeleton ───
+
+export function SkeletonDashboard() {
+    return (
+        <div className="space-y-6 animate-fadeIn" aria-busy="true" aria-label="Loading dashboard">
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1.5">
+                    <SkeletonHeading className="w-40" />
+                    <SkeletonLine className="w-56" />
+                </div>
+            </div>
+
+            {/* 6-card stat grid */}
+            <SkeletonKpiGrid count={6} />
+
+            {/* Clause progress + Alerts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="glass-card p-5 space-y-3">
+                    <Skeleton className="h-4 w-32" />
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="flex-1 h-3 rounded-full" />
+                        <Skeleton className="h-4 w-12" />
+                    </div>
+                    <Skeleton className="h-3 w-24 mt-1" />
+                </div>
+                <div className="glass-card p-5 space-y-3">
+                    <Skeleton className="h-4 w-36" />
+                    <div className="space-y-2">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                                <Skeleton className="w-2 h-2 rounded-full" />
+                                <Skeleton className={`h-3 ${i === 0 ? 'w-40' : i === 1 ? 'w-48' : 'w-36'}`} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* Quick actions + Recent activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="glass-card p-5 space-y-3">
+                    <Skeleton className="h-4 w-28" />
+                    <div className="grid grid-cols-2 gap-2">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <Skeleton key={i} className="h-8 rounded" />
+                        ))}
+                    </div>
+                </div>
+                <div className="glass-card p-5 space-y-3">
+                    <Skeleton className="h-4 w-32" />
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="flex items-start gap-2">
+                                <Skeleton className="h-3 w-28 shrink-0" />
+                                <Skeleton className={`h-3 ${i % 2 === 0 ? 'w-full' : 'w-3/4'}`} />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Detail page with tabs ───
+
+export function SkeletonDetailTabs({ tabCount = 4 }: { tabCount?: number }) {
+    return (
+        <div className="space-y-6 animate-fadeIn" aria-busy="true" aria-label="Loading details">
+            {/* Back link + heading */}
+            <div className="space-y-2">
+                <Skeleton className="h-4 w-16" />
+                <SkeletonHeading className="w-72" />
+                <div className="flex gap-2 mt-1">
+                    <SkeletonPill />
+                    <SkeletonPill className="w-24" />
+                    <SkeletonPill className="w-16" />
+                </div>
+            </div>
+
+            {/* Tab bar */}
+            <div className="flex gap-1 border-b border-slate-700/50 pb-0.5">
+                {Array.from({ length: tabCount }).map((_, i) => (
+                    <Skeleton key={i} className={`h-8 ${i === 0 ? 'w-24' : 'w-20'} rounded-t`} />
+                ))}
+            </div>
+
+            {/* Tab content placeholder */}
+            <SkeletonCard lines={5} />
+            <SkeletonCard lines={3} />
+        </div>
+    );
+}
+
+// ─── Admin / settings skeleton ───
+
+export function SkeletonSettings() {
+    return (
+        <div className="space-y-6 animate-fadeIn" aria-busy="true" aria-label="Loading settings">
+            <SkeletonHeading className="w-36" />
+            {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="glass-card p-6 space-y-4">
+                    <Skeleton className="h-5 w-40" />
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-4">
+                            <Skeleton className="h-4 w-24" />
+                            <SkeletonInput className="flex-1" />
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <Skeleton className="h-4 w-32" />
+                            <SkeletonInput className="flex-1" />
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}

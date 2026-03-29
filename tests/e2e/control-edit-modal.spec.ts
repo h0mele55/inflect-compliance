@@ -8,7 +8,7 @@ async function loginAndGetTenant(page: Page): Promise<string> {
     await page.fill('input[type="email"]', TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 15000 });
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
     const url = new URL(page.url());
     const match = url.pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug from ' + url.pathname);
@@ -23,34 +23,35 @@ test.describe('Control Edit Modal', () => {
     test('admin sees Edit button on control detail', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('#controls-table', { timeout: 15000 });
+        await page.waitForSelector('#controls-table', { timeout: 30000 });
 
         // Click first control link
         const firstLink = page.locator('#controls-table tbody tr a[id^="control-link-"]').first();
-        await firstLink.waitFor({ state: 'visible' });
+        await firstLink.waitFor({ state: 'visible', timeout: 15000 });
         await firstLink.click();
         
-        // Wait for page transition and hydration
+        // Wait for page transition and hydration — control detail page is large (995 LOC)
+        // and requires JIT compilation on first access in dev mode
         await page.waitForLoadState('networkidle');
-        await page.waitForSelector('#control-title', { timeout: 10000 });
+        await page.waitForSelector('#control-title', { timeout: 30000 });
 
         // Edit button should be visible
-        await expect(page.locator('[data-testid="control-edit-button"]')).toBeVisible({ timeout: 3000 });
+        await expect(page.locator('[data-testid="control-edit-button"]')).toBeVisible({ timeout: 5000 });
     });
 
     test('Edit button opens modal and saves title change', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('#controls-table', { timeout: 15000 });
+        await page.waitForSelector('#controls-table', { timeout: 30000 });
 
         // Click first control
         const firstLink = page.locator('#controls-table tbody tr a[id^="control-link-"]').first();
-        await firstLink.waitFor({ state: 'visible' });
+        await firstLink.waitFor({ state: 'visible', timeout: 15000 });
         await firstLink.click();
         
         // Wait for page transition and hydration
         await page.waitForLoadState('networkidle');
-        await page.waitForSelector('#control-title', { timeout: 10000 });
+        await page.waitForSelector('#control-title', { timeout: 30000 });
 
         // Record original title
         const originalTitle = (await page.locator('#control-title').textContent())!.trim();
@@ -92,14 +93,14 @@ test.describe('Control Edit Modal', () => {
     test('Cancel closes modal without saving', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForSelector('#controls-table', { timeout: 15000 });
+        await page.waitForSelector('#controls-table', { timeout: 30000 });
 
         const firstLink = page.locator('#controls-table tbody tr a[id^="control-link-"]').first();
-        await firstLink.waitFor({ state: 'visible' });
+        await firstLink.waitFor({ state: 'visible', timeout: 15000 });
         await firstLink.click();
         
         await page.waitForLoadState('networkidle');
-        await page.waitForSelector('#control-title', { timeout: 10000 });
+        await page.waitForSelector('#control-title', { timeout: 30000 });
 
         const originalTitle = (await page.locator('#control-title').textContent())!.trim();
 

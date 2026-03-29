@@ -63,6 +63,40 @@ services:
     networks:
       - internal
 
+  # ── Redis (caching, jobs, async coordination) ──
+  redis:
+    image: redis:7-alpine
+    container_name: inflect-prod-redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - prod-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No ports exposed — only accessible from app via internal network
+    networks:
+      - internal
+
+  # ── ClamAV (antivirus scanning) ──
+  clamav:
+    image: clamav/clamav:1.3
+    container_name: inflect-prod-clamav
+    restart: always
+    volumes:
+      - prod-clamav-defs:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    # No ports exposed — only accessible from app via internal network
+    networks:
+      - internal
+
   # ── Next.js App ──
   app:
     build:
@@ -72,6 +106,10 @@ services:
     restart: always
     depends_on:
       pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
     ports:
       - "${APP_PORT:-3000}:3000"
@@ -83,6 +121,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-inflect}:${POSTGRES_PASSWORD}@pgbouncer:5432/${POSTGRES_DB:-inflect_production}?schema=public&pgbouncer=true
       # Migrations/introspection use direct Postgres connection (bypasses PgBouncer)
       DIRECT_DATABASE_URL: postgresql://${POSTGRES_USER:-inflect}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-inflect_production}?schema=public
+      REDIS_URL: redis://redis:6379
+      CLAMAV_HOST: clamav:3310
+      AV_SCAN_MODE: strict
+      STORAGE_PROVIDER: s3
       FILE_STORAGE_ROOT: /data/uploads
       UPLOAD_DIR: /data/uploads
     volumes:
@@ -108,5 +150,9 @@ networks:
 volumes:
   prod-pgdata:
     name: inflect-prod-pgdata
+  prod-redisdata:
+    name: inflect-prod-redisdata
   prod-uploads:
     name: inflect-prod-uploads
+  prod-clamav-defs:
+    name: inflect-prod-clamav-defs
