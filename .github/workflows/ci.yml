@@ -299,6 +299,7 @@ jobs:
         run: npx next build
         env:
           NODE_ENV: production
+          NEXT_TEST_MODE: "1"
 
       # ── Playwright with browser cache ──
       - name: Get Playwright version
