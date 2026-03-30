@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "tsx scripts/validate-env.ts && next build",
-    "start": "next start",
+    "dev": "cross-env NEXT_IGNORE_INCORRECT_LOCKFILE=1 next dev",
+    "build": "cross-env NEXT_IGNORE_INCORRECT_LOCKFILE=1 tsx scripts/validate-env.ts && next build",
+    "start": "cross-env NEXT_IGNORE_INCORRECT_LOCKFILE=1 next start",
     "migrate:deploy": "prisma migrate deploy",
     "prod:local": "npm run migrate:deploy && npm run build && npm start",
     "db:generate": "prisma generate",
@@ -19,7 +19,7 @@
     "test:coverage": "jest --coverage --forceExit",
     "test:all": "jest && playwright test",
     "typecheck": "tsc --noEmit",
-    "lint": "next lint",
+    "lint": "cross-env NEXT_IGNORE_INCORRECT_LOCKFILE=1 next lint",
     "count-any": "node scripts/count-any.js",
     "ci:local": "node scripts/ci-local.mjs",
     "e2e:local": "node scripts/e2e-local.mjs",
@@ -70,6 +70,17 @@
     "react-dom": "^18.3.0",
     "stripe": "^20.4.1",
     "zod": "^3.25.76"
+  },
+  "optionalDependencies": {
+    "@next/swc-darwin-arm64": "14.2.35",
+    "@next/swc-darwin-x64": "14.2.35",
+    "@next/swc-linux-arm64-gnu": "14.2.35",
+    "@next/swc-linux-arm64-musl": "14.2.35",
+    "@next/swc-linux-x64-gnu": "14.2.35",
+    "@next/swc-linux-x64-musl": "14.2.35",
+    "@next/swc-win32-arm64-msvc": "14.2.35",
+    "@next/swc-win32-ia32-msvc": "14.2.35",
+    "@next/swc-win32-x64-msvc": "14.2.35"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
