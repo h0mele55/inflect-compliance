@@ -241,6 +241,10 @@ jobs:
 
     env:
       AUTH_TEST_MODE: "1"
+      AUTH_TRUST_HOST: "1"
+      AUTH_SECRET: "test-auth-secret-that-is-long-enough-32chars"
+      JWT_SECRET: "test-auth-secret-that-is-long-enough-32chars"
+      AUTH_URL: "http://localhost:3006"
       DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DIRECT_DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
