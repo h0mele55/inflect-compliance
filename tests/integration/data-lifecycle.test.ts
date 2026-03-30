@@ -29,25 +29,27 @@ const describeFn = DB_AVAILABLE ? describe : describe.skip;
 const testTenantId = `dl-test-tenant-${Date.now()}`;
 const testUserId = `dl-test-user-${Date.now()}`;
 
-beforeAll(async () => {
-    await prisma.tenant.create({
-        data: { id: testTenantId, name: `DL Test ${Date.now()}`, slug: `dl-test-${Date.now()}` },
+if (DB_AVAILABLE) {
+    beforeAll(async () => {
+        await prisma.tenant.create({
+            data: { id: testTenantId, name: `DL Test ${Date.now()}`, slug: `dl-test-${Date.now()}` },
+        });
+        await prisma.user.create({
+            data: { id: testUserId, email: `dl-test-${Date.now()}@example.com`, name: 'DL Test' },
+        });
     });
-    await prisma.user.create({
-        data: { id: testUserId, email: `dl-test-${Date.now()}@example.com`, name: 'DL Test' },
-    });
-});
 
-afterAll(async () => {
-    // Clean up raw (bypass middleware)
-    await prisma.$executeRawUnsafe('DELETE FROM "AuditLog" WHERE "tenantId" = $1', testTenantId).catch(() => {});
-    await prisma.$executeRawUnsafe('DELETE FROM "Risk" WHERE "tenantId" = $1', testTenantId).catch(() => {});
-    await prisma.$executeRawUnsafe('DELETE FROM "Control" WHERE "tenantId" = $1', testTenantId).catch(() => {});
-    await prisma.$executeRawUnsafe('DELETE FROM "Vendor" WHERE "tenantId" = $1', testTenantId).catch(() => {});
-    await prisma.$executeRawUnsafe('DELETE FROM "User" WHERE "id" = $1', testUserId).catch(() => {});
-    await prisma.$executeRawUnsafe('DELETE FROM "Tenant" WHERE "id" = $1', testTenantId).catch(() => {});
-    await prisma.$disconnect();
-});
+    afterAll(async () => {
+        // Clean up raw (bypass middleware)
+        await prisma.$executeRawUnsafe('DELETE FROM "AuditLog" WHERE "tenantId" = $1', testTenantId).catch(() => {});
+        await prisma.$executeRawUnsafe('DELETE FROM "Risk" WHERE "tenantId" = $1', testTenantId).catch(() => {});
+        await prisma.$executeRawUnsafe('DELETE FROM "Control" WHERE "tenantId" = $1', testTenantId).catch(() => {});
+        await prisma.$executeRawUnsafe('DELETE FROM "Vendor" WHERE "tenantId" = $1', testTenantId).catch(() => {});
+        await prisma.$executeRawUnsafe('DELETE FROM "User" WHERE "id" = $1', testUserId).catch(() => {});
+        await prisma.$executeRawUnsafe('DELETE FROM "Tenant" WHERE "id" = $1', testTenantId).catch(() => {});
+        await prisma.$disconnect();
+    });
+}
 
 describeFn('Data Lifecycle', () => {
     // ─── purgeSoftDeletedOlderThan ───
