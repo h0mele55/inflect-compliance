@@ -367,14 +367,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     cookies: {
         sessionToken: {
             name:
-                env.NODE_ENV === 'production'
+                env.NODE_ENV === 'production' && env.AUTH_TEST_MODE !== '1'
                     ? '__Secure-authjs.session-token'
                     : 'authjs.session-token',
             options: {
                 httpOnly: true,
                 sameSite: 'lax' as const,
                 path: '/',
-                secure: env.NODE_ENV === 'production',
+                secure: env.NODE_ENV === 'production' && env.AUTH_TEST_MODE !== '1',
             },
         },
     },

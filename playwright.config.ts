@@ -14,7 +14,7 @@ export default defineConfig({
     workers: 1,
     reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
     use: {
-        baseURL: `http://localhost:${port}`,
+        baseURL: `http://127.0.0.1:${port}`,
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
         video: 'on',

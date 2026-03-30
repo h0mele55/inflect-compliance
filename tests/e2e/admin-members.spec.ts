@@ -13,9 +13,10 @@ const ADMIN_USER = { email: 'admin@acme.com', password: 'password123' };
 const READER_USER = { email: 'viewer@acme.com', password: 'password123' };
 
 async function safeGoto(page: Page, url: string, options?: Parameters<Page['goto']>[1], retries = 5) {
+    const defaultOptions: Parameters<Page['goto']>[1] = { waitUntil: 'domcontentloaded', ...options };
     for (let i = 0; i < retries; i++) {
         try {
-            return await page.goto(url, options);
+            return await page.goto(url, defaultOptions);
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e);
             if (i < retries - 1 && msg.includes('net::')) {
