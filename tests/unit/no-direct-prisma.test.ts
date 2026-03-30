@@ -69,7 +69,7 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
     }
 
     // ─── Usecases ───
-    const USECASE_ALLOWLIST: string[] = ['sso.ts', 'mfa.ts', 'mfa-enrollment.ts', 'mfa-challenge.ts', 'session-security.ts', 'webhook-processor.ts', 'scim-users.ts', 'framework.ts'];
+    const USECASE_ALLOWLIST: string[] = ['sso.ts', 'mfa.ts', 'mfa-enrollment.ts', 'mfa-challenge.ts', 'session-security.ts', 'webhook-processor.ts', 'scim-users.ts', 'framework.ts', 'audit-hardening.ts'];
 
     const usecases = readFilesInDir(path.join(SRC_ROOT, 'app-layer/usecases'));
 

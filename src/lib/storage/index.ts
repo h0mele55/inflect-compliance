@@ -123,7 +123,10 @@ export function getProviderByName(name: StorageProviderType): StorageProvider {
  * Sanitize a filename: strip directory separators, control chars, limit length.
  */
 export function sanitizeFileName(name: string): string {
-    return path.basename(name)
+    // path.basename on Linux doesn't treat '\' as separator,
+    // so explicitly strip directory components for both separators.
+    const base = name.split(/[\\/]/).pop() || name;
+    return base
         .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
         .replace(/\.{2,}/g, '.')
         .slice(0, 200);

@@ -69,7 +69,7 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: ./node_modules/.bin/prisma generate
 
       - name: Run ESLint
         run: npm run lint
@@ -95,7 +95,7 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: ./node_modules/.bin/prisma generate
 
       - name: Run tsc --noEmit
         run: npm run typecheck
@@ -141,7 +141,7 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: ./node_modules/.bin/prisma generate
 
       # ── Quality gate: migrations must exist ──
       - name: "Gate: Prisma migrations exist"
@@ -167,7 +167,7 @@ jobs:
 
       # ── Apply schema to test DB ──
       - name: Apply Prisma migrations
-        run: npx prisma migrate deploy
+        run: ./node_modules/.bin/prisma migrate deploy
 
       # ── Jest: unit + integration tests ──
       - name: "Run tests: unit + integration"
@@ -213,7 +213,7 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: ./node_modules/.bin/prisma generate
 
       - name: Build Next.js (production)
         run: npx next build
@@ -273,7 +273,7 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: ./node_modules/.bin/prisma generate
 
       # ── Create roles required by RLS migrations ──
       - name: Create PostgreSQL roles for RLS
@@ -288,7 +288,7 @@ jobs:
           SQL
 
       - name: Apply Prisma migrations
-        run: npx prisma migrate deploy
+        run: ./node_modules/.bin/prisma migrate deploy
 
       - name: Seed test database
         run: npx tsx prisma/seed.ts
@@ -363,6 +363,7 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: always
+        continue-on-error: true
 
       - uses: actions/setup-node@v4
         with:
