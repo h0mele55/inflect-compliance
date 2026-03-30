@@ -1,63 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
+import { loginAndGetTenant, safeGoto, gotoAndVerify } from './e2e-utils';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
-
-/** Retry page.goto up to `retries` times to handle transient ERR_CONNECTION_REFUSED. */
-async function safeGoto(page: Page, url: string, options?: Parameters<Page['goto']>[1], retries = 5) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            return await page.goto(url, options);
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e);
-            if (i < retries - 1 && msg.includes('net::')) {
-                await page.waitForTimeout(5000);
-                continue;
-            }
-            throw e;
-        }
-    }
-}
-
-async function loginAndGetTenant(page: Page): Promise<string> {
-    await safeGoto(page, '/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-    await page.fill('input[type="email"]', TEST_USER.email);
-    await page.fill('input[type="password"]', TEST_USER.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-    const url = new URL(page.url());
-    const match = url.pathname.match(/^\/t\/([^/]+)\//);
-    if (!match) throw new Error('Could not extract tenant slug from ' + url.pathname);
-    const slug = match[1];
-
-    // Verify the app is fully rendered — reload if server was still compiling.
-    let renderRetries = 3;
-    while (renderRetries > 0) {
-        const hasSidebar = await page.locator('aside').isVisible().catch(() => false);
-        if (hasSidebar) break;
-        renderRetries--;
-        if (renderRetries > 0) {
-            await page.waitForLoadState('networkidle');
-            await safeGoto(page, `/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
-            await page.waitForLoadState('networkidle').catch(() => {});
-        }
-    }
-
-    return slug;
-}
-
-/** Navigate and verify content rendered. */
-async function gotoAndVerify(page: Page, url: string, contentSelector: string, maxAttempts = 3) {
-    let attempts = maxAttempts;
-    while (attempts > 0) {
-        await safeGoto(page, url, { waitUntil: 'domcontentloaded' });
-        await page.waitForLoadState('networkidle').catch(() => {});
-        const rendered = await page.locator(contentSelector).first().isVisible().catch(() => false);
-        if (rendered) return;
-        attempts--;
-        if (attempts > 0) await page.waitForTimeout(3000);
-    }
-}
 
 test.describe('Issue Management', () => {
     test.describe.configure({ mode: 'serial' });

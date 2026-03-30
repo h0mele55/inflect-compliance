@@ -3,9 +3,10 @@
  * Uses the stub provider (AI_RISK_PROVIDER=stub or unset).
  */
 import { test, expect, type Page } from '@playwright/test';
+import { safeGoto } from './e2e-utils';
 
 async function doLogin(page: Page) {
-    await page.goto('/login');
+    await safeGoto(page, '/login');
     await page.waitForSelector('input[type="email"]', { timeout: 60000 });
     await page.fill('input[type="email"]', 'admin@acme.com');
     await page.fill('input[type="password"]', 'password123');

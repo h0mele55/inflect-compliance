@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { loginAndGetTenant as login, gotoAndVerify } from './e2e-utils';
 
 /**
  * Responsive layout E2E tests.
@@ -10,46 +11,6 @@ import { test, expect, Page } from '@playwright/test';
  */
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
-
-async function login(page: Page): Promise<string> {
-    await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-    await page.fill('input[type="email"]', TEST_USER.email);
-    await page.fill('input[type="password"]', TEST_USER.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-    const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
-    if (!match) throw new Error('Could not extract tenant slug');
-    const slug = match[1];
-
-    // VERIFY-ON-EXIT: confirm the page actually rendered, not just URL matched.
-    let renderRetries = 3;
-    while (renderRetries > 0) {
-        const rendered = await page.locator('main').isVisible().catch(() => false);
-        if (rendered) break;
-        renderRetries--;
-        if (renderRetries > 0) {
-            await page.waitForLoadState('networkidle');
-            await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
-            await page.waitForLoadState('networkidle').catch(() => {});
-        }
-    }
-
-    return slug;
-}
-
-/** Navigate and verify content rendered. */
-async function gotoAndVerify(page: Page, url: string, contentSelector: string, maxAttempts = 3) {
-    let attempts = maxAttempts;
-    while (attempts > 0) {
-        await page.goto(url, { waitUntil: 'domcontentloaded' });
-        await page.waitForLoadState('networkidle').catch(() => {});
-        const rendered = await page.locator(contentSelector).first().isVisible().catch(() => false);
-        if (rendered) return;
-        attempts--;
-        if (attempts > 0) await page.waitForTimeout(3000);
-    }
-}
 
 /**
  * Check whether the page has horizontal overflow.

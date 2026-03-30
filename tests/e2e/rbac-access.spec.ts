@@ -4,52 +4,10 @@
  * and see the forbidden UX rather than the admin content.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { loginAndGetTenant, safeGoto } from './e2e-utils';
 
 const ADMIN_USER = { email: 'admin@acme.com', password: 'password123' };
 const READER_USER = { email: 'viewer@acme.com', password: 'password123' };
-
-/** Retry page.goto up to `retries` times to handle transient ERR_CONNECTION_REFUSED. */
-async function safeGoto(page: Page, url: string, options?: Parameters<Page['goto']>[1], retries = 5) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            return await page.goto(url, options);
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e);
-            if (i < retries - 1 && msg.includes('net::')) {
-                await page.waitForTimeout(5000);
-                continue;
-            }
-            throw e;
-        }
-    }
-}
-
-async function loginAndGetTenant(page: Page, user: { email: string; password: string }): Promise<string> {
-    await safeGoto(page, '/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-    await page.fill('input[type="email"]', user.email);
-    await page.fill('input[type="password"]', user.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-    const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
-    if (!match) throw new Error('Could not extract tenant slug');
-    const slug = match[1];
-
-    // Verify the app is fully rendered — reload if server was still compiling.
-    let renderRetries = 3;
-    while (renderRetries > 0) {
-        const hasSidebar = await page.locator('aside').isVisible().catch(() => false);
-        if (hasSidebar) break;
-        renderRetries--;
-        if (renderRetries > 0) {
-            await page.waitForLoadState('networkidle');
-            await safeGoto(page, `/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
-            await page.waitForLoadState('networkidle').catch(() => {});
-        }
-    }
-
-    return slug;
-}
 
 test.describe('RBAC Access Control', () => {
     // Each test independently logs in — no need for serial execution.

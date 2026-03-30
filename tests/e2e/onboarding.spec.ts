@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { loginAndGetTenant as loginAsAdmin, gotoAndVerify } from './e2e-utils';
 
 /**
  * Onboarding Wizard E2E Tests
@@ -7,47 +8,6 @@ import { test, expect, type Page } from '@playwright/test';
  * Uses relative URLs so playwright.config.ts baseURL is respected.
  */
 
-// ─── Helpers ───
-
-async function loginAsAdmin(page: Page): Promise<string> {
-    await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-    await page.fill('input[type="email"]', 'admin@acme.com');
-    await page.fill('input[type="password"]', 'password123');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-
-    const url = new URL(page.url());
-    const match = url.pathname.match(/^\/t\/([^/]+)\//);
-    if (!match) throw new Error('Could not extract tenant slug from ' + url.pathname);
-    const slug = match[1];
-
-    // Ensure the page actually rendered
-    let retries = 3;
-    while (retries > 0) {
-        const hasSidebar = await page.locator('aside').isVisible().catch(() => false);
-        if (hasSidebar) break;
-        retries--;
-        if (retries > 0) {
-            await page.waitForLoadState('networkidle');
-            await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
-            await page.waitForLoadState('networkidle').catch(() => {});
-        }
-    }
-
-    return slug;
-}
-
-async function gotoAndVerify(page: Page, url: string, selector = 'main', retries = 3) {
-    for (let attempt = 0; attempt < retries; attempt++) {
-        await page.goto(url, { waitUntil: 'domcontentloaded' });
-        await page.waitForLoadState('networkidle').catch(() => {});
-        const el = await page.locator(selector).first();
-        if (await el.isVisible({ timeout: 10000 }).catch(() => false)) return;
-        if (attempt < retries - 1) await page.waitForTimeout(2000);
-    }
-}
-
 // ─── Tests ───
 
 test.describe('Onboarding Wizard', () => {
@@ -55,7 +15,7 @@ test.describe('Onboarding Wizard', () => {
 
     test('admin starts onboarding and sees the wizard', async ({ page }) => {
         const slug = await loginAsAdmin(page);
-        await gotoAndVerify(page, `/t/${slug}/onboarding`);
+        await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
         await page.waitForLoadState('networkidle');
 
         // The onboarding page uses dynamic import (ssr: false) + API fetch.
@@ -78,7 +38,7 @@ test.describe('Onboarding Wizard', () => {
 
     test('admin completes Company Profile step', async ({ page }) => {
         const slug = await loginAsAdmin(page);
-        await gotoAndVerify(page, `/t/${slug}/onboarding`);
+        await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
 
         // Start onboarding if on welcome screen
         const startBtn = page.locator('button:has-text("Start Setup")');
@@ -103,7 +63,7 @@ test.describe('Onboarding Wizard', () => {
 
     test('wizard resumes on refresh', async ({ page }) => {
         const slug = await loginAsAdmin(page);
-        await gotoAndVerify(page, `/t/${slug}/onboarding`);
+        await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
 
         // Should NOT show the welcome screen — should show the wizard with progress
         await page.waitForLoadState('networkidle');
@@ -131,7 +91,7 @@ test.describe('Onboarding Wizard', () => {
         const match = url.pathname.match(/^\/t\/([^/]+)\//);
         const slug = match ? match[1] : 'acme-corp';
 
-        await gotoAndVerify(page, `/t/${slug}/onboarding`);
+        await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
         await page.waitForLoadState('networkidle');
 
         const pageContent = await page.textContent('body');

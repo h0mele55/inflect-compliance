@@ -82,7 +82,7 @@ services:
 
   # ── ClamAV (antivirus scanning) ──
   clamav:
-    image: clamav/clamav:1.3
+    image: clamav/clamav:1.4
     container_name: inflect-prod-clamav
     restart: always
     volumes:

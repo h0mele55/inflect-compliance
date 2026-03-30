@@ -12,6 +12,7 @@
  * All selectors use existing id attributes — no data-testid additions needed.
  */
 import { test, expect, Page } from '@playwright/test';
+import { loginAndGetTenant } from './e2e-utils';
 import * as path from 'path';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
@@ -23,21 +24,6 @@ const CONTROL_CODE = `E2E-CTRL-${UNIQUE}`;
 const CONTROL_NAME = `E2E Access Control ${UNIQUE}`;
 const RISK_TITLE = `E2E Risk ${UNIQUE}`;
 const EVIDENCE_FIXTURE = path.resolve(__dirname, '../fixtures/evidence.txt');
-
-// ── Helpers ──
-
-async function loginAndGetTenant(page: Page): Promise<string> {
-    await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-    await page.fill('input[type="email"]', TEST_USER.email);
-    await page.fill('input[type="password"]', TEST_USER.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-    const url = new URL(page.url());
-    const match = url.pathname.match(/^\/t\/([^/]+)\//);
-    if (!match) throw new Error('Could not extract tenant slug from ' + url.pathname);
-    return match[1];
-}
 
 // ── Tests (serial) ──
 

@@ -3,6 +3,7 @@
  * Uses the test-only Credentials provider (AUTH_TEST_MODE=1).
  */
 import { test, expect, type Cookie, type Page } from '@playwright/test';
+import { safeGoto } from './e2e-utils';
 
 const TEST_USER = {
     email: 'admin@acme.com',
@@ -14,7 +15,7 @@ const TEST_USER = {
  * On cold start Next.js compiles the page which can take 15+ seconds.
  */
 async function gotoLoginReady(page: Page) {
-    await page.goto('/login');
+    await safeGoto(page, '/login');
     await page.waitForSelector('input[type="email"]', { timeout: 60000 });
 }
 

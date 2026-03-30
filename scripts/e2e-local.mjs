@@ -42,8 +42,12 @@ const env = {
     ...envVars,
     DATABASE_URL: TEST_DB_URL,
     DATABASE_URL_TEST: TEST_DB_URL,
+    DIRECT_DATABASE_URL: TEST_DB_URL,
     AUTH_TEST_MODE: '1',
     SKIP_ENV_VALIDATION: '1',
+    AUTH_SECRET: envVars.AUTH_SECRET || process.env.AUTH_SECRET || 'dev-local-secret-not-for-production-at-all-ever-ever-9',
+    AUTH_URL: envVars.AUTH_URL || process.env.AUTH_URL || 'http://127.0.0.1:3006',
+    PORT: '3006',
     NODE_ENV: 'test',
 };
 
@@ -76,7 +80,7 @@ if (!SKIP_DB) {
 
 // ── 2. Generate + Migrate + Seed ──
 run('npx prisma generate', '2/6  Generate Prisma client');
-run('npx prisma migrate reset --force --skip-seed', '3/6a Reset test database');
+run('npx prisma db push --force-reset --accept-data-loss', '3/6a Reset test database');
 run('npx tsx prisma/seed.ts', '3/6b Seed test data');
 
 // ── 4. Build ──

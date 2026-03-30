@@ -1,18 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
+import { loginAndGetTenant, safeGoto } from './e2e-utils';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
-
-async function loginAndGetTenant(page: Page): Promise<string> {
-    await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-    await page.fill('input[type="email"]', TEST_USER.email);
-    await page.fill('input[type="password"]', TEST_USER.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-    const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
-    if (!match) throw new Error('Could not extract tenant slug');
-    return match[1];
-}
 
 test.describe('Audit Readiness', () => {
     test.describe.configure({ mode: 'serial', timeout: 120_000 });
@@ -27,7 +16,7 @@ test.describe('Audit Readiness', () => {
         page = await browser.newPage();
         // Retry loop: Next.js dev server may need several attempts to compile on cold start
         for (let attempt = 0; attempt < 5; attempt++) {
-            await page.goto('/login', { timeout: 60000 }).catch(() => null);
+            await safeGoto(page, '/login').catch(() => null);
             const emailInput = page.locator('input[type="email"]');
             if (await emailInput.isVisible({ timeout: 10000 }).catch(() => false)) break;
             await page.waitForTimeout(5000);

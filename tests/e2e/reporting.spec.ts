@@ -13,52 +13,12 @@
  * Uses AUTH_TEST_MODE=1 credentials provider (admin@acme.com).
  */
 import { test, expect, Page, BrowserContext } from '@playwright/test';
+import { loginAndGetTenant, gotoAndVerify } from './e2e-utils';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 const UNIQUE = Date.now().toString(36);
 
 let tenantSlug: string;
-
-async function loginAndGetTenant(page: Page): Promise<string> {
-    await page.goto('/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-    await page.fill('input[type="email"]', TEST_USER.email);
-    await page.fill('input[type="password"]', TEST_USER.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-    const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
-    if (!match) throw new Error('Could not extract tenant slug from ' + page.url());
-    const slug = match[1];
-
-    // VERIFY-ON-EXIT: URL match alone doesn't prove the page rendered.
-    // On cold-start, the server may return 500 — reload until fully rendered.
-    let renderRetries = 3;
-    while (renderRetries > 0) {
-        const hasSidebar = await page.locator('aside').isVisible().catch(() => false);
-        if (hasSidebar) break;
-        renderRetries--;
-        if (renderRetries > 0) {
-            await page.waitForLoadState('networkidle');
-            await page.goto(`/t/${slug}/dashboard`, { waitUntil: 'domcontentloaded' });
-            await page.waitForLoadState('networkidle').catch(() => {});
-        }
-    }
-
-    return slug;
-}
-
-/** Navigate to a server-rendered page and verify content rendered. */
-async function gotoAndVerify(page: Page, url: string, contentSelector: string, maxAttempts = 3) {
-    let attempts = maxAttempts;
-    while (attempts > 0) {
-        await page.goto(url, { waitUntil: 'domcontentloaded' });
-        await page.waitForLoadState('networkidle').catch(() => {});
-        const rendered = await page.locator(contentSelector).first().isVisible().catch(() => false);
-        if (rendered) return;
-        attempts--;
-        if (attempts > 0) await page.waitForTimeout(3000);
-    }
-}
 
 test.describe('Reporting & Audit Narrative', () => {
     test.describe.configure({ mode: 'serial' });
