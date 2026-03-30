@@ -1,5 +1,5 @@
 // Provide mandatory env vars for src/env.ts validation during tests
-process.env.DATABASE_URL = 'postgres://user:password@localhost:5432/testdb';
+process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/testdb';
 process.env.AUTH_SECRET = 'supersecretstringthatis16charplus';
 process.env.JWT_SECRET = 'supersecretstringthatis16charplus';
 process.env.GOOGLE_CLIENT_ID = 'test-google-id';

@@ -241,7 +241,6 @@ jobs:
 
     env:
       AUTH_TEST_MODE: "1"
-      NODE_ENV: production
       DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DIRECT_DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
