@@ -11,6 +11,7 @@ services:
       - '5434:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./prisma/init-roles.sh:/docker-entrypoint-initdb.d/01-init-roles.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d inflect_compliance"]
       interval: 3s
@@ -18,7 +19,7 @@ services:
       retries: 10
 
   pgbouncer:
-    image: edoburu/pgbouncer:1.23.1-p2
+    image: edoburu/pgbouncer:latest
     depends_on:
       postgres:
         condition: service_healthy

@@ -61,7 +61,7 @@ describe('Framework Coverage & Templates', () => {
         });
 
         it('FrameworkRequirement has section field', () => {
-            expect(schema).toContain('section     String?');
+            expect(schema).toMatch(/section\s+String\?/);
         });
 
         it('ControlRequirementLink model exists with tenant', () => {

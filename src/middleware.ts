@@ -77,13 +77,13 @@ const authMiddleware = auth(async (req) => {
             if (isApiRoute(pathname)) {
                 return forbiddenJson('Admin access required');
             }
-            // Redirect to tenant dashboard instead of root / to avoid redirect chain.
-            // Extract tenant slug from URL: /t/:slug/admin/...
-            const slugMatch = pathname.match(/^\/t\/([^/]+)\//);
-            const redirectTo = slugMatch
-                ? new URL(`/t/${slugMatch[1]}/dashboard`, req.nextUrl.origin)
-                : new URL('/', req.nextUrl.origin);
-            return NextResponse.redirect(redirectTo);
+            
+            // Allow the request to proceed to the App Router.
+            // The Server Component guard in `admin/layout.tsx` will 
+            // safely capture this and render the `<ForbiddenPage>`.
+            // (Avoiding NextResponse.redirect(dashboardUrl) here prevents a known Next.js 14 dev server crash 
+            // where 307-redirecting an HTML request back to the browser's currently active URL causes an Edge Runtime panic).
+            return NextResponse.next();
         }
 
         // Admin role confirmed — enforce stricter session posture.

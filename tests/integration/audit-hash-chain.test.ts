@@ -27,11 +27,11 @@ describeFn('Audit Hash Chain — Integration', () => {
     let tenantId: string;
 
     /** Run a callback with the immutability trigger temporarily disabled, then re-enable. */
-    async function withTriggerDisabled(fn: () => Promise<void>) {
-        await prisma.$executeRawUnsafe(`ALTER TABLE "AuditLog" DISABLE TRIGGER audit_log_immutable`);
-        try { await fn(); } finally {
-            await prisma.$executeRawUnsafe(`ALTER TABLE "AuditLog" ENABLE TRIGGER audit_log_immutable`);
-        }
+    async function withTriggerDisabled(fn: (tx: PrismaClient) => Promise<void>) {
+        await prisma.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(`SET LOCAL session_replication_role = 'replica'`);
+            await fn(tx as any);
+        });
     }
 
     beforeAll(async () => {
@@ -47,8 +47,8 @@ describeFn('Audit Hash Chain — Integration', () => {
         tenantId = tenant.id;
 
         // Clean up prior entries — disable trigger momentarily
-        await withTriggerDisabled(async () => {
-            await prisma.$executeRawUnsafe(
+        await withTriggerDisabled(async (tx) => {
+            await tx.$executeRawUnsafe(
                 `DELETE FROM "AuditLog" WHERE "tenantId" = $1`,
                 tenantId,
             );
@@ -58,17 +58,18 @@ describeFn('Audit Hash Chain — Integration', () => {
     afterAll(async () => {
         // Clean up test entries with trigger temporarily disabled
         try {
-            await withTriggerDisabled(async () => {
-                await prisma.$executeRawUnsafe(
+            await withTriggerDisabled(async (tx) => {
+                await tx.$executeRawUnsafe(
                     `DELETE FROM "AuditLog" WHERE "action" LIKE $1`,
                     `${TEST_PREFIX}%`,
                 );
-                await prisma.$executeRawUnsafe(
+                await tx.$executeRawUnsafe(
                     `DELETE FROM "AuditLog" WHERE "tenantId" = $1`,
                     tenantId,
                 );
             });
         } catch { /* best effort */ }
+        await prisma.$disconnect();
     });
 
     describe('sequential inserts', () => {
@@ -152,8 +153,8 @@ describeFn('Audit Hash Chain — Integration', () => {
             }, prisma);
 
             // Tamper with e1's action field (trigger must be off for UPDATE)
-            await withTriggerDisabled(async () => {
-                await prisma.$executeRawUnsafe(
+            await withTriggerDisabled(async (tx) => {
+                await tx.$executeRawUnsafe(
                     `UPDATE "AuditLog" SET "action" = $1 WHERE "id" = $2`,
                     `${tamperPrefix}_TAMPERED`,
                     e1.id,
@@ -171,8 +172,8 @@ describeFn('Audit Hash Chain — Integration', () => {
             expect(row[0].entryHash).toBe(e1.entryHash);
 
             // Clean up
-            await withTriggerDisabled(async () => {
-                await prisma.$executeRawUnsafe(
+            await withTriggerDisabled(async (tx) => {
+                await tx.$executeRawUnsafe(
                     `DELETE FROM "AuditLog" WHERE "action" LIKE $1`,
                     `${tamperPrefix}%`,
                 );
@@ -196,12 +197,12 @@ describeFn('Audit Hash Chain — Integration', () => {
             });
 
             // Clear both tenants' audit logs
-            await withTriggerDisabled(async () => {
-                await prisma.$executeRawUnsafe(
+            await withTriggerDisabled(async (tx) => {
+                await tx.$executeRawUnsafe(
                     `DELETE FROM "AuditLog" WHERE "tenantId" = $1`,
                     isoTenant1.id,
                 );
-                await prisma.$executeRawUnsafe(
+                await tx.$executeRawUnsafe(
                     `DELETE FROM "AuditLog" WHERE "tenantId" = $1`,
                     isoTenant2.id,
                 );
@@ -244,8 +245,8 @@ describeFn('Audit Hash Chain — Integration', () => {
             expect(t1e2.previousHash).toBe(t1e1.entryHash);
 
             // Clean up
-            await withTriggerDisabled(async () => {
-                await prisma.$executeRawUnsafe(
+            await withTriggerDisabled(async (tx) => {
+                await tx.$executeRawUnsafe(
                     `DELETE FROM "AuditLog" WHERE "action" LIKE $1`,
                     `${isoPrefix}%`,
                 );
@@ -280,8 +281,8 @@ describeFn('Audit Hash Chain — Integration', () => {
             expect(verification.valid).toBe(true);
 
             // Clean up
-            await withTriggerDisabled(async () => {
-                await prisma.$executeRawUnsafe(
+            await withTriggerDisabled(async (tx) => {
+                await tx.$executeRawUnsafe(
                     `DELETE FROM "AuditLog" WHERE "action" LIKE $1`,
                     `${concPrefix}%`,
                 );
@@ -322,8 +323,8 @@ describeFn('Audit Hash Chain — Integration', () => {
             expect(row[0].entryHash).toBe(r1.entryHash);
 
             // Clean up
-            await withTriggerDisabled(async () => {
-                await prisma.$executeRawUnsafe(
+            await withTriggerDisabled(async (tx) => {
+                await tx.$executeRawUnsafe(
                     `DELETE FROM "AuditLog" WHERE "action" LIKE $1`,
                     `${structPrefix}%`,
                 );

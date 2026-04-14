@@ -8,8 +8,14 @@ import { type Page } from '@playwright/test';
 
 export const DEFAULT_USER = { email: 'admin@acme.com', password: 'password123' };
 
+/** Errors that indicate a transient server/network issue worth retrying. */
+const TRANSIENT_ERRORS = ['net::', 'ERR_CONNECTION_REFUSED', 'ERR_EMPTY_RESPONSE'];
+
+/** Errors that mean the page/context is dead — retrying on the same page is pointless. */
+const FATAL_ERRORS = ['Target page, context or browser has been closed', 'Target closed'];
+
 /**
- * Navigate to a URL with retry on transient `net::` connection errors.
+ * Navigate to a URL with retry on transient network errors.
  * Uses `domcontentloaded` by default to avoid hanging on slow network requests.
  */
 export async function safeGoto(
@@ -20,6 +26,7 @@ export async function safeGoto(
 ) {
     const defaultOptions: Parameters<Page['goto']>[1] = {
         waitUntil: 'domcontentloaded',
+        timeout: 60_000,
         ...options,
     };
     for (let i = 0; i < retries; i++) {
@@ -27,7 +34,14 @@ export async function safeGoto(
             return await page.goto(url, defaultOptions);
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e);
-            if (i < retries - 1 && msg.includes('net::')) {
+
+            // Fatal: page/context is dead — no point retrying on the same page
+            if (FATAL_ERRORS.some(f => msg.includes(f))) {
+                throw e;
+            }
+
+            // Transient: wait and retry
+            if (i < retries - 1 && TRANSIENT_ERRORS.some(t => msg.includes(t))) {
                 await page.waitForTimeout(5000);
                 continue;
             }
@@ -48,12 +62,31 @@ export async function loginAndGetTenant(
     page: Page,
     user: { email: string; password: string } = DEFAULT_USER,
 ): Promise<string> {
-    await safeGoto(page, '/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-    await page.fill('input[type="email"]', user.email);
-    await page.fill('input[type="password"]', user.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
+    page.on('console', msg => {
+        if (msg.type() === 'error') console.log('BROWSER CONSOLE ERROR:', msg.text());
+    });
+
+    // Wait for the dev server to be ready — first navigation may trigger JIT compilation
+    await safeGoto(page, '/login', { timeout: 90_000 });
+
+    // Wait for the form to be fully hydrated to prevent React state remaining empty
+    const emailInput = page.locator('input[type="email"]');
+    await emailInput.waitFor({ state: 'visible', timeout: 60000 });
+    
+    // Give React a moment to attach event listeners, then clear and explicitly focus
+    await page.waitForTimeout(500); 
+    await emailInput.click();
+    await emailInput.fill(user.email);
+    
+    await page.locator('input[type="password"]').fill(user.password);
+    await page.locator('button[type="submit"]').click();
+    
+    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(async (e) => {
+        console.error("LOGIN TIMEOUT! URL is:", page.url());
+        console.error("PAGE CONTENT:", await page.content());
+        throw e;
+    });
     const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug from ' + page.url());
     const slug = match[1];

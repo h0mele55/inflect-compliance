@@ -1,6 +1,7 @@
 module.exports = {
     preset: 'ts-jest',
     testEnvironment: 'node',
+    forceExit: true,
     setupFiles: ['<rootDir>/jest.setup.js'],
     globalSetup: '<rootDir>/tests/setup/globalSetup.ts',
     globalTeardown: '<rootDir>/tests/setup/teardown.ts',

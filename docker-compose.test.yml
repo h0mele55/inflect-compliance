@@ -18,6 +18,8 @@ services:
       retries: 10
     tmpfs:
       - /var/lib/postgresql/data  # RAM disk — fast, wiped on stop
+    volumes:
+      - ./prisma/init-roles.sh:/docker-entrypoint-initdb.d/01-init-roles.sh:ro
 
   redis-test:
     image: redis:7-alpine

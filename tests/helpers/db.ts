@@ -22,12 +22,25 @@ import { execSync } from 'child_process';
 
 /**
  * Get the test database URL.
- * Priority: DATABASE_URL_TEST env var > DATABASE_URL from .env > fallback.
+ * Priority: DATABASE_URL_TEST env > .env.test > test container default > .env > fallback.
  */
 export function getTestDatabaseUrl(): string {
+    // 1. Explicit test env var (set by CI scripts or jest.setup.js)
     if (process.env.DATABASE_URL_TEST) return process.env.DATABASE_URL_TEST;
 
-    // Parse from .env
+    // 2. .env.test file
+    const envTestPath = path.resolve(__dirname, '../../.env.test');
+    try {
+        const content = fs.readFileSync(envTestPath, 'utf8');
+        const match = content.match(/^DATABASE_URL_TEST=["']?([^"'\n]*)["']?$/m)
+            || content.match(/^DATABASE_URL=["']?([^"'\n]*)["']?$/m);
+        if (match?.[1]) return match[1];
+    } catch { /* no .env.test */ }
+
+    // 3. Test container default (docker-compose.test.yml → port 5434)
+    const testContainerUrl = 'postgresql://test:test@127.0.0.1:5434/inflect_test?schema=public';
+
+    // 4. Parse from .env (dev database)
     const envPath = path.resolve(__dirname, '../../.env');
     try {
         const content = fs.readFileSync(envPath, 'utf8');
@@ -35,7 +48,8 @@ export function getTestDatabaseUrl(): string {
         if (match?.[1]) return match[1];
     } catch { /* no .env */ }
 
-    return 'postgresql://user:password@localhost:5432/testdb';
+    // Return test container URL as preferred fallback over hard-coded dummy
+    return testContainerUrl;
 }
 
 /**

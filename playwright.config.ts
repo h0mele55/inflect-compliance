@@ -7,6 +7,7 @@ const port = 3006;
 
 export default defineConfig({
     testDir: './tests/e2e',
+    globalSetup: './tests/e2e/global-setup.ts',
     timeout: 180_000,
     fullyParallel: false,
     forbidOnly: isCI,
@@ -14,8 +15,8 @@ export default defineConfig({
     workers: 1,
     reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
     use: {
-        baseURL: `http://127.0.0.1:${port}`,
-        trace: 'on-first-retry',
+        baseURL: process.env.URL || 'http://localhost:3006',
+        trace: 'retain-on-failure',
         screenshot: 'only-on-failure',
         video: 'on',
     },
@@ -27,8 +28,8 @@ export default defineConfig({
     ],
     webServer: {
         command: isCI
-            ? `npx cross-env NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 PORT=${port} npx next start -p ${port}`
-            : `npx cross-env NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 npx next dev -p ${port}`,
+            ? `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 PORT=${port} npx next start -p ${port}`
+            : `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 npx next dev -p ${port}`,
         port,
         reuseExistingServer: !isCI,
         timeout: 120_000,
