@@ -70,12 +70,17 @@ export async function loginAndGetTenant(
     // Wait for the dev server to be ready — first navigation may trigger JIT compilation
     await safeGoto(page, '/login', { timeout: 90_000 });
 
-    // Wait for the form to be fully hydrated to prevent React state remaining empty
+    // Wait for the form to be visible
     const emailInput = page.locator('input[type="email"]');
     await emailInput.waitFor({ state: 'visible', timeout: 60000 });
-    
-    // Give React a moment to attach event listeners, then clear and explicitly focus
-    await page.waitForTimeout(500); 
+
+    // Wait for React hydration — ensure onSubmit is attached before interacting.
+    // Without this, the browser does a native form POST to '#', not the JS auth flow.
+    await page.waitForFunction(() => {
+        const form = document.querySelector('form');
+        return form && Object.keys(form).some(k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber'));
+    }, { timeout: 30000 });
+
     await emailInput.click();
     await emailInput.fill(user.email);
     

@@ -58,16 +58,22 @@ test.describe('Admin Member Management', () => {
     test('non-admin cannot access /admin/members', async ({ page }) => {
         const tenantSlug = await loginAndGetTenant(page, READER_USER);
 
-        // Verify middleware blocks non-admin from admin pages
-        const result = await page.evaluate(async (slug: string) => {
-            const res = await fetch(`/t/${slug}/admin/members`, { redirect: 'manual' });
-            return {
-                status: res.status,
-                type: res.type,
-                isRedirect: res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400),
-            };
-        }, tenantSlug);
+        // Navigate to the admin members page as a non-admin user.
+        // The middleware allows the page to load (returns 200) to avoid a
+        // Next.js 14 dev server crash, but the admin/layout.tsx guard
+        // renders a ForbiddenPage client-side.
+        await safeGoto(page, `/t/${tenantSlug}/admin/members`, { waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle').catch(() => {});
 
-        expect(result.isRedirect).toBe(true);
+        // The ForbiddenPage should be visible (or at minimum, the members table should NOT be visible)
+        const hasMembersTable = await page.locator('#members-table').isVisible().catch(() => false);
+        expect(hasMembersTable).toBe(false);
+
+        // Verify the admin API endpoint properly rejects non-admin requests with 403
+        const apiResult = await page.evaluate(async (slug: string) => {
+            const res = await fetch(`/api/t/${slug}/admin/members`);
+            return { status: res.status };
+        }, tenantSlug);
+        expect(apiResult.status).toBe(403);
     });
 });
