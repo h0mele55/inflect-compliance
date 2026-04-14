@@ -70,12 +70,21 @@ describeFn('AuditLog Immutability (DB Trigger)', () => {
     });
 
     afterAll(async () => {
-        // TRUNCATE bypasses row-level triggers (it's DDL) — safe for cleanup
+        // Use tenant-scoped DELETE (not TRUNCATE) to avoid nuking entries from
+        // parallel test suites (e.g. audit-hash-chain). Set session_replication_role
+        // to 'replica' to bypass the immutability trigger for cleanup.
         try {
-            await prisma.$executeRawUnsafe(`TRUNCATE TABLE "AuditLog" CASCADE`);
+            await prisma.$transaction(async (tx) => {
+                await tx.$executeRawUnsafe(`SET LOCAL session_replication_role = 'replica'`);
+                await tx.$executeRawUnsafe(
+                    `DELETE FROM "AuditLog" WHERE "tenantId" = $1`,
+                    tenantId,
+                );
+            });
         } catch {
             // Ignore — globalSetup handles reset
         }
+        await prisma.$disconnect();
     });
 
     // ── INSERT works ─────────────────────────────────────────────

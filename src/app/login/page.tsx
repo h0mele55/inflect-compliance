@@ -17,10 +17,14 @@ function LoginForm() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const handleCredentialsSubmit = async (e: React.FormEvent) => {
+    const handleCredentialsSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError('');
         setLoading(true);
+
+        const formData = new FormData(e.currentTarget);
+        const submitEmail = (formData.get('email') as string) || email;
+        const submitPassword = (formData.get('password') as string) || password;
 
         try {
             if (mode === 'register') {
@@ -37,8 +41,8 @@ function LoginForm() {
 
             // Sign in via NextAuth credentials provider
             const result = await signIn('credentials', {
-                email,
-                password,
+                email: submitEmail,
+                password: submitPassword,
                 redirect: false,
                 callbackUrl,
             });
@@ -47,8 +51,10 @@ function LoginForm() {
                 throw new Error(result.error === 'CredentialsSignin' ? 'Invalid credentials' : result.error);
             }
 
-            router.push(callbackUrl);
-            router.refresh();
+            // Force a native hard redirect. 
+            // Using router.push() + router.refresh() synchronously causes App Router transition 
+            // cancellations/race conditions, leaving the user stuck on /login permanently.
+            window.location.href = callbackUrl;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             setError(err.message);
@@ -146,26 +152,26 @@ function LoginForm() {
                     </div>
 
                     {/* Credentials Form */}
-                    <form onSubmit={handleCredentialsSubmit} className="space-y-4">
+                    <form onSubmit={handleCredentialsSubmit} method="post" action="#" className="space-y-4">
                         {mode === 'register' && (
                             <>
                                 <div>
                                     <label className="input-label">{t('name')}</label>
-                                    <input className="input" value={name} onChange={(e) => setName(e.target.value)} required placeholder={t('namePlaceholder')} />
+                                    <input className="input" name="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder={t('namePlaceholder')} />
                                 </div>
                                 <div>
                                     <label className="input-label">{t('orgName')}</label>
-                                    <input className="input" value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder={t('orgPlaceholder')} />
+                                    <input className="input" name="orgName" value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder={t('orgPlaceholder')} />
                                 </div>
                             </>
                         )}
                         <div>
                             <label className="input-label">{t('email')}</label>
-                            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder={t('emailPlaceholder')} />
+                            <input className="input" type="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder={t('emailPlaceholder')} />
                         </div>
                         <div>
                             <label className="input-label">{t('password')}</label>
-                            <input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder={t('passwordPlaceholder')} minLength={6} />
+                            <input className="input" type="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder={t('passwordPlaceholder')} minLength={6} />
                         </div>
                         <button type="submit" disabled={loading} className="btn btn-primary w-full py-2.5">
                             {loading ? t('pleaseWait') : mode === 'login' ? t('submitLogin') : t('submitRegister')}

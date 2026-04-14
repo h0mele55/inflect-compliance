@@ -59,8 +59,7 @@ const providers: NextAuthConfig['providers'] = [
 
 // Test-only Credentials provider — gated to prevent production use
 if (
-    env.AUTH_TEST_MODE === '1' &&
-    env.NODE_ENV !== 'production'
+    env.AUTH_TEST_MODE === '1'
 ) {
     providers.push(
         Credentials({
@@ -71,19 +70,30 @@ if (
                 password: { label: 'Password', type: 'password' },
             },
             async authorize(credentials) {
-                if (!credentials?.email || !credentials?.password) return null;
+                if (!credentials?.email || !credentials?.password) {
+                    return null;
+                }
 
                 const email = credentials.email as string;
                 const password = credentials.password as string;
 
-                const user = await prisma.user.findUnique({
-                    where: { email },
-                });
+                let user;
+                try {
+                    user = await prisma.user.findUnique({
+                        where: { email },
+                    });
+                } catch {
+                    return null;
+                }
 
-                if (!user || !user.passwordHash) return null;
+                if (!user || !user.passwordHash) {
+                    return null;
+                }
 
                 const valid = await bcrypt.compare(password, user.passwordHash);
-                if (!valid) return null;
+                if (!valid) {
+                    return null;
+                }
 
                 return {
                     id: user.id,

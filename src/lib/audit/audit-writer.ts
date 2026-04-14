@@ -172,7 +172,9 @@ export async function appendAuditEntry(input: AppendAuditInput, client?: PrismaC
         });
 
         // 4. INSERT with all fields including hash chain
-        //    Uses the same `now` timestamp for createdAt as was used for hashing
+        //    Uses the same canonical timestamp for createdAt as was used for hashing.
+        //    We pass the ISO string directly (not a Date object) to avoid timezone
+        //    conversion issues when the PG server timezone differs from UTC.
         await tx.$executeRawUnsafe(
             `INSERT INTO "AuditLog" (
                 "id", "tenantId", "userId", "actorType",
@@ -187,7 +189,7 @@ export async function appendAuditEntry(input: AppendAuditInput, client?: PrismaC
                 $8, $9::jsonb,
                 $10, $11::jsonb, $12::jsonb, $13::jsonb,
                 $14, $15, $16,
-                $17
+                $17::timestamp
             )`,
             id,
             input.tenantId,
@@ -205,7 +207,7 @@ export async function appendAuditEntry(input: AppendAuditInput, client?: PrismaC
             previousHash,
             entryHash,
             version,
-            now,
+            occurredAt,
         );
 
         return { id, entryHash, previousHash };
@@ -252,7 +254,7 @@ export async function verifyAuditChain(tenantId: string, client?: PrismaClient):
     }> = await db.$queryRawUnsafe(
         `SELECT "id", "tenantId", "userId", "actorType", "entity", "entityId",
                 "action", "detailsJson", "previousHash", "entryHash", "version",
-                to_char("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAtIso"
+                to_char("createdAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS "createdAtIso"
          FROM "AuditLog"
          WHERE "tenantId" = $1
          ORDER BY "createdAt" ASC`,

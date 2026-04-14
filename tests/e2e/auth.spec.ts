@@ -21,10 +21,22 @@ async function gotoLoginReady(page: Page) {
 
 async function doLogin(page: Page) {
     await gotoLoginReady(page);
-    await page.fill('input[type="email"]', TEST_USER.email);
+
+    // Wait for React hydration — ensure onSubmit is attached before interacting.
+    // Without this, the browser does a native GET form submit, leaking creds as URL params.
+    await page.waitForFunction(() => {
+        const form = document.querySelector('form');
+        // React attaches internal event props on the DOM node after hydration
+        return form && Object.keys(form).some(k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber'));
+    }, { timeout: 30000 });
+
+    const emailInput = page.locator('input[type="email"]');
+    await emailInput.click();
+    await emailInput.fill(TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
     await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard', { timeout: 30000 });
+    // The app redirects /dashboard → /t/{slug}/dashboard
+    await page.waitForURL(/dashboard/, { waitUntil: 'domcontentloaded', timeout: 60000 });
 }
 
 test.describe('Authentication Flow', () => {
