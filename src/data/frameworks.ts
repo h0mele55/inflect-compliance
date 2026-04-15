@@ -1,4 +1,17 @@
 /**
+ * @deprecated — LEGACY HARDCODED FRAMEWORK DATA
+ *
+ * This file is retained as a fallback for the YAML-backed framework library system.
+ * New code should use `@/app-layer/libraries` (framework-provider) instead.
+ *
+ * Migration status:
+ * - SOC2_REQUIREMENTS: Available via getSOC2Requirements() from YAML-backed provider
+ * - NIS2_REQUIREMENTS: Still hardcoded (NIS2 YAML library pending)
+ * - FRAMEWORK_MAPPINGS: Still hardcoded (cross-framework YAML mappings pending)
+ *
+ * This file will be removed once all frameworks and mappings are in YAML.
+ *
+ * Original description:
  * SOC 2 Trust Services Categories and NIS2 Requirement Areas
  * All descriptions are ORIGINAL paraphrases — not verbatim standard text.
  * These are guidance mappings, not guarantees of compliance.

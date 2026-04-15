@@ -1,4 +1,15 @@
 /**
+ * @deprecated — LEGACY HARDCODED ANNEX A DATA
+ *
+ * This file is retained as reference data. The primary source for Annex A controls
+ * is now the YAML library at `src/data/libraries/iso27001-2022.yaml`.
+ *
+ * New code should use `getLibraryByRefId('ISO27001-2022')` from `@/app-layer/libraries`.
+ *
+ * This file is NOT imported by any runtime consumer and can be safely removed
+ * once migration validation is complete.
+ *
+ * Original description:
  * ISO 27001:2022 Annex A Control Library — ORIGINAL paraphrases.
  * IDs follow the standard numbering; descriptions are NOT verbatim ISO text.
  */

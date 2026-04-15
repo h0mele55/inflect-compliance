@@ -992,7 +992,10 @@ model Framework {
   name         String
   version      String?
   metadataJson String?
+  contentHash  String?
+  sourceUrn    String?
   createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @default(now()) @updatedAt
   kind         FrameworkKind          @default(ISO_STANDARD)
   packs        FrameworkPack[]
   requirements FrameworkRequirement[]
@@ -2125,7 +2128,12 @@ enum MfaType {
 
 enum FrameworkKind {
   ISO_STANDARD
+  NIST_FRAMEWORK
+  SOC_CRITERIA
   EU_DIRECTIVE
+  REGULATION
+  INDUSTRY_STANDARD
+  CUSTOM
 }
 
 enum VendorStatus {

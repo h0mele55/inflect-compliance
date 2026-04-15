@@ -1,4 +1,13 @@
 /**
+ * @deprecated — LEGACY HARDCODED CLAUSE DATA
+ *
+ * This file is retained as a fallback for the YAML-backed framework library system.
+ * New code should use `getISO27001Clauses()` from `@/app-layer/libraries` instead.
+ *
+ * Note: This file contains enriched fields (artifacts, checklist) not yet in the
+ * YAML schema. It will be removed once the YAML schema supports extended fields.
+ *
+ * Original description:
  * ISO 27001:2022 Clauses 4–10 — Original paraphrases (NOT verbatim ISO text).
  * These provide user-friendly guidance for each clause requirement.
  */

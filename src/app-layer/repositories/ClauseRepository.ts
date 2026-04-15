@@ -1,10 +1,11 @@
 import prisma from '@/lib/prisma';
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
-import { CLAUSES } from '@/data/clauses';
+import { getISO27001Clauses } from '@/app-layer/libraries';
 
 export class ClauseRepository {
     static async list(db: PrismaTx, ctx: RequestContext) {
+        const CLAUSES = getISO27001Clauses();
         // Ensure clauses exist in DB (global table — uses global prisma since Clause has no tenantId)
         for (const c of CLAUSES) {
             await prisma.clause.upsert({

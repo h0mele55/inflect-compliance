@@ -1,0 +1,11 @@
+-- AlterEnum: Add new framework kinds for YAML library system
+ALTER TYPE "FrameworkKind" ADD VALUE IF NOT EXISTS 'NIST_FRAMEWORK';
+ALTER TYPE "FrameworkKind" ADD VALUE IF NOT EXISTS 'SOC_CRITERIA';
+ALTER TYPE "FrameworkKind" ADD VALUE IF NOT EXISTS 'REGULATION';
+ALTER TYPE "FrameworkKind" ADD VALUE IF NOT EXISTS 'INDUSTRY_STANDARD';
+ALTER TYPE "FrameworkKind" ADD VALUE IF NOT EXISTS 'CUSTOM';
+
+-- AlterTable: Add library import tracking fields to Framework
+ALTER TABLE "Framework" ADD COLUMN IF NOT EXISTS "contentHash" TEXT;
+ALTER TABLE "Framework" ADD COLUMN IF NOT EXISTS "sourceUrn" TEXT;
+ALTER TABLE "Framework" ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
