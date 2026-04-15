@@ -64,7 +64,14 @@ export async function loginAndGetTenant(
 ): Promise<string> {
     page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
     page.on('console', msg => {
-        if (msg.type() === 'error') console.log('BROWSER CONSOLE ERROR:', msg.text());
+        if (msg.type() === 'error') {
+            const text = msg.text();
+            // Suppress known-benign Next.js dev server warnings:
+            // - RSC payload fetch failures during JIT compilation (graceful fallback to browser nav)
+            // - ClientFetchError from session polling during page transitions
+            if (text.includes('Failed to fetch RSC payload') || text.includes('ClientFetchError')) return;
+            console.log('BROWSER CONSOLE ERROR:', text);
+        }
     });
 
     // Wait for the dev server to be ready — first navigation may trigger JIT compilation
