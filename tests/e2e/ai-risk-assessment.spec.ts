@@ -1,35 +1,26 @@
-/**
- * E2E tests for AI-assisted risk assessment flow.
- * Uses the stub provider (AI_RISK_PROVIDER=stub or unset).
- */
 import { test, expect, type Page } from '@playwright/test';
-import { safeGoto } from './e2e-utils';
+import { loginAndGetTenant, safeGoto } from './e2e-utils';
 
-async function doLogin(page: Page) {
-    await safeGoto(page, '/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-    await page.fill('input[type="email"]', 'admin@acme.com');
-    await page.fill('input[type="password"]', 'password123');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-}
+const ADMIN_USER = { email: 'admin@acme.com', password: 'password123' };
 
 test.describe('AI-Assisted Risk Assessment', () => {
+    let tenantSlug: string;
+
     test.beforeEach(async ({ page }) => {
-        await doLogin(page);
+        tenantSlug = await loginAndGetTenant(page, ADMIN_USER);
     });
 
     test('risks page has AI Assessment button', async ({ page }) => {
-        await page.goto('/t/acme-corp/risks');
-        await page.waitForLoadState('networkidle');
+        await safeGoto(page, `/t/${tenantSlug}/risks`, { waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#ai-risk-btn', { timeout: 30000 });
         await expect(page.locator('#ai-risk-btn')).toBeVisible();
         await expect(page.locator('#ai-risk-btn')).toContainText('AI Assessment');
     });
 
     test('navigates to AI assessment page and shows form', async ({ page }) => {
-        await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForLoadState('networkidle');
+        await safeGoto(page, `/t/${tenantSlug}/risks/ai`, { waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#ai-risk-title', { timeout: 30000 });
         await expect(page.locator('#ai-risk-title')).toContainText('AI-Assisted Risk Assessment');
         await expect(page.locator('#ai-generate-form')).toBeVisible();
@@ -37,8 +28,8 @@ test.describe('AI-Assisted Risk Assessment', () => {
     });
 
     test('can select frameworks and generate suggestions', async ({ page }) => {
-        await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForLoadState('networkidle');
+        await safeGoto(page, `/t/${tenantSlug}/risks/ai`, { waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#ai-generate-form', { timeout: 30000 });
 
         // Select ISO27001 framework
@@ -57,8 +48,8 @@ test.describe('AI-Assisted Risk Assessment', () => {
     });
 
     test('can accept, reject, and apply suggestions', async ({ page }) => {
-        await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForLoadState('networkidle');
+        await safeGoto(page, `/t/${tenantSlug}/risks/ai`, { waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#ai-generate-form', { timeout: 30000 });
 
         // Generate
@@ -84,8 +75,8 @@ test.describe('AI-Assisted Risk Assessment', () => {
 
     test('applied risk appears in risk register', async ({ page }) => {
         // First generate and apply
-        await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForLoadState('networkidle');
+        await safeGoto(page, `/t/${tenantSlug}/risks/ai`, { waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#ai-generate-form', { timeout: 30000 });
         await page.click('#fw-iso27001');
         await page.click('#ai-generate-btn');
@@ -111,8 +102,8 @@ test.describe('AI-Assisted Risk Assessment', () => {
     });
 
     test('dismiss session returns to form', async ({ page }) => {
-        await page.goto('/t/acme-corp/risks/ai');
-        await page.waitForLoadState('networkidle');
+        await safeGoto(page, `/t/${tenantSlug}/risks/ai`, { waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#ai-generate-form', { timeout: 30000 });
         await page.click('#ai-generate-btn');
         await page.waitForSelector('#ai-review-section', { timeout: 30000 });
