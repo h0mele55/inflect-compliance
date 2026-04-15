@@ -165,29 +165,9 @@ test.describe('Issue Management', () => {
     });
 
     test('reader user sees view-only issues', async ({ page }) => {
-        // Login as reader
-        await safeGoto(page, '/login');
-        await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-        await page.fill('input[type="email"]', 'viewer@acme.com');
-        await page.fill('input[type="password"]', 'password123');
-        await page.click('button[type="submit"]');
-        await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-        const url = new URL(page.url());
-        const match = url.pathname.match(/^\/t\/([^/]+)\//);
-        tenantSlug = match?.[1] || tenantSlug;
-
-        // VERIFY-ON-EXIT for reader login
-        let renderRetries = 3;
-        while (renderRetries > 0) {
-            const rendered = await page.locator('main').isVisible().catch(() => false);
-            if (rendered) break;
-            renderRetries--;
-            if (renderRetries > 0) {
-                await page.waitForLoadState('networkidle');
-                await safeGoto(page, `/t/${tenantSlug}/dashboard`, { waitUntil: 'domcontentloaded' });
-                await page.waitForLoadState('networkidle').catch(() => {});
-            }
-        }
+        // Login as reader using the shared helper (includes React hydration wait)
+        const READER_USER = { email: 'viewer@acme.com', password: 'password123' };
+        tenantSlug = await loginAndGetTenant(page, READER_USER);
 
         await gotoAndVerify(page, `/t/${tenantSlug}/tasks`, 'h1');
 
