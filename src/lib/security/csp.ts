@@ -133,9 +133,10 @@ export function buildCspHeader(nonce: string, isDev = false): string {
         'style-src': [
             "'self'",
             // In dev, Next.js HMR injects style tags without nonces.
-            // Per the CSP spec, 'unsafe-inline' is IGNORED when a nonce is
-            // present, so we must omit the nonce in dev for 'unsafe-inline'
-            // to take effect. In production, the nonce provides strict control.
+            // Per the CSP spec, the unsafe-inline token is IGNORED when a
+            // nonce is present, so we omit the nonce in dev to let the
+            // inline-style fallback take effect. In production, the nonce
+            // provides strict control.
             // https://github.com/vercel/next.js/issues/39706
             ...(isDev ? ["'unsafe-inline'"] : [`'nonce-${nonce}'`]),
             // Google Fonts stylesheet
