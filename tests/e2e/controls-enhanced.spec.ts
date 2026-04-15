@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { loginAndGetTenant } from './e2e-utils';
+import { loginAndGetTenant, safeGoto } from './e2e-utils';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
@@ -10,43 +10,41 @@ test.describe('Controls Enhanced', () => {
 
     test('dashboard loads and shows metrics', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        // Dev server may return 500 on first load while compiling
+        // Dev server may return 500 on first load while JIT-compiling under load.
+        // safeGoto handles net:: errors; this loop handles HTTP 500s.
         let retries = 3;
         while (retries > 0) {
-            try {
-                const resp = await page.goto(`/t/${tenantSlug}/controls/dashboard`);
-                if (resp && resp.status() < 500) break;
-            } catch {
-                // net:: errors during heavy compilation
-            }
+            const resp = await safeGoto(page, `/t/${tenantSlug}/controls/dashboard`, { waitUntil: 'domcontentloaded' });
+            if (resp && resp.status() < 500) break;
             retries--;
             if (retries > 0) await page.waitForTimeout(5000);
         }
         await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#dashboard-heading', { timeout: 60000 });
         await expect(page.locator('#dashboard-heading')).toContainText('Controls Dashboard');
-        await expect(page.locator('#implementation-progress')).toBeVisible({ timeout: 10000 });
-        await expect(page.locator('#dashboard-stats')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('#implementation-progress')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('#dashboard-stats')).toBeVisible({ timeout: 15000 });
     });
 
     test('mark test completed updates last tested', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
 
         // First create a control to test with
-        let r2 = 2;
+        let r2 = 3;
         while (r2 > 0) {
-            const resp = await page.goto(`/t/${tenantSlug}/controls/new`);
+            const resp = await safeGoto(page, `/t/${tenantSlug}/controls/new`, { waitUntil: 'domcontentloaded' });
             if (resp && resp.status() < 500) break;
             r2--;
-            if (r2 > 0) await page.waitForTimeout(3000);
+            if (r2 > 0) await page.waitForTimeout(5000);
         }
-        await page.waitForSelector('#control-name-input', { timeout: 15000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await page.waitForSelector('#control-name-input', { timeout: 30000 });
         const uniqueId = Date.now().toString(36);
         await page.fill('#control-name-input', `Cadence Test ${uniqueId}`);
         await page.fill('#control-code-input', `CAD-${uniqueId}`);
         await page.click('#create-control-btn');
-        await page.waitForURL('**/controls/**', { timeout: 15000 });
-        await page.waitForSelector('#control-title', { timeout: 15000 });
+        await page.waitForURL('**/controls/**', { timeout: 30000 });
+        await page.waitForSelector('#control-title', { timeout: 30000 });
         await expect(page.locator('#control-title')).toContainText(`Cadence Test ${uniqueId}`, { timeout: 10000 });
 
         // Click "Mark Test Completed"

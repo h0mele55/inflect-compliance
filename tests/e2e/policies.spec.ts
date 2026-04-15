@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { loginAndGetTenant, gotoAndVerify } from './e2e-utils';
+import { loginAndGetTenant, gotoAndVerify, safeGoto } from './e2e-utils';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
@@ -102,13 +102,13 @@ test.describe('Policy Center', () => {
             createdPolicyPath = new URL(page.url()).pathname;
         } else {
             // Navigate directly to the policy detail page using saved path
-            await page.goto(createdPolicyPath);
-            await page.waitForLoadState('networkidle');
+            await safeGoto(page, createdPolicyPath, { waitUntil: 'domcontentloaded' });
+            await page.waitForLoadState('networkidle').catch(() => {});
             await page.waitForSelector('#policy-title', { timeout: 30000 });
         }
 
         await page.click('#tab-activity');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // The activity API route may need JIT compilation on first visit (dev server),
         // so give it extra time. Retry once if the element doesn't appear.
@@ -119,10 +119,11 @@ test.describe('Policy Center', () => {
                 feedVisible = true;
             } catch {
                 // Retry: reload and re-click the Activity tab
-                await page.reload({ waitUntil: 'networkidle' });
+                await page.reload({ waitUntil: 'domcontentloaded' });
+                await page.waitForLoadState('networkidle').catch(() => {});
                 await page.waitForSelector('#policy-title', { timeout: 15000 });
                 await page.click('#tab-activity');
-                await page.waitForLoadState('networkidle');
+                await page.waitForLoadState('networkidle').catch(() => {});
             }
         }
 
