@@ -83,6 +83,7 @@ model Tenant {
   vendorEvidenceBundleItems VendorEvidenceBundleItem[]
   vendorLinks               VendorLink[]
   vendorRelationships       VendorRelationship[]
+  syncMappings              IntegrationSyncMapping[]
 }
 
 model TenantOnboarding {
@@ -1702,6 +1703,7 @@ model IntegrationConnection {
   updatedAt       DateTime               @updatedAt
   tenant          Tenant                 @relation(fields: [tenantId], references: [id])
   executions      IntegrationExecution[]
+  syncMappings    IntegrationSyncMapping[]
 
   @@unique([tenantId, provider, name])
   @@index([tenantId])
@@ -1755,6 +1757,36 @@ model IntegrationWebhookEvent {
   @@index([provider, receivedAt])
   @@index([provider, payloadHash, createdAt])
   @@index([status])
+}
+
+model IntegrationSyncMapping {
+  id                String              @id @default(cuid())
+  tenantId          String
+  provider          String
+  connectionId      String?
+  localEntityType   String
+  localEntityId     String
+  remoteEntityType  String
+  remoteEntityId    String
+  syncStatus        SyncStatus          @default(PENDING)
+  lastSyncDirection SyncDirection?
+  conflictStrategy  ConflictStrategy    @default(REMOTE_WINS)
+  localUpdatedAt    DateTime?
+  remoteUpdatedAt   DateTime?
+  remoteDataJson    Json?
+  version           Int                 @default(1)
+  errorMessage      String?
+  lastSyncedAt      DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  connection        IntegrationConnection? @relation(fields: [connectionId], references: [id])
+  tenant            Tenant              @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, provider, localEntityType, localEntityId])
+  @@unique([tenantId, provider, remoteEntityType, remoteEntityId])
+  @@index([tenantId, provider])
+  @@index([tenantId, syncStatus])
+  @@index([connectionId])
 }
 
 enum Role {
@@ -2248,4 +2280,23 @@ enum IntegrationExecutionStatus {
   PASSED
   FAILED
   ERROR
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  CONFLICT
+  FAILED
+  STALE
+}
+
+enum SyncDirection {
+  PUSH
+  PULL
+}
+
+enum ConflictStrategy {
+  REMOTE_WINS
+  LOCAL_WINS
+  MANUAL
 }
