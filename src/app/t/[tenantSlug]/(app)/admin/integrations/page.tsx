@@ -248,7 +248,7 @@ export default function AdminIntegrationsPage() {
                                                         ? <CheckCircle className="w-3 h-3 text-emerald-400" />
                                                         : <XCircle className="w-3 h-3 text-red-400" />
                                                     }
-                                                    {new Date(conn.lastTestedAt).toLocaleDateString()}
+                                                    {formatDate(conn.lastTestedAt)}
                                                 </span>
                                             ) : '—'}
                                         </td>

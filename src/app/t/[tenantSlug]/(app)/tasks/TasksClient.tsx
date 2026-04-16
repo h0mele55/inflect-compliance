@@ -325,10 +325,10 @@ export function TasksClient({
                                         </td>
                                         <td className="text-xs text-slate-400">{task.assignee?.name || '—'}</td>
                                         <td className="text-xs text-slate-400">
-                                            {task.dueAt ? new Date(task.dueAt).toLocaleDateString() : '—'}
+                                            {task.dueAt ? formatDate(task.dueAt) : '—'}
                                         </td>
                                         <td className="text-xs text-slate-400">
-                                            {new Date(task.updatedAt).toLocaleDateString()}
+                                            {formatDate(task.updatedAt)}
                                         </td>
                                     </tr>
                                 );

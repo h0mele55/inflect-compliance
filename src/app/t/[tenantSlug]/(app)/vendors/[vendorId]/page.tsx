@@ -158,7 +158,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
     if (loading) return <SkeletonDetailPage />;
     if (!vendor) return <div className="text-red-400 py-8 text-center">Vendor not found</div>;
 
-    const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString() : '—';
+    const fmtDate = (d: string | null) => d ? formatDate(d) : '—';
 
     return (
         <div className="space-y-6">
@@ -314,7 +314,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                                     <tr key={d.id} className="border-b border-slate-800">
                                         <td className="p-3"><span className="badge badge-info">{DOC_TYPE_LABELS[d.type] || d.type}</span></td>
                                         <td className="p-3">{d.title || '—'}</td>
-                                        <td className="p-3">{d.validTo ? new Date(d.validTo).toLocaleDateString() : '—'}</td>
+                                        <td className="p-3">{d.validTo ? formatDate(d.validTo) : '—'}</td>
                                         <td className="p-3 text-slate-400">{d.uploadedBy?.name || '—'}</td>
                                         <td className="p-3">
                                             {d.externalUrl && <a href={d.externalUrl} target="_blank" className="text-blue-400 underline text-xs">Open ↗</a>}
@@ -369,7 +369,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                                         <td className="p-3"><span className={`badge ${ASSESSMENT_STATUS_BADGE[a.status]}`}>{a.status}</span></td>
                                         <td className="p-3">{a.score != null ? a.score.toFixed(1) : '—'}</td>
                                         <td className="p-3">{a.riskRating ? <span className={`badge ${CRIT_BADGE[a.riskRating]}`}>{a.riskRating}</span> : '—'}</td>
-                                        <td className="p-3 text-slate-400">{new Date(a.startedAt).toLocaleDateString()}</td>
+                                        <td className="p-3 text-slate-400">{formatDate(a.startedAt)}</td>
                                         <td className="p-3">
                                             <Link href={tenantHref(`/vendors/${params.vendorId}/assessment/${a.id}`)} className="text-blue-400 hover:underline text-xs" id={`open-assessment-${a.id}`}>
                                                 Open →
@@ -476,7 +476,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                                     }}>Freeze</button>
                                 )}
                             </div>
-                            <div className="text-xs text-slate-400">Created by {b.createdBy?.name || '—'} on {new Date(b.createdAt).toLocaleDateString()}</div>
+                            <div className="text-xs text-slate-400">Created by {b.createdBy?.name || '—'} on {formatDate(b.createdAt)}</div>
                         </div>
                     ))}
                     {bundles.length === 0 && <div className="card p-6 text-center text-slate-500">No evidence bundles</div>}

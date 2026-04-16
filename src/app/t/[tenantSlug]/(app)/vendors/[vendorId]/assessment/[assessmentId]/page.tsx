@@ -161,7 +161,7 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
                     <span>Rating: {assessment.riskRating ? <span className={`badge ${CRIT_BADGE[assessment.riskRating]}`} id="assessment-rating">{assessment.riskRating}</span> : '—'}</span>
                     <span>Requested by: {assessment.requestedBy?.name || '—'}</span>
                 </div>
-                {assessment.decidedBy && <p className="text-sm text-slate-400">Decided by: {assessment.decidedBy.name} on {new Date(assessment.decidedAt).toLocaleDateString()}</p>}
+                {assessment.decidedBy && <p className="text-sm text-slate-400">Decided by: {assessment.decidedBy.name} on {formatDate(assessment.decidedAt)}</p>}
                 {assessment.notes && <p className="text-sm text-slate-300 bg-slate-800/50 p-2 rounded">{assessment.notes}</p>}
             </div>
 

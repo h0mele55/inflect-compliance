@@ -49,7 +49,7 @@ export function AdminClient({ auditLog, tenantSlug, translations: t }: AdminClie
                         <tbody>
                             {auditLog.map(e => (
                                 <tr key={e.id}>
-                                    <td className="text-xs whitespace-nowrap">{new Date(e.createdAt).toLocaleString()}</td>
+                                    <td className="text-xs whitespace-nowrap">{formatDateTime(e.createdAt)}</td>
                                     <td className="text-xs">{e.user?.name || '—'}</td>
                                     <td><span className="badge badge-info">{e.action}</span></td>
                                     <td className="text-xs">{e.entity}</td>

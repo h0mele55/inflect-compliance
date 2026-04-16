@@ -75,7 +75,7 @@ describe('IntegrationRegistry', () => {
         integrationRegistry.register({
             name: 'github',
             type: 'scm',
-            clientClass: GitHubClient,
+            clientClass: GitHubClient as any,
             mapperClass: GitHubBranchProtectionMapper,
         });
     });

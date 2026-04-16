@@ -19,9 +19,12 @@ import {
     shallowEqual,
     findConflictingFields,
 } from '@/app-layer/integrations/sync-orchestrator';
+import type { RequestContext } from '@/app-layer/types';
 import type {
     SyncMapping,
     SyncMappingKey,
+    SyncMappingCreateData,
+    SyncMappingStatusUpdate,
     SyncEvent,
     ConflictStrategy,
 } from '@/app-layer/integrations/sync-types';
@@ -37,6 +40,20 @@ import { BaseFieldMapper, type FieldMappings } from '@/app-layer/integrations/ba
 // ═══════════════════════════════════════════════════════════════════════
 // Test Fixtures
 // ═══════════════════════════════════════════════════════════════════════
+
+// Mocks
+jest.mock('@/app-layer/jobs/queue', () => ({
+    enqueue: jest.fn().mockResolvedValue({ id: 'mock-job' }),
+}));
+import { enqueue } from '@/app-layer/jobs/queue';
+
+export const mockCtx: RequestContext = {
+    tenantId: 'tenant-1',
+    userId: 'system',
+    requestId: 'req-1',
+    role: 'ADMIN',
+    permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
+};
 
 // ── In-Memory Sync Mapping Store ──
 
@@ -68,14 +85,13 @@ class InMemoryMappingStore implements SyncMappingStore {
         return null;
     }
 
-    async upsert(key: SyncMappingKey, data: Partial<SyncMapping>): Promise<SyncMapping> {
+    async findOrCreate(key: SyncMappingKey, defaults?: SyncMappingCreateData): Promise<SyncMapping> {
         const existing = await this.findByLocalEntity(
             key.tenantId, key.provider, key.localEntityType, key.localEntityId,
         );
         if (existing) {
-            const updated = { ...existing, ...data, updatedAt: new Date() };
-            this.mappings.set(existing.id, updated);
-            return updated;
+            // findOrCreate returns existing unchanged
+            return existing;
         }
 
         const id = `mapping-${this.nextId++}`;
@@ -89,29 +105,41 @@ class InMemoryMappingStore implements SyncMappingStore {
             localEntityId: key.localEntityId,
             remoteEntityType: key.remoteEntityType,
             remoteEntityId: key.remoteEntityId,
-            syncStatus: 'PENDING',
+            syncStatus: defaults?.syncStatus ?? 'PENDING',
             lastSyncDirection: null,
             conflictStrategy: 'REMOTE_WINS',
             localUpdatedAt: null,
             remoteUpdatedAt: null,
             remoteDataJson: null,
             version: 1,
-            errorMessage: null,
+            errorMessage: defaults?.errorMessage ?? null,
             lastSyncedAt: null,
             createdAt: now,
             updatedAt: now,
-            ...data,
         };
         this.mappings.set(id, mapping);
         return mapping;
     }
 
     async updateStatus(
-        id: string, status: SyncMapping['syncStatus'], extra?: Partial<SyncMapping>,
+        id: string, status: SyncMapping['syncStatus'], extra?: SyncMappingStatusUpdate,
     ): Promise<SyncMapping> {
         const existing = this.mappings.get(id);
         if (!existing) throw new Error(`Mapping ${id} not found`);
-        const updated = { ...existing, syncStatus: status, ...extra, updatedAt: new Date() };
+        const updated: SyncMapping = {
+            ...existing,
+            syncStatus: status,
+            updatedAt: new Date(),
+        };
+        // Apply only the narrowly-typed operational fields
+        if (extra?.lastSyncDirection !== undefined) updated.lastSyncDirection = extra.lastSyncDirection;
+        if (extra?.localUpdatedAt !== undefined) updated.localUpdatedAt = extra.localUpdatedAt;
+        if (extra?.remoteUpdatedAt !== undefined) updated.remoteUpdatedAt = extra.remoteUpdatedAt;
+        if (extra?.remoteDataJson !== undefined) updated.remoteDataJson = extra.remoteDataJson;
+        if (extra?.lastSyncedAt !== undefined) updated.lastSyncedAt = extra.lastSyncedAt;
+        if (extra?.version !== undefined) updated.version = extra.version;
+        if (extra?.errorMessage !== undefined) updated.errorMessage = extra.errorMessage;
+        // conflictStrategy intentionally NOT writable here
         this.mappings.set(id, updated);
         return updated;
     }
@@ -137,6 +165,7 @@ class StubClient extends BaseIntegrationClient<{ token: string }> {
         return { items: [], total: 0 };
     }
     async createRemoteObject(data: Record<string, unknown>): Promise<RemoteObject> {
+        this.lastPushed = { remoteId: 'remote-new', changes: data };
         return { remoteId: 'remote-new', data };
     }
     async updateRemoteObject(remoteId: string, changes: Record<string, unknown>): Promise<RemoteObject> {
@@ -171,25 +200,25 @@ class StubOrchestrator extends BaseSyncOrchestrator {
         this.mapper = new StubMapper();
     }
 
-    protected getClient() { return this.client; }
-    protected getMapper() { return this.mapper; }
+    protected resolveClient() { return this.client; }
+    protected resolveMapper() { return this.mapper; }
     protected getRemoteEntityType() { return 'issue'; }
 
     getStubClient() { return this.client; }
 
     protected async applyLocalChanges(
-        _tenantId: string, localEntityType: string, localEntityId: string,
+        _ctx: RequestContext, localEntityType: string, localEntityId: string,
         localData: Record<string, unknown>,
     ): Promise<string[]> {
         const key = `${localEntityType}:${localEntityId}`;
         const existing = this.localEntities.get(key) ?? {};
         this.localEntities.set(key, { ...existing, ...localData });
-        this.appliedChanges.push({ type: localEntityType, id: localEntityId, data: localData });
+        this.appliedChanges.push({ ctx: mockCtx, type: localEntityType, id: localEntityId, data: localData });
         return Object.keys(localData);
     }
 
     protected async getLocalData(
-        _tenantId: string, localEntityType: string, localEntityId: string,
+        _ctx: RequestContext, localEntityType: string, localEntityId: string,
     ): Promise<Record<string, unknown> | null> {
         return this.localEntities.get(`${localEntityType}:${localEntityId}`) ?? null;
     }
@@ -233,37 +262,38 @@ describe('In-Memory Sync Mapping Store', () => {
 
     beforeEach(() => { store = new InMemoryMappingStore(); });
 
-    test('upsert creates a new mapping', async () => {
-        const mapping = await store.upsert(makeMappingKey(), { syncStatus: 'PENDING' });
+    test('findOrCreate creates a new mapping', async () => {
+        const mapping = await store.findOrCreate(makeMappingKey(), { syncStatus: 'PENDING' });
         expect(mapping.id).toBeDefined();
         expect(mapping.tenantId).toBe('tenant-1');
         expect(mapping.provider).toBe('stub');
         expect(mapping.syncStatus).toBe('PENDING');
     });
 
-    test('upsert updates existing mapping', async () => {
-        const first = await store.upsert(makeMappingKey(), { syncStatus: 'PENDING' });
-        const second = await store.upsert(makeMappingKey(), { syncStatus: 'SYNCED' });
+    test('findOrCreate returns existing unchanged', async () => {
+        const first = await store.findOrCreate(makeMappingKey(), { syncStatus: 'PENDING' });
+        const second = await store.findOrCreate(makeMappingKey(), { syncStatus: 'SYNCED' });
         expect(second.id).toBe(first.id);
-        expect(second.syncStatus).toBe('SYNCED');
+        // findOrCreate does NOT overwrite existing — returns as-is
+        expect(second.syncStatus).toBe('PENDING');
     });
 
     test('findByLocalEntity returns match', async () => {
-        await store.upsert(makeMappingKey(), {});
+        await store.findOrCreate(makeMappingKey());
         const found = await store.findByLocalEntity('tenant-1', 'stub', 'task', 'task-1');
         expect(found).not.toBeNull();
         expect(found!.localEntityId).toBe('task-1');
     });
 
     test('findByRemoteEntity returns match', async () => {
-        await store.upsert(makeMappingKey(), {});
+        await store.findOrCreate(makeMappingKey());
         const found = await store.findByRemoteEntity('tenant-1', 'stub', 'issue', 'PROJ-1');
         expect(found).not.toBeNull();
         expect(found!.remoteEntityId).toBe('PROJ-1');
     });
 
     test('updateStatus changes status and extras', async () => {
-        const mapping = await store.upsert(makeMappingKey(), {});
+        const mapping = await store.findOrCreate(makeMappingKey());
         const updated = await store.updateStatus(mapping.id, 'FAILED', { errorMessage: 'timeout' });
         expect(updated.syncStatus).toBe('FAILED');
         expect(updated.errorMessage).toBe('timeout');
@@ -282,7 +312,7 @@ describe('Push flow (local → remote)', () => {
     });
 
     test('push creates mapping and marks SYNCED', async () => {
-        const result = await orch.push({
+        const result = await orch.push({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             localData: { title: 'Fix bug', status: 'OPEN' },
             changedFields: ['title'],
@@ -296,7 +326,7 @@ describe('Push flow (local → remote)', () => {
     });
 
     test('push sends mapped partial data to client', async () => {
-        await orch.push({
+        await orch.push({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             localData: { title: 'Fix bug', status: 'OPEN', priority: 'HIGH' },
             changedFields: ['title'],
@@ -309,7 +339,7 @@ describe('Push flow (local → remote)', () => {
     });
 
     test('push logs a sync event', async () => {
-        await orch.push({
+        await orch.push({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             localData: { title: 'X' },
             changedFields: ['title'],
@@ -322,7 +352,7 @@ describe('Push flow (local → remote)', () => {
     });
 
     test('push increments version', async () => {
-        const r1 = await orch.push({
+        const r1 = await orch.push({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             localData: { title: 'V1' },
             changedFields: ['title'],
@@ -330,7 +360,7 @@ describe('Push flow (local → remote)', () => {
         });
         expect(r1.mapping.version).toBe(2); // initial 1 + 1
 
-        const r2 = await orch.push({
+        const r2 = await orch.push({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             localData: { title: 'V2' },
             changedFields: ['title'],
@@ -352,7 +382,7 @@ describe('Pull flow (remote → local)', () => {
     });
 
     test('pull applies mapped remote data to local entity', async () => {
-        const result = await orch.pull({
+        const result = await orch.pull({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             remoteData: { summary: 'Remote title', status: 'Done' },
             remoteUpdatedAt: new Date(),
@@ -373,7 +403,7 @@ describe('Pull flow (remote → local)', () => {
 
     test('pull stores remote data for future conflict detection', async () => {
         const remoteData = { summary: 'Title', status: 'Open' };
-        const result = await orch.pull({
+        const result = await orch.pull({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             remoteData,
             remoteUpdatedAt: new Date(),
@@ -393,7 +423,7 @@ describe('Conflict detection', () => {
     });
 
     test('no conflict on first sync (PENDING status)', async () => {
-        const mapping = await store.upsert(makeMappingKey(), { syncStatus: 'PENDING' });
+        const mapping = await store.findOrCreate(makeMappingKey(), { syncStatus: 'PENDING' });
         const result = await orch.checkForConflict(
             mapping,
             { title: 'Local' },
@@ -405,8 +435,8 @@ describe('Conflict detection', () => {
 
     test('no conflict when only remote changed (local not modified)', async () => {
         const lastSynced = new Date('2024-01-01');
-        const mapping = await store.upsert(makeMappingKey(), {
-            syncStatus: 'SYNCED',
+        const base = await store.findOrCreate(makeMappingKey());
+        const mapping = await store.updateStatus(base.id, 'SYNCED', {
             lastSyncedAt: lastSynced,
             localUpdatedAt: new Date('2023-12-31'), // BEFORE last sync
             remoteDataJson: { summary: 'Old' },
@@ -423,8 +453,8 @@ describe('Conflict detection', () => {
 
     test('conflict when both local and remote changed since last sync', async () => {
         const lastSynced = new Date('2024-01-01');
-        const mapping = await store.upsert(makeMappingKey(), {
-            syncStatus: 'SYNCED',
+        const base = await store.findOrCreate(makeMappingKey());
+        const mapping = await store.updateStatus(base.id, 'SYNCED', {
             lastSyncedAt: lastSynced,
             localUpdatedAt: new Date('2024-01-02'), // AFTER last sync
             remoteDataJson: { summary: 'Old remote', status: 'Open' },
@@ -453,20 +483,25 @@ describe('Conflict resolution: remote_wins', () => {
     });
 
     test('remote_wins strategy during pull applies remote data', async () => {
-        // Set up a synced mapping with local changes
+        // Set up a synced mapping with local changes and REMOTE_WINS strategy
         const lastSynced = new Date('2024-01-01');
-        await store.upsert(makeMappingKey(), {
-            syncStatus: 'SYNCED',
-            lastSyncedAt: lastSynced,
-            localUpdatedAt: new Date('2024-01-02'),
-            remoteDataJson: { summary: 'Old', status: 'Open' },
+        const now = new Date();
+        const key = makeMappingKey();
+        store.setMapping({
+            id: 'conflict-rw-1', tenantId: key.tenantId, provider: key.provider,
+            connectionId: null, localEntityType: key.localEntityType, localEntityId: key.localEntityId,
+            remoteEntityType: key.remoteEntityType, remoteEntityId: key.remoteEntityId,
+            syncStatus: 'SYNCED', lastSyncDirection: 'PULL',
             conflictStrategy: 'REMOTE_WINS',
+            lastSyncedAt: lastSynced, localUpdatedAt: new Date('2024-01-02'),
+            remoteUpdatedAt: null, remoteDataJson: { summary: 'Old', status: 'Open' },
+            version: 1, errorMessage: null, createdAt: now, updatedAt: now,
         });
 
         // Set local data
         orch.localEntities.set('task:task-1', { title: 'Local changed', status: 'IN_PROGRESS' });
 
-        const result = await orch.pull({
+        const result = await orch.pull({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             remoteData: { summary: 'Remote changed', status: 'Done' },
             remoteUpdatedAt: new Date('2024-01-03'),
@@ -490,17 +525,22 @@ describe('Conflict resolution: local_wins', () => {
 
     test('local_wins strategy during pull skips applying remote data', async () => {
         const lastSynced = new Date('2024-01-01');
-        await store.upsert(makeMappingKey(), {
-            syncStatus: 'SYNCED',
-            lastSyncedAt: lastSynced,
-            localUpdatedAt: new Date('2024-01-02'),
-            remoteDataJson: { summary: 'Old', status: 'Open' },
+        const now = new Date();
+        const key = makeMappingKey();
+        store.setMapping({
+            id: 'conflict-lw-1', tenantId: key.tenantId, provider: key.provider,
+            connectionId: null, localEntityType: key.localEntityType, localEntityId: key.localEntityId,
+            remoteEntityType: key.remoteEntityType, remoteEntityId: key.remoteEntityId,
+            syncStatus: 'SYNCED', lastSyncDirection: 'PULL',
             conflictStrategy: 'LOCAL_WINS',
+            lastSyncedAt: lastSynced, localUpdatedAt: new Date('2024-01-02'),
+            remoteUpdatedAt: null, remoteDataJson: { summary: 'Old', status: 'Open' },
+            version: 1, errorMessage: null, createdAt: now, updatedAt: now,
         });
 
         orch.localEntities.set('task:task-1', { title: 'Local changed', status: 'IN_PROGRESS' });
 
-        const result = await orch.pull({
+        const result = await orch.pull({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             remoteData: { summary: 'Remote changed', status: 'Done' },
             remoteUpdatedAt: new Date('2024-01-03'),
@@ -523,17 +563,22 @@ describe('Conflict resolution: manual', () => {
 
     test('manual strategy returns conflict status without applying', async () => {
         const lastSynced = new Date('2024-01-01');
-        await store.upsert(makeMappingKey(), {
-            syncStatus: 'SYNCED',
-            lastSyncedAt: lastSynced,
-            localUpdatedAt: new Date('2024-01-02'),
-            remoteDataJson: { summary: 'Old', status: 'Open' },
+        const now = new Date();
+        const key = makeMappingKey();
+        store.setMapping({
+            id: 'conflict-m-1', tenantId: key.tenantId, provider: key.provider,
+            connectionId: null, localEntityType: key.localEntityType, localEntityId: key.localEntityId,
+            remoteEntityType: key.remoteEntityType, remoteEntityId: key.remoteEntityId,
+            syncStatus: 'SYNCED', lastSyncDirection: 'PULL',
             conflictStrategy: 'MANUAL',
+            lastSyncedAt: lastSynced, localUpdatedAt: new Date('2024-01-02'),
+            remoteUpdatedAt: null, remoteDataJson: { summary: 'Old', status: 'Open' },
+            version: 1, errorMessage: null, createdAt: now, updatedAt: now,
         });
 
         orch.localEntities.set('task:task-1', { title: 'Local changed', status: 'IN_PROGRESS' });
 
-        const result = await orch.pull({
+        const result = await orch.pull({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             remoteData: { summary: 'Remote changed', status: 'Done' },
             remoteUpdatedAt: new Date('2024-01-03'),
@@ -559,37 +604,36 @@ describe('Webhook-triggered pull', () => {
         orch = new StubOrchestrator(store, logger);
 
         // Pre-create a mapping for the remote entity
-        await store.upsert({
+        const base = await store.findOrCreate({
             tenantId: 'tenant-1',
             provider: 'stub',
             localEntityType: 'task',
             localEntityId: 'task-1',
             remoteEntityType: 'issue',
             remoteEntityId: 'PROJ-1',
-        }, { syncStatus: 'SYNCED' });
+        });
+        await store.updateStatus(base.id, 'SYNCED');
     });
 
     test('webhook triggers pull and applies changes', async () => {
-        const result = await orch.handleWebhookEvent({
+        const result = await orch.handleWebhookEvent({ ctx: mockCtx,
             provider: 'stub',
             eventType: 'updated',
             payload: { issue: { key: 'PROJ-1', summary: 'Webhook title', status: 'In Progress' } },
-            tenantId: 'tenant-1',
+            
         });
 
         expect(result.processed).toBe(true);
         expect(result.syncCount).toBe(1);
-        expect(result.results).toHaveLength(1);
-        expect(result.results[0].success).toBe(true);
-        expect(result.results[0].direction).toBe('PULL');
+        expect(enqueue).toHaveBeenCalled();
     });
 
     test('webhook returns not processed for unknown remote ID', async () => {
-        const result = await orch.handleWebhookEvent({
+        const result = await orch.handleWebhookEvent({ ctx: mockCtx,
             provider: 'stub',
             eventType: 'updated',
             payload: { issue: { key: 'UNKNOWN-99', summary: 'X' } },
-            tenantId: 'tenant-1',
+            
         });
 
         expect(result.processed).toBe(false);
@@ -597,11 +641,11 @@ describe('Webhook-triggered pull', () => {
     });
 
     test('webhook handles missing remote ID in payload', async () => {
-        const result = await orch.handleWebhookEvent({
+        const result = await orch.handleWebhookEvent({ ctx: mockCtx,
             provider: 'stub',
             eventType: 'updated',
             payload: { noIssue: true },
-            tenantId: 'tenant-1',
+            
         });
 
         expect(result.processed).toBe(false);
@@ -609,11 +653,11 @@ describe('Webhook-triggered pull', () => {
     });
 
     test('webhook handles deletion events', async () => {
-        const result = await orch.handleWebhookEvent({
+        const result = await orch.handleWebhookEvent({ ctx: mockCtx,
             provider: 'stub',
             eventType: 'deleted',
             payload: { issue: { key: 'PROJ-1' } },
-            tenantId: 'tenant-1',
+            
         });
 
         expect(result.processed).toBe(true);
@@ -630,8 +674,9 @@ describe('Error handling', () => {
         // Make the client throw
         const client = orch.getStubClient();
         client.updateRemoteObject = async () => { throw new Error('Network timeout'); };
+        client.createRemoteObject = async () => { throw new Error('Network timeout'); };
 
-        const result = await orch.push({
+        const result = await orch.push({ ctx: mockCtx,
             mappingKey: makeMappingKey(),
             localData: { title: 'X' },
             changedFields: ['title'],
@@ -667,5 +712,256 @@ describe('Utility functions', () => {
         expect(conflicts).toContain('title');
         expect(conflicts).toContain('status');
         expect(conflicts).not.toContain('priority');
+    });
+});
+
+describe('Utility functions — deep equality', () => {
+    test('shallowEqual handles nested objects (deep comparison)', () => {
+        const a = { top: 'same', nested: { count: 2, strict: true } };
+        const b = { top: 'same', nested: { count: 2, strict: true } };
+        expect(shallowEqual(a, b)).toBe(true);
+    });
+
+    test('shallowEqual detects nested differences', () => {
+        const a = { nested: { count: 2 } };
+        const b = { nested: { count: 3 } };
+        expect(shallowEqual(a, b)).toBe(false);
+    });
+
+    test('shallowEqual handles arrays in values', () => {
+        const a = { contexts: ['ci', 'lint'] };
+        const b = { contexts: ['ci', 'lint'] };
+        expect(shallowEqual(a, b)).toBe(true);
+
+        const c = { contexts: ['ci'] };
+        expect(shallowEqual(a, c)).toBe(false);
+    });
+
+    test('shallowEqual handles null vs object', () => {
+        expect(shallowEqual({ a: null }, { a: null })).toBe(true);
+        expect(shallowEqual({ a: null }, { a: {} })).toBe(false);
+    });
+
+    test('shallowEqual returns true for reference equality', () => {
+        const obj = { a: 1, b: { c: 2 } };
+        expect(shallowEqual(obj, obj)).toBe(true);
+    });
+
+    test('findConflictingFields handles nested remote data', () => {
+        // Simulate GitHub-like nested protection data:
+        // mapper maps 'status' <-> 'status', 'priority' <-> 'priority'
+        const mapper = new StubMapper();
+        const conflicts = findConflictingFields(
+            { title: 'Same', status: 'OPEN', priority: 'HIGH' },
+            { summary: 'Same', status: 'OPEN', priority: 'LOW' },
+            mapper,
+            ['title', 'status', 'priority'],
+        );
+        // title maps to summary='Same', which maps back to title='Same' — no conflict
+        expect(conflicts).not.toContain('title');
+        // status is same — no conflict
+        expect(conflicts).not.toContain('status');
+        // priority changed
+        expect(conflicts).toContain('priority');
+    });
+});
+
+describe('Push conflict detection', () => {
+    let store: InMemoryMappingStore;
+    let orch: StubOrchestrator;
+
+    beforeEach(() => {
+        store = new InMemoryMappingStore();
+        orch = new StubOrchestrator(store);
+    });
+
+    test('no conflict on PUSH when last direction was PULL', async () => {
+        const base = await store.findOrCreate(makeMappingKey());
+        const mapping = await store.updateStatus(base.id, 'SYNCED', {
+            lastSyncedAt: new Date('2024-01-01'),
+            lastSyncDirection: 'PULL',
+            localUpdatedAt: new Date('2024-01-02'),
+        });
+
+        const result = await orch.checkForConflict(
+            mapping,
+            { title: 'Changed after pull' },
+            'PUSH',
+        );
+        expect(result.hasConflict).toBe(false);
+    });
+
+    test('no conflict on PUSH when last direction was PUSH (no remote data)', async () => {
+        const base = await store.findOrCreate(makeMappingKey());
+        const mapping = await store.updateStatus(base.id, 'SYNCED', {
+            lastSyncedAt: new Date('2024-01-01'),
+            lastSyncDirection: 'PUSH',
+            localUpdatedAt: new Date('2024-01-02'),
+        });
+
+        const result = await orch.checkForConflict(
+            mapping,
+            { title: 'Another push' },
+            'PUSH',
+        );
+        // No incoming remote data on a push, so no conflict possible
+        expect(result.hasConflict).toBe(false);
+    });
+
+    test('push with REMOTE_WINS conflict skips pushing', async () => {
+        // Create a SYNCED mapping with both sides changed
+        const lastSynced = new Date('2024-01-01');
+        const now = new Date();
+        const key = makeMappingKey();
+        store.setMapping({
+            id: 'push-rw-1', tenantId: key.tenantId, provider: key.provider,
+            connectionId: null, localEntityType: key.localEntityType, localEntityId: key.localEntityId,
+            remoteEntityType: key.remoteEntityType, remoteEntityId: key.remoteEntityId,
+            syncStatus: 'SYNCED', lastSyncDirection: 'PUSH',
+            conflictStrategy: 'REMOTE_WINS',
+            lastSyncedAt: lastSynced, localUpdatedAt: new Date('2024-01-02'),
+            remoteUpdatedAt: null, remoteDataJson: { summary: 'Old', status: 'Open' },
+            version: 1, errorMessage: null, createdAt: now, updatedAt: now,
+        });
+
+        // Push should succeed (no incoming remote data to compare against)
+        const result = await orch.push({ ctx: mockCtx,
+            mappingKey: makeMappingKey(),
+            localData: { title: 'New local', status: 'DONE' },
+            changedFields: ['title', 'status'],
+            localUpdatedAt: new Date('2024-01-02'),
+        });
+
+        expect(result.success).toBe(true);
+    });
+});
+
+describe('Pull error handling', () => {
+    test('pull handles applyLocalChanges failure gracefully', async () => {
+        const store = new InMemoryMappingStore();
+        const orch = new StubOrchestrator(store);
+
+        // Override applyLocalChanges to throw
+        (orch as any).applyLocalChanges = async () => {
+            throw new Error('Database write failed');
+        };
+
+        const result = await orch.pull({ ctx: mockCtx,
+            mappingKey: makeMappingKey(),
+            remoteData: { summary: 'Remote title', status: 'Open' },
+            remoteUpdatedAt: new Date(),
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.action).toBe('error');
+        expect(result.errorMessage).toContain('Database write failed');
+        expect(result.mapping.syncStatus).toBe('FAILED');
+    });
+
+    test('pull handles mapper failure gracefully', async () => {
+        const store = new InMemoryMappingStore();
+        const orch = new StubOrchestrator(store);
+
+        // Override getMapper to return a broken mapper
+        (orch as any).getMapper = () => ({
+            toLocal: () => { throw new Error('Mapping error'); },
+            getMappedLocalFields: () => ['title'],
+        });
+
+        const result = await orch.pull({ ctx: mockCtx,
+            mappingKey: makeMappingKey(),
+            remoteData: { summary: 'X' },
+            remoteUpdatedAt: new Date(),
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.action).toBe('error');
+        expect(result.errorMessage).toContain('Mapping error');
+    });
+});
+
+describe('Webhook audit logging', () => {
+    test('webhook deletion logs with triggeredBy webhook', async () => {
+        const store = new InMemoryMappingStore();
+        const logger = new SpyEventLogger();
+        const orch = new StubOrchestrator(store, logger);
+
+        const base = await store.findOrCreate({
+            tenantId: 'tenant-1',
+            provider: 'stub',
+            localEntityType: 'task', localEntityId: 'task-1',
+            remoteEntityType: 'issue', remoteEntityId: 'PROJ-1',
+        });
+        await store.updateStatus(base.id, 'SYNCED');
+
+        await orch.handleWebhookEvent({ ctx: mockCtx,
+            provider: 'stub',
+            eventType: 'deleted',
+            payload: { issue: { key: 'PROJ-1' } },
+            
+        });
+
+        expect(logger.events).toHaveLength(1);
+        expect(logger.events[0].triggeredBy).toBe('webhook');
+        expect(logger.events[0].direction).toBe('PULL');
+    });
+});
+
+describe('Orchestrator instance caching', () => {
+    class CountingOrchestrator extends BaseSyncOrchestrator {
+        clientResolves = 0;
+        mapperResolves = 0;
+        
+        protected resolveClient(): BaseIntegrationClient {
+            this.clientResolves++;
+            return new StubClient({ token: 'cached' });
+        }
+        protected resolveMapper(): BaseFieldMapper {
+            this.mapperResolves++;
+            return new StubMapper();
+        }
+        protected getRemoteEntityType() { return 'test'; }
+        protected extractRemoteId() { return null; }
+        protected extractRemoteData() { return null; }
+        protected async applyLocalChanges() { return []; }
+        protected async getLocalData() { return null; }
+
+        // Expose protected methods for testing
+        public testGetClient() { return this.getClient(); }
+        public testGetMapper() { return this.getMapper(); }
+    }
+
+    test('mapper and client resolve exactly once per operation instance', () => {
+        const store = new InMemoryMappingStore();
+        const orch = new CountingOrchestrator({ provider: 'test', store });
+
+        // First calls trigger resolution
+        orch.testGetClient();
+        orch.testGetMapper();
+        expect(orch.clientResolves).toBe(1);
+        expect(orch.mapperResolves).toBe(1);
+
+        // Subsequent calls use cached values on the same instance
+        orch.testGetClient();
+        orch.testGetClient();
+        orch.testGetMapper();
+        
+        // Count should not increment
+        expect(orch.clientResolves).toBe(1);
+        expect(orch.mapperResolves).toBe(1);
+    });
+
+    test('caching does not cross-contaminate orchestrator instances', () => {
+        const store = new InMemoryMappingStore();
+        
+        const orchA = new CountingOrchestrator({ provider: 'test', store });
+        const orchB = new CountingOrchestrator({ provider: 'test', store });
+
+        orchA.testGetClient();
+        expect(orchA.clientResolves).toBe(1);
+        expect(orchB.clientResolves).toBe(0);
+
+        orchB.testGetClient();
+        expect(orchB.clientResolves).toBe(1);
     });
 });

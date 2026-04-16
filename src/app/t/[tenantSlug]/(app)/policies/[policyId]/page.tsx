@@ -285,7 +285,7 @@ export default function PolicyDetailPage() {
                             {policy.owner && <span>{policy.owner.name}</span>}
                             {policy.nextReviewAt && (
                                 <span className={isOverdue ? 'text-red-400' : ''}>
-                                    Review: {new Date(policy.nextReviewAt).toLocaleDateString()}
+                                    Review: {formatDate(policy.nextReviewAt)}
                                 </span>
                             )}
                             {policy.reviewFrequencyDays && <span>Every {policy.reviewFrequencyDays}d</span>}
@@ -349,7 +349,7 @@ export default function PolicyDetailPage() {
                         <>
                             <div className="flex items-center justify-between mb-4">
                                 <div className="text-sm text-slate-400">
-                                    Version {currentVersion.versionNumber} · {currentVersion.createdBy?.name} · {new Date(currentVersion.createdAt).toLocaleDateString()}
+                                    Version {currentVersion.versionNumber} · {currentVersion.createdBy?.name} · {formatDate(currentVersion.createdAt)}
                                     {currentVersion.contentType === 'EXTERNAL_LINK' && <span className="ml-2 badge badge-info text-xs">External</span>}
                                 </div>
                             </div>
@@ -383,7 +383,7 @@ export default function PolicyDetailPage() {
                                         {isCurrentPublished && <span className="badge badge-success text-xs">Published</span>}
                                         {v.contentType === 'EXTERNAL_LINK' && <span className="badge badge-info text-xs">External Link</span>}
                                         <span className="text-xs text-slate-500">
-                                            {v.createdBy?.name} · {new Date(v.createdAt).toLocaleDateString()}
+                                            {v.createdBy?.name} · {formatDate(v.createdAt)}
                                         </span>
                                     </div>
                                     <div className="flex gap-2">
@@ -415,7 +415,7 @@ export default function PolicyDetailPage() {
                                                     <span className={`badge text-xs ${APPROVAL_BADGE[a.status]}`}>{a.status}</span>
                                                     <span className="text-slate-400">
                                                         by {a.requestedBy?.name || 'Unknown'}
-                                                        {a.decidedAt && ` · ${new Date(a.decidedAt).toLocaleDateString()}`}
+                                                        {a.decidedAt && ` · ${formatDate(a.decidedAt)}`}
                                                     </span>
                                                 </div>
                                                 {canAdmin && a.status === 'PENDING' && (

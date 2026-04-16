@@ -1759,6 +1759,10 @@ model IntegrationWebhookEvent {
   @@index([status])
 }
 
+// Note: @@map is deliberately omitted here to conform to the repository's 
+// global Prisma convention. All models use Prisma's default exact-case tables
+// (e.g., 'IntegrationSyncMapping' instead of 'integration_sync_mappings').
+// The isolated AuthSession model mapped strictly to "Session" remains an anomaly.
 model IntegrationSyncMapping {
   id                String              @id @default(cuid())
   tenantId          String

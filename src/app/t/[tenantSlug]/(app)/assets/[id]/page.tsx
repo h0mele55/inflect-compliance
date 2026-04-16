@@ -147,8 +147,8 @@ export default function AssetDetailPage() {
                             <div className="glass-card p-4 text-center"><p className="text-xs text-slate-400 uppercase">Availability</p><p className="text-2xl font-bold mt-1">{asset.availability ?? '—'}</p></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4 border-t border-slate-700/50 pt-4">
-                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Created</h3><p className="text-sm text-slate-400">{new Date(asset.createdAt).toLocaleDateString()}</p></div>
-                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Updated</h3><p className="text-sm text-slate-400">{new Date(asset.updatedAt).toLocaleDateString()}</p></div>
+                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Created</h3><p className="text-sm text-slate-400">{formatDate(asset.createdAt)}</p></div>
+                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Updated</h3><p className="text-sm text-slate-400">{formatDate(asset.updatedAt)}</p></div>
                         </div>
                     </>
                 )}

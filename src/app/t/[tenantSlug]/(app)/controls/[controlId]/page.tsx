@@ -135,6 +135,13 @@ export default function ControlDetailPage() {
     const [autoKey, setAutoKey] = useState('');
     const [savingAutomation, setSavingAutomation] = useState(false);
 
+    // Sync status (conflict badge + Sync Now)
+    const [syncStatus, setSyncStatus] = useState<string | null>(null);
+    const [syncLastAt, setSyncLastAt] = useState<string | null>(null);
+    const [syncError, setSyncError] = useState<string | null>(null);
+    const [syncing, setSyncing] = useState(false);
+    const [syncResult, setSyncResult] = useState<{ status: string; summary?: string } | null>(null);
+
     // Edit modal state
     const [showEditModal, setShowEditModal] = useState(false);
     const [editForm, setEditForm] = useState({ name: '', description: '', intent: '', category: '', frequency: '', owner: '' });
@@ -265,6 +272,47 @@ export default function ControlDetailPage() {
         setActivityLoading(true);
         fetch(apiUrl(`/controls/${controlId}/activity`)).then(r => r.ok ? r.json() : []).then(setActivity).catch(() => { }).finally(() => setActivityLoading(false));
     }, [tab, apiUrl, controlId]);
+
+    // Fetch sync status on load (only when control has an automationKey)
+    useEffect(() => {
+        if (!control?.automationKey) return;
+        fetch(apiUrl(`/controls/${controlId}/sync`))
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (data) {
+                    setSyncStatus(data.syncStatus ?? null);
+                    setSyncLastAt(data.lastSyncedAt ?? null);
+                    setSyncError(data.errorMessage ?? null);
+                }
+            })
+            .catch(() => { });
+    }, [control?.automationKey, apiUrl, controlId]);
+
+    const handleSyncNow = async () => {
+        setSyncing(true);
+        setSyncResult(null);
+        try {
+            const res = await fetch(apiUrl(`/controls/${controlId}/sync`), { method: 'POST' });
+            const data = await res.json();
+            if (res.ok && data.execution) {
+                setSyncResult({ status: data.execution.status, summary: data.execution.summary });
+                // Refresh sync status
+                const statusRes = await fetch(apiUrl(`/controls/${controlId}/sync`));
+                if (statusRes.ok) {
+                    const statusData = await statusRes.json();
+                    setSyncStatus(statusData.syncStatus ?? null);
+                    setSyncLastAt(statusData.lastSyncedAt ?? null);
+                    setSyncError(statusData.errorMessage ?? null);
+                }
+                await refetch();
+            } else {
+                setSyncResult({ status: 'ERROR', summary: data.error || 'Sync failed' });
+            }
+        } catch {
+            setSyncResult({ status: 'ERROR', summary: 'Network error' });
+        }
+        setSyncing(false);
+    };
 
     const handleMarkTestCompleted = async () => {
         setMarkingTest(true);
@@ -449,6 +497,32 @@ export default function ControlDetailPage() {
                         <span className={`badge ${control.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'}`} id="control-applicability">
                             {control.applicability === 'NOT_APPLICABLE' ? 'Not Applicable' : 'Applicable'}
                         </span>
+                        {syncStatus === 'CONFLICT' && (
+                            <span
+                                className="badge badge-error flex items-center gap-1 animate-pulse"
+                                title={syncError ?? 'Sync conflict detected — local and remote state diverged'}
+                                id="sync-conflict-badge"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                                Sync Conflict
+                            </span>
+                        )}
+                        {syncStatus === 'FAILED' && (
+                            <span
+                                className="badge badge-error flex items-center gap-1"
+                                title={syncError ?? 'Last sync failed'}
+                                id="sync-failed-badge"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                                Sync Failed
+                            </span>
+                        )}
+                        {syncStatus === 'SYNCED' && (
+                            <span className="badge badge-success flex items-center gap-1" id="sync-ok-badge" title={syncLastAt ? `Last synced: ${formatDateTime(syncLastAt)}` : 'Synced'}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                                Synced
+                            </span>
+                        )}
                     </div>
                 </div>
                 {permissions.canWrite && (
@@ -572,23 +646,55 @@ export default function ControlDetailPage() {
                         </div>
                         <div>
                             <span className="text-xs text-slate-500 uppercase">Last Tested</span>
-                            <p className="text-sm text-slate-300 mt-1">{control.lastTested ? new Date(control.lastTested).toLocaleDateString() : '—'}</p>
+                            <p className="text-sm text-slate-300 mt-1">{control.lastTested ? formatDate(control.lastTested) : '—'}</p>
                         </div>
                         <div>
                             <span className="text-xs text-slate-500 uppercase">Next Due</span>
-                            <p className="text-sm text-slate-300 mt-1">{control.nextDueAt ? new Date(control.nextDueAt).toLocaleDateString() : '—'}</p>
+                            <p className="text-sm text-slate-300 mt-1">{control.nextDueAt ? formatDate(control.nextDueAt) : '—'}</p>
                         </div>
                     </div>
                     {/* Automation Section */}
                     <div className="border-t border-slate-700 pt-4 mt-4">
                         <div className="flex items-center justify-between mb-2">
                             <h3 className="text-sm font-semibold text-slate-300">Automation</h3>
-                            {permissions.canWrite && (
-                                <button className="text-xs text-brand-400 hover:underline" onClick={() => { setAutoEvidenceSource(control.evidenceSource || ''); setAutoKey(control.automationKey || ''); setEditingAutomation(!editingAutomation); }} id="edit-automation-btn">
-                                    {editingAutomation ? 'Cancel' : 'Edit'}
-                                </button>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {/* Sync Now button — only when automationKey is set */}
+                                {control.automationKey && permissions.canWrite && !editingAutomation && (
+                                    <button
+                                        className="btn btn-secondary btn-xs flex items-center gap-1 disabled:opacity-50"
+                                        onClick={handleSyncNow}
+                                        disabled={syncing}
+                                        id="sync-now-btn"
+                                        title="Manually trigger a sync check now"
+                                    >
+                                        {syncing ? (
+                                            <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                                        ) : (
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                                        )}
+                                        {syncing ? 'Syncing…' : 'Sync Now'}
+                                    </button>
+                                )}
+                                {permissions.canWrite && (
+                                    <button className="text-xs text-brand-400 hover:underline" onClick={() => { setAutoEvidenceSource(control.evidenceSource || ''); setAutoKey(control.automationKey || ''); setEditingAutomation(!editingAutomation); }} id="edit-automation-btn">
+                                        {editingAutomation ? 'Cancel' : 'Edit'}
+                                    </button>
+                                )}
+                            </div>
                         </div>
+
+                        {/* Sync result flash */}
+                        {syncResult && (
+                            <div className={`mb-3 p-2.5 rounded text-xs flex items-start gap-2 ${
+                                syncResult.status === 'PASSED' ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                                : syncResult.status === 'FAILED' || syncResult.status === 'ERROR' ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+                                : 'bg-slate-700/50 border border-slate-600 text-slate-300'
+                            }`} id="sync-result-banner">
+                                <span className="font-semibold">{syncResult.status}</span>
+                                {syncResult.summary && <span className="opacity-80">{syncResult.summary}</span>}
+                            </div>
+                        )}
+
                         {editingAutomation && permissions.canWrite ? (
                             <div className="space-y-2">
                                 <select className="input w-full" value={autoEvidenceSource} onChange={e => setAutoEvidenceSource(e.target.value)} id="evidence-source-select">
@@ -613,6 +719,26 @@ export default function ControlDetailPage() {
                                     <span className="text-xs text-slate-500">Automation Key</span>
                                     <p className="text-sm text-slate-300 mt-1 font-mono">{control.automationKey || '—'}</p>
                                 </div>
+                                {syncStatus && (
+                                    <div>
+                                        <span className="text-xs text-slate-500">Sync Status</span>
+                                        <div className="mt-1 flex items-center gap-1.5">
+                                            <span className={`badge text-xs ${
+                                                syncStatus === 'SYNCED' ? 'badge-success'
+                                                : syncStatus === 'CONFLICT' ? 'badge-error'
+                                                : syncStatus === 'FAILED' ? 'badge-error'
+                                                : syncStatus === 'STALE' ? 'badge-warning'
+                                                : 'badge-neutral'
+                                            }`}>{syncStatus}</span>
+                                            {syncLastAt && (
+                                                <span className="text-xs text-slate-600">{formatDateTime(syncLastAt)}</span>
+                                            )}
+                                        </div>
+                                        {syncError && syncStatus !== 'SYNCED' && (
+                                            <p className="text-xs text-red-400 mt-1 truncate" title={syncError}>{syncError}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -764,7 +890,7 @@ export default function ControlDetailPage() {
                                             <td className="text-sm text-white">{t.title}</td>
                                             <td><span className={`badge ${TASK_STATUS_BADGE[t.status] || 'badge-neutral'}`}>{t.status}</span></td>
                                             <td className="text-xs text-slate-400">{t.assignee?.name || '—'}</td>
-                                            <td className="text-xs text-slate-400">{t.dueAt ? new Date(t.dueAt).toLocaleDateString() : '—'}</td>
+                                            <td className="text-xs text-slate-400">{t.dueAt ? formatDate(t.dueAt) : '—'}</td>
                                             {permissions.canWrite && (
                                                 <td>
                                                     {t.status !== 'DONE' && (
@@ -867,7 +993,7 @@ export default function ControlDetailPage() {
                                                 {el.url ? <a href={el.url} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">{el.url}</a> : (el.note || '—')}
                                             </td>
                                             <td className="text-xs text-slate-400">{el.createdBy?.name || '—'}</td>
-                                            <td className="text-xs text-slate-400">{el.createdAt ? new Date(el.createdAt).toLocaleDateString() : '—'}</td>
+                                            <td className="text-xs text-slate-400">{el.createdAt ? formatDate(el.createdAt) : '—'}</td>
                                             {permissions.canWrite && (
                                                 <td>
                                                     <button className="text-red-400 text-xs hover:text-red-300" onClick={() => unlinkEvidence(el.id)} id={`unlink-${el.id}`}>
@@ -974,7 +1100,7 @@ export default function ControlDetailPage() {
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm text-slate-300">{ev.details}</p>
                                         <p className="text-xs text-slate-500 mt-0.5">
-                                            {ev.user?.name || 'System'} · {new Date(ev.createdAt).toLocaleString()}
+                                            {ev.user?.name || 'System'} · {formatDateTime(ev.createdAt)}
                                         </p>
                                     </div>
                                 </div>

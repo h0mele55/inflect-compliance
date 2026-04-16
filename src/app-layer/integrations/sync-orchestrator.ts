@@ -36,11 +36,14 @@
  *
  * @module integrations/sync-orchestrator
  */
+import type { RequestContext } from '@/app-layer/types';
 import type { BaseIntegrationClient } from './base-client';
 import type { BaseFieldMapper } from './base-mapper';
 import type {
     SyncMapping,
     SyncMappingKey,
+    SyncMappingCreateData,
+    SyncMappingStatusUpdate,
     PushInput,
     PullInput,
     SyncResult,
@@ -50,14 +53,22 @@ import type {
     ConflictCheckResult,
     WebhookPullInput,
     WebhookPullResult,
+    WebhookPullResult,
     SyncEvent,
 } from './sync-types';
+import { enqueue } from '../jobs/queue';
 
 // ─── Sync Mapping Store ──────────────────────────────────────────────
 
 /**
  * Interface for sync mapping persistence.
  * Production implementations use Prisma; tests use in-memory.
+ *
+ * Design: create vs update are intentionally separated.
+ *   - `findOrCreate` sets identity + safe defaults only
+ *   - `updateStatus` updates operational fields with a narrow typed input
+ *   - Control-plane fields (e.g. `conflictStrategy`) cannot be
+ *     accidentally overwritten through either path
  */
 export interface SyncMappingStore {
     findByLocalEntity(
@@ -74,12 +85,28 @@ export interface SyncMappingStore {
         remoteEntityId: string,
     ): Promise<SyncMapping | null>;
 
-    upsert(key: SyncMappingKey, data: Partial<SyncMapping>): Promise<SyncMapping>;
+    /**
+     * Find an existing mapping by key, or create one with safe defaults.
+     *
+     * On create: identity fields come from `key`, control-plane fields
+     * get safe defaults (conflictStrategy=REMOTE_WINS, version=1).
+     * Only `syncStatus` and `errorMessage` can be set via `defaults`.
+     *
+     * On find: returns the existing mapping unchanged — `defaults`
+     * are NOT applied to existing records.
+     */
+    findOrCreate(key: SyncMappingKey, defaults?: SyncMappingCreateData): Promise<SyncMapping>;
 
+    /**
+     * Update operational status of an existing mapping.
+     *
+     * The `extra` payload is narrowly typed to prevent accidental
+     * overwrites of identity and control-plane fields.
+     */
     updateStatus(
         id: string,
         status: SyncMapping['syncStatus'],
-        extra?: Partial<SyncMapping>,
+        extra?: SyncMappingStatusUpdate,
     ): Promise<SyncMapping>;
 }
 
@@ -104,8 +131,8 @@ export const noopSyncLogger: SyncEventLogger = {
  * Abstract base class for sync orchestration.
  *
  * Subclasses must provide:
- *   - getClient()          → the BaseIntegrationClient for this provider
- *   - getMapper()          → the BaseFieldMapper for this provider
+ *   - resolveClient()      → the BaseIntegrationClient for this provider
+ *   - resolveMapper()      → the BaseFieldMapper for this provider
  *   - applyLocalChanges()  → apply mapped remote data to the local entity
  *   - getLocalData()       → fetch current local entity data
  *   - extractRemoteId()    → extract remote ID from webhook payload
@@ -126,26 +153,51 @@ export abstract class BaseSyncOrchestrator {
         this.logger = opts.logger ?? noopSyncLogger;
     }
 
+    private _clientCache: BaseIntegrationClient | null = null;
+    private _mapperCache: BaseFieldMapper | null = null;
+
     // ── Abstract Methods ──
 
-    /** Return the integration client for remote interaction */
-    protected abstract getClient(): BaseIntegrationClient;
+    /** Implement this to resolve and return the integration client */
+    protected abstract resolveClient(): BaseIntegrationClient;
 
-    /** Return the field mapper for this integration */
-    protected abstract getMapper(): BaseFieldMapper;
+    /** Implement this to resolve and return the field mapper */
+    protected abstract resolveMapper(): BaseFieldMapper;
+
+    /** 
+     * Return the integration client for remote interaction.
+     * Caches the resolved client per-operation to prevent redundant resolution.
+     */
+    protected getClient(): BaseIntegrationClient {
+        if (!this._clientCache) {
+            this._clientCache = this.resolveClient();
+        }
+        return this._clientCache;
+    }
+
+    /** 
+     * Return the field mapper for this integration.
+     * Caches the resolved mapper per-operation to prevent redundant instantiation.
+     */
+    protected getMapper(): BaseFieldMapper {
+        if (!this._mapperCache) {
+            this._mapperCache = this.resolveMapper();
+        }
+        return this._mapperCache;
+    }
 
     /**
      * Apply mapped local data to the actual local entity.
      * Called during pull operations after mapping.
      *
-     * @param tenantId       - The tenant scope
+     * @param ctx            - The request context
      * @param localEntityType - Entity type (e.g. 'task', 'control')
      * @param localEntityId   - Entity ID
      * @param localData       - Mapped data to apply
      * @returns Updated fields for audit
      */
     protected abstract applyLocalChanges(
-        tenantId: string,
+        ctx: RequestContext,
         localEntityType: string,
         localEntityId: string,
         localData: Record<string, unknown>,
@@ -156,7 +208,7 @@ export abstract class BaseSyncOrchestrator {
      * Used for conflict detection during push.
      */
     protected abstract getLocalData(
-        tenantId: string,
+        ctx: RequestContext,
         localEntityType: string,
         localEntityId: string,
     ): Promise<Record<string, unknown> | null>;
@@ -183,7 +235,7 @@ export abstract class BaseSyncOrchestrator {
      * Push local changes to the remote system.
      */
     async push(input: PushInput): Promise<SyncResult> {
-        const { mappingKey, localData, changedFields, localUpdatedAt } = input;
+        const { ctx, mappingKey, localData, changedFields, localUpdatedAt } = input;
 
         try {
             // 1. Get or create mapping (preserve existing status)
@@ -193,7 +245,7 @@ export abstract class BaseSyncOrchestrator {
                 mappingKey.localEntityType,
                 mappingKey.localEntityId,
             );
-            const mapping = existing ?? await this.store.upsert(mappingKey, {
+            const mapping = existing ?? await this.store.findOrCreate(mappingKey, {
                 syncStatus: 'PENDING',
             });
 
@@ -240,10 +292,8 @@ export abstract class BaseSyncOrchestrator {
 
             // 4. Push to remote
             const client = this.getClient();
-            const isNew = !mapping.remoteEntityId || mapping.syncStatus === 'PENDING';
-            if (isNew && !mapping.remoteEntityId) {
-                // Skip actual remote call for new mappings without remote ID
-                // The caller should set the remote ID first
+            if (mapping.syncStatus === 'PENDING') {
+                await client.createRemoteObject(remoteChanges);
             } else {
                 await client.updateRemoteObject(mapping.remoteEntityId, remoteChanges);
             }
@@ -277,7 +327,7 @@ export abstract class BaseSyncOrchestrator {
             );
             const failedMapping = mapping
                 ? await this.store.updateStatus(mapping.id, 'FAILED', { errorMessage })
-                : await this.store.upsert(mappingKey, { syncStatus: 'FAILED', errorMessage });
+                : await this.store.findOrCreate(mappingKey, { syncStatus: 'FAILED', errorMessage });
 
             this.logEvent(failedMapping.id, 'PUSH', 'error', input.changedFields, false, errorMessage);
 
@@ -297,7 +347,7 @@ export abstract class BaseSyncOrchestrator {
      * Pull remote changes into the local system.
      */
     async pull(input: PullInput): Promise<SyncResult> {
-        const { mappingKey, remoteData, remoteUpdatedAt } = input;
+        const { ctx, mappingKey, remoteData, remoteUpdatedAt } = input;
 
         try {
             // 1. Get or create mapping (preserve existing status)
@@ -307,13 +357,13 @@ export abstract class BaseSyncOrchestrator {
                 mappingKey.localEntityType,
                 mappingKey.localEntityId,
             );
-            const mapping = existing ?? await this.store.upsert(mappingKey, {
+            const mapping = existing ?? await this.store.findOrCreate(mappingKey, {
                 syncStatus: 'PENDING',
             });
 
             // 2. Get current local data for conflict check
             const localData = await this.getLocalData(
-                mappingKey.tenantId,
+                ctx,
                 mappingKey.localEntityType,
                 mappingKey.localEntityId,
             );
@@ -361,7 +411,7 @@ export abstract class BaseSyncOrchestrator {
 
             // 5. Apply to local entity
             const appliedFields = await this.applyLocalChanges(
-                mappingKey.tenantId,
+                ctx,
                 mappingKey.localEntityType,
                 mappingKey.localEntityId,
                 mappedLocalData,
@@ -388,15 +438,27 @@ export abstract class BaseSyncOrchestrator {
             };
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : String(err);
-            const mapping = await this.store.findByRemoteEntity(
+            // Try local-entity lookup first (matches the mapping created at the top of the
+            // try block). This is the correct path when applyLocalChanges or mapper.toLocal
+            // throws — the mapping is always findable by local key at that point.
+            // Fall back to remote-entity lookup for webhook-triggered code paths where
+            // only the remote ID is known (e.g. handleWebhookEvent → pull).
+            const mappingByLocal = await this.store.findByLocalEntity(
+                mappingKey.tenantId,
+                mappingKey.provider,
+                mappingKey.localEntityType,
+                mappingKey.localEntityId,
+            );
+            const mappingByRemote = mappingByLocal ? null : await this.store.findByRemoteEntity(
                 mappingKey.tenantId,
                 mappingKey.provider,
                 mappingKey.remoteEntityType,
                 mappingKey.remoteEntityId,
             );
-            const failedMapping = mapping
-                ? await this.store.updateStatus(mapping.id, 'FAILED', { errorMessage })
-                : await this.store.upsert(mappingKey, { syncStatus: 'FAILED', errorMessage });
+            const existingMapping = mappingByLocal ?? mappingByRemote;
+            const failedMapping = existingMapping
+                ? await this.store.updateStatus(existingMapping.id, 'FAILED', { errorMessage })
+                : await this.store.findOrCreate(mappingKey, { syncStatus: 'FAILED', errorMessage });
 
             this.logEvent(failedMapping.id, 'PULL', 'error', [], false, errorMessage);
 
@@ -418,7 +480,8 @@ export abstract class BaseSyncOrchestrator {
      * into structured sync operations.
      */
     async handleWebhookEvent(input: WebhookPullInput): Promise<WebhookPullResult> {
-        const { provider, eventType, payload, tenantId, connectionId } = input;
+        const { ctx, provider, eventType, payload, connectionId } = input;
+        const tenantId = ctx.tenantId;
 
         // 1. Extract remote identity from payload
         const remoteId = this.extractRemoteId(payload);
@@ -440,7 +503,7 @@ export abstract class BaseSyncOrchestrator {
                 await this.store.updateStatus(mapping.id, 'STALE', {
                     errorMessage: 'Remote object was deleted',
                 });
-                this.logEvent(mapping.id, 'PULL', 'updated', [], true);
+                this.logEvent(mapping.id, 'PULL', 'updated', [], true, undefined, 'webhook');
             }
             return {
                 processed: true,
@@ -475,25 +538,38 @@ export abstract class BaseSyncOrchestrator {
             };
         }
 
-        // 5. Execute pull
-        const result = await this.pull({
-            mappingKey: {
-                tenantId,
-                provider,
-                connectionId,
-                localEntityType: existingMapping.localEntityType,
-                localEntityId: existingMapping.localEntityId,
-                remoteEntityType: existingMapping.remoteEntityType,
-                remoteEntityId: existingMapping.remoteEntityId,
+        // 5. Defer pull to background job
+        const jobId = `sync-pull:${tenantId}:${provider}:${existingMapping.remoteEntityType}:${existingMapping.remoteEntityId}`;
+
+        await enqueue(
+            'sync-pull',
+            {
+                ctx: {
+                    tenantId: ctx.tenantId,
+                    userId: ctx.userId,
+                    requestId: ctx.requestId,
+                    role: ctx.role,
+                    permissions: ctx.permissions,
+                },
+                mappingKey: {
+                    tenantId,
+                    provider,
+                    connectionId: connectionId ?? existingMapping.connectionId ?? undefined,
+                    localEntityType: existingMapping.localEntityType,
+                    localEntityId: existingMapping.localEntityId,
+                    remoteEntityType: existingMapping.remoteEntityType,
+                    remoteEntityId: existingMapping.remoteEntityId,
+                },
+                remoteData,
+                remoteUpdatedAtIso: new Date().toISOString(),
             },
-            remoteData,
-            remoteUpdatedAt: new Date(),
-        });
+            { jobId }
+        );
 
         return {
             processed: true,
-            syncCount: 1,
-            results: [result],
+            syncCount: 1, // Indicates 1 sync operation was queued
+            results: [],  // Empty because it evaluates asynchronously
         };
     }
 
@@ -599,13 +675,14 @@ export abstract class BaseSyncOrchestrator {
         changedFields: string[],
         success: boolean,
         errorDetails?: string,
+        triggeredBy: 'user' | 'webhook' | 'scheduled' = 'user',
     ): void {
         this.logger.log({
             mappingId,
             direction,
             action,
             changedFields,
-            triggeredBy: 'user',
+            triggeredBy,
             success,
             errorDetails,
             timestamp: new Date(),
@@ -616,22 +693,56 @@ export abstract class BaseSyncOrchestrator {
 // ─── Utility Functions ───────────────────────────────────────────────
 
 /**
- * Shallow equality check for two objects (one level deep).
+ * Canonical JSON serialiser — sorts object keys recursively before
+ * stringifying so that { a:1, b:2 } and { b:2, a:1 } produce the
+ * same string. This is the only safe approach when comparing payloads
+ * returned by remote APIs, whose key ordering is not guaranteed.
+ */
+function canonicalJSON(val: unknown): string {
+    if (val === null || typeof val !== 'object') return JSON.stringify(val);
+    if (Array.isArray(val)) return `[${val.map(canonicalJSON).join(',')}]`;
+    const sorted = Object.keys(val as Record<string, unknown>).sort();
+    const pairs = sorted.map(k => `${JSON.stringify(k)}:${canonicalJSON((val as Record<string, unknown>)[k])}`);
+    return `{${pairs.join(',')}}`;
+}
+
+/**
+ * Deep equality check for two objects.
+ *
+ * Uses a canonical (sorted-key) JSON representation so that objects
+ * with identical content but differently-ordered keys are correctly
+ * considered equal. This matters for remote API payloads (e.g. GitHub)
+ * whose key order is not guaranteed across API versions or endpoints.
+ *
+ * Previously used raw JSON.stringify, which is NOT key-order-stable
+ * and produced false-positive conflicts for semantically equal objects.
  */
 export function shallowEqual(
     a: Record<string, unknown>,
     b: Record<string, unknown>,
 ): boolean {
+    // Fast path: reference equality
+    if (a === b) return true;
     const keysA = Object.keys(a);
     const keysB = Object.keys(b);
     if (keysA.length !== keysB.length) return false;
-    return keysA.every(key => a[key] === b[key]);
+    return keysA.every(key => {
+        const va = a[key];
+        const vb = b[key];
+        if (va === vb) return true;
+        // Deep compare for nested objects/arrays using canonical serialisation
+        if (typeof va === 'object' && typeof vb === 'object' && va !== null && vb !== null) {
+            return canonicalJSON(va) === canonicalJSON(vb);
+        }
+        return false;
+    });
 }
 
 /**
  * Find fields that conflict between local data and incoming remote data.
- * Compares via the mapper: maps local to remote shape, then compares
- * each mapped field against the incoming remote data.
+ * Maps remote data to local shape once, then compares each mapped field.
+ *
+ * Uses canonical JSON comparison (key-order-stable) for nested values.
  */
 export function findConflictingFields(
     localData: Record<string, unknown>,
@@ -639,16 +750,22 @@ export function findConflictingFields(
     mapper: BaseFieldMapper,
     mappedLocalFields: string[],
 ): string[] {
-    const localAsRemote = mapper.toRemote(localData);
+    const mappedRemoteData = mapper.toLocal(remoteData);
     const conflicting: string[] = [];
 
     for (const localField of mappedLocalFields) {
         const localValue = localData[localField];
-        const mappedRemoteData = mapper.toLocal(remoteData);
         const remoteValue = mappedRemoteData[localField];
 
-        if (localValue !== undefined && remoteValue !== undefined && localValue !== remoteValue) {
-            conflicting.push(localField);
+        if (localValue !== undefined && remoteValue !== undefined) {
+            // Deep compare using canonical serialisation (key-order-stable)
+            const equal = typeof localValue === 'object' && typeof remoteValue === 'object'
+                && localValue !== null && remoteValue !== null
+                ? canonicalJSON(localValue) === canonicalJSON(remoteValue)
+                : localValue === remoteValue;
+            if (!equal) {
+                conflicting.push(localField);
+            }
         }
     }
 

@@ -17,6 +17,7 @@ import { registry, integrationRegistry } from './registry';
 import { GitHubProvider } from './providers/github';
 import { GitHubClient } from './providers/github-client';
 import { GitHubBranchProtectionMapper } from './providers/github-mapper';
+import { GitHubSyncOrchestrator } from './providers/github/sync';
 
 // ─── ProviderRegistry: Automation Key Routing ────────────────────────
 
@@ -37,6 +38,7 @@ integrationRegistry.register({
     description: 'GitHub repository compliance — branch protection, security settings',
     clientClass: GitHubClient,
     mapperClass: GitHubBranchProtectionMapper,
+    orchestratorClass: GitHubSyncOrchestrator,
 });
 
 // Future bundles:

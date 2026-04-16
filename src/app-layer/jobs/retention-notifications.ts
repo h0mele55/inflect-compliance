@@ -8,6 +8,7 @@
  *   await runEvidenceRetentionNotifications({ days: 30 });           // all tenants
  *   await runEvidenceRetentionNotifications({ tenantId: 'xxx' });    // single tenant
  */
+import { formatDate } from '@/lib/format-date';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/observability/logger';
 
@@ -76,7 +77,7 @@ export async function runEvidenceRetentionNotifications(
                 tenantId: ev.tenantId,
                 type: 'IMPROVEMENT',
                 title: `Refresh expiring evidence: ${ev.title}`,
-                description: `Evidence "${ev.title}" expires in ${daysLeft} days (${new Date(ev.retentionUntil).toLocaleDateString()}). Please upload refreshed evidence or extend the retention date.`,
+                description: `Evidence "${ev.title}" expires in ${daysLeft} days (${formatDate(ev.retentionUntil)}). Please upload refreshed evidence or extend the retention date.`,
                 status: 'OPEN',
                 priority: daysLeft <= 7 ? 'HIGH' : 'MEDIUM',
                 ...(ev.controlId ? { controlId: ev.controlId } : {}),

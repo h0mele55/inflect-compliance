@@ -1,3 +1,4 @@
+import { formatDateTime } from '@/lib/format-date';
 import { getTenantCtx } from '@/app-layer/context';
 import { runInTenantContext } from '@/lib/db-context';
 import { DashboardRepository } from '@/app-layer/repositories/DashboardRepository';
@@ -31,7 +32,7 @@ export default async function RecentActivityCard({
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {recentActivity.map((log: any) => (
                     <div key={log.id} className="flex flex-col sm:flex-row items-start gap-1 sm:gap-2 text-xs">
-                        <span className="text-slate-500 whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</span>
+                        <span className="text-slate-500 whitespace-nowrap">{formatDateTime(log.createdAt)}</span>
                         <span className="text-slate-400">
                             <span className="text-slate-300 font-medium">{log.user?.name}</span>{' '}
                             {log.action.toLowerCase()} {log.entity.toLowerCase()}

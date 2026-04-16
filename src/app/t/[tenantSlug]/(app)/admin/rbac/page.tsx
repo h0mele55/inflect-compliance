@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/format-date';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { resolveTenantContext } from '@/lib/tenant-context';
@@ -96,7 +97,7 @@ export default async function RbacPage({
                                             'badge-neutral'
                                         }`}>{m.role}</span>
                                     </td>
-                                    <td className="text-xs text-slate-500">{new Date(m.createdAt).toLocaleDateString()}</td>
+                                    <td className="text-xs text-slate-500">{formatDate(m.createdAt)}</td>
                                 </tr>
                             ))}
                             {members.length === 0 && (

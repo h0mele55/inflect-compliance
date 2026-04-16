@@ -166,6 +166,23 @@ export abstract class BaseIntegrationClient<
         changes: Record<string, unknown>,
     ): Promise<RemoteObject>;
 
+    /**
+     * Delete a remote object by its external ID.
+     *
+     * Default implementation throws — providers that support deletion
+     * should override this method. Not all remote systems support
+     * deletion of the objects we sync (e.g. GitHub branch protection
+     * can be removed, but some APIs are append-only).
+     *
+     * @param remoteId - The external system's identifier
+     * @throws Error if deletion is not supported or fails
+     */
+    async deleteRemoteObject(remoteId: string): Promise<void> {
+        throw new Error(
+            `${this.providerId} does not support deleteRemoteObject (remoteId: ${remoteId})`,
+        );
+    }
+
     // ── Utilities ──
 
     /**

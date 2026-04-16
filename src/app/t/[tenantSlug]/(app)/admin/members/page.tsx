@@ -400,7 +400,7 @@ export default function MembersAdminPage() {
                                     </span>
                                 </td>
                                 <td className="text-xs text-slate-500">
-                                    {new Date(m.createdAt).toLocaleDateString()}
+                                    {formatDate(m.createdAt)}
                                 </td>
                                 <td className="text-right relative">
                                     {m.status === 'ACTIVE' && (
@@ -479,7 +479,7 @@ export default function MembersAdminPage() {
                                             {inv.invitedBy?.name || '—'}
                                         </td>
                                         <td className="text-xs text-slate-500">
-                                            {new Date(inv.expiresAt).toLocaleDateString()}
+                                            {formatDate(inv.expiresAt)}
                                         </td>
                                     </tr>
                                 ))}

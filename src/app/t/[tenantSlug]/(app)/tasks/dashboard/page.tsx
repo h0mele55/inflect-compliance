@@ -120,7 +120,7 @@ export default function TaskDashboardPage() {
                                 <span className={`badge ${TASK_STATUS_BADGE[task.status] || 'badge-neutral'} text-xs`}>{task.status}</span>
                                 {task.dueAt && (
                                     <span className={`text-xs ${new Date(task.dueAt) < new Date() ? 'text-red-400' : 'text-slate-400'}`}>
-                                        {new Date(task.dueAt).toLocaleDateString()}
+                                        {formatDate(task.dueAt)}
                                     </span>
                                 )}
                             </Link>
@@ -264,7 +264,7 @@ export default function TaskDashboardPage() {
                                 <span className="flex-1 text-white truncate">{task.title}</span>
                                 <span className="badge badge-danger text-xs">{task.severity}</span>
                                 <span className="text-xs text-red-400">
-                                    Due {new Date(task.dueAt).toLocaleDateString()}
+                                    Due {formatDate(task.dueAt)}
                                 </span>
                             </Link>
                         ))}

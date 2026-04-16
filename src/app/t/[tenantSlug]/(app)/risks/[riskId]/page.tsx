@@ -320,7 +320,7 @@ export default function RiskDetailPage() {
                             </div>
                             <div>
                                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Target Date</h3>
-                                <p className="text-sm">{risk.targetDate ? new Date(risk.targetDate).toLocaleDateString() : '—'}</p>
+                                <p className="text-sm">{risk.targetDate ? formatDate(risk.targetDate) : '—'}</p>
                             </div>
                         </div>
 
@@ -365,14 +365,14 @@ export default function RiskDetailPage() {
                                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Next Review</h3>
                                 <p className={`text-sm ${overdue ? 'text-red-400 font-semibold' : ''}`}>
                                     {risk.nextReviewAt
-                                        ? `${overdue ? '! ' : ''}${new Date(risk.nextReviewAt).toLocaleDateString()}`
+                                        ? `${overdue ? '! ' : ''}${formatDate(risk.nextReviewAt)}`
                                         : '—'
                                     }
                                 </p>
                             </div>
                             <div>
                                 <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Created</h3>
-                                <p className="text-sm text-slate-400">{new Date(risk.createdAt).toLocaleDateString()}</p>
+                                <p className="text-sm text-slate-400">{formatDate(risk.createdAt)}</p>
                             </div>
                         </div>
                     </>

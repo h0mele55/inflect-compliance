@@ -25,7 +25,9 @@ import {
 
 // ─── GitHub Connection Config ────────────────────────────────────────
 
-export interface GitHubConnectionConfig {
+import { type BaseConnectionConfig } from '../../base-client';
+
+export interface GitHubConnectionConfig extends BaseConnectionConfig {
     /** GitHub org or user (e.g. 'acme-corp') */
     owner: string;
     /** Repository name (e.g. 'platform-api') */
@@ -34,6 +36,7 @@ export interface GitHubConnectionConfig {
     branch?: string;
     /** Personal access token or app token */
     token: string;
+    [key: string]: unknown;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -149,5 +152,23 @@ export class GitHubClient extends BaseIntegrationClient<GitHubConnectionConfig> 
     ): Promise<RemoteObject> {
         // GitHub's branch protection API uses PUT (full replace), not PATCH
         return this.createRemoteObject({ ...changes, branch: remoteId });
+    }
+
+    /**
+     * Delete branch protection for a branch.
+     * Returns silently if protection doesn't exist (404).
+     */
+    async deleteRemoteObject(remoteId: string): Promise<void> {
+        const branch = remoteId || this.config.branch || 'main';
+        const url = `${this.repoUrl}/branches/${branch}/protection`;
+
+        const res = await this.request(url, {
+            method: 'DELETE',
+            headers: this.headers,
+        });
+
+        // 204 = success, 404 = already gone — both are acceptable
+        if (res.status === 204 || res.status === 404) return;
+        if (!res.ok) throw new Error(`GitHub API error deleting protection: ${res.status}`);
     }
 }

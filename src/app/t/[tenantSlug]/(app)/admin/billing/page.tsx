@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/format-date';
 import { notFound } from 'next/navigation';
 import { auth } from '@/auth';
 import { resolveTenantContext } from '@/lib/tenant-context';
@@ -85,7 +86,7 @@ export default async function BillingPage({
                                     : `${trialDaysRemaining} day${trialDaysRemaining !== 1 ? 's' : ''} left in your trial`}
                             </p>
                             <p className="text-xs text-slate-400 mt-0.5">
-                                Trial ends on {new Date(trialEnd).toLocaleDateString()}. Upgrade to keep access to premium features.
+                                Trial ends on {formatDate(trialEnd)}. Upgrade to keep access to premium features.
                             </p>
                         </div>
                         <BillingActions plan="PRO" tenantSlug={tenantSlug} />
@@ -123,7 +124,7 @@ export default async function BillingPage({
                     <div>
                         <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Renewal</p>
                         <p className="text-sm text-white">
-                            {periodEnd ? new Date(periodEnd).toLocaleDateString() : '—'}
+                            {periodEnd ? formatDate(periodEnd) : '—'}
                         </p>
                     </div>
                     <div>
@@ -131,7 +132,7 @@ export default async function BillingPage({
                         <p className="text-sm text-white">
                             {trialEnd ? (
                                 <>
-                                    {new Date(trialEnd).toLocaleDateString()}
+                                    {formatDate(trialEnd)}
                                     {trialDaysRemaining !== null && (
                                         <span className={`ml-1 text-xs ${trialDaysRemaining <= 3 ? 'text-red-400' : 'text-amber-400'}`}>
                                             ({trialDaysRemaining}d left)

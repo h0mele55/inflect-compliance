@@ -189,7 +189,7 @@ export default function UserMfaPage() {
 
                     {status.isVerified && status.verifiedAt && (
                         <p className="text-xs text-slate-500">
-                            Enrolled since {new Date(status.verifiedAt).toLocaleDateString()}
+                            Enrolled since {formatDate(status.verifiedAt)}
                         </p>
                     )}
 

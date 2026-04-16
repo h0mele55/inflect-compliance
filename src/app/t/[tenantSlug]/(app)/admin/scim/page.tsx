@@ -216,12 +216,12 @@ export default function ScimAdminPage() {
                                     </div>
                                     <div className="flex items-center gap-3 mt-1">
                                         <span className="text-xs text-slate-500">
-                                            Created {new Date(token.createdAt).toLocaleDateString()}
+                                            Created {formatDate(token.createdAt)}
                                         </span>
                                         {token.lastUsedAt && (
                                             <span className="text-xs text-slate-400 flex items-center gap-1">
                                                 <Clock className="w-3 h-3" />
-                                                Last used {new Date(token.lastUsedAt).toLocaleDateString()}
+                                                Last used {formatDate(token.lastUsedAt)}
                                             </span>
                                         )}
                                     </div>
@@ -253,7 +253,7 @@ export default function ScimAdminPage() {
                                     <span className="text-sm text-slate-400">{token.label}</span>
                                     <span className="badge badge-error text-[10px] ml-2">Revoked</span>
                                     <div className="text-xs text-slate-600 mt-1">
-                                        Revoked {new Date(token.revokedAt!).toLocaleDateString()}
+                                        Revoked {formatDate(token.revokedAt!)}
                                     </div>
                                 </div>
                             </div>

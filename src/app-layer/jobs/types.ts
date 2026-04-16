@@ -52,6 +52,34 @@ export interface RetentionSweepPayload {
     dryRun?: boolean;
 }
 
+/** Webhook-driven sync pull */
+export interface SyncPullPayload {
+    ctx: {
+        tenantId: string;
+        userId: string;
+        requestId: string;
+        role: string;
+        permissions: {
+            canRead: boolean;
+            canWrite: boolean;
+            canAdmin: boolean;
+            canAudit: boolean;
+            canExport: boolean;
+        };
+    };
+    mappingKey: {
+        tenantId: string;
+        provider: string;
+        connectionId?: string;
+        localEntityType: string;
+        localEntityId: string;
+        remoteEntityType: string;
+        remoteEntityId: string;
+    };
+    remoteData: Record<string, unknown>;
+    remoteUpdatedAtIso: string;
+}
+
 // ─── Job Name → Payload Map ───
 
 /**
@@ -70,6 +98,7 @@ export interface JobPayloadMap {
     'data-lifecycle': DataLifecyclePayload;
     'policy-review-reminder': PolicyReviewReminderPayload;
     'retention-sweep': RetentionSweepPayload;
+    'sync-pull': SyncPullPayload;
 }
 
 /** Union of all valid job names */
@@ -121,6 +150,12 @@ export const JOB_DEFAULTS: Record<JobName, {
         attempts: 2,
         backoff: { type: 'exponential', delay: 10000 },
         removeOnComplete: 200,
+        removeOnFail: 500,
+    },
+    'sync-pull': {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 100, // Important for dedupe: allow same id after completion
         removeOnFail: 500,
     },
 };

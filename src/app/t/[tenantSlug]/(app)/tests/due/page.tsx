@@ -72,7 +72,7 @@ export default function DueQueuePage() {
 
     const formatDate = (d: string | null) => {
         if (!d) return '—';
-        return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return formatDate(d);
     };
 
     const overdueCount = queue.filter(p => p.isOverdue).length;

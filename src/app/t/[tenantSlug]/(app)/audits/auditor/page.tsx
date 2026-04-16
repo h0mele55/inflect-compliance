@@ -78,7 +78,7 @@ export default function AuditorPortalPage() {
                                         <h2 className="text-lg font-bold" id="auditor-pack-name">{selectedPack.name}</h2>
                                         <p className="text-sm text-slate-400">
                                             {selectedPack.status} · {selectedPack._count?.items || 0} items
-                                            {selectedPack.frozenAt && ` · Frozen: ${new Date(selectedPack.frozenAt).toLocaleDateString()}`}
+                                            {selectedPack.frozenAt && ` · Frozen: ${formatDate(selectedPack.frozenAt)}`}
                                         </p>
                                     </div>
                                     <span className={`badge ${selectedPack.status === 'FROZEN' ? 'badge-info' : 'badge-neutral'}`}>

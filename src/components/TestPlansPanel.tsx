@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { AppIcon } from '@/components/icons/AppIcon';
@@ -97,7 +97,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
 
     const formatDate = (d: string | null) => {
         if (!d) return '—';
-        return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return formatDate(d);
     };
 
     const isOverdue = (d: string | null) => {

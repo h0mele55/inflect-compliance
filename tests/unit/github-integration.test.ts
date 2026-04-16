@@ -20,9 +20,22 @@ import {
 } from '@/app-layer/integrations/providers/github';
 import type { GitHubConnectionConfig } from '@/app-layer/integrations/providers/github';
 import type { GitHubLocalStore } from '@/app-layer/integrations/providers/github/sync';
-import type { SyncMapping, SyncMappingKey } from '@/app-layer/integrations/sync-types';
+import type { SyncMapping, SyncMappingKey, SyncMappingCreateData, SyncMappingStatusUpdate } from '@/app-layer/integrations/sync-types';
 import type { SyncMappingStore, SyncEventLogger } from '@/app-layer/integrations/sync-orchestrator';
 import type { SyncEvent } from '@/app-layer/integrations/sync-types';
+import type { RequestContext } from '@/app-layer/types';
+
+jest.mock('@/app-layer/jobs/queue', () => ({
+    enqueue: jest.fn().mockResolvedValue({ id: 'mock-job' }),
+}));
+import { enqueue } from '@/app-layer/jobs/queue';
+export const mockCtx: RequestContext = {
+    tenantId: 'tenant-1',
+    userId: 'system',
+    requestId: 'req-1',
+    role: 'ADMIN',
+    permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
+};
 
 // ─── Test Fixtures ───────────────────────────────────────────────────
 
@@ -55,14 +68,12 @@ class InMemoryMappingStore implements SyncMappingStore {
         return null;
     }
 
-    async upsert(key: SyncMappingKey, data: Partial<SyncMapping>): Promise<SyncMapping> {
+    async findOrCreate(key: SyncMappingKey, defaults?: SyncMappingCreateData): Promise<SyncMapping> {
         const existing = await this.findByLocalEntity(
             key.tenantId, key.provider, key.localEntityType, key.localEntityId,
         );
         if (existing) {
-            const updated = { ...existing, ...data, updatedAt: new Date() };
-            this.mappings.set(existing.id, updated);
-            return updated;
+            return existing;
         }
         const now = new Date();
         const id = `mapping-${this.nextId++}`;
@@ -71,21 +82,28 @@ class InMemoryMappingStore implements SyncMappingStore {
             connectionId: key.connectionId ?? null,
             localEntityType: key.localEntityType, localEntityId: key.localEntityId,
             remoteEntityType: key.remoteEntityType, remoteEntityId: key.remoteEntityId,
-            syncStatus: 'PENDING', lastSyncDirection: null, conflictStrategy: 'REMOTE_WINS',
+            syncStatus: defaults?.syncStatus ?? 'PENDING', lastSyncDirection: null, conflictStrategy: 'REMOTE_WINS',
             localUpdatedAt: null, remoteUpdatedAt: null, remoteDataJson: null,
-            version: 1, errorMessage: null, lastSyncedAt: null,
-            createdAt: now, updatedAt: now, ...data,
+            version: 1, errorMessage: defaults?.errorMessage ?? null, lastSyncedAt: null,
+            createdAt: now, updatedAt: now,
         };
         this.mappings.set(id, mapping);
         return mapping;
     }
 
     async updateStatus(
-        id: string, status: SyncMapping['syncStatus'], extra?: Partial<SyncMapping>,
+        id: string, status: SyncMapping['syncStatus'], extra?: SyncMappingStatusUpdate,
     ): Promise<SyncMapping> {
         const existing = this.mappings.get(id);
         if (!existing) throw new Error(`Mapping ${id} not found`);
-        const updated = { ...existing, syncStatus: status, ...extra, updatedAt: new Date() };
+        const updated: SyncMapping = { ...existing, syncStatus: status, updatedAt: new Date() };
+        if (extra?.lastSyncDirection !== undefined) updated.lastSyncDirection = extra.lastSyncDirection;
+        if (extra?.localUpdatedAt !== undefined) updated.localUpdatedAt = extra.localUpdatedAt;
+        if (extra?.remoteUpdatedAt !== undefined) updated.remoteUpdatedAt = extra.remoteUpdatedAt;
+        if (extra?.remoteDataJson !== undefined) updated.remoteDataJson = extra.remoteDataJson;
+        if (extra?.lastSyncedAt !== undefined) updated.lastSyncedAt = extra.lastSyncedAt;
+        if (extra?.version !== undefined) updated.version = extra.version;
+        if (extra?.errorMessage !== undefined) updated.errorMessage = extra.errorMessage;
         this.mappings.set(id, updated);
         return updated;
     }
@@ -96,7 +114,7 @@ class InMemoryLocalStore implements GitHubLocalStore {
     private entities = new Map<string, Record<string, unknown>>();
 
     async applyChanges(
-        _tenantId: string, entityType: string, entityId: string,
+        _ctx: RequestContext, entityType: string, entityId: string,
         data: Record<string, unknown>,
     ): Promise<string[]> {
         const key = `${entityType}:${entityId}`;
@@ -106,7 +124,7 @@ class InMemoryLocalStore implements GitHubLocalStore {
     }
 
     async getData(
-        _tenantId: string, entityType: string, entityId: string,
+        _ctx: RequestContext, entityType: string, entityId: string,
     ): Promise<Record<string, unknown> | null> {
         return this.entities.get(`${entityType}:${entityId}`) ?? null;
     }
@@ -308,7 +326,7 @@ describe('GitHub provider — sync orchestrator', () => {
     });
 
     test('push syncs local data to remote', async () => {
-        const result = await orch.push({
+        const result = await orch.push({ ctx: mockCtx,
             mappingKey: MAPPING_KEY,
             localData: { protectionEnabled: true, status: 'IMPLEMENTED' },
             changedFields: ['protectionEnabled'],
@@ -321,7 +339,7 @@ describe('GitHub provider — sync orchestrator', () => {
     });
 
     test('pull applies remote data to local entity', async () => {
-        const result = await orch.pull({
+        const result = await orch.pull({ ctx: mockCtx,
             mappingKey: MAPPING_KEY,
             remoteData: {
                 enabled: true,
@@ -335,7 +353,7 @@ describe('GitHub provider — sync orchestrator', () => {
         expect(result.direction).toBe('PULL');
 
         // Verify local entity was updated
-        const localData = await localStore.getData('tenant-1', 'control', 'ctrl-1');
+        const localData = await localStore.getData(mockCtx, 'control', 'ctrl-1');
         expect(localData).toBeTruthy();
         expect(localData!.protectionEnabled).toBe(true);
         expect(localData!.requiredReviewCount).toBe(2);
@@ -344,9 +362,10 @@ describe('GitHub provider — sync orchestrator', () => {
 
     test('webhook pull extracts data from branch_protection_rule event', async () => {
         // Pre-create a mapping
-        await store.upsert(MAPPING_KEY, { syncStatus: 'SYNCED' });
+        const base = await store.findOrCreate(MAPPING_KEY);
+        await store.updateStatus(base.id, 'SYNCED');
 
-        const result = await orch.handleWebhookEvent({
+        const result = await orch.handleWebhookEvent({ ctx: mockCtx,
             provider: 'github',
             eventType: 'updated',
             payload: {
@@ -356,20 +375,18 @@ describe('GitHub provider — sync orchestrator', () => {
                     required_status_checks: { strict: true, contexts: ['ci'] },
                 },
             },
-            tenantId: 'tenant-1',
         });
 
         expect(result.processed).toBe(true);
         expect(result.syncCount).toBe(1);
-        expect(result.results[0].success).toBe(true);
+        expect(enqueue).toHaveBeenCalled();
     });
 
     test('webhook handles unknown remote ID gracefully', async () => {
-        const result = await orch.handleWebhookEvent({
+        const result = await orch.handleWebhookEvent({ ctx: mockCtx,
             provider: 'github',
             eventType: 'updated',
             payload: { rule: { name: 'unknown-branch' } },
-            tenantId: 'tenant-1',
         });
 
         expect(result.processed).toBe(false);

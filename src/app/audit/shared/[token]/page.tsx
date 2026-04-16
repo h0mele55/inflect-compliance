@@ -69,7 +69,7 @@ export default function SharedPackPage() {
                     </p>
                     {pack?.frozenAt && (
                         <p className="text-xs text-slate-500 mt-1">
-                            Frozen: {new Date(pack.frozenAt).toLocaleString()}
+                            Frozen: {formatDateTime(pack.frozenAt)}
                         </p>
                     )}
                 </div>

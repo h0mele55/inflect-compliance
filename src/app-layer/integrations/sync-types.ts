@@ -9,6 +9,8 @@
 
 // ─── Sync Status / Direction / Strategy (mirrors Prisma enums) ───────
 
+import type { RequestContext } from '@/app-layer/types';
+
 export type SyncStatus = 'PENDING' | 'SYNCED' | 'CONFLICT' | 'FAILED' | 'STALE';
 export type SyncDirection = 'PUSH' | 'PULL';
 export type ConflictStrategy = 'REMOTE_WINS' | 'LOCAL_WINS' | 'MANUAL';
@@ -54,12 +56,58 @@ export interface SyncMappingKey {
     remoteEntityId: string;
 }
 
+/**
+ * Narrowed data allowed when CREATING a new sync mapping.
+ *
+ * Only operational initial-state fields are permitted.
+ * Identity fields come from SyncMappingKey.
+ * Control-plane fields (conflictStrategy, version) get safe defaults.
+ */
+export interface SyncMappingCreateData {
+    /** Initial sync status (defaults to 'PENDING' in store implementations) */
+    syncStatus?: SyncStatus;
+    /** Initial error message (e.g. if creation itself is a failure record) */
+    errorMessage?: string | null;
+}
+
+/**
+ * Narrowed data allowed when UPDATING a sync mapping's status.
+ *
+ * Explicitly excludes:
+ *   - Identity fields (tenantId, provider, localEntityType, etc.)
+ *   - conflictStrategy (configuration-level, set only by explicit admin action)
+ *   - id, createdAt, updatedAt (system-managed)
+ *
+ * The `tenantId` field is included ONLY as an RLS routing hint for
+ * the Prisma store — it is NOT persisted as a data update.
+ */
+export interface SyncMappingStatusUpdate {
+    /** RLS routing hint for Prisma store — not persisted as data */
+    tenantId?: string;
+    /** Which direction the sync just completed */
+    lastSyncDirection?: SyncDirection | null;
+    /** When the local entity was last modified */
+    localUpdatedAt?: Date | null;
+    /** When the remote entity was last modified */
+    remoteUpdatedAt?: Date | null;
+    /** Cached remote data snapshot (for conflict detection) */
+    remoteDataJson?: unknown;
+    /** When the last sync completed */
+    lastSyncedAt?: Date | null;
+    /** Optimistic concurrency version */
+    version?: number;
+    /** Error message (null to clear) */
+    errorMessage?: string | null;
+}
+
 // ─── Push / Pull ─────────────────────────────────────────────────────
 
 /**
  * Input for a push operation (local → remote).
  */
 export interface PushInput {
+    /** The execution context for tenant isolation */
+    ctx: RequestContext;
     /** Sync mapping key to find/create the mapping */
     mappingKey: SyncMappingKey;
     /** The local object data (already in local shape) */
@@ -74,6 +122,8 @@ export interface PushInput {
  * Input for a pull operation (remote → local).
  */
 export interface PullInput {
+    /** The execution context for tenant isolation */
+    ctx: RequestContext;
     /** Sync mapping key to find/create the mapping */
     mappingKey: SyncMappingKey;
     /** The current remote object data (in remote shape) */
@@ -136,14 +186,14 @@ export interface ConflictCheckResult {
  * Input for webhook-triggered pull.
  */
 export interface WebhookPullInput {
+    /** The execution context for tenant isolation */
+    ctx: RequestContext;
     /** Provider key (e.g. 'jira', 'github') */
     provider: string;
     /** Webhook event type (e.g. 'issue_updated', 'created') */
     eventType: string;
     /** Raw webhook payload */
     payload: Record<string, unknown>;
-    /** Tenant context (if resolvable from webhook) */
-    tenantId: string;
     /** Connection ID (if resolvable) */
     connectionId?: string;
 }

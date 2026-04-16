@@ -17,9 +17,11 @@
  * @module usecases/webhook-processor
  */
 import { prisma } from '@/lib/prisma';
-import { registry } from '../integrations/registry';
+import { registry, integrationRegistry } from '../integrations/registry';
 import { isWebhookEventProvider } from '../integrations/types';
 import type { WebhookPayload, WebhookProcessResult, CheckResult } from '../integrations/types';
+import { PrismaSyncMappingStore } from '../integrations/prisma-sync-store';
+import { PrismaLocalStore } from '../integrations/prisma-local-store';
 import { extractSignature, verifyHmacSha256, verifyGitHubSignature } from '../integrations/webhook-crypto';
 import { decryptField } from '@/lib/security/encryption';
 import { logger } from '@/lib/observability/logger';
@@ -246,7 +248,16 @@ export async function processIncomingWebhook(input: WebhookInput): Promise<Webho
         data: { tenantId: matchedConnection.tenantId },
     });
 
-    // 7. Dispatch to provider handler if it supports webhooks
+    // 7. Establish tenant execution context
+    const ctx = {
+        tenantId: matchedConnection.tenantId,
+        userId: 'system:webhook',
+        requestId,
+        role: 'ADMIN' as const,
+        permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
+    };
+
+    // 8. Dispatch to provider handler if it supports webhooks
     let processResult: WebhookProcessResult = { status: 'ignored' };
     let executionsCreated = 0;
     let evidenceCreated = 0;
@@ -275,15 +286,6 @@ export async function processIncomingWebhook(input: WebhookInput): Promise<Webho
                     return { status: 'auth_failed', eventId: event.id };
                 }
             }
-
-            // Build a minimal RequestContext for the provider
-            const ctx = {
-                tenantId: matchedConnection.tenantId,
-                userId: 'system:webhook',
-                requestId,
-                role: 'ADMIN' as const,
-                permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
-            };
 
             processResult = await providerImpl.handleWebhook(
                 ctx,
@@ -350,7 +352,7 @@ export async function processIncomingWebhook(input: WebhookInput): Promise<Webho
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : String(err);
-            logger.error('Webhook processing error', {
+            logger.error('Webhook processing error in ProviderImpl', {
                 component: 'integrations',
                 provider,
                 eventId: event.id,
@@ -363,6 +365,66 @@ export async function processIncomingWebhook(input: WebhookInput): Promise<Webho
             });
 
             return { status: 'error', eventId: event.id, errorMessage };
+        }
+    }
+
+    // 8.5. Dispatch to sync orchestrator if the provider supports CRUD orchestration
+    if (integrationRegistry.has(provider)) {
+        try {
+            // Build complete connection config by merging stored config + decrypted secrets.
+            // This ensures the orchestrator gets all required fields (e.g. owner, repo, token for GitHub).
+            const connectionSecrets = decryptWebhookSecret(matchedConnection.secretEncrypted);
+            const connectionConfig = {
+                ...(matchedConnection.configJson as Record<string, unknown>),
+                ...connectionSecrets,
+            };
+
+            const orchestrator = integrationRegistry.createOrchestrator(provider, {
+                config: connectionConfig,
+                store: new PrismaSyncMappingStore(),
+                localStore: new PrismaLocalStore(),
+                logger: {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    log: (syncEvent: any) => logger.info('Sync event from webhook', {
+                        component: 'integrations',
+                        provider,
+                        eventId: event.id,
+                        syncEvent,
+                    }),
+                },
+            });
+
+            if (orchestrator) {
+                const syncResult = await orchestrator.handleWebhookEvent({
+                    ctx,
+                    provider,
+                    eventType: event.eventType || 'unknown',
+                    payload: parsedBody as Record<string, unknown>,
+                    connectionId: matchedConnection.id,
+                });
+
+                if (syncResult.processed) {
+                    logger.info('Webhook dispatched to sync orchestrator', {
+                        component: 'integrations',
+                        provider,
+                        eventId: event.id,
+                        tenantId: matchedConnection.tenantId,
+                        syncCount: syncResult.syncCount,
+                        actions: syncResult.results.map(r => r.action),
+                    });
+                }
+            }
+        } catch (err) {
+            // Sync orchestrator failures are logged but do NOT fail the webhook.
+            // The webhook's primary job (persist event, run provider checks, create evidence)
+            // has already succeeded above. Sync is a best-effort follow-on step.
+            logger.error('Sync orchestrator dispatch failed', {
+                component: 'integrations',
+                provider,
+                eventId: event.id,
+                tenantId: matchedConnection.tenantId,
+                error: err instanceof Error ? err : new Error(String(err)),
+            });
         }
     }
 

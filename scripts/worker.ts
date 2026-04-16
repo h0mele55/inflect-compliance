@@ -31,6 +31,7 @@ import {
     type DataLifecyclePayload,
     type PolicyReviewReminderPayload,
     type RetentionSweepPayload,
+    type SyncPullPayload,
 } from '../src/app-layer/jobs/types';
 
 // ─── Standalone logger ───
@@ -147,6 +148,14 @@ async function processRetentionSweep(job: Job<RetentionSweepPayload>) {
     return result;
 }
 
+async function processSyncPull(job: Job<SyncPullPayload>) {
+    log.info({ jobId: job.id, payload: job.data }, 'processing sync-pull');
+    const { runSyncPull } = await import('../src/app-layer/jobs/sync-pull');
+    const result = await runSyncPull(job.data);
+    log.info({ jobId: job.id, result }, 'sync-pull completed');
+    return result;
+}
+
 // ─── Processor Registry ───
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -157,6 +166,7 @@ const processors: Record<string, (job: Job<any>) => Promise<any>> = {
     'data-lifecycle': processDataLifecycle,
     'policy-review-reminder': processPolicyReviewReminder,
     'retention-sweep': processRetentionSweep,
+    'sync-pull': processSyncPull,
 };
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

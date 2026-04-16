@@ -350,11 +350,11 @@ export default function TaskDetailPage() {
                         </div>
                         <div>
                             <span className="text-xs text-slate-500 uppercase">Due Date</span>
-                            <p className="text-sm text-slate-300 mt-1">{task.dueAt ? new Date(task.dueAt).toLocaleDateString() : '—'}</p>
+                            <p className="text-sm text-slate-300 mt-1">{task.dueAt ? formatDate(task.dueAt) : '—'}</p>
                         </div>
                         <div>
                             <span className="text-xs text-slate-500 uppercase">Created</span>
-                            <p className="text-sm text-slate-300 mt-1">{new Date(task.createdAt).toLocaleString()}</p>
+                            <p className="text-sm text-slate-300 mt-1">{formatDateTime(task.createdAt)}</p>
                         </div>
                         <div>
                             <span className="text-xs text-slate-500 uppercase">Created By</span>
@@ -369,7 +369,7 @@ export default function TaskDetailPage() {
                         {task.completedAt && (
                             <div>
                                 <span className="text-xs text-slate-500 uppercase">Completed At</span>
-                                <p className="text-sm text-emerald-400 mt-1">{new Date(task.completedAt).toLocaleString()}</p>
+                                <p className="text-sm text-emerald-400 mt-1">{formatDateTime(task.completedAt)}</p>
                             </div>
                         )}
                         {task.resolution && (
@@ -449,7 +449,7 @@ export default function TaskDetailPage() {
                                             <td><span className="badge badge-info text-xs">{l.entityType}</span></td>
                                             <td className="text-sm text-slate-300 font-mono">{l.entityId}</td>
                                             <td className="text-xs text-slate-400">{l.relation?.replace(/_/g, ' ') || '—'}</td>
-                                            <td className="text-xs text-slate-400">{new Date(l.createdAt).toLocaleDateString()}</td>
+                                            <td className="text-xs text-slate-400">{formatDate(l.createdAt)}</td>
                                             {permissions.canWrite && (
                                                 <td>
                                                     <button className="text-red-400 text-xs hover:text-red-300" onClick={() => removeLink(l.id)}>
@@ -503,7 +503,7 @@ export default function TaskDetailPage() {
                                     <div key={c.id} className="px-5 py-3">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="text-sm font-medium text-white">{c.createdBy?.name || 'Unknown'}</span>
-                                            <span className="text-xs text-slate-500">{new Date(c.createdAt).toLocaleString()}</span>
+                                            <span className="text-xs text-slate-500">{formatDateTime(c.createdAt)}</span>
                                         </div>
                                         <p className="text-sm text-slate-300 whitespace-pre-wrap">{c.body}</p>
                                     </div>
@@ -542,7 +542,7 @@ export default function TaskDetailPage() {
                                             <span className="badge badge-neutral text-xs">{evt.action?.replace(/_/g, ' ')}</span>
                                         </div>
                                         <p className="text-xs text-slate-400 truncate">{evt.details?.split('\n')[0]}</p>
-                                        <span className="text-xs text-slate-500">{new Date(evt.createdAt).toLocaleString()}</span>
+                                        <span className="text-xs text-slate-500">{formatDateTime(evt.createdAt)}</span>
                                     </div>
                                 </div>
                             ))}

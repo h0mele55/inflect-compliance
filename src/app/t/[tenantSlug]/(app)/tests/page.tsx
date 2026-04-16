@@ -54,7 +54,7 @@ export default function TestsRollupPage() {
 
     const formatDate = (d: string | null) => {
         if (!d) return '—';
-        return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return formatDate(d);
     };
 
     const isOverdue = (d: string | null) => {

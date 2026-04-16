@@ -116,7 +116,7 @@ export default function AuditCyclesPage() {
                                 <div className="flex items-center gap-2 mt-3 text-xs text-slate-500">
                                     <span>{c.packs?.length || 0} pack{(c.packs?.length || 0) !== 1 ? 's' : ''}</span>
                                     <span>·</span>
-                                    <span>{new Date(c.createdAt).toLocaleDateString()}</span>
+                                    <span>{formatDate(c.createdAt)}</span>
                                 </div>
                             </Link>
                         );

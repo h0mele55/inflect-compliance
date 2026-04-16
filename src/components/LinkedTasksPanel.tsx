@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
@@ -56,7 +56,7 @@ export default function LinkedTasksPanel({ apiBase, entityType, entityId, tenant
                     )}
                     {task.dueAt && (
                         <span className={`text-xs ${new Date(task.dueAt) < new Date() ? 'text-red-400' : 'text-slate-400'}`}>
-                            {new Date(task.dueAt).toLocaleDateString()}
+                            {formatDate(task.dueAt)}
                         </span>
                     )}
                 </Link>

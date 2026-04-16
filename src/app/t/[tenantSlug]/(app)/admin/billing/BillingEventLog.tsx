@@ -60,7 +60,7 @@ export function BillingEventLog({ events }: { events: BillingEvent[] }) {
                                     </div>
                                 </td>
                                 <td className="text-xs text-slate-400 whitespace-nowrap">
-                                    {new Date(event.createdAt).toLocaleString()}
+                                    {formatDateTime(event.createdAt)}
                                 </td>
                                 <td className="text-xs text-slate-500 font-mono">
                                     {event.stripeEventId.slice(0, 20)}…

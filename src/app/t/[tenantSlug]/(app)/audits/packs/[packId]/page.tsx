@@ -93,7 +93,7 @@ export default function PackDetailPage() {
                         </p>
                         {pack.frozenAt && (
                             <p className="text-xs text-slate-500 mt-1">
-                                Frozen {new Date(pack.frozenAt).toLocaleString()} by {pack.frozenBy?.name || pack.frozenBy?.email || 'Admin'}
+                                Frozen {formatDateTime(pack.frozenAt)} by {pack.frozenBy?.name || pack.frozenBy?.email || 'Admin'}
                             </p>
                         )}
                     </div>

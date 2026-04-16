@@ -212,6 +212,9 @@ export interface IntegrationBundle {
     readonly clientClass: IntegrationClientConstructor;
     /** Field mapper class constructor */
     readonly mapperClass: FieldMapperConstructor;
+    /** Sync orchestrator class constructor (optional) */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    readonly orchestratorClass?: new (opts: any) => import('./sync-orchestrator').BaseSyncOrchestrator;
 }
 
 /**
@@ -224,6 +227,8 @@ export interface IntegrationBundleRegistration {
     description?: string;
     clientClass: IntegrationClientConstructor;
     mapperClass: FieldMapperConstructor;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    orchestratorClass?: new (opts: any) => import('./sync-orchestrator').BaseSyncOrchestrator;
 }
 
 /**
@@ -265,6 +270,7 @@ class IntegrationRegistryImpl {
             description: registration.description || '',
             clientClass,
             mapperClass,
+            orchestratorClass: registration.orchestratorClass,
         };
 
         this.bundles.set(name, bundle);
@@ -332,13 +338,14 @@ class IntegrationRegistryImpl {
     /**
      * Factory: create a client instance for the given provider.
      */
-    createClient<TConfig extends BaseConnectionConfig>(
+    createClient<TConfig extends import('./base-client').BaseConnectionConfig>(
         providerName: string,
         config: TConfig,
         fetchImpl?: typeof globalThis.fetch,
-    ): BaseIntegrationClient<TConfig> {
+    ): import('./base-client').BaseIntegrationClient<TConfig> {
         const bundle = this.requireBundle(providerName);
-        return new bundle.clientClass(config, fetchImpl);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return new bundle.clientClass(config, fetchImpl) as any;
     }
 
     /**
@@ -350,6 +357,19 @@ class IntegrationRegistryImpl {
     ): BaseFieldMapper {
         const bundle = this.requireBundle(providerName);
         return new bundle.mapperClass(options);
+    }
+
+    /**
+     * Factory: create an orchestrator instance for the given provider.
+     * Returns undefined if the bundle does not support orchestration.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    createOrchestrator(providerName: string, opts: any) {
+        const bundle = this.requireBundle(providerName);
+        if (!bundle.orchestratorClass) {
+            return undefined;
+        }
+        return new bundle.orchestratorClass(opts);
     }
 
     /**

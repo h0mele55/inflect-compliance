@@ -26,7 +26,7 @@ export default function NotificationsPage() {
                         <span className="text-lg"><AppIcon name={n.type === 'EVIDENCE' ? 'evidence' : n.type === 'FINDING' ? 'bug' : 'bell'} size={18} /></span>
                         <div className="flex-1">
                             <p className="text-sm text-slate-200">{n.message}</p>
-                            <p className="text-xs text-slate-500 mt-1">{new Date(n.createdAt).toLocaleString()}</p>
+                            <p className="text-xs text-slate-500 mt-1">{formatDateTime(n.createdAt)}</p>
                         </div>
                         {!n.read && <button onClick={() => markRead(n.id)} className="btn btn-ghost btn-sm text-xs">{t('markRead')}</button>}
                     </div>

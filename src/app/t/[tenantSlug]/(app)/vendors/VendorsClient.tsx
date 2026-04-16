@@ -18,7 +18,7 @@ const CRIT_BADGE: Record<string, string> = {
 
 function fmtDate(d: string | null) {
     if (!d) return '—';
-    return new Date(d).toLocaleDateString();
+    return formatDate(d);
 }
 
 function isOverdue(d: string | null) {

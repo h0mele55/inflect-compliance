@@ -123,7 +123,7 @@ export default function TestPlanDetailPage() {
 
     const formatDate = (d: string | null) => {
         if (!d) return '—';
-        return new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return formatDate(d);
     };
 
     if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading test plan...</div>;

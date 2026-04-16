@@ -155,7 +155,7 @@ export function PoliciesClient({
                                     <td className="text-xs text-slate-400">
                                         {p.nextReviewAt ? (
                                             <span className="flex items-center gap-1">
-                                                {new Date(p.nextReviewAt).toLocaleDateString()}
+                                                {formatDate(p.nextReviewAt)}
                                                 {new Date(p.nextReviewAt) < new Date() && p.status !== 'ARCHIVED' && (
                                                     <span className="badge badge-danger text-xs">Overdue</span>
                                                 )}
@@ -163,7 +163,7 @@ export function PoliciesClient({
                                         ) : '—'}
                                     </td>
                                     <td className="text-xs text-slate-500">
-                                        {new Date(p.updatedAt).toLocaleDateString()}
+                                        {formatDate(p.updatedAt)}
                                     </td>
                                 </tr>
                             ))}

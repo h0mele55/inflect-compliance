@@ -13,6 +13,7 @@ import type { BaseIntegrationClient } from '../../base-client';
 import type { BaseFieldMapper } from '../../base-mapper';
 import { GitHubClient, type GitHubConnectionConfig } from './client';
 import { GitHubBranchProtectionMapper } from './mapper';
+import type { RequestContext } from '@/app-layer/types';
 
 // ─── Orchestrator Implementation ─────────────────────────────────────
 
@@ -41,11 +42,11 @@ export class GitHubSyncOrchestrator extends BaseSyncOrchestrator {
 
     // ── Abstract Method Implementations ──
 
-    protected getClient(): BaseIntegrationClient {
+    protected resolveClient(): BaseIntegrationClient {
         return this.client;
     }
 
-    protected getMapper(): BaseFieldMapper {
+    protected resolveMapper(): BaseFieldMapper {
         return this.mapper;
     }
 
@@ -54,20 +55,20 @@ export class GitHubSyncOrchestrator extends BaseSyncOrchestrator {
     }
 
     protected async applyLocalChanges(
-        tenantId: string,
+        ctx: RequestContext,
         localEntityType: string,
         localEntityId: string,
         localData: Record<string, unknown>,
     ): Promise<string[]> {
-        return this.localStore.applyChanges(tenantId, localEntityType, localEntityId, localData);
+        return this.localStore.applyChanges(ctx, localEntityType, localEntityId, localData);
     }
 
     protected async getLocalData(
-        tenantId: string,
+        ctx: RequestContext,
         localEntityType: string,
         localEntityId: string,
     ): Promise<Record<string, unknown> | null> {
-        return this.localStore.getData(tenantId, localEntityType, localEntityId);
+        return this.localStore.getData(ctx, localEntityType, localEntityId);
     }
 
     protected extractRemoteId(payload: Record<string, unknown>): string | null {
@@ -101,14 +102,14 @@ export class GitHubSyncOrchestrator extends BaseSyncOrchestrator {
  */
 export interface GitHubLocalStore {
     applyChanges(
-        tenantId: string,
+        ctx: RequestContext,
         entityType: string,
         entityId: string,
         data: Record<string, unknown>,
     ): Promise<string[]>;
 
     getData(
-        tenantId: string,
+        ctx: RequestContext,
         entityType: string,
         entityId: string,
     ): Promise<Record<string, unknown> | null>;
