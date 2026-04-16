@@ -9,6 +9,7 @@ import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { tasksFilterConfig } from '@/components/filters/configs';
+import { formatDate } from '@/lib/format-date';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -300,6 +301,7 @@ export function TasksClient({
                                                     type="checkbox"
                                                     checked={selected.has(task.id)}
                                                     onChange={() => toggleSelect(task.id)}
+                                                    onClick={e => e.stopPropagation()}
                                                     className="task-checkbox"
                                                 />
                                             </td>
