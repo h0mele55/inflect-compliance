@@ -1,4 +1,5 @@
 'use client';
+import { formatDateTime } from '@/lib/format-date';
 
 import { Activity, CreditCard, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 

@@ -1,4 +1,5 @@
 'use client';
+import { formatDate } from '@/lib/format-date';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
