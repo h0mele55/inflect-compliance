@@ -31,10 +31,12 @@ export default async function DashboardPage({
     params: Promise<{ tenantSlug: string }>;
 }) {
     const { tenantSlug } = await params;
-    const t = await getTranslations('dashboard');
 
-    // Build tenant context server-side (uses session cookies, no req needed)
-    const ctx = await getTenantCtx({ tenantSlug });
+    // Translation and tenant context are independent — fetch in parallel
+    const [t, ctx] = await Promise.all([
+        getTranslations('dashboard'),
+        getTenantCtx({ tenantSlug }),
+    ]);
     const { stats } = await getDashboardData(ctx);
 
     const href = (path: string) => `/t/${tenantSlug}${path}`;

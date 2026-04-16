@@ -16,10 +16,15 @@ export default async function EvidencePage({
     params: Promise<{ tenantSlug: string }>;
 }) {
     const { tenantSlug } = await params;
-    const t = await getTranslations('evidence');
-    const tc = await getTranslations('common');
-    const ctx = await getTenantCtx({ tenantSlug });
 
+    // Translations and tenant context are independent — fetch in parallel
+    const [t, tc, ctx] = await Promise.all([
+        getTranslations('evidence'),
+        getTranslations('common'),
+        getTenantCtx({ tenantSlug }),
+    ]);
+
+    // Data fetches depend on ctx but are independent of each other
     const [evidence, controls] = await Promise.all([
         listEvidence(ctx),
         listControls(ctx),

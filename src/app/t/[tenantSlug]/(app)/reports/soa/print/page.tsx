@@ -16,19 +16,20 @@ export default async function SoAPrintPage({
     const { tenantSlug } = await params;
     const ctx = await getTenantCtx({ tenantSlug });
 
-    const report = await getSoA(ctx, {
-        includeEvidence: true,
-        includeTasks: true,
-        includeTests: true,
-    });
-
-    // Resolve tenant name
-    const tenant = await import('@/lib/prisma').then(m =>
-        m.default.tenant.findUnique({
-            where: { id: ctx.tenantId },
-            select: { name: true },
-        })
-    );
+    // Independent fetches — run in parallel
+    const [report, tenant] = await Promise.all([
+        getSoA(ctx, {
+            includeEvidence: true,
+            includeTasks: true,
+            includeTests: true,
+        }),
+        import('@/lib/prisma').then(m =>
+            m.default.tenant.findUnique({
+                where: { id: ctx.tenantId },
+                select: { name: true },
+            })
+        ),
+    ]);
 
     return (
         <SoAPrintView

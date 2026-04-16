@@ -19,8 +19,12 @@ export default async function PoliciesPage({
 }) {
     const { tenantSlug } = await params;
     const sp = await searchParams;
-    const t = await getTranslations('policies');
-    const ctx = await getTenantCtx({ tenantSlug });
+
+    // Translation and tenant context are independent — fetch in parallel
+    const [t, ctx] = await Promise.all([
+        getTranslations('policies'),
+        getTenantCtx({ tenantSlug }),
+    ]);
 
     // Build filters from searchParams for server-side data fetch
     const filters: Record<string, string> = {};

@@ -96,13 +96,13 @@ describe('RBAC Guardrail Scans', () => {
 
     describe('Tasks page RBAC', () => {
         test('task create button uses appPerms', () => {
-            const content = readFile('app/t/[tenantSlug]/(app)/tasks/page.tsx');
-            expect(content).toMatch(/appPerms\.tasks\.create/);
+            const content = readFile('app/t/[tenantSlug]/(app)/tasks/TasksClient.tsx');
+            expect(content).toMatch(/appPermissions\.tasks\.create/);
         });
 
         test('task bulk actions use appPerms', () => {
-            const content = readFile('app/t/[tenantSlug]/(app)/tasks/page.tsx');
-            expect(content).toMatch(/appPerms\.tasks\.edit/);
+            const content = readFile('app/t/[tenantSlug]/(app)/tasks/TasksClient.tsx');
+            expect(content).toMatch(/appPermissions\.tasks\.edit/);
         });
     });
 

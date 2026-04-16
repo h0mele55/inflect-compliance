@@ -1,12 +1,14 @@
-'use client';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTenantHref } from '@/lib/tenant-context-provider';
+import { redirect } from 'next/navigation';
 
-/** Legacy redirect: /issues → /tasks */
-export default function IssuesRedirect() {
-    const router = useRouter();
-    const tenantHref = useTenantHref();
-    useEffect(() => { router.replace(tenantHref('/tasks')); }, [router, tenantHref]);
-    return <div className="p-12 text-center text-slate-500 animate-pulse">Redirecting to Tasks…</div>;
+/**
+ * Legacy redirect: /issues → /tasks
+ * Server-side redirect — zero client JS shipped.
+ */
+export default async function IssuesRedirect({
+    params,
+}: {
+    params: Promise<{ tenantSlug: string }>;
+}) {
+    const { tenantSlug } = await params;
+    redirect(`/t/${tenantSlug}/tasks`);
 }

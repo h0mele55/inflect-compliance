@@ -19,9 +19,13 @@ export default async function RisksPage({
 }) {
     const { tenantSlug } = await params;
     const sp = await searchParams;
-    const t = await getTranslations('risks');
-    const td = await getTranslations('riskManager');
-    const ctx = await getTenantCtx({ tenantSlug });
+
+    // Translations and tenant context are independent — fetch in parallel
+    const [t, td, ctx] = await Promise.all([
+        getTranslations('risks'),
+        getTranslations('riskManager'),
+        getTenantCtx({ tenantSlug }),
+    ]);
 
     // Build filters from searchParams for server-side data fetch
     const filters: Record<string, string> = {};

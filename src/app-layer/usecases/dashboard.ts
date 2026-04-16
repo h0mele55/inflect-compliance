@@ -7,8 +7,10 @@ export async function getDashboardData(ctx: RequestContext) {
     assertCanRead(ctx);
 
     return runInTenantContext(ctx, async (db) => {
-        const stats = await DashboardRepository.getStats(db, ctx);
-        const recentActivity = await DashboardRepository.getRecentActivity(db, ctx);
+        const [stats, recentActivity] = await Promise.all([
+            DashboardRepository.getStats(db, ctx),
+            DashboardRepository.getRecentActivity(db, ctx),
+        ]);
 
         return {
             stats,

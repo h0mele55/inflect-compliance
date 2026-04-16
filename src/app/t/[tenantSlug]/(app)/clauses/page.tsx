@@ -15,8 +15,12 @@ export default async function ClausesPage({
     params: Promise<{ tenantSlug: string }>;
 }) {
     const { tenantSlug } = await params;
-    const t = await getTranslations('clauses');
-    const ctx = await getTenantCtx({ tenantSlug });
+
+    // Translation and tenant context are independent — fetch in parallel
+    const [t, ctx] = await Promise.all([
+        getTranslations('clauses'),
+        getTenantCtx({ tenantSlug }),
+    ]);
     const clauses = await listClauses(ctx);
 
     return (

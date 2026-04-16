@@ -18,11 +18,15 @@ export default async function ReportsPage({
     params: Promise<{ tenantSlug: string }>;
 }) {
     const { tenantSlug } = await params;
-    const t = await getTranslations('reports');
-    const tc = await getTranslations('common');
-    const ctx = await getTenantCtx({ tenantSlug });
 
-    // Parallel fetch old reports + new SoA + controls
+    // Translations and tenant context are independent — fetch in parallel
+    const [t, tc, ctx] = await Promise.all([
+        getTranslations('reports'),
+        getTranslations('common'),
+        getTenantCtx({ tenantSlug }),
+    ]);
+
+    // Data fetches depend on ctx but are independent of each other
     const [data, soaReport, controls] = await Promise.all([
         getReports(ctx),
         getSoA(ctx, {
