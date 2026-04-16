@@ -87,7 +87,9 @@ test.describe('Filter contract: Tasks', () => {
 
     test('severity dropdown updates URL', async ({ page }) => {
         await page.click('[data-testid="filter-dd-severity"]');
-        await page.click('text=Critical');
+        const option = page.locator('button:has-text("Critical")');
+        await option.waitFor({ state: 'visible', timeout: 5000 });
+        await option.click();
         await expect(page).toHaveURL(/severity=CRITICAL/, { timeout: 15000 });
     });
 });

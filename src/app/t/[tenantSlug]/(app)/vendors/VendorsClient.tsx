@@ -1,6 +1,9 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { vendorsFilterConfig } from '@/components/filters/configs';
@@ -38,11 +41,31 @@ interface VendorsClientProps {
  */
 export function VendorsClient({ initialVendors, initialFilters, tenantSlug, permissions }: VendorsClientProps) {
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
+    const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
+    const router = useRouter();
 
     // URL-driven filter state
     const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'criticality', 'reviewDue']);
 
-    const vendors = initialVendors;
+    const hasFilters = !!(filters.q || filters.status || filters.criticality || filters.reviewDue);
+    const serverHadFilters = initialFilters && Object.keys(initialFilters).length > 0;
+    const filtersMatchInitial = serverHadFilters
+        ? JSON.stringify(filters) === JSON.stringify(initialFilters)
+        : !hasFilters;
+
+    const vendorsQuery = useQuery({
+        queryKey: queryKeys.vendors.list(tenantSlug, filters),
+        queryFn: async () => {
+            const params = new URLSearchParams(filters);
+            const qs = params.toString();
+            const res = await fetch(apiUrl(`/vendors${qs ? `?${qs}` : ''}`));
+            if (!res.ok) throw new Error('Failed to fetch vendors');
+            return res.json();
+        },
+        initialData: filtersMatchInitial ? initialVendors : undefined,
+    });
+
+    const vendors = vendorsQuery.data ?? [];
 
     return (
         <>
@@ -83,7 +106,7 @@ export function VendorsClient({ initialVendors, initialFilters, tenantSlug, perm
                     <tbody>
                         {vendors.map((v: any) => (
                             <tr key={v.id} className="border-b border-slate-800 hover:bg-slate-800/50 cursor-pointer"
-                                onClick={() => window.location.href = tenantHref(`/vendors/${v.id}`)}>
+                                onClick={() => router.push(tenantHref(`/vendors/${v.id}`))}>
                                 <td className="p-3 font-medium">
                                     <Link href={tenantHref(`/vendors/${v.id}`)} className="text-blue-400 hover:underline" id={`vendor-link-${v.id}`}>
                                         {v.name}

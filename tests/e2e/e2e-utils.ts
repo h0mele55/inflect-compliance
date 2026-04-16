@@ -138,7 +138,18 @@ export async function gotoAndVerify(
             .first()
             .isVisible()
             .catch(() => false);
-        if (rendered) return;
+        if (rendered) {
+            // Wait for React hydration — event handlers must be attached
+            // before tests interact with any elements.
+            await page.waitForFunction(() => {
+                const el = document.querySelector('[data-hydrated]')
+                    || document.querySelector('main');
+                return el && Object.keys(el).some(
+                    k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber') || k.startsWith('__reactProps'),
+                );
+            }, { timeout: 15000 }).catch(() => {});
+            return;
+        }
         attempts--;
         if (attempts > 0) await page.waitForTimeout(3000);
     }

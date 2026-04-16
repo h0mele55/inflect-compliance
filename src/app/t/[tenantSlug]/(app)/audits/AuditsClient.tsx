@@ -1,5 +1,7 @@
 'use client';
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const STATUS_BADGE: Record<string, string> = {
@@ -39,22 +41,46 @@ interface AuditsClientProps {
  * Data is pre-fetched server-side and passed via props.
  */
 export function AuditsClient({ initialAudits, tenantSlug, translations: t }: AuditsClientProps) {
-    const [audits, setAudits] = useState<any[]>(initialAudits);
     const [selected, setSelected] = useState<any>(null);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ title: '', scope: '', auditors: '', generateChecklist: true });
 
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
+    const queryClient = useQueryClient();
+
+    const auditsQuery = useQuery({
+        queryKey: queryKeys.audits.list(tenantSlug),
+        queryFn: async () => {
+            const res = await fetch(apiUrl('/audits'));
+            if (!res.ok) throw new Error('Failed to fetch audits');
+            return res.json();
+        },
+        initialData: initialAudits,
+    });
+    const audits = auditsQuery.data ?? [];
 
     const loadAudit = async (id: string) => {
         const res = await fetch(apiUrl(`/audits/${id}`));
         setSelected(await res.json());
     };
 
-    const createAudit = async (e: React.FormEvent) => {
+    const createMutation = useMutation({
+        mutationFn: async (newAudit: any) => {
+            const res = await fetch(apiUrl('/audits'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAudit) });
+            if (!res.ok) throw new Error('Failed to create audit');
+            return res.json();
+        },
+        onSuccess: (a) => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.audits.all(tenantSlug) });
+            setShowForm(false);
+            setForm({ title: '', scope: '', auditors: '', generateChecklist: true });
+            loadAudit(a.id);
+        }
+    });
+
+    const createAudit = (e: React.FormEvent) => {
         e.preventDefault();
-        const res = await fetch(apiUrl('/audits'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-        if (res.ok) { const a = await res.json(); setAudits(prev => [a, ...prev]); setShowForm(false); loadAudit(a.id); }
+        createMutation.mutate(form);
     };
 
     const updateChecklist = async (itemId: string, result: string, notes: string = '') => {
@@ -67,7 +93,7 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
         if (!selected) return;
         await fetch(apiUrl(`/audits/${selected.id}`), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
         setSelected((s: any) => ({ ...s, status }));
-        setAudits(prev => prev.map(a => a.id === selected.id ? { ...a, status } : a));
+        queryClient.invalidateQueries({ queryKey: queryKeys.audits.list(tenantSlug) });
     };
 
     const statusLabel = (status: string) => {

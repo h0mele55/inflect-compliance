@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
@@ -74,6 +75,11 @@ export function TasksClient({
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
     const queryClient = useQueryClient();
+    const router = useRouter();
+
+    // Hydration marker — signals to E2E tests that React event handlers are attached
+    const [hydrated, setHydrated] = useState(false);
+    useEffect(() => { setHydrated(true); }, []);
 
     // URL-driven filter state
     const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'type', 'severity', 'due'], initialFilters);
@@ -102,6 +108,8 @@ export function TasksClient({
         },
         initialData: filtersMatchInitial ? initialTasks : undefined,
         initialDataUpdatedAt: 0,
+        // Prevent aggressive refetch during user interaction (SWR after 30s)
+        staleTime: 30_000,
     });
 
     const tasks = tasksQuery.data ?? [];
@@ -183,7 +191,7 @@ export function TasksClient({
     };
 
     return (
-        <div className="space-y-6 animate-fadeIn">
+        <div className="space-y-6 animate-fadeIn" data-hydrated={hydrated || undefined}>
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
@@ -285,7 +293,7 @@ export function TasksClient({
                             {tasks.map(task => {
                                 const slaLabel = getSlaLabel(task.severity, task.createdAt, task.status);
                                 return (
-                                    <tr key={task.id} className="cursor-pointer hover:bg-slate-700/30 transition">
+                                    <tr key={task.id} className="cursor-pointer hover:bg-slate-700/30 transition" onClick={() => router.push(tenantHref(`/tasks/${task.id}`))}>
                                         {appPermissions.tasks.edit && (
                                             <td>
                                                 <input

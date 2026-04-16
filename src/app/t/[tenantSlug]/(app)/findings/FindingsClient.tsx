@@ -1,5 +1,7 @@
 'use client';
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 
 const SEV_BADGE: Record<string, string> = { LOW: 'badge-info', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
 const STATUS_BADGE: Record<string, string> = { OPEN: 'badge-danger', IN_PROGRESS: 'badge-info', READY_FOR_VERIFICATION: 'badge-warning', CLOSED: 'badge-success' };
@@ -41,22 +43,67 @@ interface FindingsClientProps {
  * Data is pre-fetched server-side and passed via props.
  */
 export function FindingsClient({ initialFindings, tenantSlug, translations: t }: FindingsClientProps) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [findings, setFindings] = useState<any[]>(initialFindings);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ title: '', description: '', severity: 'MEDIUM', type: 'OBSERVATION', owner: '', dueDate: '' });
 
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
+    const queryClient = useQueryClient();
 
-    const createFinding = async (e: React.FormEvent) => {
+    const findingsQuery = useQuery({
+        queryKey: queryKeys.findings.list(tenantSlug),
+        queryFn: async () => {
+            const res = await fetch(apiUrl('/findings'));
+            if (!res.ok) throw new Error('Failed to fetch findings');
+            return res.json();
+        },
+        initialData: initialFindings,
+    });
+    const findings = findingsQuery.data ?? [];
+
+    const createMutation = useMutation({
+        mutationFn: async (newFinding: any) => {
+            const res = await fetch(apiUrl('/findings'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newFinding) });
+            if (!res.ok) throw new Error('Failed to create finding');
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.findings.all(tenantSlug) });
+            setShowForm(false);
+            setForm({ title: '', description: '', severity: 'MEDIUM', type: 'OBSERVATION', owner: '', dueDate: '' });
+        }
+    });
+
+    const createFinding = (e: React.FormEvent) => {
         e.preventDefault();
-        const res = await fetch(apiUrl('/findings'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-        if (res.ok) { const f = await res.json(); setFindings(prev => [f, ...prev]); setShowForm(false); }
+        createMutation.mutate(form);
     };
 
-    const updateStatus = async (id: string, status: string) => {
-        await fetch(apiUrl(`/findings/${id}`), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
-        setFindings(prev => prev.map(f => f.id === id ? { ...f, status } : f));
+    const statusMutation = useMutation({
+        mutationFn: async ({ id, status }: { id: string, status: string }) => {
+            const res = await fetch(apiUrl(`/findings/${id}`), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+            if (!res.ok) throw new Error('Failed to update status');
+            return res.json();
+        },
+        onMutate: async ({ id, status }) => {
+            await queryClient.cancelQueries({ queryKey: queryKeys.findings.list(tenantSlug) });
+            const prev = queryClient.getQueryData<any[]>(queryKeys.findings.list(tenantSlug));
+            if (prev) {
+                queryClient.setQueryData(queryKeys.findings.list(tenantSlug), prev.map(f => f.id === id ? { ...f, status } : f));
+            }
+            return { prev };
+        },
+        onError: (err, variables, context) => {
+            if (context?.prev) {
+                queryClient.setQueryData(queryKeys.findings.list(tenantSlug), context.prev);
+            }
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.findings.list(tenantSlug) });
+        }
+    });
+
+    const updateStatus = (id: string, status: string) => {
+        statusMutation.mutate({ id, status });
     };
 
     const sevLabel = (sev: string) => {

@@ -2,6 +2,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { assetsFilterConfig } from '@/components/filters/configs';
@@ -41,25 +44,51 @@ interface AssetsClientProps {
  * Data is pre-fetched server-side and passed via props.
  */
 export function AssetsClient({ initialAssets, initialFilters, tenantSlug, permissions, translations: t }: AssetsClientProps) {
-    const [assets, setAssets] = useState<any[]>(initialAssets);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ name: '', type: 'SYSTEM', classification: '', owner: '', location: '', confidentiality: 3, integrity: 3, availability: 3, dataResidency: '', retention: '' });
 
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
+    const router = useRouter();
+    const queryClient = useQueryClient();
 
     // URL-driven filter state
     const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'type', 'status']);
+    const hasFilters = !!(filters.q || filters.type || filters.status);
+    const serverHadFilters = initialFilters && Object.keys(initialFilters).length > 0;
+    const filtersMatchInitial = serverHadFilters
+        ? JSON.stringify(filters) === JSON.stringify(initialFilters)
+        : !hasFilters;
 
-    const createAsset = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const res = await fetch(apiUrl('/assets'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-        if (res.ok) {
-            const newAsset = await res.json();
-            setAssets(prev => [newAsset, ...prev]);
+    const assetsQuery = useQuery({
+        queryKey: queryKeys.assets.list(tenantSlug, filters),
+        queryFn: async () => {
+            const params = new URLSearchParams(filters);
+            const qs = params.toString();
+            const res = await fetch(apiUrl(`/assets${qs ? `?${qs}` : ''}`));
+            if (!res.ok) throw new Error('Failed to fetch assets');
+            return res.json();
+        },
+        initialData: filtersMatchInitial ? initialAssets : undefined,
+    });
+    const assets = assetsQuery.data ?? [];
+
+    const createMutation = useMutation({
+        mutationFn: async (newAsset: any) => {
+            const res = await fetch(apiUrl('/assets'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newAsset) });
+            if (!res.ok) throw new Error('Failed to create asset');
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.assets.all(tenantSlug) });
             setShowForm(false);
             setForm({ name: '', type: 'SYSTEM', classification: '', owner: '', location: '', confidentiality: 3, integrity: 3, availability: 3, dataResidency: '', retention: '' });
         }
+    });
+
+    const createAsset = (e: React.FormEvent) => {
+        e.preventDefault();
+        createMutation.mutate(form);
     };
 
     return (
@@ -100,7 +129,7 @@ export function AssetsClient({ initialAssets, initialFilters, tenantSlug, permis
                     <thead><tr><th>{t.name}</th><th>{t.type}</th><th>{t.classification}</th><th>{t.owner}</th><th>{t.cia}</th><th>{t.controlsCol}</th></tr></thead>
                     <tbody>
                         {assets.map((a: any) => (
-                            <tr key={a.id} className="cursor-pointer hover:bg-slate-700/30" onClick={() => window.location.href = tenantHref(`/assets/${a.id}`)}>
+                            <tr key={a.id} className="cursor-pointer hover:bg-slate-700/30" onClick={() => router.push(tenantHref(`/assets/${a.id}`))}>
                                 <td className="font-medium text-white">{a.name}</td>
                                 <td><span className="badge badge-info">{a.type.replace(/_/g, ' ')}</span></td>
                                 <td>{a.classification || '—'}</td>
