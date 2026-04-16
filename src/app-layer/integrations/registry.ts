@@ -165,3 +165,204 @@ class ProviderRegistry {
  * Import and use this across the application.
  */
 export const registry = new ProviderRegistry();
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// Integration Registry — Client + Mapper Bundle Pattern
+// ═══════════════════════════════════════════════════════════════════════
+//
+// This is a SECOND registry that sits alongside ProviderRegistry.
+//
+// ProviderRegistry  → routes automationKeys to check/webhook providers
+// IntegrationRegistry → bundles client + mapper classes for CRUD integrations
+//
+// Inspired by CISO-Assistant's IntegrationRegistry, which registers
+// client_class + mapper_class + orchestrator_class per provider name.
+// ═══════════════════════════════════════════════════════════════════════
+
+import type { BaseIntegrationClient, BaseConnectionConfig } from './base-client';
+import type { BaseFieldMapper } from './base-mapper';
+
+/**
+ * Constructor type for BaseIntegrationClient subclasses.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type IntegrationClientConstructor<T extends BaseIntegrationClient = BaseIntegrationClient> = new (config: any, fetchImpl?: typeof globalThis.fetch) => T;
+
+/**
+ * Constructor type for BaseFieldMapper subclasses.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type FieldMapperConstructor<T extends BaseFieldMapper = BaseFieldMapper> = new (options?: any) => T;
+
+/**
+ * A registered integration bundle — groups client + mapper classes
+ * under a single provider key with metadata.
+ */
+export interface IntegrationBundle {
+    /** Unique provider key (e.g. 'jira', 'github', 'servicenow') */
+    readonly name: string;
+    /** Integration category (e.g. 'itsm', 'scm', 'cloud', 'directory') */
+    readonly type: string;
+    /** Human-readable display name */
+    readonly displayName: string;
+    /** Provider description */
+    readonly description: string;
+    /** Client class constructor */
+    readonly clientClass: IntegrationClientConstructor;
+    /** Field mapper class constructor */
+    readonly mapperClass: FieldMapperConstructor;
+}
+
+/**
+ * Registration input — what callers pass to IntegrationRegistry.register().
+ */
+export interface IntegrationBundleRegistration {
+    name: string;
+    type: string;
+    displayName?: string;
+    description?: string;
+    clientClass: IntegrationClientConstructor;
+    mapperClass: FieldMapperConstructor;
+}
+
+/**
+ * Central registry for integration bundles (client + mapper per provider).
+ *
+ * This is a class-level (static) singleton — no instantiation required.
+ * Providers register their client + mapper classes at module load time,
+ * and consumers resolve them by name or type at runtime.
+ *
+ * @example
+ *   IntegrationRegistry.register({
+ *       name: 'jira',
+ *       type: 'itsm',
+ *       clientClass: JiraClient,
+ *       mapperClass: JiraMapper,
+ *   });
+ *
+ *   const bundle = IntegrationRegistry.getBundle('jira');
+ *   const client = IntegrationRegistry.createClient('jira', config);
+ */
+class IntegrationRegistryImpl {
+    private readonly bundles = new Map<string, IntegrationBundle>();
+
+    /**
+     * Register an integration bundle (client + mapper).
+     * Overwrites any existing bundle with the same name.
+     */
+    register(registration: IntegrationBundleRegistration): void {
+        const { name, type, clientClass, mapperClass } = registration;
+
+        if (!name || typeof name !== 'string') {
+            throw new Error('Integration bundle must have a non-empty string name');
+        }
+
+        const bundle: IntegrationBundle = {
+            name,
+            type,
+            displayName: registration.displayName || name.charAt(0).toUpperCase() + name.slice(1),
+            description: registration.description || '',
+            clientClass,
+            mapperClass,
+        };
+
+        this.bundles.set(name, bundle);
+        logger.info('Integration bundle registered', {
+            component: 'integrations',
+            bundle: name,
+            type,
+        });
+    }
+
+    /**
+     * Unregister an integration bundle by name.
+     */
+    unregister(name: string): boolean {
+        return this.bundles.delete(name);
+    }
+
+    /**
+     * Get a registered bundle by name.
+     * Returns undefined if not found.
+     */
+    getBundle(name: string): IntegrationBundle | undefined {
+        return this.bundles.get(name);
+    }
+
+    /**
+     * Get a bundle by name, throwing if not found.
+     */
+    requireBundle(name: string): IntegrationBundle {
+        const bundle = this.bundles.get(name);
+        if (!bundle) {
+            throw new Error(`Integration provider "${name}" is not registered`);
+        }
+        return bundle;
+    }
+
+    /**
+     * Get all bundles of a specific integration type.
+     */
+    getBundlesByType(type: string): IntegrationBundle[] {
+        return Array.from(this.bundles.values()).filter(b => b.type === type);
+    }
+
+    /**
+     * List all registered bundles.
+     */
+    listBundles(): IntegrationBundle[] {
+        return Array.from(this.bundles.values());
+    }
+
+    /**
+     * List all registered bundle names.
+     */
+    listBundleNames(): string[] {
+        return Array.from(this.bundles.keys());
+    }
+
+    /**
+     * Check if a bundle with the given name is registered.
+     */
+    has(name: string): boolean {
+        return this.bundles.has(name);
+    }
+
+    /**
+     * Factory: create a client instance for the given provider.
+     */
+    createClient<TConfig extends BaseConnectionConfig>(
+        providerName: string,
+        config: TConfig,
+        fetchImpl?: typeof globalThis.fetch,
+    ): BaseIntegrationClient<TConfig> {
+        const bundle = this.requireBundle(providerName);
+        return new bundle.clientClass(config, fetchImpl);
+    }
+
+    /**
+     * Factory: create a mapper instance for the given provider.
+     */
+    createMapper(
+        providerName: string,
+        options?: { customMappings?: Record<string, string> },
+    ): BaseFieldMapper {
+        const bundle = this.requireBundle(providerName);
+        return new bundle.mapperClass(options);
+    }
+
+    /**
+     * Clear all bundles. Used in tests.
+     * @internal
+     */
+    _clear(): void {
+        this.bundles.clear();
+    }
+}
+
+/**
+ * Global singleton integration registry.
+ */
+export const integrationRegistry = new IntegrationRegistryImpl();
+

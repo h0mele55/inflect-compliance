@@ -1,18 +1,24 @@
 /**
  * Integration Provider Bootstrap
  *
- * Registers all available integration providers with the global registry.
+ * Registers all available integration providers with the global registries.
  * Import this module once at application startup to enable all providers.
+ *
+ * Two registries are populated:
+ *   - `registry` (ProviderRegistry) — automation key routing for checks/webhooks
+ *   - `integrationRegistry` (IntegrationRegistry) — client + mapper bundles for CRUD
  *
  * Usage:
  *   import '@/app-layer/integrations/bootstrap';
  *
  * @module integrations/bootstrap
  */
-import { registry } from './registry';
+import { registry, integrationRegistry } from './registry';
 import { GitHubProvider } from './providers/github';
+import { GitHubClient } from './providers/github-client';
+import { GitHubBranchProtectionMapper } from './providers/github-mapper';
 
-// ─── Register Providers ──────────────────────────────────────────────
+// ─── ProviderRegistry: Automation Key Routing ────────────────────────
 
 // GitHub — branch protection, repo security
 registry.register(new GitHubProvider());
@@ -21,3 +27,19 @@ registry.register(new GitHubProvider());
 // registry.register(new AwsProvider());
 // registry.register(new AzureProvider());
 // registry.register(new GitLabProvider());
+
+// ─── IntegrationRegistry: Client + Mapper Bundles ────────────────────
+
+integrationRegistry.register({
+    name: 'github',
+    type: 'scm',
+    displayName: 'GitHub',
+    description: 'GitHub repository compliance — branch protection, security settings',
+    clientClass: GitHubClient,
+    mapperClass: GitHubBranchProtectionMapper,
+});
+
+// Future bundles:
+// integrationRegistry.register({ name: 'jira', type: 'itsm', ... });
+// integrationRegistry.register({ name: 'servicenow', type: 'itsm', ... });
+
