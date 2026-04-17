@@ -1,5 +1,6 @@
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
+import { TERMINAL_WORK_ITEM_STATUSES } from '../domain/work-item-status';
 
 export class DashboardRepository {
     static async getStats(db: PrismaTx, ctx: RequestContext) {
@@ -10,7 +11,7 @@ export class DashboardRepository {
             db.risk.count({ where: { tenantId } }),
             db.control.count({ where: { OR: [{ tenantId }, { tenantId: null }] } }),
             db.evidence.count({ where: { tenantId } }),
-            db.task.count({ where: { tenantId, status: { notIn: ['RESOLVED', 'CLOSED', 'CANCELED'] } } }),
+            db.task.count({ where: { tenantId, status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] } } }),
             db.finding.count({ where: { tenantId, status: { not: 'CLOSED' } } }),
         ]);
 

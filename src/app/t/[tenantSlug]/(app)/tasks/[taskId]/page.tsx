@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonLine, SkeletonCard } from '@/components/ui/skeleton';
+import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -44,7 +45,7 @@ const SLA_RESOLVE: Record<string, number> = { CRITICAL: 24, HIGH: 72, MEDIUM: 16
 const SLA_TRIAGE: Record<string, number> = { CRITICAL: 4, HIGH: 24, MEDIUM: 72, LOW: 168 };
 
 function getSlaStatus(severity: string, createdAt: string, status: string) {
-    if (['RESOLVED', 'CLOSED', 'CANCELED'].includes(status)) return { label: '', breach: false };
+    if ((TERMINAL_WORK_ITEM_STATUSES as readonly string[]).includes(status)) return { label: '', breach: false };
     const now = Date.now();
     const created = new Date(createdAt).getTime();
     const resolveH = SLA_RESOLVE[severity];
@@ -241,7 +242,7 @@ export default function TaskDetailPage() {
         { key: 'activity', label: 'Activity', icon: <AppIcon name="activity" size={14} /> },
     ];
 
-    const isOverdue = task.dueAt && new Date(task.dueAt) < new Date() && !['RESOLVED', 'CLOSED', 'CANCELED'].includes(task.status);
+    const isOverdue = task.dueAt && new Date(task.dueAt) < new Date() && !(TERMINAL_WORK_ITEM_STATUSES as readonly string[]).includes(task.status);
     const sla = getSlaStatus(task.severity, task.createdAt, task.status);
     const relevance = getRelevanceStatus(task, links);
     const metadata = task.metadataJson || {};

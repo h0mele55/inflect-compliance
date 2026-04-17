@@ -178,11 +178,6 @@ export default function TestRunPage() {
         }
     };
 
-    const formatDate = (d: string | null) => {
-        if (!d) return '—';
-        return formatDate(d);
-    };
-
     if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse"><div className="h-6 w-full sm:w-48 bg-slate-700 rounded mx-auto" /></div>;
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
     if (!run) return <div className="p-12 text-center text-slate-500">Run not found.</div>;

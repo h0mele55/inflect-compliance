@@ -74,8 +74,8 @@ describe('Infrastructure Regression Guards', () => {
             }
         });
 
-        test('exactly 5 scheduled jobs exist', () => {
-            expect(SCHEDULED_JOBS).toHaveLength(5);
+        test('exactly 6 scheduled jobs exist', () => {
+            expect(SCHEDULED_JOBS).toHaveLength(6);
         });
 
         test('scheduled job names match expected set', () => {
@@ -84,6 +84,7 @@ describe('Infrastructure Regression Guards', () => {
                 'automation-runner',
                 'daily-evidence-expiry',
                 'data-lifecycle',
+                'notification-dispatch',
                 'policy-review-reminder',
                 'retention-sweep',
             ]);

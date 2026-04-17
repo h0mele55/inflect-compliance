@@ -2,6 +2,7 @@
  * SLA computation service.
  * Pure functions — no DB, no side effects. Derives triage/resolve deadlines from severity + createdAt.
  */
+import { isTerminalStatus } from '../domain/work-item-status';
 
 export interface SLADates {
     triageDueAt: Date | null;
@@ -58,8 +59,8 @@ export function getSlaStatus(
     const sla = computeSLADates(severity, createdAt);
     const effectiveNow = now || new Date();
 
-    // Resolved/Closed issues don't breach
-    if (['RESOLVED', 'CLOSED'].includes(currentStatus)) {
+    // Resolved/Closed/Canceled issues don't breach
+    if (isTerminalStatus(currentStatus)) {
         return { triageBreach: false, resolveBreach: false, label: '' };
     }
 

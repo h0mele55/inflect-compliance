@@ -1,0 +1,282 @@
+/**
+ * Background Job Tenant Isolation — Regression Guards
+ *
+ * This is the regression test suite for the critical tenant-scope bug
+ * where background jobs silently widened from single-tenant to all-tenant
+ * scans when services ignored the tenantId payload.
+ *
+ * WHAT THIS CATCHES:
+ *   - Job executor ignores tenantId from payload (e.g. `_payload`)
+ *   - Service function doesn't accept tenantId parameter
+ *   - Service queries don't apply tenantId to WHERE clauses
+ *   - Cross-tenant data leakage in results
+ *
+ * HOW TO ADD A NEW JOB TO THIS SUITE:
+ *   1. Add a new describe() block below
+ *   2. Mock the Prisma model(s) the job queries
+ *   3. Use assertAllQueriesScoped() and assertNoTenantLeakage()
+ *   4. Test both tenant-scoped and system-wide modes
+ */
+
+import {
+    assertAllQueriesScoped,
+    assertNoTenantLeakage,
+    assertQueriesUnscoped,
+    assertResultsBelongToTenant,
+    assertScopeLogged,
+} from '../helpers/tenant-scope-guard';
+
+const TENANT_A = 'tenant-regression-a';
+const TENANT_B = 'tenant-regression-b';
+
+// ── Shared mocks ────────────────────────────────────────────────────
+
+const mockLogger = {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    fatal: jest.fn(),
+    child: jest.fn().mockReturnThis(),
+};
+
+beforeEach(() => {
+    jest.resetModules();
+    jest.clearAllMocks();
+    jest.mock('@/lib/observability/logger', () => ({ logger: mockLogger }));
+    jest.mock('@/lib/observability/job-runner', () => ({
+        runJob: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+    }));
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 1. vendor-renewal-check — REGRESSION for original bug
+// ═════════════════════════════════════════════════════════════════════
+
+describe('REGRESSION: vendor-renewal-check tenant isolation', () => {
+    const mockVendorFindMany = jest.fn().mockResolvedValue([]);
+
+    beforeEach(() => {
+        jest.mock('@/lib/prisma', () => ({
+            __esModule: true,
+            default: {
+                vendor: { findMany: (...args: unknown[]) => mockVendorFindMany(...args) },
+            },
+        }));
+    });
+
+    test('tenant-scoped: all 4 queries include tenantId', async () => {
+        const { runVendorRenewalCheck } = await import(
+            '../../src/app-layer/jobs/vendor-renewal-check'
+        );
+        await runVendorRenewalCheck({ tenantId: TENANT_A });
+
+        assertAllQueriesScoped(mockVendorFindMany, TENANT_A, 'vendor query');
+        expect(mockVendorFindMany).toHaveBeenCalledTimes(4);
+    });
+
+    test('tenant-scoped: tenant B data never touched', async () => {
+        const { runVendorRenewalCheck } = await import(
+            '../../src/app-layer/jobs/vendor-renewal-check'
+        );
+        await runVendorRenewalCheck({ tenantId: TENANT_A });
+
+        assertNoTenantLeakage(mockVendorFindMany, TENANT_B);
+    });
+
+    test('system-wide: no tenantId in queries when omitted', async () => {
+        const { runVendorRenewalCheck } = await import(
+            '../../src/app-layer/jobs/vendor-renewal-check'
+        );
+        await runVendorRenewalCheck({});
+
+        assertQueriesUnscoped(mockVendorFindMany);
+    });
+
+    test('tenant-scoped: results only contain target tenant', async () => {
+        mockVendorFindMany.mockImplementation((args: { where: Record<string, unknown> }) => {
+            const vendors = [
+                { id: 'v1', tenantId: TENANT_A, name: 'A-Vendor', ownerUserId: null, nextReviewAt: new Date('2020-01-01'), contractRenewalAt: new Date('2020-01-01') },
+                { id: 'v2', tenantId: TENANT_B, name: 'B-Vendor', ownerUserId: null, nextReviewAt: new Date('2020-01-01'), contractRenewalAt: new Date('2020-01-01') },
+            ];
+            if (args.where.tenantId) {
+                return Promise.resolve(vendors.filter(v => v.tenantId === args.where.tenantId));
+            }
+            return Promise.resolve(vendors);
+        });
+
+        const { runVendorRenewalCheck } = await import(
+            '../../src/app-layer/jobs/vendor-renewal-check'
+        );
+        const { items } = await runVendorRenewalCheck({ tenantId: TENANT_A });
+
+        assertResultsBelongToTenant(items, TENANT_A);
+        expect(items.find(i => i.tenantId === TENANT_B)).toBeUndefined();
+    });
+
+    test('tenant-scoped: logging shows scope', async () => {
+        const { findDueVendorsAndEmitEvents } = await import(
+            '../../src/app-layer/services/vendor-renewals'
+        );
+        await findDueVendorsAndEmitEvents({ tenantId: TENANT_A });
+
+        assertScopeLogged(mockLogger, 'vendor renewal scan starting', {
+            scope: 'tenant-scoped',
+            tenantId: TENANT_A,
+        });
+    });
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 2. policy-review-reminder — REGRESSION for same bug class
+// ═════════════════════════════════════════════════════════════════════
+
+describe('REGRESSION: policy-review-reminder tenant isolation', () => {
+    const mockPolicyFindMany = jest.fn().mockResolvedValue([]);
+    const mockAuditLogCreate = jest.fn().mockResolvedValue({});
+
+    const mockPrisma = {
+        policy: { findMany: (...args: unknown[]) => mockPolicyFindMany(...args) },
+        auditLog: { create: (...args: unknown[]) => mockAuditLogCreate(...args) },
+    } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    test('tenant-scoped: query includes tenantId', async () => {
+        const { findOverduePolicies } = await import(
+            '../../src/app-layer/jobs/policyReviewReminder'
+        );
+        await findOverduePolicies(mockPrisma, { tenantId: TENANT_A });
+
+        assertAllQueriesScoped(mockPolicyFindMany, TENANT_A, 'policy query');
+    });
+
+    test('tenant-scoped: tenant B never queried', async () => {
+        const { findOverduePolicies } = await import(
+            '../../src/app-layer/jobs/policyReviewReminder'
+        );
+        await findOverduePolicies(mockPrisma, { tenantId: TENANT_A });
+
+        assertNoTenantLeakage(mockPolicyFindMany, TENANT_B);
+    });
+
+    test('system-wide: no tenantId when omitted', async () => {
+        const { findOverduePolicies } = await import(
+            '../../src/app-layer/jobs/policyReviewReminder'
+        );
+        await findOverduePolicies(mockPrisma);
+
+        assertQueriesUnscoped(mockPolicyFindMany);
+    });
+
+    test('tenant-scoped: audit log uses correct tenantId', async () => {
+        const overduePolicy = {
+            id: 'pol-1', tenantId: TENANT_A, title: 'Test Policy',
+            slug: 'test-policy', nextReviewAt: new Date('2020-01-01'),
+            ownerUserId: 'u1',
+        };
+        mockPolicyFindMany.mockResolvedValue([overduePolicy]);
+
+        const { processOverdueReminders } = await import(
+            '../../src/app-layer/jobs/policyReviewReminder'
+        );
+        await processOverdueReminders(mockPrisma, { tenantId: TENANT_A });
+
+        expect(mockAuditLogCreate).toHaveBeenCalledTimes(1);
+        const auditData = mockAuditLogCreate.mock.calls[0][0].data;
+        expect(auditData.tenantId).toBe(TENANT_A);
+    });
+
+    test('tenant-scoped: logging shows scope', async () => {
+        const { findOverduePolicies } = await import(
+            '../../src/app-layer/jobs/policyReviewReminder'
+        );
+        await findOverduePolicies(mockPrisma, { tenantId: TENANT_A });
+
+        assertScopeLogged(mockLogger, 'policy review scan starting', {
+            scope: 'tenant-scoped',
+            tenantId: TENANT_A,
+        });
+    });
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 3. Executor Registry — Structural Guards (source-code analysis)
+// ═════════════════════════════════════════════════════════════════════
+
+describe('Executor Registry — structural tenant-scope guards', () => {
+    const { readFileSync } = require('fs');
+    const { resolve } = require('path');
+    const registryPath = resolve(__dirname, '../../src/app-layer/jobs/executor-registry.ts');
+    const registrySource = readFileSync(registryPath, 'utf8');
+
+    // Jobs that are explicitly not tenant-scoped
+    const EXEMPT_JOBS = ['health-check', 'sync-pull'];
+
+    test('no executor uses _payload (unused parameter = ignored tenantId)', () => {
+        const pattern = /executorRegistry\.register\('[^']+',\s*async\s*\(_payload\)/g;
+        const matches = registrySource.match(pattern) || [];
+        expect(matches).toEqual([]);
+    });
+
+    test('every non-exempt executor references tenantId', () => {
+        const registerPattern = /executorRegistry\.register\('([^']+)',\s*async\s*\(([^)]*)\)\s*=>\s*\{([\s\S]*?)\}\);/g;
+        const violations: string[] = [];
+
+        let match;
+        while ((match = registerPattern.exec(registrySource)) !== null) {
+            const jobName = match[1];
+            const body = match[3];
+
+            if (EXEMPT_JOBS.includes(jobName)) continue;
+            if (!body.includes('tenantId')) {
+                violations.push(`${jobName}: body does not reference tenantId`);
+            }
+        }
+
+        expect(violations).toEqual([]);
+    });
+
+    test('service files for tenant-scoped jobs contain tenantId filtering', () => {
+        const serviceFiles = [
+            { name: 'vendor-renewals', path: '../../src/app-layer/services/vendor-renewals.ts', pattern: /tenantFilter/ },
+            { name: 'policyReviewReminder', path: '../../src/app-layer/jobs/policyReviewReminder.ts', pattern: /where\.tenantId\s*=\s*tenantId/ },
+        ];
+
+        for (const svc of serviceFiles) {
+            const source = readFileSync(resolve(__dirname, svc.path), 'utf8');
+            expect(source).toMatch(svc.pattern);
+        }
+    });
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// 4. Payload Type Contract — tenantId must exist on all job payloads
+// ═════════════════════════════════════════════════════════════════════
+
+describe('Payload Type Contract — tenantId field audit', () => {
+    const { readFileSync } = require('fs');
+    const { resolve } = require('path');
+    const typesPath = resolve(__dirname, '../../src/app-layer/jobs/types.ts');
+    const typesSource = readFileSync(typesPath, 'utf8');
+
+    // Jobs that legitimately don't need tenantId
+    const EXEMPT_PAYLOADS = ['HealthCheckPayload', 'SyncPullPayload'];
+
+    test('every non-exempt payload interface has tenantId field', () => {
+        // Extract all payload interfaces
+        const interfacePattern = /export interface (\w+Payload)\s*\{([\s\S]*?)\}/g;
+        const violations: string[] = [];
+
+        let match;
+        while ((match = interfacePattern.exec(typesSource)) !== null) {
+            const name = match[1];
+            const body = match[2];
+
+            if (EXEMPT_PAYLOADS.includes(name)) continue;
+            if (!body.includes('tenantId')) {
+                violations.push(`${name}: missing tenantId field`);
+            }
+        }
+
+        expect(violations).toEqual([]);
+    });
+});

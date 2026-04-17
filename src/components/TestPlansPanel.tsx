@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
@@ -94,11 +94,6 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
     const getLastRun = (plan: TestPlan) => {
         if (!plan.runs || plan.runs.length === 0) return null;
         return plan.runs[0];
-    };
-
-    const formatDate = (d: string | null) => {
-        if (!d) return '—';
-        return formatDate(d);
     };
 
     const isOverdue = (d: string | null) => {

@@ -148,14 +148,15 @@ describeFn('Postgres RLS Tenant Isolation', () => {
             },
         });
 
-        await globalPrisma.evidence.create({
-            data: {
-                tenantId: tenantAId,
-                title: `Evidence A - ${testRunId}`,
-                type: 'TEXT',
-                content: 'Test evidence content A',
-            },
-        });
+        // Use raw SQL for Evidence to avoid Prisma Client trying to SELECT
+        // the ownerUserId column which may not exist in the DB yet (pending migration).
+        await globalPrisma.$executeRawUnsafe(
+            `INSERT INTO "Evidence" ("id", "tenantId", "title", "type", "content", "status", "dateCollected", "createdAt", "updatedAt")
+             VALUES (gen_random_uuid()::text, $1, $2, 'TEXT', $3, 'DRAFT', NOW(), NOW(), NOW())`,
+            tenantAId,
+            `Evidence A - ${testRunId}`,
+            'Test evidence content A',
+        );
 
         await globalPrisma.vendor.create({
             data: {
@@ -224,14 +225,13 @@ describeFn('Postgres RLS Tenant Isolation', () => {
             },
         });
 
-        await globalPrisma.evidence.create({
-            data: {
-                tenantId: tenantBId,
-                title: `Evidence B - ${testRunId}`,
-                type: 'TEXT',
-                content: 'Test evidence content B',
-            },
-        });
+        await globalPrisma.$executeRawUnsafe(
+            `INSERT INTO "Evidence" ("id", "tenantId", "title", "type", "content", "status", "dateCollected", "createdAt", "updatedAt")
+             VALUES (gen_random_uuid()::text, $1, $2, 'TEXT', $3, 'DRAFT', NOW(), NOW(), NOW())`,
+            tenantBId,
+            `Evidence B - ${testRunId}`,
+            'Test evidence content B',
+        );
 
         await globalPrisma.vendor.create({
             data: {
@@ -560,9 +560,11 @@ describeFn('Postgres RLS Tenant Isolation', () => {
     describe('Evidence SELECT Isolation', () => {
         it('Tenant B context only sees its own evidence', async () => {
             await withTenantDb(tenantBId, async (tx) => {
-                const evidence = await tx.evidence.findMany({
-                    where: { title: { contains: testRunId } }
-                });
+                // Use raw SQL to avoid Prisma Client column mismatch on ownerUserId
+                const evidence: Array<{ title: string; tenantId: string }> = await tx.$queryRawUnsafe(
+                    `SELECT "title", "tenantId" FROM "Evidence" WHERE "title" LIKE $1`,
+                    `%${testRunId}%`,
+                );
 
                 expect(evidence.length).toBe(1);
                 expect(evidence[0].title).toBe(`Evidence B - ${testRunId}`);

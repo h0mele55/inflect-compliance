@@ -10,6 +10,7 @@ import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { tasksFilterConfig } from '@/components/filters/configs';
 import { formatDate } from '@/lib/format-date';
+import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -33,7 +34,7 @@ const STATUS_OPTIONS = ['OPEN', 'TRIAGED', 'IN_PROGRESS', 'BLOCKED', 'RESOLVED',
 const SLA_RESOLVE: Record<string, number> = { CRITICAL: 24, HIGH: 72, MEDIUM: 168, LOW: 720 };
 
 function getSlaLabel(severity: string, createdAt: string, status: string): string {
-    if (['RESOLVED', 'CLOSED', 'CANCELED'].includes(status)) return '';
+    if ((TERMINAL_WORK_ITEM_STATUSES as readonly string[]).includes(status)) return '';
     const hours = SLA_RESOLVE[severity];
     if (!hours) return '';
     const deadline = new Date(new Date(createdAt).getTime() + hours * 3600000);
@@ -116,7 +117,7 @@ export function TasksClient({
     const tasks = tasksQuery.data ?? [];
     const loading = tasksQuery.isLoading && !tasksQuery.data;
 
-    const isOverdue = (task: TaskListItem) => task.dueAt && new Date(task.dueAt) < new Date() && !['RESOLVED', 'CLOSED', 'CANCELED'].includes(task.status);
+    const isOverdue = (task: TaskListItem) => task.dueAt && new Date(task.dueAt) < new Date() && !(TERMINAL_WORK_ITEM_STATUSES as readonly string[]).includes(task.status);
 
     const toggleSelect = (id: string) => {
         setSelected(prev => {

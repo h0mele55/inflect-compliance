@@ -223,7 +223,8 @@ export const CreateEvidenceSchema = z.object({
     fileName: z.string().optional().nullable(),
     fileSize: z.coerce.number().optional().nullable(),
     category: z.string().optional().nullable(),
-    owner: z.string().optional().nullable(),
+    owner: z.string().optional().nullable(),          // Legacy free-text
+    ownerUserId: z.string().optional().nullable(),    // Real user reference (preferred)
     reviewCycle: z.string().optional().nullable(),
     nextReviewDate: z.string().optional().nullable(),
 }).strip();
@@ -236,7 +237,8 @@ export const UpdateEvidenceSchema = z.object({
     title: z.string().min(1).optional(),
     content: z.string().optional(),
     category: z.string().optional().nullable(),
-    owner: z.string().optional().nullable(),
+    owner: z.string().optional().nullable(),          // Legacy free-text
+    ownerUserId: z.string().optional().nullable(),    // Real user reference (preferred)
     reviewCycle: z.string().optional().nullable(),
     nextReviewDate: z.string().optional().nullable(),
 }).strip();

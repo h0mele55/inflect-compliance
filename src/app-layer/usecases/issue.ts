@@ -9,6 +9,7 @@ import { assertCanReadIssues, assertCanCreateIssue, assertCanUpdateIssue, assert
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound } from '@/lib/errors/types';
+import { TERMINAL_WORK_ITEM_STATUSES } from '../domain/work-item-status';
 
 /** @deprecated Use TaskFilters */
 export type IssueFilters = TaskFilters;
@@ -292,7 +293,7 @@ export async function findOverdueIssuesAndEmitEvents(ctx: RequestContext) {
                 tenantId: ctx.tenantId,
                 dueAt: { lt: new Date() },
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                status: { notIn: ['RESOLVED', 'CLOSED'] as any },
+                status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] as any },
             },
             select: { id: true, title: true, dueAt: true, assigneeUserId: true },
         });

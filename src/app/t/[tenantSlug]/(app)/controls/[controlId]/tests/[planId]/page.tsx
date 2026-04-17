@@ -122,11 +122,6 @@ export default function TestPlanDetailPage() {
         }
     };
 
-    const formatDate = (d: string | null) => {
-        if (!d) return '—';
-        return formatDate(d);
-    };
-
     if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading test plan...</div>;
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
     if (!plan) return <div className="p-12 text-center text-slate-500">Plan not found.</div>;

@@ -11,6 +11,12 @@
  *   - data-lifecycle:          daily at 03:00 UTC (purge + retention)
  *   - policy-review-reminder:  daily at 08:00 UTC (overdue review audit)
  *   - retention-sweep:         daily at 04:00 UTC (evidence archival)
+ *   - notification-dispatch:   daily at 07:00 UTC (single-pass: monitors + digest dispatch)
+ *
+ * IMPORTANT: deadline-monitor, evidence-expiry-monitor, and vendor-renewal-check
+ * are NOT scheduled independently. They run as part of notification-dispatch
+ * to prevent duplicate database scans. They remain registered in the executor
+ * registry for ad-hoc/CLI/API use.
  *
  * All times are UTC. BullMQ uses standard cron syntax.
  *
@@ -71,4 +77,11 @@ export const SCHEDULED_JOBS: ScheduleDefinition[] = [
         description: 'Archive evidence with elapsed retention periods',
         defaultPayload: {},
     },
+    {
+        name: 'notification-dispatch',
+        pattern: '0 7 * * *',     // daily at 07:00 UTC (single-pass: runs monitors internally)
+        description: 'Single-pass pipeline: run all monitors → group by owner → dispatch digest notifications. Replaces separate monitor+dispatch schedule to prevent duplicate DB scans.',
+        defaultPayload: {},
+    },
 ];
+

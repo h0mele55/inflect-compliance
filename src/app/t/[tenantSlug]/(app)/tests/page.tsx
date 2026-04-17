@@ -53,11 +53,6 @@ export default function TestsRollupPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const formatDate = (d: string | null) => {
-        if (!d) return '—';
-        return formatDate(d);
-    };
-
     const isOverdue = (d: string | null) => {
         if (!d) return false;
         return new Date(d) < new Date();

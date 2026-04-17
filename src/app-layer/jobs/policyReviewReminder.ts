@@ -4,6 +4,10 @@
  * This module provides functions to find overdue policies and process review reminders.
  * It is designed to be called from a cron job or scheduler.
  *
+ * TENANT ISOLATION: When `tenantId` is provided, all queries are scoped
+ * to that single tenant. The system-wide scan (no tenantId) is only used
+ * by the scheduled global cron and is clearly separated.
+ *
  * ## How to hook into cron:
  *
  * ### Option 1: Vercel Cron (recommended for serverless)
@@ -18,6 +22,7 @@
  */
 
 import type { PrismaClient } from '@prisma/client';
+import { logger } from '@/lib/observability/logger';
 
 export interface OverduePolicy {
     id: string;
@@ -27,6 +32,11 @@ export interface OverduePolicy {
     nextReviewAt: Date;
     daysOverdue: number;
     ownerUserId: string | null;
+}
+
+export interface PolicyReminderOptions {
+    /** When provided, scope ALL queries to this tenant only. */
+    tenantId?: string;
 }
 
 /**
@@ -48,16 +58,35 @@ export function daysOverdue(nextReviewAt: Date | null | undefined, now: Date = n
 }
 
 /**
- * Find all policies across all tenants that are overdue for review.
- * Accepts a PrismaClient instance (dependency injection for testability).
+ * Find policies that are overdue for review.
+ *
+ * @param db        PrismaClient instance (dependency injection for testability)
+ * @param options   If tenantId is provided, only scan that tenant's policies.
+ *                  If omitted, scans all tenants (system-wide mode).
  */
-export async function findOverduePolicies(db: PrismaClient): Promise<OverduePolicy[]> {
+export async function findOverduePolicies(
+    db: PrismaClient,
+    options: PolicyReminderOptions = {},
+): Promise<OverduePolicy[]> {
     const now = new Date();
+    const { tenantId } = options;
+    const scope = tenantId ? 'tenant-scoped' : 'system-wide';
+
+    logger.info('policy review scan starting', {
+        component: 'policy-review-reminder',
+        scope,
+        ...(tenantId ? { tenantId } : {}),
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {
+        nextReviewAt: { lt: now },
+        status: { not: 'ARCHIVED' },
+    };
+    if (tenantId) where.tenantId = tenantId;
+
     const policies = await db.policy.findMany({
-        where: {
-            nextReviewAt: { lt: now },
-            status: { not: 'ARCHIVED' },
-        },
+        where,
         select: {
             id: true,
             tenantId: true,
@@ -68,25 +97,38 @@ export async function findOverduePolicies(db: PrismaClient): Promise<OverduePoli
         },
     });
 
-    return policies
+    const results = policies
         .filter(p => p.nextReviewAt !== null)
         .map(p => ({
             ...p,
             nextReviewAt: p.nextReviewAt!,
             daysOverdue: daysOverdue(p.nextReviewAt, now),
         }));
+
+    logger.info('policy review scan completed', {
+        component: 'policy-review-reminder',
+        scope,
+        ...(tenantId ? { tenantId } : {}),
+        total: results.length,
+    });
+
+    return results;
 }
 
 /**
  * Process overdue policy reminders.
- * Finds all overdue policies and emits audit events for each.
- * Accepts a PrismaClient instance (dependency injection).
+ *
+ * @param db        PrismaClient instance (dependency injection)
+ * @param options   If tenantId is provided, only process that tenant's policies.
  */
-export async function processOverdueReminders(db: PrismaClient): Promise<{
+export async function processOverdueReminders(
+    db: PrismaClient,
+    options: PolicyReminderOptions = {},
+): Promise<{
     processed: number;
     policies: Array<{ id: string; tenantId: string; title: string; daysOverdue: number }>;
 }> {
-    const overdue = await findOverduePolicies(db);
+    const overdue = await findOverduePolicies(db, options);
 
     for (const policy of overdue) {
         await db.auditLog.create({

@@ -11,6 +11,8 @@
 import { formatDate } from '@/lib/format-date';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/observability/logger';
+import { TERMINAL_WORK_ITEM_STATUSES } from '../domain/work-item-status';
+import { isNotificationsEnabled } from '../notifications/settings';
 
 export interface RetentionNotificationOptions {
     tenantId?: string;
@@ -55,7 +57,7 @@ export async function runEvidenceRetentionNotifications(
             where: {
                 tenantId: ev.tenantId,
                 type: 'IMPROVEMENT',
-                status: { notIn: ['RESOLVED', 'CLOSED', 'CANCELED'] },
+                status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] },
                 links: {
                     some: {
                         entityType: 'EVIDENCE',
@@ -96,37 +98,48 @@ export async function runEvidenceRetentionNotifications(
         });
 
         // Enqueue EVIDENCE_EXPIRING email to tenant admins/editors
+        // Tenant notification eligibility — skip if notifications are disabled.
+        // Uses the same isNotificationsEnabled check as enqueue.ts and digest-dispatcher.
         try {
-            const members = await prisma.tenantMembership.findMany({
-                where: { tenantId: ev.tenantId, role: { in: ['ADMIN', 'EDITOR'] } },
-                include: { user: { select: { email: true, name: true } } },
-            });
-
-            let controlName: string | null = null;
-            if (ev.controlId) {
-                const control = await prisma.control.findUnique({
-                    where: { id: ev.controlId },
-                    select: { name: true },
+            const enabled = await isNotificationsEnabled(prisma, ev.tenantId);
+            if (!enabled) {
+                logger.info('retention notification suppressed — notifications disabled for tenant', {
+                    component: 'retention-notifications',
+                    tenantId: ev.tenantId,
+                    evidenceId: ev.id,
                 });
-                controlName = control?.name || null;
-            }
-
-            for (const m of members) {
-                if (!m.user.email) continue;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                await (prisma as any).notificationOutbox.create({
-                    data: {
-                        tenantId: ev.tenantId,
-                        type: 'EVIDENCE_EXPIRING',
-                        toEmail: m.user.email,
-                        subject: `${daysLeft <= 7 ? '⚠️ ' : ''}Evidence expiring in ${daysLeft} day(s): ${ev.title}`,
-                        bodyText: `Evidence "${ev.title}" expires in ${daysLeft} days. Please upload refreshed evidence or extend the retention date.`,
-                        bodyHtml: null,
-                        dedupeKey: `${ev.tenantId}:EVIDENCE_EXPIRING:${m.user.email}:${ev.id}:${new Date().toISOString().slice(0, 10)}`,
-                    },
-                }).catch(() => {
-                    // Silently skip duplicates (P2002)
+            } else {
+                const members = await prisma.tenantMembership.findMany({
+                    where: { tenantId: ev.tenantId, role: { in: ['ADMIN', 'EDITOR'] } },
+                    include: { user: { select: { email: true, name: true } } },
                 });
+
+                let controlName: string | null = null;
+                if (ev.controlId) {
+                    const control = await prisma.control.findUnique({
+                        where: { id: ev.controlId },
+                        select: { name: true },
+                    });
+                    controlName = control?.name || null;
+                }
+
+                for (const m of members) {
+                    if (!m.user.email) continue;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    await (prisma as any).notificationOutbox.create({
+                        data: {
+                            tenantId: ev.tenantId,
+                            type: 'EVIDENCE_EXPIRING',
+                            toEmail: m.user.email,
+                            subject: `${daysLeft <= 7 ? '⚠️ ' : ''}Evidence expiring in ${daysLeft} day(s): ${ev.title}`,
+                            bodyText: `Evidence "${ev.title}" expires in ${daysLeft} days. Please upload refreshed evidence or extend the retention date.`,
+                            bodyHtml: null,
+                            dedupeKey: `${ev.tenantId}:EVIDENCE_EXPIRING:${m.user.email}:${ev.id}:${new Date().toISOString().slice(0, 10)}`,
+                        },
+                    }).catch(() => {
+                        // Silently skip duplicates (P2002)
+                    });
+                }
             }
         } catch (err) {
             logger.warn('failed to enqueue evidence expiring emails', { component: 'job' });

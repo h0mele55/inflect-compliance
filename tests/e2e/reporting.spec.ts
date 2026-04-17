@@ -51,10 +51,17 @@ test.describe('Reporting & Audit Narrative', () => {
         // VERIFY-ON-EXIT: navigate and wait for content
         await gotoAndVerify(page, `/t/${tenantSlug}/frameworks/ISO27001/coverage`, 'h1', 3);
 
-        // Wait for the heading — may show "Coverage data not available" if no pack installed
+        // Wait for the heading — may show "Coverage data not available" if no pack installed.
+        // The coverage API route needs JIT compilation on first access, so give it generous time.
         await page.waitForLoadState('networkidle');
         const heading = page.locator('#coverage-report-heading');
-        const hasReport = await heading.isVisible().catch(() => false);
+        let hasReport = false;
+        try {
+            await page.waitForSelector('#coverage-report-heading', { timeout: 30000 });
+            hasReport = true;
+        } catch {
+            hasReport = false;
+        }
 
         if (!hasReport) {
             // Coverage page renders but no data — framework pack not installed
@@ -86,8 +93,15 @@ test.describe('Reporting & Audit Narrative', () => {
         // VERIFY-ON-EXIT: navigate and wait for content
         await gotoAndVerify(page, `/t/${tenantSlug}/frameworks/ISO27001/coverage`, 'h1', 3);
 
-        const exportBtn = page.locator('#export-json-btn');
-        const hasExport = await exportBtn.isVisible().catch(() => false);
+        // The export button only renders after the coverage data loads.
+        // The coverage API route needs JIT compilation on first access, so give it generous time.
+        let hasExport = false;
+        try {
+            await page.waitForSelector('#export-json-btn', { timeout: 30000 });
+            hasExport = true;
+        } catch {
+            hasExport = false;
+        }
 
         if (!hasExport) {
             test.skip(true, 'Export button not visible — coverage data not available');
@@ -97,7 +111,7 @@ test.describe('Reporting & Audit Narrative', () => {
         // Intercept the download event
         const [download] = await Promise.all([
             page.waitForEvent('download', { timeout: 5000 }),
-            exportBtn.click(),
+            page.locator('#export-json-btn').click(),
         ]);
 
         // Verify download properties

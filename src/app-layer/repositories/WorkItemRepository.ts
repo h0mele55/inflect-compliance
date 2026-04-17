@@ -3,6 +3,7 @@ import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
 import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
 import type { PaginatedResponse } from '@/lib/dto/pagination';
+import { TERMINAL_WORK_ITEM_STATUSES, isTerminalStatus } from '../domain/work-item-status';
 
 // ─── Filters ───
 
@@ -82,12 +83,12 @@ export class WorkItemRepository {
         if (filters.controlId) where.controlId = filters.controlId;
         if (filters.due === 'overdue') {
             where.dueAt = { lt: new Date() };
-            where.status = { notIn: ['RESOLVED', 'CLOSED', 'CANCELED'] };
+            where.status = { notIn: [...TERMINAL_WORK_ITEM_STATUSES] };
         } else if (filters.due === 'next7d') {
             const now = new Date();
             const in7 = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
             where.dueAt = { gte: now, lte: in7 };
-            where.status = { notIn: ['RESOLVED', 'CLOSED', 'CANCELED'] };
+            where.status = { notIn: [...TERMINAL_WORK_ITEM_STATUSES] };
         }
         if (filters.q) {
             where.OR = [
@@ -212,7 +213,7 @@ export class WorkItemRepository {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: any = { status: status as any };
-        if (['RESOLVED', 'CLOSED', 'CANCELED'].includes(status)) {
+        if (isTerminalStatus(status)) {
             updateData.completedAt = new Date();
             if (resolution !== undefined) updateData.resolution = resolution;
         } else {
@@ -243,7 +244,7 @@ export class WorkItemRepository {
         const ago30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const openFilter = { notIn: ['RESOLVED', 'CLOSED', 'CANCELED'] as any[] };
+        const openFilter = { notIn: [...TERMINAL_WORK_ITEM_STATUSES] as any[] };
 
         const [byStatus, bySeverity, byType, overdueCount, due7dCount, due30dCount, total, recentCreated, recentResolved] = await Promise.all([
             db.task.groupBy({ by: ['status'], where: { tenantId }, _count: true }),
@@ -324,7 +325,7 @@ export class WorkItemRepository {
     static async bulkSetStatus(db: PrismaTx, ctx: RequestContext, taskIds: string[], status: string, resolution?: string | null) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updateData: any = { status: status as any };
-        if (['RESOLVED', 'CLOSED', 'CANCELED'].includes(status)) {
+        if (isTerminalStatus(status)) {
             updateData.completedAt = new Date();
             if (resolution !== undefined) updateData.resolution = resolution;
         }

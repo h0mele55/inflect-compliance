@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { User, Link2, AlertOctagon } from 'lucide-react';
+import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 
 const STATUS_LABELS: Record<string, string> = {
     OPEN: 'Open', TRIAGED: 'Triaged', IN_PROGRESS: 'In Progress',
@@ -59,7 +60,7 @@ export default function TaskDashboardPage() {
         if (myRes.ok) {
             const all = await myRes.json();
             // Show only open tasks assigned to current user
-            setMyTasks(Array.isArray(all) ? all.filter((t: any) => !['RESOLVED', 'CLOSED', 'CANCELED'].includes(t.status)).slice(0, 10) : []);
+            setMyTasks(Array.isArray(all) ? all.filter((t: any) => !(TERMINAL_WORK_ITEM_STATUSES as readonly string[]).includes(t.status)).slice(0, 10) : []);
         }
         setLoading(false);
     }, [apiUrl]);

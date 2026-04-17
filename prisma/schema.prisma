@@ -154,6 +154,7 @@ model User {
   createdTestRuns               ControlTestRun[]             @relation("TestRunCreator")
   executedTestRuns              ControlTestRun[]             @relation("TestRunExecutor")
   evidenceReviews               EvidenceReview[]
+  ownedEvidence                 Evidence[]                   @relation("EvidenceOwner")
   uploadedFiles                 FileRecord[]                 @relation("FileUploader")
   notifications                 Notification[]
   ownedPolicies                 Policy[]                     @relation("PolicyOwner")
@@ -679,7 +680,8 @@ model Evidence {
   fileSize          Int?
   category          String?
   dateCollected     DateTime                  @default(now())
-  owner             String?
+  owner             String?                                         // Legacy free-text — kept for backward compat
+  ownerUserId       String?                                         // Real user FK — used for due-item routing & notifications
   reviewCycle       ReviewCadence?
   nextReviewDate    DateTime?
   status            EvidenceStatus            @default(DRAFT)
@@ -696,6 +698,7 @@ model Evidence {
   testEvidenceLinks ControlTestEvidenceLink[]
   control           Control?                  @relation(fields: [controlId], references: [id])
   fileRecord        FileRecord?               @relation(fields: [fileRecordId], references: [id])
+  ownerUser         User?                     @relation("EvidenceOwner", fields: [ownerUserId], references: [id])
   tenant            Tenant                    @relation(fields: [tenantId], references: [id])
   reviews           EvidenceReview[]
   findingLinks      FindingEvidence[]
@@ -706,6 +709,7 @@ model Evidence {
   @@index([tenantId, deletedAt])
   @@index([tenantId, retentionUntil])
   @@index([tenantId, isArchived])
+  @@index([tenantId, ownerUserId])
 }
 
 model FileRecord {
@@ -809,29 +813,36 @@ model ReminderHistory {
 }
 
 model Policy {
-  id                  String              @id @default(cuid())
-  tenantId            String
-  slug                String
-  title               String
-  description         String?
-  category            String?
-  status              PolicyStatus        @default(DRAFT)
-  currentVersionId    String?             @unique
-  ownerUserId         String?
-  reviewFrequencyDays Int?
-  nextReviewAt        DateTime?
-  language            String?             @default("en")
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  deletedAt           DateTime?
-  deletedByUserId     String?
-  retentionUntil      DateTime?
-  currentVersion      PolicyVersion?      @relation("CurrentVersion", fields: [currentVersionId], references: [id])
-  owner               User?               @relation("PolicyOwner", fields: [ownerUserId], references: [id])
-  tenant              Tenant              @relation(fields: [tenantId], references: [id])
-  approvals           PolicyApproval[]
-  controlLinks        PolicyControlLink[]
-  versions            PolicyVersion[]     @relation("PolicyVersions")
+  id                    String              @id @default(cuid())
+  tenantId              String
+  slug                  String
+  title                 String
+  description           String?
+  category              String?
+  status                PolicyStatus        @default(DRAFT)
+  currentVersionId      String?             @unique
+  ownerUserId           String?
+  reviewFrequencyDays   Int?
+  nextReviewAt          DateTime?
+  language              String?             @default("en")
+  /// Lifecycle version counter (matches CISO-Assistant editing_version).
+  /// 1 = initial content, 2+ = published. Incremented only on publish.
+  lifecycleVersion      Int                 @default(1)
+  /// Persisted history of prior published snapshots as JSON array.
+  /// Matches CISO-Assistant editing_history. Entries have fields:
+  /// version, payload, publishedAt, publishedBy, changeSummary (optional)
+  lifecycleHistoryJson  Json?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  deletedAt             DateTime?
+  deletedByUserId       String?
+  retentionUntil        DateTime?
+  currentVersion        PolicyVersion?      @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  owner                 User?               @relation("PolicyOwner", fields: [ownerUserId], references: [id])
+  tenant                Tenant              @relation(fields: [tenantId], references: [id])
+  approvals             PolicyApproval[]
+  controlLinks          PolicyControlLink[]
+  versions              PolicyVersion[]     @relation("PolicyVersions")
 
   @@index([tenantId, slug])
   @@index([tenantId])
@@ -998,8 +1009,10 @@ model Framework {
   createdAt    DateTime               @default(now())
   updatedAt    DateTime               @default(now()) @updatedAt
   kind         FrameworkKind          @default(ISO_STANDARD)
-  packs        FrameworkPack[]
-  requirements FrameworkRequirement[]
+  packs                   FrameworkPack[]
+  requirements            FrameworkRequirement[]
+  mappingSetsAsSource     RequirementMappingSet[]  @relation("MappingSetSource")
+  mappingSetsAsTarget     RequirementMappingSet[]  @relation("MappingSetTarget")
 
   @@unique([key, version])
 }
@@ -1016,10 +1029,12 @@ model FrameworkRequirement {
   themeNumber   Int?
   section       String?
   deprecatedAt  DateTime?
-  controlLinks  ControlRequirementLink[]
-  templateLinks ControlTemplateRequirementLink[]
-  mappingsFrom  FrameworkMapping[]               @relation("MappingFrom")
-  mappingsTo    FrameworkMapping[]               @relation("MappingTo")
+  controlLinks            ControlRequirementLink[]
+  templateLinks           ControlTemplateRequirementLink[]
+  mappingsFrom            FrameworkMapping[]               @relation("MappingFrom")
+  mappingsTo              FrameworkMapping[]               @relation("MappingTo")
+  requirementMappingsFrom RequirementMapping[]             @relation("ReqMappingSource")
+  requirementMappingsTo   RequirementMapping[]             @relation("ReqMappingTarget")
   framework     Framework                        @relation(fields: [frameworkId], references: [id])
 
   @@unique([frameworkId, code])
@@ -1058,6 +1073,53 @@ model FrameworkMapping {
   toRequirement     FrameworkRequirement? @relation("MappingTo", fields: [toRequirementId], references: [id])
 
   @@unique([fromRequirementId, toControlId])
+}
+
+// ─── Cross-Framework Requirement Mapping Domain ──────────────────────
+// Durable, framework-agnostic mapping infrastructure for cross-framework
+// traceability and gap analysis. Inspired by CISO Assistant's mapping set
+// architecture but adapted for the YAML library system.
+//
+// A MappingSet groups all mappings between two specific frameworks.
+// Individual Mappings carry explicit strength semantics.
+
+model RequirementMappingSet {
+  id                  String               @id @default(cuid())
+  sourceFrameworkId   String
+  targetFrameworkId   String
+  name                String
+  description         String?
+  version             Int                  @default(1)
+  sourceUrn           String?                                     // Provenance URN from library system
+  contentHash         String?                                     // Deduplication hash
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @default(now()) @updatedAt
+  sourceFramework     Framework            @relation("MappingSetSource", fields: [sourceFrameworkId], references: [id])
+  targetFramework     Framework            @relation("MappingSetTarget", fields: [targetFrameworkId], references: [id])
+  mappings            RequirementMapping[]
+
+  @@unique([sourceFrameworkId, targetFrameworkId])
+  @@index([sourceFrameworkId])
+  @@index([targetFrameworkId])
+}
+
+model RequirementMapping {
+  id                    String               @id @default(cuid())
+  mappingSetId          String
+  sourceRequirementId   String
+  targetRequirementId   String
+  strength              MappingStrength      @default(RELATED)
+  rationale             String?
+  metadataJson          String?                                   // Provenance, ingestion source, extra context
+  createdAt             DateTime             @default(now())
+  mappingSet            RequirementMappingSet @relation(fields: [mappingSetId], references: [id], onDelete: Cascade)
+  sourceRequirement     FrameworkRequirement  @relation("ReqMappingSource", fields: [sourceRequirementId], references: [id])
+  targetRequirement     FrameworkRequirement  @relation("ReqMappingTarget", fields: [targetRequirementId], references: [id])
+
+  @@unique([mappingSetId, sourceRequirementId, targetRequirementId])
+  @@index([sourceRequirementId])
+  @@index([targetRequirementId])
+  @@index([mappingSetId])
 }
 
 model ControlRequirementLink {
@@ -1197,28 +1259,34 @@ model QuestionnaireQuestion {
 }
 
 model VendorAssessment {
-  id                String                   @id @default(cuid())
-  tenantId          String
-  vendorId          String
-  templateId        String
-  status            AssessmentStatus         @default(DRAFT)
-  startedAt         DateTime                 @default(now())
-  submittedAt       DateTime?
-  decidedAt         DateTime?
-  requestedByUserId String
-  decidedByUserId   String?
-  score             Float?
-  riskRating        VendorCriticality?
-  notes             String?
-  nextReviewAt      DateTime?
-  createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
-  decidedBy         User?                    @relation("AssessmentDecider", fields: [decidedByUserId], references: [id])
-  requestedBy       User                     @relation("AssessmentRequester", fields: [requestedByUserId], references: [id])
-  template          QuestionnaireTemplate    @relation(fields: [templateId], references: [id])
-  tenant            Tenant                   @relation(fields: [tenantId], references: [id])
-  vendor            Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  answers           VendorAssessmentAnswer[]
+  id                    String                   @id @default(cuid())
+  tenantId              String
+  vendorId              String
+  templateId            String
+  status                AssessmentStatus         @default(DRAFT)
+  startedAt             DateTime                 @default(now())
+  submittedAt           DateTime?
+  decidedAt             DateTime?
+  requestedByUserId     String
+  decidedByUserId       String?
+  score                 Float?
+  riskRating            VendorCriticality?
+  notes                 String?
+  nextReviewAt          DateTime?
+  /// Lifecycle version counter (matches CISO-Assistant editing_version).
+  /// 1 = initial, 2+ = approved. Incremented on each approval cycle.
+  lifecycleVersion      Int                      @default(1)
+  /// Persisted history of prior assessment snapshots as JSON array.
+  /// Matches CISO-Assistant editing_history.
+  lifecycleHistoryJson  Json?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  decidedBy             User?                    @relation("AssessmentDecider", fields: [decidedByUserId], references: [id])
+  requestedBy           User                     @relation("AssessmentRequester", fields: [requestedByUserId], references: [id])
+  template              QuestionnaireTemplate    @relation(fields: [templateId], references: [id])
+  tenant                Tenant                   @relation(fields: [tenantId], references: [id])
+  vendor                Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  answers               VendorAssessmentAnswer[]
 
   @@index([tenantId, vendorId])
   @@index([tenantId, status])
@@ -2112,6 +2180,9 @@ enum EmailNotificationType {
   POLICY_APPROVAL_REQUESTED
   POLICY_APPROVED
   POLICY_REJECTED
+  DEADLINE_DIGEST
+  EVIDENCE_EXPIRY_DIGEST
+  VENDOR_RENEWAL_DIGEST
 }
 
 enum EmailOutboxStatus {
@@ -2170,6 +2241,16 @@ enum FrameworkKind {
   REGULATION
   INDUSTRY_STANDARD
   CUSTOM
+}
+
+// Defines the semantic strength of a mapping between two requirement nodes.
+// Used by RequirementMapping to express how closely two requirements align.
+enum MappingStrength {
+  EQUAL      // Semantically equivalent: source and target express the same obligation
+  SUPERSET   // Source fully covers target: implementing source satisfies target
+  SUBSET     // Source partially covers target: implementing source only partially satisfies target
+  INTERSECT  // Partial overlap: source and target share common ground but neither fully covers the other
+  RELATED    // Conceptually related: useful for awareness but no direct coverage claim
 }
 
 enum VendorStatus {

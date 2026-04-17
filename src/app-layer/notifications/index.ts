@@ -22,3 +22,18 @@ export {
     type PolicyApprovalRequestedPayload,
     type PolicyDecisionPayload,
 } from './templates';
+export {
+    buildDeadlineDigestEmail,
+    buildEvidenceExpiryDigestEmail,
+    buildVendorRenewalDigestEmail,
+    type DeadlineDigestPayload,
+    type EvidenceExpiryDigestPayload,
+    type VendorRenewalDigestPayload,
+} from './digest-templates';
+export {
+    dispatchDigest,
+    buildDigestDedupeKey,
+    type DigestCategory,
+    type DispatchDigestOptions,
+    type DispatchDigestResult,
+} from './digest-dispatcher';

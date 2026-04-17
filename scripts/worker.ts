@@ -25,13 +25,6 @@ import pino from 'pino';
 import {
     QUEUE_NAME,
     type JobName,
-    type HealthCheckPayload,
-    type AutomationRunnerPayload,
-    type DailyEvidenceExpiryPayload,
-    type DataLifecyclePayload,
-    type PolicyReviewReminderPayload,
-    type RetentionSweepPayload,
-    type SyncPullPayload,
 } from '../src/app-layer/jobs/types';
 
 // ─── Standalone logger ───
@@ -61,114 +54,16 @@ function createWorkerConnection(): Redis {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// Job Processors
+// Job Processing — Executor Registry Delegation
 //
-// Each processor delegates to the existing business logic function.
-// The business logic modules use `runJob()` internally for
-// observability (correlation IDs, OTel spans, Sentry).
+// All job dispatch is handled by the executor registry in the
+// app-layer. The worker simply delegates to it. Adding a new job
+// only requires registering it in executor-registry.ts — no
+// worker changes needed.
+//
+// The registry is imported lazily (dynamic import) so that Prisma
+// and other heavy modules are only loaded when the first job runs.
 // ═══════════════════════════════════════════════════════════════════
-
-async function processHealthCheck(job: Job<HealthCheckPayload>) {
-    log.info({ jobId: job.id, payload: job.data }, 'processing health-check');
-    return {
-        status: 'ok',
-        processedAt: new Date().toISOString(),
-        enqueuedAt: job.data.enqueuedAt,
-        message: job.data.message || 'pong',
-    };
-}
-
-async function processAutomationRunner(job: Job<AutomationRunnerPayload>) {
-    log.info({ jobId: job.id, payload: job.data }, 'processing automation-runner');
-    // Dynamic import to avoid loading Prisma/app modules at worker boot
-    const { runScheduledAutomations } = await import('../src/app-layer/jobs/automation-runner');
-    const result = await runScheduledAutomations({
-        tenantId: job.data.tenantId,
-        dryRun: job.data.dryRun,
-    });
-    log.info({ jobId: job.id, result }, 'automation-runner completed');
-    return result;
-}
-
-async function processDailyEvidenceExpiry(job: Job<DailyEvidenceExpiryPayload>) {
-    log.info({ jobId: job.id, payload: job.data }, 'processing daily-evidence-expiry');
-    const { runDailyEvidenceExpiryNotifications } = await import('../src/app-layer/jobs/dailyEvidenceExpiry');
-    const result = await runDailyEvidenceExpiryNotifications({
-        tenantId: job.data.tenantId,
-        skipOutbox: job.data.skipOutbox,
-    });
-    log.info({ jobId: job.id, result }, 'daily-evidence-expiry completed');
-    return result;
-}
-
-async function processDataLifecycle(job: Job<DataLifecyclePayload>) {
-    log.info({ jobId: job.id, payload: job.data }, 'processing data-lifecycle');
-    const {
-        purgeSoftDeletedOlderThan,
-        purgeExpiredEvidenceOlderThan,
-        runRetentionSweep,
-    } = await import('../src/app-layer/jobs/data-lifecycle');
-
-    // Run all three sub-jobs sequentially
-    const purgeResults = await purgeSoftDeletedOlderThan({
-        tenantId: job.data.tenantId,
-        dryRun: job.data.dryRun,
-    });
-    const evidencePurge = await purgeExpiredEvidenceOlderThan({
-        tenantId: job.data.tenantId,
-        dryRun: job.data.dryRun,
-    });
-    const retentionResults = await runRetentionSweep({
-        tenantId: job.data.tenantId,
-        dryRun: job.data.dryRun,
-    });
-
-    const result = { purgeResults, evidencePurge, retentionResults };
-    log.info({ jobId: job.id, result }, 'data-lifecycle completed');
-    return result;
-}
-
-async function processPolicyReviewReminder(job: Job<PolicyReviewReminderPayload>) {
-    log.info({ jobId: job.id, payload: job.data }, 'processing policy-review-reminder');
-    const { processOverdueReminders } = await import('../src/app-layer/jobs/policyReviewReminder');
-    const { prisma } = await import('../src/lib/prisma');
-    const result = await processOverdueReminders(prisma);
-    log.info({ jobId: job.id, processed: result.processed }, 'policy-review-reminder completed');
-    return result;
-}
-
-async function processRetentionSweep(job: Job<RetentionSweepPayload>) {
-    log.info({ jobId: job.id, payload: job.data }, 'processing retention-sweep');
-    const { runEvidenceRetentionSweep } = await import('../src/app-layer/jobs/retention');
-    const result = await runEvidenceRetentionSweep({
-        tenantId: job.data.tenantId,
-        dryRun: job.data.dryRun,
-    });
-    log.info({ jobId: job.id, result }, 'retention-sweep completed');
-    return result;
-}
-
-async function processSyncPull(job: Job<SyncPullPayload>) {
-    log.info({ jobId: job.id, payload: job.data }, 'processing sync-pull');
-    const { runSyncPull } = await import('../src/app-layer/jobs/sync-pull');
-    const result = await runSyncPull(job.data);
-    log.info({ jobId: job.id, result }, 'sync-pull completed');
-    return result;
-}
-
-// ─── Processor Registry ───
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const processors: Record<string, (job: Job<any>) => Promise<any>> = {
-    'health-check': processHealthCheck,
-    'automation-runner': processAutomationRunner,
-    'daily-evidence-expiry': processDailyEvidenceExpiry,
-    'data-lifecycle': processDataLifecycle,
-    'policy-review-reminder': processPolicyReviewReminder,
-    'retention-sweep': processRetentionSweep,
-    'sync-pull': processSyncPull,
-};
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // ─── Worker Bootstrap ───
 
@@ -180,40 +75,44 @@ const worker = new Worker(
     QUEUE_NAME,
     async (job: Job) => {
         const jobName = job.name as JobName;
-        const processor = processors[jobName];
 
-        if (!processor) {
-            log.warn({ jobName, jobId: job.id }, 'no processor registered for job — skipping');
-            return { skipped: true, reason: `no processor for "${jobName}"` };
+        // Lazy-import the executor registry on first job
+        const { executorRegistry } = await import('../src/app-layer/jobs/executor-registry');
+
+        if (!executorRegistry.has(jobName)) {
+            log.warn({ jobName, jobId: job.id }, 'no executor registered for job — skipping');
+            return { skipped: true, reason: `no executor for "${jobName}"` };
         }
 
         const startTime = performance.now();
 
-        try {
-            const result = await processor(job);
-            const durationMs = Math.round(performance.now() - startTime);
+        log.info({ jobName, jobId: job.id, payload: job.data }, 'processing job');
 
-            log.info({
-                jobName,
-                jobId: job.id,
-                attemptsMade: job.attemptsMade,
-                durationMs,
-            }, 'job processed successfully');
+        const result = await executorRegistry.execute(jobName, job.data);
+        const durationMs = Math.round(performance.now() - startTime);
 
-            return result;
-        } catch (error) {
-            const durationMs = Math.round(performance.now() - startTime);
-
+        if (!result.success) {
             log.error({
                 jobName,
                 jobId: job.id,
                 attemptsMade: job.attemptsMade,
                 durationMs,
-                err: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : String(error),
+                errorMessage: result.errorMessage,
             }, 'job processing failed');
 
-            throw error; // Re-throw for BullMQ retry
+            throw new Error(result.errorMessage || `Job "${jobName}" failed`);
         }
+
+        log.info({
+            jobName,
+            jobId: job.id,
+            attemptsMade: job.attemptsMade,
+            durationMs,
+            itemsScanned: result.itemsScanned,
+            itemsActioned: result.itemsActioned,
+        }, 'job processed successfully');
+
+        return result;
     },
     {
         connection,
@@ -230,7 +129,7 @@ const worker = new Worker(
 worker.on('ready', () => {
     log.info({
         queueName: QUEUE_NAME,
-        processors: Object.keys(processors),
+        note: 'Dispatch via executor-registry (lazy-loaded on first job)',
     }, 'worker ready — listening for jobs');
 });
 

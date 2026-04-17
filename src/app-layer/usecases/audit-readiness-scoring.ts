@@ -26,6 +26,7 @@ import { assertCanViewPack } from '../policies/audit-readiness.policies';
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound } from '@/lib/errors/types';
+import { TERMINAL_WORK_ITEM_STATUSES } from '../domain/work-item-status';
 
 
 // ─── Types ───
@@ -198,7 +199,7 @@ async function computeISO27001Readiness(ctx: RequestContext, cycle: any): Promis
         tdb.task.findMany({
             where: {
                 tenantId: ctx.tenantId,
-                status: { notIn: ['RESOLVED', 'CLOSED', 'CANCELED'] },
+                status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] },
                 dueAt: { lt: new Date() },
             },
             select: { id: true, title: true, dueAt: true },
@@ -220,7 +221,7 @@ async function computeISO27001Readiness(ctx: RequestContext, cycle: any): Promis
         tdb.task.findMany({
             where: {
                 tenantId: ctx.tenantId,
-                status: { in: ['OPEN', 'IN_PROGRESS'] },
+                status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] },
                 type: { in: ['CONTROL_GAP', 'AUDIT_FINDING'] },
             },
             select: { id: true, title: true, severity: true },
@@ -382,7 +383,7 @@ async function computeNIS2Readiness(ctx: RequestContext, cycle: any): Promise<Re
         tdb.task.findMany({
             where: {
                 tenantId: ctx.tenantId,
-                status: { in: ['OPEN', 'IN_PROGRESS'] },
+                status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] },
             },
             select: { id: true, title: true, severity: true, type: true },
             take: 20,

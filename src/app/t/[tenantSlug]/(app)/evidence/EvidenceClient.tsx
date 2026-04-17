@@ -27,11 +27,6 @@ function formatBytes(bytes: number | null | undefined): string {
     return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-function formatDate(d: string | null | undefined): string {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
 type RetentionFilter = 'active' | 'expiring' | 'archived';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

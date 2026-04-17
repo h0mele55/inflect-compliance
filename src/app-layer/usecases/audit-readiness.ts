@@ -11,6 +11,7 @@ import {
 import { logEvent } from '../events/audit';
 import { runInTenantContext, runInGlobalContext } from '@/lib/db-context';
 import { notFound, badRequest, forbidden } from '@/lib/errors/types';
+import { TERMINAL_WORK_ITEM_STATUSES } from '../domain/work-item-status';
 
 import crypto from 'crypto';
 
@@ -530,7 +531,7 @@ async function previewISO27001DefaultPack(ctx: RequestContext) {
     // Open issues
     const issues = await runInTenantContext(ctx, (tdb) =>
         tdb.task.findMany({
-            where: { tenantId: ctx.tenantId, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+            where: { tenantId: ctx.tenantId, status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] } },
             select: { id: true },
         })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -607,7 +608,7 @@ async function previewNIS2DefaultPack(ctx: RequestContext) {
     // Issues
     const issues = await runInTenantContext(ctx, (tdb) =>
         tdb.task.findMany({
-            where: { tenantId: ctx.tenantId, status: { in: ['OPEN', 'IN_PROGRESS'] } },
+            where: { tenantId: ctx.tenantId, status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] } },
             select: { id: true },
         })
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

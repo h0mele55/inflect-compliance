@@ -10,8 +10,103 @@
  *   3. Each job name maps to exactly one payload type via JobPayloadMap
  *   4. Add new jobs by extending JobPayloadMap + registering a processor
  *
+ * TENANT ISOLATION (CRITICAL):
+ *   5. Every tenant-scoped payload MUST include `tenantId?: string`
+ *   6. Executors MUST pass payload.tenantId to the service layer
+ *   7. Services MUST apply tenantId to ALL Prisma where clauses
+ *   8. NEVER use `_payload` (unused parameter) in executors — this silently
+ *      drops tenantId and causes all-tenant scans
+ *   9. Regression tests in `tests/unit/job-tenant-isolation-regression.test.ts`
+ *      enforce these rules automatically
+ *
  * @module app-layer/jobs/types
  */
+
+// ─── Unified Job Run Result ───
+
+/**
+ * Universal result contract returned by every scheduled job executor.
+ * Provides a consistent shape for observability, logging, and
+ * downstream consumers (dashboards, audit logs, alerting).
+ *
+ * All fields are JSON-serializable.
+ */
+export interface JobRunResult {
+    /** The job name that produced this result */
+    jobName: string;
+    /** Unique identifier for this particular execution */
+    jobRunId: string;
+    /** Whether the job completed without throwing */
+    success: boolean;
+    /** ISO timestamp of when execution started */
+    startedAt: string;
+    /** ISO timestamp of when execution finished */
+    completedAt: string;
+    /** Execution duration in milliseconds */
+    durationMs: number;
+    /** Number of items scanned/inspected during the run */
+    itemsScanned: number;
+    /** Number of items that triggered an action (e.g. notified, archived, purged) */
+    itemsActioned: number;
+    /** Number of items skipped (duplicate, already processed, etc.) */
+    itemsSkipped: number;
+    /** Optional error message if success=false */
+    errorMessage?: string;
+    /** Optional structured details (job-specific payload) */
+    details?: Record<string, unknown>;
+}
+
+// ─── Normalized Due Item Output ───
+
+/**
+ * Entity types that can have due/expiring items.
+ * Used for downstream notification grouping.
+ */
+export type MonitoredEntityType =
+    | 'CONTROL'
+    | 'EVIDENCE'
+    | 'POLICY'
+    | 'VENDOR'
+    | 'TASK'
+    | 'RISK'
+    | 'TEST_PLAN';
+
+/**
+ * Urgency classification for due items.
+ *   OVERDUE  — already past its deadline
+ *   URGENT   — within 7 days
+ *   UPCOMING — within 30 days
+ */
+export type DueItemUrgency = 'OVERDUE' | 'URGENT' | 'UPCOMING';
+
+/**
+ * Normalized due/expiring item — the universal output of all monitors.
+ *
+ * Designed for downstream consumption:
+ *   - Group by tenantId + ownerUserId → per-user digest
+ *   - Group by entityType → summary dashboards
+ *   - All fields are JSON-serializable
+ */
+export interface DueItem {
+    /** Entity type being monitored */
+    entityType: MonitoredEntityType;
+    /** Database ID of the entity */
+    entityId: string;
+    /** Tenant that owns this entity */
+    tenantId: string;
+    /** Human-readable name/title */
+    name: string;
+    /** Specific reason this item is flagged */
+    reason: string;
+    /** Urgency classification */
+    urgency: DueItemUrgency;
+    /** The date that drives this due item (ISO string) */
+    dueDate: string;
+    /** Days remaining (negative = overdue) */
+    daysRemaining: number;
+    /** Owner user ID (for notification routing), if known */
+    ownerUserId?: string;
+}
 
 // ─── Job Payload Definitions ───
 
@@ -50,6 +145,34 @@ export interface PolicyReviewReminderPayload {
 export interface RetentionSweepPayload {
     tenantId?: string;
     dryRun?: boolean;
+}
+
+/** Vendor renewal/review deadline monitor */
+export interface VendorRenewalCheckPayload {
+    tenantId?: string;
+}
+
+/** Deadline monitor — controls, policies, tasks, risks, test plans */
+export interface DeadlineMonitorPayload {
+    tenantId?: string;
+    /** Detection windows in days. Default: [30, 7, 1] */
+    windows?: number[];
+}
+
+/** Evidence expiry monitor — expiring/expired evidence detection */
+export interface EvidenceExpiryMonitorPayload {
+    tenantId?: string;
+    /** Detection windows in days. Default: [30, 7, 1] */
+    windows?: number[];
+}
+
+/** Notification dispatch — monitor → grouped digest → outbox pipeline */
+export interface NotificationDispatchPayload {
+    tenantId?: string;
+    /** Which categories to dispatch. Default: all */
+    categories?: ('DEADLINE_DIGEST' | 'EVIDENCE_EXPIRY_DIGEST' | 'VENDOR_RENEWAL_DIGEST')[];
+    /** Detection windows in days. Default: [30, 7, 1] */
+    windows?: number[];
 }
 
 /** Webhook-driven sync pull */
@@ -98,6 +221,10 @@ export interface JobPayloadMap {
     'data-lifecycle': DataLifecyclePayload;
     'policy-review-reminder': PolicyReviewReminderPayload;
     'retention-sweep': RetentionSweepPayload;
+    'vendor-renewal-check': VendorRenewalCheckPayload;
+    'deadline-monitor': DeadlineMonitorPayload;
+    'evidence-expiry-monitor': EvidenceExpiryMonitorPayload;
+    'notification-dispatch': NotificationDispatchPayload;
     'sync-pull': SyncPullPayload;
 }
 
@@ -147,6 +274,30 @@ export const JOB_DEFAULTS: Record<JobName, {
         removeOnFail: 500,
     },
     'retention-sweep': {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 10000 },
+        removeOnComplete: 200,
+        removeOnFail: 500,
+    },
+    'vendor-renewal-check': {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 10000 },
+        removeOnComplete: 200,
+        removeOnFail: 500,
+    },
+    'deadline-monitor': {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 10000 },
+        removeOnComplete: 200,
+        removeOnFail: 500,
+    },
+    'evidence-expiry-monitor': {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 10000 },
+        removeOnComplete: 200,
+        removeOnFail: 500,
+    },
+    'notification-dispatch': {
         attempts: 2,
         backoff: { type: 'exponential', delay: 10000 },
         removeOnComplete: 200,

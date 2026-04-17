@@ -110,13 +110,14 @@ test.describe('Policy Center', () => {
         await page.click('#tab-activity');
         await page.waitForLoadState('networkidle').catch(() => {});
 
-        // The activity API route may need JIT compilation on first visit (dev server),
-        // so give it extra time. Retry once if the element doesn't appear.
-        let feedVisible = false;
-        for (let attempt = 0; attempt < 2 && !feedVisible; attempt++) {
+        // The activity API route needs JIT compilation on first visit (dev server).
+        // The #activity-feed container renders immediately (even during loading),
+        // so we must wait for the actual CREATED text to appear, not just the container.
+        let createdVisible = false;
+        for (let attempt = 0; attempt < 2 && !createdVisible; attempt++) {
             try {
-                await page.waitForSelector('#activity-feed', { timeout: 30000 });
-                feedVisible = true;
+                await expect(page.locator('#activity-feed')).toContainText('CREATED', { timeout: 30000 });
+                createdVisible = true;
             } catch {
                 // Retry: reload and re-click the Activity tab
                 await page.reload({ waitUntil: 'domcontentloaded' });
@@ -127,9 +128,8 @@ test.describe('Policy Center', () => {
             }
         }
 
-        // Should show the activity feed (CREATED event or empty state)
+        // Should show the activity feed with the POLICY_CREATED event
         await expect(page.locator('#activity-feed')).toBeVisible({ timeout: 10000 });
-        // The POLICY_CREATED event action is rendered as "CREATED" in the UI
         await expect(page.locator('#activity-feed')).toContainText('CREATED', { timeout: 10000 });
     });
 

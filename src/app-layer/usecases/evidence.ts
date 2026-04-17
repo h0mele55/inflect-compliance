@@ -41,7 +41,8 @@ export async function createEvidence(ctx: RequestContext, data: {
     fileSize?: number | null;
     controlId?: string | null;
     category?: string;
-    owner?: string;
+    owner?: string;         // Legacy free-text
+    ownerUserId?: string;   // Real user FK (preferred)
     reviewCycle?: string | null;
     nextReviewDate?: string | null;
     file?: File;
@@ -76,6 +77,7 @@ export async function createEvidence(ctx: RequestContext, data: {
             fileSize,
             category: data.category,
             owner: data.owner,
+            ownerUserId: data.ownerUserId || null,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum boundary
             reviewCycle: (data.reviewCycle || null) as ReviewCadence | null,
             nextReviewDate: data.nextReviewDate ? new Date(data.nextReviewDate) : null,
@@ -104,7 +106,8 @@ export async function updateEvidence(ctx: RequestContext, id: string, data: {
     title?: string;
     content?: string | null;
     category?: string;
-    owner?: string;
+    owner?: string;         // Legacy free-text
+    ownerUserId?: string;   // Real user FK (preferred)
     reviewCycle?: string;
     nextReviewDate?: string | null;
 }) {
@@ -116,6 +119,7 @@ export async function updateEvidence(ctx: RequestContext, id: string, data: {
             content: data.content,
             category: data.category,
             owner: data.owner,
+            ownerUserId: data.ownerUserId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum boundary
             reviewCycle: data.reviewCycle as ReviewCadence | undefined,
             nextReviewDate: data.nextReviewDate ? new Date(data.nextReviewDate) : undefined,
@@ -162,11 +166,15 @@ export async function reviewEvidence(ctx: RequestContext, id: string, data: { ac
         await EvidenceRepository.update(db, ctx, id, { status: newStatus });
         await EvidenceRepository.addReview(db, ctx, id, newStatus, comment);
 
-        // Create notification — User lookup uses injected db
+        // Create notification — prefer ownerUserId FK, fall back to legacy name lookup
         if (newStatus === 'APPROVED' || newStatus === 'REJECTED') {
-            const ownerUser = evidence.owner
-                ? await db.user.findFirst({ where: { tenantId: ctx.tenantId, name: evidence.owner } })
+            let ownerUser = evidence.ownerUserId
+                ? await db.user.findUnique({ where: { id: evidence.ownerUserId } })
                 : null;
+            // Fallback: legacy free-text name lookup (transitional)
+            if (!ownerUser && evidence.owner) {
+                ownerUser = await db.user.findFirst({ where: { tenantId: ctx.tenantId, name: evidence.owner } });
+            }
             if (ownerUser) {
                 await db.notification.create({
                     data: {
@@ -335,7 +343,8 @@ export async function uploadEvidenceFile(
         title?: string;
         controlId?: string | null;
         category?: string | null;
-        owner?: string | null;
+        owner?: string | null;         // Legacy free-text
+        ownerUserId?: string | null;   // Real user FK (preferred)
         reviewCycle?: string | null;
         nextReviewDate?: string | null;
         domain?: StorageDomain;
@@ -403,6 +412,7 @@ export async function uploadEvidenceFile(
             controlId: metadata.controlId || null,
             category: metadata.category || undefined,
             owner: metadata.owner || undefined,
+            ownerUserId: metadata.ownerUserId || null,
             reviewCycle: (metadata.reviewCycle || null) as ReviewCadence | null,
             nextReviewDate: metadata.nextReviewDate ? new Date(metadata.nextReviewDate) : null,
             status: 'DRAFT',

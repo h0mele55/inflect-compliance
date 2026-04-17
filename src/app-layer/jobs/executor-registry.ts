@@ -1,0 +1,407 @@
+/**
+ * Job Executor Registry — Typed Job Dispatch
+ *
+ * Provides a central, type-safe registry that maps job names to their
+ * executor functions. This decouples job *dispatch* from job *scheduling*,
+ * allowing any entrypoint (BullMQ worker, Vercel Cron route, node-cron,
+ * CLI scripts) to execute jobs through one unified interface.
+ *
+ * Architecture:
+ *   ┌─────────────┐     ┌──────────────────┐     ┌──────────────┐
+ *   │ BullMQ      │────▶│                  │────▶│ automation   │
+ *   │ Worker      │     │  ExecutorRegistry │     │ runner       │
+ *   ├─────────────┤     │                  │     ├──────────────┤
+ *   │ Vercel Cron │────▶│  .execute(name,  │────▶│ evidence     │
+ *   │ Route       │     │    payload)       │     │ expiry       │
+ *   ├─────────────┤     │                  │     ├──────────────┤
+ *   │ node-cron   │────▶│  .getExecutor()  │────▶│ retention    │
+ *   │ Scheduler   │     │  .listRegistered()│    │ sweep        │
+ *   └─────────────┘     └──────────────────┘     └──────────────┘
+ *
+ * Usage:
+ *   import { executorRegistry } from '@/app-layer/jobs/executor-registry';
+ *   const result = await executorRegistry.execute('vendor-renewal-check', {});
+ *
+ * Adding new jobs:
+ *   1. Define payload in types.ts (JobPayloadMap)
+ *   2. Create job module (e.g. vendor-renewal-check.ts)
+ *   3. Register executor below
+ *
+ * @module app-layer/jobs/executor-registry
+ */
+import { logger } from '@/lib/observability/logger';
+import type { JobName, JobPayload, JobRunResult } from './types';
+
+// ─── Executor Contract ──────────────────────────────────────────────
+
+/**
+ * A job executor function.
+ *
+ * Takes a typed payload and returns a `JobRunResult`.
+ * Executors are responsible for:
+ *   - Performing the job's business logic
+ *   - Using `runJob()` for observability
+ *   - Returning a consistent `JobRunResult`
+ *   - NOT catching errors (let the registry handle fault isolation)
+ */
+export type JobExecutor<T extends JobName> = (
+    payload: JobPayload<T>,
+) => Promise<JobRunResult>;
+
+// ─── Registry Implementation ────────────────────────────────────────
+
+/**
+ * Internal storage for registered executors.
+ * Uses `Map` for O(1) lookup and safe iteration.
+ */
+const executors = new Map<string, JobExecutor<any>>(); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+/**
+ * The executor registry — singleton service.
+ *
+ * Thread-safe in Node.js (single-threaded). Registry mutations
+ * (register) should only happen at module load time.
+ */
+export const executorRegistry = {
+    /**
+     * Register a job executor.
+     *
+     * @param name — job name (must match a key in JobPayloadMap)
+     * @param executor — async function that processes the job
+     * @throws if a duplicate registration is attempted
+     */
+    register<T extends JobName>(name: T, executor: JobExecutor<T>): void {
+        if (executors.has(name)) {
+            throw new Error(
+                `Duplicate executor registration for job "${name}". ` +
+                `Each job must have exactly one executor.`,
+            );
+        }
+        executors.set(name, executor);
+        logger.debug('executor registered', {
+            component: 'executor-registry',
+            jobName: name,
+        });
+    },
+
+    /**
+     * Execute a job by name with fault isolation.
+     *
+     * If the executor throws, the error is caught, logged, and
+     * a failure `JobRunResult` is returned. One failing job
+     * never crashes the scheduler or other jobs.
+     *
+     * @param name — job name
+     * @param payload — typed payload
+     * @returns JobRunResult (always — never throws)
+     */
+    async execute<T extends JobName>(
+        name: T,
+        payload: JobPayload<T>,
+    ): Promise<JobRunResult> {
+        const executor = executors.get(name);
+        const startedAt = new Date().toISOString();
+        const startMs = performance.now();
+        const jobRunId = crypto.randomUUID();
+
+        if (!executor) {
+            logger.error('no executor registered for job', {
+                component: 'executor-registry',
+                jobName: name,
+            });
+            return {
+                jobName: name,
+                jobRunId,
+                success: false,
+                startedAt,
+                completedAt: new Date().toISOString(),
+                durationMs: 0,
+                itemsScanned: 0,
+                itemsActioned: 0,
+                itemsSkipped: 0,
+                errorMessage: `No executor registered for job "${name}"`,
+            };
+        }
+
+        try {
+            const result = await executor(payload);
+            return result;
+        } catch (error) {
+            const durationMs = Math.round(performance.now() - startMs);
+            const errorMessage = error instanceof Error
+                ? error.message
+                : String(error);
+
+            logger.error('job executor threw', {
+                component: 'executor-registry',
+                jobName: name,
+                jobRunId,
+                durationMs,
+                error: errorMessage,
+            });
+
+            return {
+                jobName: name,
+                jobRunId,
+                success: false,
+                startedAt,
+                completedAt: new Date().toISOString(),
+                durationMs,
+                itemsScanned: 0,
+                itemsActioned: 0,
+                itemsSkipped: 0,
+                errorMessage,
+            };
+        }
+    },
+
+    /**
+     * Get the executor for a job name (or undefined).
+     * Useful for the BullMQ worker to check registration before dispatch.
+     */
+    getExecutor<T extends JobName>(name: T): JobExecutor<T> | undefined {
+        return executors.get(name) as JobExecutor<T> | undefined;
+    },
+
+    /**
+     * Check if an executor is registered for a job name.
+     */
+    has(name: string): boolean {
+        return executors.has(name);
+    },
+
+    /**
+     * List all registered job names.
+     */
+    listRegistered(): string[] {
+        return Array.from(executors.keys());
+    },
+
+    /**
+     * Total number of registered executors.
+     */
+    get size(): number {
+        return executors.size;
+    },
+
+    /**
+     * Clear all registrations. **Test-only.**
+     * @internal
+     */
+    _reset(): void {
+        executors.clear();
+    },
+};
+
+// ─── Default Registrations ──────────────────────────────────────────
+//
+// Each registration uses dynamic import so that heavy modules
+// (Prisma, integration SDK, etc.) are only loaded when the job
+// actually executes — not at registry import time.
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Helper: create a normalized JobRunResult from a legacy job's
+ * ad-hoc return shape. Jobs that already return JobRunResult
+ * should be registered directly.
+ */
+function makeResult(
+    jobName: string,
+    startedAt: string,
+    startMs: number,
+    scanned: number,
+    actioned: number,
+    skipped: number,
+    details?: Record<string, unknown>,
+): JobRunResult {
+    return {
+        jobName,
+        jobRunId: crypto.randomUUID(),
+        success: true,
+        startedAt,
+        completedAt: new Date().toISOString(),
+        durationMs: Math.round(performance.now() - startMs),
+        itemsScanned: scanned,
+        itemsActioned: actioned,
+        itemsSkipped: skipped,
+        details,
+    };
+}
+
+// ── health-check ─────────────────────────────────────────────────────
+
+executorRegistry.register('health-check', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    return makeResult('health-check', startedAt, startMs, 0, 0, 0, {
+        enqueuedAt: payload.enqueuedAt,
+        message: payload.message ?? 'pong',
+        processedAt: new Date().toISOString(),
+    });
+});
+
+// ── automation-runner ────────────────────────────────────────────────
+
+executorRegistry.register('automation-runner', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runScheduledAutomations } = await import('./automation-runner');
+    const r = await runScheduledAutomations({
+        tenantId: payload.tenantId,
+        dryRun: payload.dryRun,
+    });
+    return makeResult(
+        'automation-runner', startedAt, startMs,
+        r.totalDue, r.executed, r.skipped,
+        { passed: r.passed, failed: r.failed, errors: r.errors, dryRun: r.dryRun },
+    );
+});
+
+// ── daily-evidence-expiry ────────────────────────────────────────────
+
+executorRegistry.register('daily-evidence-expiry', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runDailyEvidenceExpiryNotifications } = await import('./dailyEvidenceExpiry');
+    const r = await runDailyEvidenceExpiryNotifications({
+        tenantId: payload.tenantId,
+        skipOutbox: payload.skipOutbox,
+    });
+    const totalCreated = r.sweeps.days30.tasksCreated
+        + r.sweeps.days7.tasksCreated + r.sweeps.days1.tasksCreated;
+    const totalSkipped = r.sweeps.days30.skippedDuplicate
+        + r.sweeps.days7.skippedDuplicate + r.sweeps.days1.skippedDuplicate;
+    const totalScanned = r.sweeps.days30.scanned
+        + r.sweeps.days7.scanned + r.sweeps.days1.scanned;
+    return makeResult(
+        'daily-evidence-expiry', startedAt, startMs,
+        totalScanned, totalCreated, totalSkipped,
+        { sweeps: r.sweeps, outbox: r.outbox },
+    );
+});
+
+// ── data-lifecycle ───────────────────────────────────────────────────
+
+executorRegistry.register('data-lifecycle', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const {
+        purgeSoftDeletedOlderThan,
+        purgeExpiredEvidenceOlderThan,
+        runRetentionSweep,
+    } = await import('./data-lifecycle');
+
+    const purgeResults = await purgeSoftDeletedOlderThan({
+        tenantId: payload.tenantId,
+        dryRun: payload.dryRun,
+    });
+    const evidencePurge = await purgeExpiredEvidenceOlderThan({
+        tenantId: payload.tenantId,
+        dryRun: payload.dryRun,
+    });
+    const retentionResults = await runRetentionSweep({
+        tenantId: payload.tenantId,
+        dryRun: payload.dryRun,
+    });
+
+    const totalScanned = purgeResults.reduce((s, r) => s + r.scanned, 0)
+        + evidencePurge.scanned
+        + retentionResults.reduce((s, r) => s + r.scanned, 0);
+    const totalActioned = purgeResults.reduce((s, r) => s + r.purged, 0)
+        + evidencePurge.purged
+        + retentionResults.reduce((s, r) => s + r.expired, 0);
+
+    return makeResult(
+        'data-lifecycle', startedAt, startMs,
+        totalScanned, totalActioned, 0,
+        { purgeResults, evidencePurge, retentionResults },
+    );
+});
+
+// ── policy-review-reminder ───────────────────────────────────────────
+
+executorRegistry.register('policy-review-reminder', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { processOverdueReminders } = await import('./policyReviewReminder');
+    const { prisma } = await import('@/lib/prisma');
+    const r = await processOverdueReminders(prisma, { tenantId: payload.tenantId });
+    return makeResult(
+        'policy-review-reminder', startedAt, startMs,
+        r.processed, r.processed, 0,
+        { policies: r.policies },
+    );
+});
+
+// ── retention-sweep ──────────────────────────────────────────────────
+
+executorRegistry.register('retention-sweep', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runEvidenceRetentionSweep } = await import('./retention');
+    const r = await runEvidenceRetentionSweep({
+        tenantId: payload.tenantId,
+        dryRun: payload.dryRun,
+    });
+    return makeResult(
+        'retention-sweep', startedAt, startMs,
+        r.scanned, r.archived, 0,
+        { expired: r.expired, dryRun: r.dryRun },
+    );
+});
+
+// ── vendor-renewal-check ─────────────────────────────────────────────
+
+executorRegistry.register('vendor-renewal-check', async (payload) => {
+    const { runVendorRenewalCheck } = await import('./vendor-renewal-check');
+    const { result } = await runVendorRenewalCheck({ tenantId: payload.tenantId });
+    return result;
+});
+
+// ── deadline-monitor ─────────────────────────────────────────────────
+
+executorRegistry.register('deadline-monitor', async (payload) => {
+    const { runDeadlineMonitor } = await import('./deadline-monitor');
+    const { result } = await runDeadlineMonitor({
+        tenantId: payload.tenantId,
+        windows: payload.windows,
+    });
+    return result;
+});
+
+// ── evidence-expiry-monitor ──────────────────────────────────────────
+
+executorRegistry.register('evidence-expiry-monitor', async (payload) => {
+    const { runEvidenceExpiryMonitor } = await import('./evidence-expiry-monitor');
+    const { result } = await runEvidenceExpiryMonitor({
+        tenantId: payload.tenantId,
+        windows: payload.windows,
+    });
+    return result;
+});
+
+// ── notification-dispatch ────────────────────────────────────────────
+
+executorRegistry.register('notification-dispatch', async (payload) => {
+    const { runNotificationDispatch } = await import('./notification-dispatch');
+    const { result } = await runNotificationDispatch({
+        tenantId: payload.tenantId,
+        categories: payload.categories,
+        windows: payload.windows,
+    });
+    return result;
+});
+
+// ── sync-pull ────────────────────────────────────────────────────────
+
+executorRegistry.register('sync-pull', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runSyncPull } = await import('./sync-pull');
+    await runSyncPull(payload);
+    return makeResult('sync-pull', startedAt, startMs, 1, 1, 0, {
+        provider: payload.mappingKey.provider,
+        remoteEntityType: payload.mappingKey.remoteEntityType,
+    });
+});
+

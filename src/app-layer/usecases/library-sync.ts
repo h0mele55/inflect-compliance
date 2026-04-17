@@ -8,6 +8,13 @@
  *
  * All paths use the library-importer under the hood and follow
  * the project's job-runner pattern for structured observability.
+ *
+ * Lifecycle order (critical for referential integrity):
+ * 1. Framework libraries imported first (creates Framework + FrameworkRequirement rows)
+ * 2. Mapping sets imported second (references FrameworkRequirement rows by code)
+ *
+ * Mapping-set import failures are isolated — they don't block framework sync
+ * but are reported clearly in the sync result.
  */
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
@@ -20,6 +27,10 @@ import {
     type ImportResult,
     type ImportOptions,
 } from '../services/library-importer';
+import {
+    importAllMappingSets,
+    type ImportMappingSetResult,
+} from '../services/mapping-set-importer';
 import {
     scanLibraryDirectory,
     parseLibraryFile,
@@ -46,6 +57,18 @@ export interface SyncResult {
         skipped: number;
         failed: number;
     };
+    /** Mapping set import results (runs after framework import) */
+    mappingSets: {
+        /** Per-set results */
+        results: ImportMappingSetResult[];
+        /** Summary */
+        summary: {
+            imported: number;
+            skipped: number;
+            failed: number;
+            totalEntries: number;
+        };
+    };
     /** Total duration in ms */
     totalDurationMs: number;
 }
@@ -53,7 +76,8 @@ export interface SyncResult {
 // ─── Sync All Libraries ──────────────────────────────────────────────
 
 /**
- * Synchronize all YAML libraries from the default directory into Prisma.
+ * Synchronize all YAML libraries from the default directory into Prisma,
+ * then import cross-framework mapping sets.
  *
  * This is the primary entry point for library management. It:
  * 1. Scans the libraries directory for YAML files
@@ -61,18 +85,25 @@ export interface SyncResult {
  * 3. Compares against DB state (hash-based deduplication)
  * 4. Upserts changed/new libraries
  * 5. Skips unchanged libraries
+ * 6. Imports mapping sets (after frameworks exist, for referential integrity)
+ *
+ * Mapping-set import failures are isolated: they are logged and reported
+ * but do not block or roll back framework import.
  *
  * Wrapped in `runJob` for structured observability.
  */
 export async function syncAllLibraries(
     db: PrismaClient,
-    options?: ImportOptions,
+    options?: ImportOptions & { skipMappings?: boolean },
 ): Promise<SyncResult> {
     return runJob('library-sync-all', async () => {
         const start = performance.now();
         const component = 'library-sync';
 
-        logger.info('Sync started', { component, dir: LIBRARIES_DIR });
+        // ── Phase 1: Framework Libraries ──────────────────────────
+        // Must complete before mapping sets — mappings reference
+        // FrameworkRequirement rows created by framework import.
+        logger.info('Sync started — phase 1: frameworks', { component, dir: LIBRARIES_DIR });
 
         const results = await importAllFromDirectory(db, LIBRARIES_DIR, options);
 
@@ -83,12 +114,63 @@ export async function syncAllLibraries(
             failed: 0, // Failures throw, so this is 0 if we reach here
         };
 
+        logger.info('Phase 1 complete — frameworks synced', {
+            component,
+            totalFound: results.length,
+            ...summary,
+        });
+
+        // ── Phase 2: Mapping Sets ─────────────────────────────────
+        // Isolated: failures are caught, logged, and reported but do
+        // not roll back framework changes.
+        let mappingSetResults: ImportMappingSetResult[] = [];
+        const mappingSummary = { imported: 0, skipped: 0, failed: 0, totalEntries: 0 };
+
+        if (!options?.skipMappings) {
+            logger.info('Sync phase 2: mapping sets', { component });
+
+            try {
+                mappingSetResults = await importAllMappingSets(
+                    db,
+                    undefined, // default MAPPINGS_DIR
+                    { force: options?.force },
+                );
+
+                for (const r of mappingSetResults) {
+                    if (r.skippedDuplicate) {
+                        mappingSummary.skipped++;
+                    } else {
+                        mappingSummary.imported++;
+                    }
+                    mappingSummary.totalEntries += r.created + r.updated;
+                    if (r.errors.length > 0) {
+                        mappingSummary.failed += r.errors.length;
+                    }
+                }
+
+                logger.info('Phase 2 complete — mapping sets synced', {
+                    component,
+                    sets: mappingSetResults.length,
+                    ...mappingSummary,
+                });
+            } catch (err) {
+                // Mapping failure is isolated — log and continue
+                logger.error('Phase 2 failed — mapping set import error', {
+                    component,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        } else {
+            logger.info('Phase 2 skipped — skipMappings=true', { component });
+        }
+
         const totalDurationMs = Math.round(performance.now() - start);
 
         logger.info('Sync completed', {
             component,
             totalFound: results.length,
             ...summary,
+            mappingSets: mappingSetResults.length,
             totalDurationMs,
         });
 
@@ -96,6 +178,10 @@ export async function syncAllLibraries(
             totalFound: results.length,
             results,
             summary,
+            mappingSets: {
+                results: mappingSetResults,
+                summary: mappingSummary,
+            },
             totalDurationMs,
         };
     });

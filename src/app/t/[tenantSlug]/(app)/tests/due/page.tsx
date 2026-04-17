@@ -71,11 +71,6 @@ export default function DueQueuePage() {
         }
     };
 
-    const formatDate = (d: string | null) => {
-        if (!d) return '—';
-        return formatDate(d);
-    };
-
     const overdueCount = queue.filter(p => p.isOverdue).length;
     const pendingCount = queue.filter(p => p.hasPendingRun).length;
 
