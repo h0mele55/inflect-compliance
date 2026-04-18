@@ -1,6 +1,5 @@
 import { getTenantCtx } from '@/app-layer/context';
 import { listControls } from '@/app-layer/usecases/control';
-import { getPermissionsForRole } from '@/lib/permissions';
 import { ControlsClient } from './ControlsClient';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +28,6 @@ export default async function ControlsPage({
     }
 
     const controls = await listControls(ctx, Object.keys(filters).length > 0 ? filters : undefined);
-    const appPerms = getPermissionsForRole(ctx.role);
 
     return (
         <ControlsClient
@@ -38,7 +36,7 @@ export default async function ControlsPage({
             tenantSlug={tenantSlug}
             permissions={ctx.permissions}
             appPermissions={{
-                controls: appPerms.controls,
+                controls: ctx.appPermissions.controls,
             }}
         />
     );

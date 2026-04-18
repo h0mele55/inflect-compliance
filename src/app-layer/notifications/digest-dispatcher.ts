@@ -103,7 +103,7 @@ async function resolveTenantAdmins(
     const memberships = await prisma.tenantMembership.findMany({
         where: {
             tenantId,
-            role: { in: ['ADMIN', 'OWNER'] },
+            role: 'ADMIN',
             status: 'ACTIVE',
         },
         select: {

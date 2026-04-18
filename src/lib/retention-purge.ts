@@ -13,6 +13,7 @@
  */
 import { prisma } from './prisma';
 import { SOFT_DELETE_MODELS } from './soft-delete';
+import { logger } from '@/lib/observability/logger';
 
 export interface PurgeResult {
     totalPurged: number;
@@ -69,16 +70,19 @@ export async function purgeSoftDeletedOlderThan(days: number): Promise<PurgeResu
             }
         } catch {
             // Best effort — don't fail the purge if audit log fails
-            console.warn('[retention-purge] Failed to write audit log');
+            logger.warn('Failed to write audit log for retention purge', { component: 'retention-purge' });
         }
     }
 
     const durationMs = Date.now() - start;
 
-    console.log(`[retention-purge] Purged ${totalPurged} records (cutoff: ${cutoff.toISOString()}, took ${durationMs}ms)`);
-    for (const [model, count] of Object.entries(perModel)) {
-        if (count > 0) console.log(`  ${model}: ${count}`);
-    }
+    logger.info('Retention purge completed', {
+        component: 'retention-purge',
+        totalPurged,
+        cutoff: cutoff.toISOString(),
+        durationMs,
+        perModel: Object.fromEntries(Object.entries(perModel).filter(([, c]) => c > 0)),
+    });
 
     return { totalPurged, perModel, cutoffDate: cutoff, durationMs };
 }

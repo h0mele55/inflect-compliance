@@ -20,6 +20,7 @@
  *   WHERE clause lookups without decrypting every row.
  */
 import crypto from 'crypto';
+import { logger } from '@/lib/observability/logger';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -60,9 +61,8 @@ function getRawKeyMaterial(): string {
     // Dev/test fallback — deterministic so tests are reproducible
     const devKey = 'inflect-dev-encryption-key-not-for-production-use!!';
     if (nodeEnv !== 'test') {
-        console.warn(
-            '[encryption] Using development fallback key. Set DATA_ENCRYPTION_KEY for production.'
-        );
+        // Lazy require to avoid circular module init issues
+        logger.warn('Using development fallback encryption key', { component: 'encryption' });
     }
     return devKey;
 }

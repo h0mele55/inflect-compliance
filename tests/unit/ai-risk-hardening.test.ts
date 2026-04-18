@@ -9,6 +9,7 @@ import { checkFeatureGate, enforceFeatureGate, isAIRiskEnabled } from '@/app-lay
 import type { RiskAssessmentInput, RiskAssessmentAsset } from '@/app-layer/ai/risk-assessment/types';
 import type { RequestContext } from '@/app-layer/types';
 import { AppError } from '@/lib/errors/types';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 // ─── Test Helpers ───
 
@@ -26,6 +27,7 @@ function makeCtx(overrides: Partial<RequestContext> = {}): RequestContext {
             canAudit: false,
             canExport: false,
         },
+        appPermissions: getPermissionsForRole((overrides.role ?? 'ADMIN') as any),
         ...overrides,
     };
 }

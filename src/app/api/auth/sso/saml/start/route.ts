@@ -66,7 +66,6 @@ export async function GET(req: NextRequest) {
     // ── Parse SAML config ──
     const configResult = SamlConfigSchema.safeParse(provider.configJson);
     if (!configResult.success) {
-        console.error('[SSO-SAML] Invalid config for provider:', provider.id, configResult.error.message);
         ssoLog('error', 'Invalid SAML configuration', {
             requestId, tenantSlug: tenantSlug || '', providerType: 'SAML',
             providerId: provider.id, stage: 'config_load',
@@ -81,7 +80,9 @@ export async function GET(req: NextRequest) {
     if (!samlConfig.ssoUrl || !samlConfig.entityId) {
         // If metadataUrl was provided but not ssoUrl/entityId, we need to handle that
         // For now, require explicit ssoUrl + entityId
-        console.error('[SSO-SAML] SAML config missing ssoUrl or entityId:', provider.id);
+        ssoLog('error', 'SAML config missing ssoUrl or entityId', {
+            tenantSlug: tenantSlug || '', providerType: 'SAML', providerId: provider.id, stage: 'config_load',
+        });
         return NextResponse.json(
             { error: 'SAML configuration incomplete — ssoUrl and entityId required' },
             { status: 500 }
@@ -116,7 +117,7 @@ export async function GET(req: NextRequest) {
             providerId: provider.id, stage: 'authn_request',
             meta: { error: (err as Error).message },
         });
-        console.error('[SSO-SAML] AuthnRequest generation failed:', (err as Error).message);
+
         return NextResponse.json(
             { error: 'Failed to initiate SAML authentication' },
             { status: 500 }

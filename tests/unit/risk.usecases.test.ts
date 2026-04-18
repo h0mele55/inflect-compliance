@@ -47,6 +47,7 @@ jest.mock('@/lib/prisma', () => ({
 }));
 
 import { RequestContext } from '@/app-layer/types';
+import { getPermissionsForRole } from '@/lib/permissions';
 import { RiskRepository } from '@/app-layer/repositories/RiskRepository';
 import { RiskTemplateRepository } from '@/app-layer/repositories/RiskTemplateRepository';
 import { logEvent } from '@/app-layer/events/audit';
@@ -62,6 +63,7 @@ const writerCtx: RequestContext = {
     tenantId: 'tenant-1',
     role: 'ADMIN' as any,
     permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
+    appPermissions: getPermissionsForRole('ADMIN'),
 };
 
 describe('Risk Usecases', () => {

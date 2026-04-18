@@ -228,20 +228,20 @@ describe('Structured Logger (Pino) — redaction', () => {
 describe('extractErrorMeta', () => {
     it('extracts name, message, and stack from an Error instance', () => {
         const err = new TypeError('bad type');
-        const meta = extractErrorMeta(err);
+        const meta = extractErrorMeta(err) as { name: string; message: string; stack?: string };
         expect(meta?.name).toBe('TypeError');
         expect(meta?.message).toBe('bad type');
         expect(meta?.stack).toBeDefined();
     });
 
     it('handles non-Error values gracefully', () => {
-        const meta = extractErrorMeta('string error');
+        const meta = extractErrorMeta('string error') as { name: string; message: string; stack?: string };
         expect(meta?.name).toBe('UnknownError');
         expect(meta?.message).toBe('string error');
     });
 
     it('handles null/undefined gracefully', () => {
-        const meta = extractErrorMeta(null);
+        const meta = extractErrorMeta(null) as { name: string; message: string; stack?: string };
         expect(meta?.name).toBe('UnknownError');
         expect(meta?.message).toBe('null');
     });

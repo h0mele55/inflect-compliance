@@ -4,6 +4,7 @@
  * NEVER logs secrets or tokens.
  */
 import { env } from '@/env';
+import { logger } from '@/lib/observability/logger';
 
 export interface TokenRefreshResult {
     accessToken: string;
@@ -30,7 +31,7 @@ export async function refreshGoogleToken(
     const clientId = env.GOOGLE_CLIENT_ID;
     const clientSecret = env.GOOGLE_CLIENT_SECRET;
 
-    console.log('[auth:refresh] Refreshing Google access token');
+    logger.info('Refreshing Google access token', { component: 'auth' });
 
     const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -45,7 +46,7 @@ export async function refreshGoogleToken(
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error('[auth:refresh] Google token refresh failed:', response.status);
+        logger.error('Google token refresh failed', { component: 'auth', statusCode: response.status });
         throw new Error(`Google token refresh failed: ${response.status}`);
     }
 
@@ -70,7 +71,7 @@ export async function refreshMicrosoftToken(
     const clientSecret = env.MICROSOFT_CLIENT_SECRET;
     const tenantId = env.MICROSOFT_TENANT_ID;
 
-    console.log('[auth:refresh] Refreshing Microsoft access token');
+    logger.info('Refreshing Microsoft access token', { component: 'auth' });
 
     const response = await fetch(
         `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
@@ -89,7 +90,7 @@ export async function refreshMicrosoftToken(
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error('[auth:refresh] Microsoft token refresh failed:', response.status);
+        logger.error('Microsoft token refresh failed', { component: 'auth', statusCode: response.status });
         throw new Error(`Microsoft token refresh failed: ${response.status}`);
     }
 

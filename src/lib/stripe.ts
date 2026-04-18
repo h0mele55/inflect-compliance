@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import prisma from '@/lib/prisma';
+import { logger } from '@/lib/observability/logger';
 
 // ─── Types (matching Prisma enums, duplicated so we don't depend on generated client at import time) ───
 
@@ -190,7 +191,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
         where: { stripeEventId: event.id },
     });
     if (existingEvent) {
-        console.log(`[billing] Skipping duplicate event ${event.id} (${event.type})`);
+        logger.debug('Skipping duplicate event', { component: 'billing', eventId: event.id, eventType: event.type });
         return;
     }
 
@@ -317,7 +318,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
                     payloadJson: JSON.parse(JSON.stringify(event.data.object)),
                 },
             });
-            console.warn(`[billing] Payment failed for customer ${customerId} (tenant ${billingAccount.tenantId})`);
+            logger.warn('Payment failed', { component: 'billing', stripeCustomerId: customerId, tenantId: billingAccount.tenantId });
             break;
         }
 
@@ -352,7 +353,7 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
 
         default:
             // Unhandled event type — log but don't process
-            console.log(`[billing] Unhandled event type: ${event.type}`);
+            logger.debug('Unhandled event type', { component: 'billing', eventType: event.type });
             break;
     }
 }

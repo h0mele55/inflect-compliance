@@ -1,6 +1,5 @@
 import { getTenantCtx } from '@/app-layer/context';
 import { listTasks } from '@/app-layer/usecases/task';
-import { getPermissionsForRole } from '@/lib/permissions';
 import { TasksClient } from './TasksClient';
 
 export const dynamic = 'force-dynamic';
@@ -29,7 +28,6 @@ export default async function TasksPage({
     }
 
     const tasks = await listTasks(ctx, Object.keys(filters).length > 0 ? filters : undefined);
-    const appPerms = getPermissionsForRole(ctx.role);
 
     return (
         <TasksClient
@@ -37,7 +35,7 @@ export default async function TasksPage({
             initialFilters={filters}
             tenantSlug={tenantSlug}
             appPermissions={{
-                tasks: appPerms.tasks,
+                tasks: ctx.appPermissions.tasks,
             }}
         />
     );

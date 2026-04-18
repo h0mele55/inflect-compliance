@@ -1,5 +1,6 @@
 import { assertCanRead, assertCanWrite, assertCanAdmin, assertCanAudit } from '@/app-layer/policies/common';
 import { RequestContext } from '@/app-layer/types';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 describe('Application Layer Policies', () => {
     let baseCtx: RequestContext;
@@ -11,6 +12,7 @@ describe('Application Layer Policies', () => {
             tenantId: 'tenant-1',
             role: 'READER' as any,
             permissions: { canRead: false, canWrite: false, canAdmin: false, canAudit: false, canExport: false },
+            appPermissions: getPermissionsForRole('READER'),
         };
     });
 

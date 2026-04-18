@@ -1,8 +1,10 @@
+import { logger as appLogger } from '@/lib/observability/logger';
+
 /**
  * SSO Structured Logging
  *
  * Provides structured, secret-safe logging for all SSO operations.
- * Uses a consistent format for easy parsing in production log aggregators.
+ * Delegates to the centralized Pino logger for consistent formatting.
  *
  * SAFETY RULES:
  * - Never log raw tokens, assertions, or secrets
@@ -46,31 +48,17 @@ export type SsoStage =
 
 /**
  * Log an SSO event with structured context.
- * Output format is JSON for easy parsing in production.
+ * Delegates to the centralized Pino logger for JSON output.
  */
 export function ssoLog(
     level: SsoLogLevel,
     message: string,
     context: SsoLogContext
 ): void {
-    const entry = {
-        timestamp: new Date().toISOString(),
-        level,
+    appLogger[level](message, {
         component: 'sso',
-        message,
         ...context,
-    };
-
-    switch (level) {
-        case 'error':
-            console.error(JSON.stringify(entry));
-            break;
-        case 'warn':
-            console.warn(JSON.stringify(entry));
-            break;
-        default:
-            console.log(JSON.stringify(entry));
-    }
+    });
 }
 
 /**

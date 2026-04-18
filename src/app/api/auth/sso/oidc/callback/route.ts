@@ -81,7 +81,10 @@ export async function GET(req: NextRequest) {
     // ── Parse OIDC config ──
     const configResult = OidcConfigSchema.safeParse(provider.configJson);
     if (!configResult.success) {
-        console.error('[SSO] Invalid OIDC config on callback:', provider.id);
+        ssoLog('error', 'Invalid OIDC config on callback', {
+            requestId, tenantSlug: state.tenantSlug, providerType: 'OIDC',
+            providerId: provider.id, stage: 'config_load',
+        });
         return redirectToLogin(req, 'config_error');
     }
     const oidcConfig = configResult.data;
@@ -91,7 +94,11 @@ export async function GET(req: NextRequest) {
     try {
         discovery = await discoverOidc(oidcConfig);
     } catch (err) {
-        console.error('[SSO] Discovery failed on callback:', (err as Error).message);
+        ssoLog('error', 'OIDC discovery failed on callback', {
+            requestId, tenantSlug: state.tenantSlug, providerType: 'OIDC',
+            providerId: state.providerId, stage: 'discovery',
+            meta: { error: (err as Error).message },
+        });
         return redirectToLogin(req, 'discovery_error');
     }
 
@@ -109,7 +116,11 @@ export async function GET(req: NextRequest) {
             state.codeVerifier
         );
     } catch (err) {
-        console.error('[SSO] Token exchange failed:', (err as Error).message);
+        ssoLog('error', 'OIDC token exchange failed', {
+            requestId, tenantSlug: state.tenantSlug, providerType: 'OIDC',
+            providerId: state.providerId, stage: 'token_exchange',
+            meta: { error: (err as Error).message },
+        });
         return redirectToLogin(req, 'token_error', 'Failed to exchange authorization code');
     }
 
@@ -127,7 +138,11 @@ export async function GET(req: NextRequest) {
     try {
         claims = extractIdTokenClaims(tokens.id_token);
     } catch (err) {
-        console.error('[SSO] Failed to extract ID token claims:', (err as Error).message);
+        ssoLog('error', 'Failed to extract ID token claims', {
+            requestId, tenantSlug: state.tenantSlug, providerType: 'OIDC',
+            providerId: state.providerId, stage: 'claims_extraction',
+            meta: { error: (err as Error).message },
+        });
         return redirectToLogin(req, 'claims_error');
     }
 
@@ -193,7 +208,9 @@ export async function GET(req: NextRequest) {
     // ── Create JWT session (compatible with Auth.js JWT strategy) ──
     const authSecret = env.AUTH_SECRET;
     if (!authSecret) {
-        console.error('[SSO] AUTH_SECRET not set — cannot create session');
+        ssoLog('error', 'AUTH_SECRET not set', {
+            requestId, tenantSlug: tenant.slug, providerType: 'OIDC', stage: 'session_creation',
+        });
         return redirectToLogin(req, 'config_error');
     }
 

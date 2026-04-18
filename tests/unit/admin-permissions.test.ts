@@ -28,6 +28,7 @@ function makeCtx(role: Role, userId = 'user-1'): RequestContext {
         tenantSlug: 'acme-co',
         role,
         permissions: computePermissions(role),
+        appPermissions: getPermissionsForRole(role),
     };
 }
 

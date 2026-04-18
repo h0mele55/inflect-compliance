@@ -17,6 +17,8 @@ import type { EditableState, PublishCommand } from '@/app-layer/domain/editable-
 import { LifecycleError } from '@/app-layer/domain/editable-lifecycle.types';
 import { createEditableState } from '@/app-layer/services/editable-lifecycle';
 import type { RequestContext } from '@/app-layer/types';
+import type { Role } from '@prisma/client';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -52,7 +54,7 @@ const TEST_CTX: RequestContext = {
     userId: 'user-1',
     tenantId: 'tenant-1',
     tenantSlug: 'test-corp',
-    role: 'ADMIN',
+    role: 'ADMIN' as Role,
     permissions: {
         canRead: true,
         canWrite: true,
@@ -60,6 +62,7 @@ const TEST_CTX: RequestContext = {
         canAudit: true,
         canExport: true,
     },
+    appPermissions: getPermissionsForRole('ADMIN'),
 };
 
 const AUDIT_CONFIG: LifecycleAuditConfig = {
@@ -148,6 +151,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 2,
                 draft: null,
                 published: { content: 'live' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             });
 
@@ -211,6 +216,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 2,
                 draft: { content: 'v2-draft' },
                 published: { content: 'v1-live' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             });
 
@@ -238,6 +245,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 2,
                 draft: { content: 'new draft' },
                 published: priorPayload,
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             });
 
@@ -313,6 +322,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 2,
                 draft: { content: 'v2' },
                 published: { content: 'v1' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             });
 
@@ -373,6 +384,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 2,
                 draft: null,
                 published: { content: 'live' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             });
 
@@ -392,6 +405,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 2,
                 draft: null,
                 published: { content: 'frozen' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [{ version: 1, payload: { content: 'v1' }, publishedAt: '2026-01-01', publishedBy: 'user-1' }],
             });
 
@@ -483,6 +498,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 3,
                 draft: null,
                 published: { content: 'v2-live' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [{
                     version: 2,
                     payload: { content: 'v1-original' },
@@ -508,6 +525,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 3,
                 draft: null,
                 published: { content: 'v2' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [{
                     version: 2,
                     payload: { content: 'v1' },
@@ -537,6 +556,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 2,
                 draft: null,
                 published: { content: 'v1' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             });
 
@@ -558,6 +579,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 3,
                 draft: null,
                 published: { content: 'v2' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [{
                     version: 2,
                     payload: { content: 'v1' },
@@ -588,6 +611,8 @@ describe('Editable Lifecycle Usecase — Publish Workflow', () => {
                 currentVersion: 2,
                 draft: null,
                 published: { content: 'frozen' },
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             });
 

@@ -12,6 +12,7 @@
  * - Framework pair uniqueness on MappingSet: one canonical set per direction.
  */
 import { PrismaTx } from '@/lib/db-context';
+import { badRequest } from '@/lib/errors/types';
 import type {
     CreateMappingSetInput,
     CreateMappingInput,
@@ -144,7 +145,7 @@ export class RequirementMappingRepository {
     /** Create a single mapping edge. */
     static async createMapping(db: PrismaTx, input: CreateMappingInput) {
         if (!isValidMappingStrength(input.strength)) {
-            throw new Error(`Invalid mapping strength: "${input.strength}". Must be one of: EQUAL, SUPERSET, SUBSET, INTERSECT, RELATED`);
+            throw badRequest(`Invalid mapping strength: "${input.strength}". Must be one of: EQUAL, SUPERSET, SUBSET, INTERSECT, RELATED`);
         }
         return db.requirementMapping.create({
             data: {
@@ -309,7 +310,7 @@ export class RequirementMappingRepository {
         const results = [];
         for (const input of inputs) {
             if (!isValidMappingStrength(input.strength)) {
-                throw new Error(`Invalid mapping strength: "${input.strength}"`);
+                throw badRequest(`Invalid mapping strength: "${input.strength}"`);
             }
             const result = await db.requirementMapping.upsert({
                 where: {

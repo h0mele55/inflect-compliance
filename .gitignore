@@ -27,12 +27,29 @@ tsconfig.tsbuildinfo
 coverage/
 test-results/
 playwright-report/
+blob-report/
 jest_out.json
 jest_out_utf8.txt
 jest-debug.txt
 test-output*.json
 test-out.txt
 test-login.js
+test_output.txt
+test_result.json
+test-results.json
+test-results-json.txt
+testall*.txt
+
+# Playwright debug artifacts
+pw-debug.json
+pw-debug.txt
+pw-*.json
+pw-*.txt
+
+# TSC / lint output dumps
+tsc-*.txt
+ts_check.txt
+lint_output.txt
 
 # IDE
 .vscode/
@@ -50,7 +67,7 @@ tmp/
 *.log
 npm-debug.log*
 
-# Debug / scratch output
+# Debug / scratch output at repo root
 *-result.txt
 *-result*.txt
 *-output.txt
@@ -61,9 +78,32 @@ e2e_out.txt
 log.txt
 out.json
 prisma-status.txt
+prisma-err.txt
 playwright-errors.txt
 playwright-filters-errors.txt
 playwright-final.txt
 responsive-log.txt
-apply-rls.js
-test-db.js
+route-analysis.txt
+npm-ci-test.txt
+manual-dev-log.txt
+err_*.txt
+utf8.txt
+e2e-logout.json
+
+# Ad-hoc debug/utility scripts (root level only — not scripts/)
+/analyze.js
+/apply-rls.js
+/ensure-format-date-imports.js
+/patch-locale-dates.js
+/run_tests_debug.js
+/test-bull.js
+/test-db.js
+/wrap-api.js
+
+# Credential / sensitive dumps (should NEVER be versioned)
+cred-list.txt
+
+# V8 / Node profiling
+*.heapsnapshot
+*.cpuprofile
+*.pid

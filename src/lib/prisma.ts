@@ -4,6 +4,7 @@ import { getAuditContext } from './audit-context';
 import { redactSensitiveFields, extractChangedFields } from './audit-redact';
 import { registerSoftDeleteMiddleware } from './soft-delete';
 import { piiEncryptionMiddleware } from './security/pii-middleware';
+import { logger as auditMiddlewareLogger } from '@/lib/observability/logger';
 
 // ─── Write actions to intercept ───
 const WRITE_ACTIONS = new Set([
@@ -28,7 +29,7 @@ const EXCLUDED_MODELS = new Set([
  * Simple cuid-like ID generator for audit log entries.
  */
 function generateCuid(): string {
-    const uuid = require('crypto').randomUUID().replace(/-/g, '');
+    const uuid = crypto.randomUUID().replace(/-/g, '');
     return 'c' + uuid.substring(0, 24);
 }
 
@@ -187,7 +188,7 @@ function registerAuditMiddleware(client: PrismaClient): void {
         } catch (auditError) {
             // Best effort — never break the original operation
             if (env.NODE_ENV === 'development') {
-                console.warn('[audit-middleware] Failed to write audit log:', auditError);
+                auditMiddlewareLogger.warn('Failed to write audit log', { component: 'audit-middleware', error: auditError instanceof Error ? auditError.message : String(auditError) });
             }
         }
 

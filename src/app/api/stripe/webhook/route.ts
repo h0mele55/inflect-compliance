@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { constructWebhookEvent, handleWebhookEvent } from '@/lib/stripe';
+import { logger } from '@/lib/observability/logger';
 
 /**
  * POST /api/stripe/webhook
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         event = constructWebhookEvent(body, signature);
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Invalid signature';
-        console.error('[Stripe Webhook] Signature verification failed:', message);
+        logger.error('Stripe webhook signature verification failed', { component: 'stripe', error: message });
         return NextResponse.json({ error: `Webhook signature verification failed: ${message}` }, { status: 400 });
     }
 
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         await handleWebhookEvent(event);
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
-        console.error('[Stripe Webhook] Event processing failed:', message);
+        logger.error('Stripe webhook event processing failed', { component: 'stripe', error: message });
         // Return 200 anyway to prevent Stripe from retrying — we log the error
         // In production, this should alert to an error tracking service
     }

@@ -14,6 +14,7 @@ import type { RequestContext } from '../types';
 import { badRequest, internal } from '@/lib/errors/types';
 import { env } from '@/env';
 import { logger } from '@/lib/observability/logger';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 export interface MfaChallengeResult {
     success: boolean;
@@ -63,6 +64,7 @@ export async function verifyMfaChallenge(
         userId,
         role: 'READER' as const,
         permissions: { canAdmin: false, canWrite: false, canRead: true, canAudit: false, canExport: false },
+        appPermissions: getPermissionsForRole('READER'),
         requestId: crypto.randomUUID(),
     };
 

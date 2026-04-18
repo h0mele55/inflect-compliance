@@ -51,6 +51,9 @@ export async function listTenantMembers(ctx: RequestContext) {
                 invitedBy: {
                     select: { id: true, name: true },
                 },
+                customRole: {
+                    select: { id: true, name: true },
+                },
             },
             orderBy: { createdAt: 'asc' },
         })

@@ -200,12 +200,26 @@ test.describe('Reporting & Audit Narrative', () => {
         await expect(page.locator('#pack-status')).toContainText('DRAFT');
 
         // Freeze the pack
+        // The freeze operation creates snapshots for every item and attaches
+        // an SoA report. On cold environments this triggers JIT compilation
+        // of multiple API routes and can take 30-60s.
         const freezeBtn = page.locator('#freeze-pack-btn');
         await expect(freezeBtn).toBeVisible({ timeout: 5000 });
-        await freezeBtn.click();
 
-        // Wait for status to change to FROZEN
-        await expect(page.locator('#pack-status')).toContainText('FROZEN', { timeout: 10000 });
+        // Click freeze and wait for the API round-trip to complete.
+        // The client calls POST ?action=freeze, then re-fetches the pack.
+        await Promise.all([
+            page.waitForResponse(
+                resp => resp.url().includes('/audits/packs/') && resp.url().includes('action=freeze'),
+                { timeout: 90000 },
+            ),
+            freezeBtn.click(),
+        ]);
+
+        // After the freeze API responds, the page re-fetches pack data.
+        // Wait for that network activity to settle and the UI to update.
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await expect(page.locator('#pack-status')).toContainText('FROZEN', { timeout: 60000 });
 
         // Share button should now appear
         const shareBtn = page.locator('#share-pack-btn');
@@ -229,13 +243,14 @@ test.describe('Reporting & Audit Narrative', () => {
     test('G — shared pack is accessible without login (read-only)', async ({ browser }) => {
         expect(shareToken).toBeTruthy();
 
-        // Open a fresh browser context (no cookies, no login)
+        // Open a fresh browser context (no cookies, no login).
         const freshContext: BrowserContext = await browser.newContext();
         const freshPage = await freshContext.newPage();
 
         try {
-            await freshPage.goto(`/audit/shared/${shareToken}`);
-            await freshPage.waitForSelector('#shared-pack-name', { timeout: 15000 });
+            await freshPage.goto(`/audit/shared/${shareToken}`, { timeout: 30000 });
+            await freshPage.waitForLoadState('networkidle').catch(() => {});
+            await freshPage.waitForSelector('#shared-pack-name', { timeout: 30000 });
 
             // Verify the shared pack name is visible
             await expect(freshPage.locator('#shared-pack-name')).toBeVisible();
@@ -250,8 +265,10 @@ test.describe('Reporting & Audit Narrative', () => {
             await expect(freshPage.locator('#freeze-pack-btn')).not.toBeVisible();
             await expect(freshPage.locator('#share-pack-btn')).not.toBeVisible();
         } finally {
-            await freshPage.close();
-            await freshContext.close();
+            // Wrap cleanup in try-catch to handle ENOENT errors from Playwright's
+            // trace artifact finalization on Windows with manually-created contexts.
+            try { await freshPage.close(); } catch { /* ignore */ }
+            try { await freshContext.close(); } catch { /* ignore */ }
         }
     });
 });

@@ -212,11 +212,12 @@ export async function importLibrary(
     if (isNew) {
         result = await createAllRequirements(db, frameworkId, library, start);
     } else {
-        result = await updateRequirements(db, frameworkId, library, opts, start, existing.metadataJson);
+        // existing is guaranteed non-null when isNew is false
+        result = await updateRequirements(db, frameworkId, library, opts, start, existing!.metadataJson);
     }
 
     // 5. Record version history
-    const existingMetadata = isNew ? null : existing.metadataJson;
+    const existingMetadata = isNew ? null : existing!.metadataJson;
     const history = parseHistoryFromMetadata(existingMetadata);
     const assessableNodes = library.framework.nodes.filter(n => n.assessable);
     const allCodes = assessableNodes.map(n => n.refId);
@@ -234,7 +235,7 @@ export async function importLibrary(
 
     const updatedHistory = appendHistoryEntry(history, historyEntry);
     const updatedMetadataJson = mergeHistoryIntoMetadata(
-        isNew ? null : existing.metadataJson,
+        isNew ? null : existing!.metadataJson,
         updatedHistory,
     );
 

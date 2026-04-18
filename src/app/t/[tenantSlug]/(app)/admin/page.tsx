@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { listAuditLogs } from '@/app-layer/usecases/auditLog';
-import { Shield, CreditCard, KeyRound, ShieldCheck, Users, CloudCog, Plug } from 'lucide-react';
+import { Shield, CreditCard, KeyRound, ShieldCheck, ShieldPlus, Users, CloudCog, Plug } from 'lucide-react';
 import Link from 'next/link';
 import { AdminClient } from './AdminClient';
 
@@ -72,6 +72,22 @@ export default async function AdminPage({
                 >
                     <Shield className="w-3.5 h-3.5" />
                     Roles &amp; Access
+                </Link>
+                <Link
+                    href={tenantHref('/admin/roles')}
+                    className="btn btn-secondary"
+                    id="custom-roles-pill-btn"
+                >
+                    <ShieldPlus className="w-3.5 h-3.5" />
+                    Custom Roles
+                </Link>
+                <Link
+                    href={tenantHref('/admin/api-keys')}
+                    className="btn btn-secondary"
+                    id="api-keys-pill-btn"
+                >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    API Keys
                 </Link>
                 <Link
                     href={tenantHref('/admin/billing')}

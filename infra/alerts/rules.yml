@@ -1,0 +1,300 @@
+# Alerting Rules for inflect-compliance
+#
+# Compatible with: Prometheus Alertmanager, Grafana Unified Alerting
+#
+# These rules implement alerting thresholds defined in docs/slos.md.
+# They use the OTel metrics emitted by src/lib/observability/metrics.ts
+# and exposed via OTel Collector → Prometheus pipeline.
+#
+# Metric name convention:
+#   OTel dots (api.request.count) → Prometheus underscores (api_request_count)
+
+groups:
+  # ─── Error Rate Alerts ───────────────────────────────────────────────
+  - name: inflect.error_rate
+    interval: 30s
+    rules:
+      # Warning: error rate > 1% sustained for 10 minutes
+      - alert: ApiErrorRateWarning
+        expr: |
+          (
+            sum(rate(api_request_count{http_status_code=~"5.."}[5m]))
+            /
+            (sum(rate(api_request_count[5m])) > 0)
+          ) > 0.01
+        for: 10m
+        labels:
+          severity: warning
+          service: inflect-compliance
+          slo: error_rate
+        annotations:
+          summary: "API error rate exceeds 1% (SLO breach)"
+          description: |
+            The 5xx error rate has been above 1% for 10 minutes.
+            Current value: {{ $value | humanizePercentage }}
+            SLO target: < 1%
+            
+            Runbook:
+            1. Check structured logs: grep for level=50 (error) entries
+            2. Identify top failing routes via the SLO dashboard
+            3. Check database connectivity (/api/readyz)
+            4. Review recent deployments
+          dashboard: "/d/inflect-compliance-slos"
+
+      # Critical: error rate > 5% sustained for 5 minutes
+      - alert: ApiErrorRateCritical
+        expr: |
+          (
+            sum(rate(api_request_count{http_status_code=~"5.."}[5m]))
+            /
+            (sum(rate(api_request_count[5m])) > 0)
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: inflect-compliance
+          slo: error_rate
+        annotations:
+          summary: "CRITICAL: API error rate exceeds 5%"
+          description: |
+            The 5xx error rate has been above 5% for 5 minutes.
+            Current value: {{ $value | humanizePercentage }}
+            This indicates significant service degradation.
+            
+            Immediate actions:
+            1. Check /api/readyz for dependency failures
+            2. Check for recent deployments — consider rollback
+            3. Review Sentry for error clustering
+            4. Check database and Redis health
+          dashboard: "/d/inflect-compliance-slos"
+
+  # ─── Latency Alerts ──────────────────────────────────────────────────
+  - name: inflect.latency
+    interval: 30s
+    rules:
+      # Warning: P95 latency > 500ms sustained for 10 minutes
+      - alert: ApiP95LatencyWarning
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(api_request_duration_bucket{
+              http_route!~"/api/(livez|readyz|health|staging/seed)",
+              http_route!~"/api/t/[^/]+/(reports/export|files)",
+              http_route!="/api/stripe/webhook"
+            }[5m])) by (le)
+          ) > 500
+        for: 10m
+        labels:
+          severity: warning
+          service: inflect-compliance
+          slo: latency_p95
+        annotations:
+          summary: "API P95 latency exceeds 500ms (SLO breach)"
+          description: |
+            P95 API response time has been above 500ms for 10 minutes.
+            Current P95: {{ $value | humanize }}ms
+            SLO target: < 500ms
+            
+            Runbook:
+            1. Check the "Top Slow Routes" table in the SLO dashboard
+            2. Look for slow database queries in structured logs (durationMs field)
+            3. Check database connection pool health
+            4. Check for lock contention or table bloat
+          dashboard: "/d/inflect-compliance-slos"
+
+      # Critical: P95 latency > 2000ms sustained for 5 minutes
+      - alert: ApiP95LatencyCritical
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(api_request_duration_bucket{
+              http_route!~"/api/(livez|readyz|health|staging/seed)",
+              http_route!~"/api/t/[^/]+/(reports/export|files)",
+              http_route!="/api/stripe/webhook"
+            }[5m])) by (le)
+          ) > 2000
+        for: 5m
+        labels:
+          severity: critical
+          service: inflect-compliance
+          slo: latency_p95
+        annotations:
+          summary: "CRITICAL: API P95 latency exceeds 2000ms"
+          description: |
+            P95 API response time has been above 2 seconds for 5 minutes.
+            Current P95: {{ $value | humanize }}ms
+            This indicates a major performance degradation.
+            
+            Immediate actions:
+            1. Check database health — likely query or connection issue
+            2. Check for runaway queries: SELECT * FROM pg_stat_activity WHERE state = 'active'
+            3. Check Redis connectivity if caching is expected
+            4. Consider restarting the application if event loop is blocked
+          dashboard: "/d/inflect-compliance-slos"
+
+  # ─── Health Check Alerts ─────────────────────────────────────────────
+  - name: inflect.health
+    interval: 15s
+    rules:
+      # Warning: readyz probe has failed for 30+ seconds (2 consecutive checks)
+      - alert: ReadyzProbeFailure
+        expr: |
+          probe_success{job="blackbox-readyz"} == 0
+        for: 30s
+        labels:
+          severity: warning
+          service: inflect-compliance
+          slo: health_check
+        annotations:
+          summary: "Readiness probe failing (/api/readyz)"
+          description: |
+            The readiness probe has been failing for 30+ seconds.
+            This means a critical dependency (database or Redis) is unreachable.
+            
+            Runbook:
+            1. Check /api/readyz directly for structured failure info
+            2. Verify PostgreSQL connectivity
+            3. Verify Redis connectivity (if REDIS_URL is configured)
+            4. Check network between app and database
+          dashboard: "/d/inflect-compliance-slos"
+
+      # Critical: readyz probe has failed for 45+ seconds (3 consecutive checks)
+      - alert: ReadyzProbeCritical
+        expr: |
+          probe_success{job="blackbox-readyz"} == 0
+        for: 45s
+        labels:
+          severity: critical
+          service: inflect-compliance
+          slo: health_check
+        annotations:
+          summary: "CRITICAL: Readiness probe failing for 45+ seconds"
+          description: |
+            The readiness probe has been failing for 45+ seconds.
+            The service is degraded and should be removed from the load balancer.
+            
+            Immediate actions:
+            1. Check database server health
+            2. Check Redis server health (if configured)
+            3. Check container resources (memory, CPU)
+            4. Consider failover or restart
+          dashboard: "/d/inflect-compliance-slos"
+
+      # Critical: livez probe failure — process is unresponsive
+      - alert: LivezProbeFailure
+        expr: |
+          probe_success{job="blackbox-livez"} == 0
+        for: 15s
+        labels:
+          severity: critical
+          service: inflect-compliance
+          slo: health_check
+        annotations:
+          summary: "CRITICAL: Liveness probe failing — process unresponsive"
+          description: |
+            The liveness probe has failed. The Node.js process is unresponsive.
+            The container orchestrator should restart this instance.
+            
+            Immediate actions:
+            1. Check container status (is it OOMKilled?)
+            2. Check for event loop blocking (CPU-bound operations)
+            3. Force-restart the container
+            4. Check for memory leaks if this recurs
+          dashboard: "/d/inflect-compliance-slos"
+
+  # ─── Availability (Burn Rate) Alerts ─────────────────────────────────
+  - name: inflect.availability
+    interval: 60s
+    rules:
+      # Multi-window burn rate alert for 99.9% SLO
+      # If we're burning error budget 14.4x faster than allowed over 1h
+      # AND 6x faster over 5m, we'll breach our SLO within 1 day.
+      - alert: ApiAvailabilityBurnRateHigh
+        expr: |
+          (
+            (
+              sum(rate(api_request_count{http_status_code=~"5.."}[1h]))
+              /
+              (sum(rate(api_request_count[1h])) > 0)
+            ) > (14.4 * 0.001)
+          )
+          and
+          (
+            (
+              sum(rate(api_request_count{http_status_code=~"5.."}[5m]))
+              /
+              (sum(rate(api_request_count[5m])) > 0)
+            ) > (6 * 0.001)
+          )
+        for: 2m
+        labels:
+          severity: critical
+          service: inflect-compliance
+          slo: availability
+        annotations:
+          summary: "CRITICAL: API error budget burn rate is dangerously high"
+          description: |
+            The error budget for the 99.9% availability SLO is being consumed
+            at a rate that will exhaust the monthly budget within 1 day.
+            
+            1h error rate: {{ $value | humanizePercentage }}
+            Budget allowed: 0.1% per 30 days (43 min/month)
+            
+            This alert uses multi-window burn rate detection to avoid
+            false positives from brief spikes.
+            
+            Immediate actions:
+            1. Check the SLO dashboard for error distribution
+            2. Identify failing routes and error codes
+            3. Consider rollback if correlated with recent deployment
+          dashboard: "/d/inflect-compliance-slos"
+
+  # ─── Job Execution Alerts ────────────────────────────────────────────
+  - name: inflect.jobs
+    interval: 60s
+    rules:
+      # Warning: any job has > 50% failure rate over 15 minutes
+      - alert: JobFailureRateWarning
+        expr: |
+          (
+            sum(rate(job_execution_count{job_status="failure"}[15m])) by (job_name)
+            /
+            (sum(rate(job_execution_count[15m])) by (job_name) > 0)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: inflect-compliance
+          slo: job_health
+        annotations:
+          summary: "Job {{ $labels.job_name }} failure rate exceeds 50%"
+          description: |
+            The job "{{ $labels.job_name }}" has been failing more than half
+            of its executions for 5+ minutes.
+            Current failure rate: {{ $value | humanizePercentage }}
+
+            Runbook:
+            1. Check structured logs for job_name={{ $labels.job_name }}
+            2. Review recent code changes to the job executor
+            3. Check database/Redis connectivity
+          dashboard: "/d/inflect-compliance-slos"
+
+      # Warning: queue depth (waiting) exceeds 100 jobs for 10 minutes
+      - alert: QueueDepthBacklogWarning
+        expr: |
+          job_queue_depth{queue_state="waiting"} > 100
+        for: 10m
+        labels:
+          severity: warning
+          service: inflect-compliance
+          slo: job_health
+        annotations:
+          summary: "Job queue backlog exceeds 100 waiting jobs"
+          description: |
+            The BullMQ queue has {{ $value }} jobs waiting for processing.
+            This may indicate worker capacity issues or a processing stall.
+
+            Runbook:
+            1. Check if workers are running
+            2. Check for stuck/active jobs
+            3. Verify Redis connectivity
+            4. Consider scaling worker concurrency
+          dashboard: "/d/inflect-compliance-slos"

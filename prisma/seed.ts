@@ -14,28 +14,28 @@ async function main() {
     });
     console.log('✅ Tenant:', tenant.name);
 
-    // ─── Users ───
+    // ─── Users (no role/tenantId — membership is sole authority) ───
     const pwd = await bcrypt.hash('password123', 10);
 
     const admin = await prisma.user.upsert({
         where: { email: 'admin@acme.com' },
         update: {},
-        create: { tenantId: tenant.id, email: 'admin@acme.com', passwordHash: pwd, name: 'Alice Admin', role: 'ADMIN' },
+        create: { email: 'admin@acme.com', passwordHash: pwd, name: 'Alice Admin' },
     });
     const editor = await prisma.user.upsert({
         where: { email: 'editor@acme.com' },
         update: {},
-        create: { tenantId: tenant.id, email: 'editor@acme.com', passwordHash: pwd, name: 'Bob Editor', role: 'EDITOR' },
+        create: { email: 'editor@acme.com', passwordHash: pwd, name: 'Bob Editor' },
     });
     const reader = await prisma.user.upsert({
         where: { email: 'viewer@acme.com' },
         update: {},
-        create: { tenantId: tenant.id, email: 'viewer@acme.com', passwordHash: pwd, name: 'Carol Reader', role: 'READER' },
+        create: { email: 'viewer@acme.com', passwordHash: pwd, name: 'Carol Reader' },
     });
     const auditor = await prisma.user.upsert({
         where: { email: 'auditor@acme.com' },
         update: {},
-        create: { tenantId: tenant.id, email: 'auditor@acme.com', passwordHash: pwd, name: 'Dan Auditor', role: 'AUDITOR' },
+        create: { email: 'auditor@acme.com', passwordHash: pwd, name: 'Dan Auditor' },
     });
     console.log('✅ Users created');
 

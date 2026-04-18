@@ -1,0 +1,118 @@
+/**
+ * ProgressCard — Reusable progress/coverage visualization.
+ *
+ * Renders a glass-card with a labeled progress bar, percentage,
+ * and optional breakdown segments.
+ *
+ * @example
+ * ```tsx
+ * <ProgressCard
+ *     label="Control Coverage"
+ *     value={75.3}
+ *     max={100}
+ *     segments={[
+ *         { label: 'Implemented', value: 15, color: 'bg-emerald-500' },
+ *         { label: 'In Progress', value: 3, color: 'bg-amber-500' },
+ *         { label: 'Not Started', value: 2, color: 'bg-slate-600' },
+ *     ]}
+ * />
+ * ```
+ */
+
+// ─── Props ──────────────────────────────────────────────────────────
+
+export interface ProgressSegment {
+    label: string;
+    value: number;
+    color: string;
+}
+
+export interface ProgressCardProps {
+    /** Card heading */
+    label: string;
+    /** Current value (0–max) */
+    value: number;
+    /** Maximum value (default: 100) */
+    max?: number;
+    /** Gradient for the main progress bar */
+    gradient?: string;
+    /** Optional breakdown segments (stacked bar) */
+    segments?: ProgressSegment[];
+    /** Footer text / link */
+    footer?: React.ReactNode;
+    /** Optional CSS class */
+    className?: string;
+    /** Optional test-id */
+    id?: string;
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+export default function ProgressCard({
+    label,
+    value,
+    max = 100,
+    gradient = 'from-brand-500 to-emerald-500',
+    segments,
+    footer,
+    className = '',
+    id,
+}: ProgressCardProps) {
+    const percent = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+    const displayPercent = percent.toFixed(1);
+
+    return (
+        <div id={id} className={`glass-card p-5 ${className}`}>
+            <h3 className="text-sm font-semibold text-slate-300 mb-3">{label}</h3>
+
+            {/* Main progress bar */}
+            <div className="flex items-center gap-3">
+                <div className="flex-1 bg-slate-800 rounded-full h-3 overflow-hidden">
+                    {segments && segments.length > 0 ? (
+                        // Stacked segments
+                        <div className="flex h-full">
+                            {segments.map((seg) => {
+                                const segPercent = max > 0 ? (seg.value / max) * 100 : 0;
+                                return (
+                                    <div
+                                        key={seg.label}
+                                        className={`h-full ${seg.color} transition-all duration-500`}
+                                        style={{ width: `${segPercent}%` }}
+                                        title={`${seg.label}: ${seg.value}`}
+                                    />
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        // Single gradient bar
+                        <div
+                            className={`h-full bg-gradient-to-r ${gradient} rounded-full transition-all duration-500`}
+                            style={{ width: `${percent}%` }}
+                        />
+                    )}
+                </div>
+                <span className="text-sm font-medium text-slate-300 tabular-nums min-w-[3.5rem] text-right">
+                    {displayPercent}%
+                </span>
+            </div>
+
+            {/* Segment legend */}
+            {segments && segments.length > 0 && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
+                    {segments.map((seg) => (
+                        <div key={seg.label} className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <span className={`w-2 h-2 rounded-full ${seg.color}`} />
+                            <span>{seg.label}</span>
+                            <span className="text-slate-500 tabular-nums">({seg.value})</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Footer */}
+            {footer && (
+                <div className="mt-3 text-xs text-slate-400">{footer}</div>
+            )}
+        </div>
+    );
+}

@@ -171,9 +171,14 @@ export async function reviewEvidence(ctx: RequestContext, id: string, data: { ac
             let ownerUser = evidence.ownerUserId
                 ? await db.user.findUnique({ where: { id: evidence.ownerUserId } })
                 : null;
-            // Fallback: legacy free-text name lookup (transitional)
+            // Fallback: legacy free-text name lookup (transitional) — use membership to scope by tenant
             if (!ownerUser && evidence.owner) {
-                ownerUser = await db.user.findFirst({ where: { tenantId: ctx.tenantId, name: evidence.owner } });
+                ownerUser = await db.user.findFirst({
+                    where: {
+                        name: evidence.owner,
+                        tenantMemberships: { some: { tenantId: ctx.tenantId, status: 'ACTIVE' } },
+                    },
+                });
             }
             if (ownerUser) {
                 await db.notification.create({

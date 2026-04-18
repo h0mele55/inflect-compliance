@@ -124,7 +124,7 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
     return (
         <>
             <div className="flex items-center justify-between">
-                <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-slate-400 text-sm">{findings.filter(f => f.status !== 'CLOSED').length} {t.open.toLowerCase()}</p></div>
+                <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-slate-400 text-sm">{findings.filter((f: any) => f.status !== 'CLOSED').length} {t.open.toLowerCase()}</p></div>
                 <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t.newFinding}</button>
             </div>
 
@@ -146,7 +146,7 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
                 <table className="data-table">
                     <thead><tr><th>{t.findingTitle}</th><th>{t.severity}</th><th>{t.type}</th><th>{t.owner}</th><th>{t.status}</th><th>{t.actions}</th></tr></thead>
                     <tbody>
-                        {findings.map(f => (
+                        {findings.map((f: any) => (
                             <tr key={f.id}>
                                 <td className="font-medium text-white text-sm">{f.title}</td>
                                 <td><span className={`badge ${SEV_BADGE[f.severity]}`}>{sevLabel(f.severity)}</span></td>

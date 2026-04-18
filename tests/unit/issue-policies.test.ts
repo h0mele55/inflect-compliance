@@ -11,6 +11,7 @@ import {
     assertCanManageLinks,
 } from '@/app-layer/policies/issue.policies';
 import type { RequestContext } from '@/app-layer/types';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 function makeCtx(role: 'ADMIN' | 'EDITOR' | 'READER' | 'AUDITOR'): RequestContext {
     const canWrite = role === 'ADMIN' || role === 'EDITOR';
@@ -28,6 +29,7 @@ function makeCtx(role: 'ADMIN' | 'EDITOR' | 'READER' | 'AUDITOR'): RequestContex
             canAudit,
             canExport: canAdmin || canAudit,
         },
+        appPermissions: getPermissionsForRole(role),
     };
 }
 

@@ -42,10 +42,10 @@ describe('RBAC Guardrail Scans', () => {
     describe('Controls page RBAC', () => {
         test('controls server page resolves appPerms and passes to client island', () => {
             const content = readFile('app/t/[tenantSlug]/(app)/controls/page.tsx');
-            // Server component must resolve permissions via getPermissionsForRole
-            expect(content).toMatch(/getPermissionsForRole/);
+            // Server component must resolve permissions via ctx.appPermissions (from custom role resolution)
+            expect(content).toMatch(/ctx\.appPermissions\.controls/);
             // Must pass appPermissions (including controls) to client island
-            expect(content).toMatch(/appPerms\.controls/);
+            expect(content).toMatch(/appPermissions/);
         });
 
         test('controls client island receives and enforces create/edit permissions', () => {
@@ -109,7 +109,7 @@ describe('RBAC Guardrail Scans', () => {
     describe('Vendors page RBAC', () => {
         test('vendor create button uses appPerms', () => {
             const content = readFile('app/t/[tenantSlug]/(app)/vendors/page.tsx');
-            expect(content).toMatch(/appPerms\.vendors\.create/);
+            expect(content).toMatch(/appPermissions\.vendors\.create/);
         });
     });
 

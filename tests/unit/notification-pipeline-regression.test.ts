@@ -1,3 +1,4 @@
+export {};
 /**
  * Notification Pipeline — Performance & Regression Guards
  *
@@ -291,11 +292,11 @@ describe('REGRESSION: schedule cannot contain duplicate scan paths', () => {
         const scheduledNames = SCHEDULED_JOBS.map(j => j.name);
 
         const hasDispatch = scheduledNames.includes('notification-dispatch');
-        const hasMonitors = MONITOR_JOB_NAMES.some(m => scheduledNames.includes(m));
+        const hasMonitors = MONITOR_JOB_NAMES.some(m => (scheduledNames as string[]).includes(m));
 
         // Either dispatch exists alone, or monitors exist alone. Never both.
         if (hasDispatch && hasMonitors) {
-            const duplicates = MONITOR_JOB_NAMES.filter(m => scheduledNames.includes(m));
+            const duplicates = MONITOR_JOB_NAMES.filter(m => (scheduledNames as string[]).includes(m));
             fail(
                 `Schedule contains both notification-dispatch AND standalone monitors: [${duplicates.join(', ')}]. ` +
                 `This will cause duplicate DB scans. Remove the standalone monitors or notification-dispatch.`

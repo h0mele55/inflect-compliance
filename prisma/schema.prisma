@@ -70,7 +70,6 @@ model Tenant {
   onboarding                TenantOnboarding?
   scimTokens                TenantScimToken[]
   securitySettings          TenantSecuritySettings?
-  users                     User[]
   identityLinks             UserIdentityLink[]
   mfaEnrollments            UserMfaEnrollment[]
   userNotificationPrefs     UserNotificationPreference[]
@@ -84,6 +83,9 @@ model Tenant {
   vendorLinks               VendorLink[]
   vendorRelationships       VendorRelationship[]
   syncMappings              IntegrationSyncMapping[]
+  customRoles               TenantCustomRole[]
+  apiKeys                   TenantApiKey[]
+  complianceSnapshots       ComplianceSnapshot[]
 }
 
 model TenantOnboarding {
@@ -100,34 +102,83 @@ model TenantOnboarding {
   tenant         Tenant           @relation(fields: [tenantId], references: [id])
 }
 
+/// Tenant-scoped custom role with granular permission overrides.
+/// Coexists with the built-in Role enum (ADMIN/EDITOR/READER/AUDITOR).
+/// When a TenantMembership has a customRoleId, the permissionsJson from
+/// this model takes precedence over the enum-based defaults for UI gating.
+/// Backend authorization should merge/override accordingly.
+model TenantCustomRole {
+  id              String             @id @default(cuid())
+  tenantId        String
+  name            String             /// Display name, e.g. "Compliance Lead"
+  description     String?            /// Optional description of the role's purpose
+  baseRole        Role               @default(READER) /// Fallback enum role for coarse checks
+  permissionsJson Json               /// Typed PermissionSet — see src/lib/permissions.ts
+  isActive        Boolean            @default(true)   /// Soft-disable without deleting assignments
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  tenant          Tenant             @relation(fields: [tenantId], references: [id])
+  memberships     TenantMembership[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+}
+
+/// Tenant-scoped API keys for machine-to-machine authentication.
+/// Keys are stored as SHA-256 hashes — the plaintext is shown only once at creation.
+/// Supports expiry, revocation, scope restrictions, and last-used tracking.
+model TenantApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String    /// Human-friendly label, e.g. "CI/CD Pipeline"
+  keyPrefix   String    /// First 8 chars of the plaintext key (for identification)
+  keyHash     String    /// SHA-256 hash of the full plaintext key
+  scopes      Json      @default("[]") /// JSON array of scope strings, e.g. ["controls:read","evidence:write"]
+  expiresAt   DateTime? /// Optional expiry — null = no expiry
+  revokedAt   DateTime? /// Non-null = revoked
+  lastUsedAt  DateTime? /// Updated on each successful auth
+  lastUsedIp  String?   /// IP of last auth request
+  createdById String    /// User who created this key
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  createdBy   User      @relation("ApiKeyCreator", fields: [createdById], references: [id])
+
+  @@unique([keyHash])
+  @@index([tenantId])
+  @@index([tenantId, revokedAt])
+}
+
 model TenantMembership {
-  id              String           @id @default(cuid())
+  id              String            @id @default(cuid())
   tenantId        String
   userId          String
-  role            Role             @default(READER)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  role            Role              @default(READER)
+  customRoleId    String?           /// Optional FK to TenantCustomRole for granular overrides
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
   deactivatedAt   DateTime?
   invitedAt       DateTime?
   invitedByUserId String?
-  status          MembershipStatus @default(ACTIVE)
-  invitedBy       User?            @relation("MembershipInviter", fields: [invitedByUserId], references: [id])
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  user            User             @relation(fields: [userId], references: [id])
+  status          MembershipStatus  @default(ACTIVE)
+  customRole      TenantCustomRole? @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  invitedBy       User?             @relation("MembershipInviter", fields: [invitedByUserId], references: [id])
+  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  user            User              @relation(fields: [userId], references: [id])
 
   @@unique([tenantId, userId])
   @@index([tenantId, status])
+  @@index([customRoleId])
 }
 
 model User {
   id                            String                       @id @default(cuid())
-  tenantId                      String?
   email                         String                       @unique
   passwordHash                  String?
   name                          String?
   emailVerified                 DateTime?
   image                         String?
-  role                          Role                         @default(READER)
   createdAt                     DateTime                     @default(now())
   updatedAt                     DateTime                     @updatedAt
   sessionVersion                Int                          @default(0)
@@ -173,7 +224,6 @@ model User {
   invitesSent                   TenantInvite[]
   invitedMemberships            TenantMembership[]           @relation("MembershipInviter")
   tenantMemberships             TenantMembership[]
-  tenant                        Tenant?                      @relation(fields: [tenantId], references: [id])
   identityLinks                 UserIdentityLink[]
   mfaEnrollments                UserMfaEnrollment[]
   notificationPreferences       UserNotificationPreference[]
@@ -182,6 +232,7 @@ model User {
   assessmentsRequested          VendorAssessment[]           @relation("AssessmentRequester")
   vendorDocsUploaded            VendorDocument[]             @relation("VendorDocUploader")
   vendorBundlesCreated          VendorEvidenceBundle[]       @relation("EvidenceBundleCreator")
+  apiKeysCreated                TenantApiKey[]               @relation("ApiKeyCreator")
 }
 
 model Account {
@@ -2384,4 +2435,68 @@ enum ConflictStrategy {
   REMOTE_WINS
   LOCAL_WINS
   MANUAL
+}
+
+/// Daily compliance KPI snapshot for trend reporting.
+/// One row per tenant per day. Idempotent via @@unique([tenantId, snapshotDate]).
+/// Stores denormalized KPI values computed by the daily snapshot job.
+model ComplianceSnapshot {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  /// Calendar date (midnight UTC) — NOT a full timestamp.
+  /// Enables clean GROUP BY / ORDER BY for trend queries.
+  snapshotDate          DateTime @db.Date
+
+  // ── Control Coverage ──
+  controlsTotal         Int      @default(0)
+  controlsApplicable    Int      @default(0)
+  controlsImplemented   Int      @default(0)
+  controlsInProgress    Int      @default(0)
+  controlsNotStarted    Int      @default(0)
+  /// Cached coverage % × 10 (e.g. 753 = 75.3%). Int avoids float precision issues.
+  controlCoverageBps    Int      @default(0)
+
+  // ── Risks ──
+  risksTotal            Int      @default(0)
+  risksOpen             Int      @default(0)
+  risksMitigating       Int      @default(0)
+  risksAccepted         Int      @default(0)
+  risksClosed           Int      @default(0)
+  risksLow              Int      @default(0)
+  risksMedium           Int      @default(0)
+  risksHigh             Int      @default(0)
+  risksCritical         Int      @default(0)
+
+  // ── Evidence ──
+  evidenceTotal         Int      @default(0)
+  evidenceOverdue       Int      @default(0)
+  evidenceDueSoon7d     Int      @default(0)
+  evidenceDueSoon30d    Int      @default(0)
+  evidenceCurrent       Int      @default(0)
+
+  // ── Policies ──
+  policiesTotal         Int      @default(0)
+  policiesPublished     Int      @default(0)
+  policiesOverdueReview Int      @default(0)
+
+  // ── Tasks ──
+  tasksTotal            Int      @default(0)
+  tasksOpen             Int      @default(0)
+  tasksOverdue          Int      @default(0)
+
+  // ── Vendors ──
+  vendorsTotal          Int      @default(0)
+  vendorsOverdueReview  Int      @default(0)
+
+  // ── Findings ──
+  findingsOpen          Int      @default(0)
+
+  // ── Meta ──
+  createdAt             DateTime @default(now())
+
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, snapshotDate])
+  @@index([tenantId, snapshotDate])
+  @@index([tenantId])
 }

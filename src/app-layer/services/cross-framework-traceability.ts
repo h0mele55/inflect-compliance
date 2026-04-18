@@ -494,7 +494,7 @@ function gapStatusExplanation(status: GapStatus, bestConfidence: CoverageConfide
  */
 export async function analyzeGaps(
     sourceRequirementIds: readonly string[],
-    targetRequirements: readonly Array<{
+    targetRequirements: ReadonlyArray<{
         requirementId: string;
         requirementCode: string;
         requirementTitle: string;

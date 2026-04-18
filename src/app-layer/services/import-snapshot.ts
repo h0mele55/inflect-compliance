@@ -123,7 +123,7 @@ export async function createPreImportSnapshot(
         tenantId,
     });
 
-    log.info('creating pre-import snapshot', { reason });
+    log.info({ reason }, 'creating pre-import snapshot');
 
     // Step 1: Export current tenant data
     const exportResult = await exportTenantData({
@@ -155,13 +155,13 @@ export async function createPreImportSnapshot(
         reason,
     };
 
-    log.info('pre-import snapshot created', {
+    log.info({
         snapshotId,
         entityCount: snapshot.entityCount,
         sizeBytes: snapshot.sizeBytes,
         compressed: snapshot.compressed,
         durationMs,
-    });
+    }, 'pre-import snapshot created');
 
     return { snapshot, durationMs };
 }

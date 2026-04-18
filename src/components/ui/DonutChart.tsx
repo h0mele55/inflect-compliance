@@ -1,0 +1,210 @@
+/**
+ * DonutChart — Lightweight SVG donut chart for distribution visualization.
+ *
+ * Zero external dependencies. Uses SVG circle + stroke-dasharray
+ * to render proportional arcs. Center can display a summary value.
+ *
+ * Design:
+ *   - Dark-theme friendly (transparent background, slate text)
+ *   - Accessible with aria-labels and titles
+ *   - Responsive via viewBox (scales to container)
+ *   - Smooth segment transitions
+ *
+ * @example
+ * ```tsx
+ * <DonutChart
+ *     segments={[
+ *         { label: 'Open', value: 10, color: '#f59e0b' },
+ *         { label: 'Mitigating', value: 5, color: '#22c55e' },
+ *         { label: 'Closed', value: 3, color: '#64748b' },
+ *     ]}
+ *     centerLabel="10"
+ *     centerSub="Open"
+ *     size={160}
+ * />
+ * ```
+ */
+
+// ─── Props ──────────────────────────────────────────────────────────
+
+export interface DonutSegment {
+    /** Segment label (for legend and accessibility) */
+    label: string;
+    /** Numeric value */
+    value: number;
+    /** CSS/SVG color (hex, rgb, or Tailwind-compatible) */
+    color: string;
+}
+
+export interface DonutChartProps {
+    /** Data segments */
+    segments: DonutSegment[];
+    /** Diameter in px (default: 160) */
+    size?: number;
+    /** Stroke width for the arc (default: 20) */
+    strokeWidth?: number;
+    /** Center headline text (e.g. "75%") */
+    centerLabel?: string;
+    /** Center subtitle text (e.g. "Coverage") */
+    centerSub?: string;
+    /** Show legend below the chart */
+    showLegend?: boolean;
+    /** Optional CSS class */
+    className?: string;
+    /** Optional test-id */
+    id?: string;
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+export default function DonutChart({
+    segments,
+    size = 160,
+    strokeWidth = 20,
+    centerLabel,
+    centerSub,
+    showLegend = true,
+    className = '',
+    id,
+}: DonutChartProps) {
+    const total = segments.reduce((sum, s) => sum + s.value, 0);
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const center = size / 2;
+
+    // Empty state
+    if (total === 0) {
+        return (
+            <div id={id} className={`flex flex-col items-center ${className}`}>
+                <svg
+                    width={size}
+                    height={size}
+                    viewBox={`0 0 ${size} ${size}`}
+                    role="img"
+                    aria-label="No data available"
+                >
+                    <circle
+                        cx={center}
+                        cy={center}
+                        r={radius}
+                        fill="none"
+                        stroke="#334155"
+                        strokeWidth={strokeWidth}
+                        opacity={0.5}
+                    />
+                    <text
+                        x={center}
+                        y={center}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="#64748b"
+                        fontSize="14"
+                        fontFamily="Inter, system-ui, sans-serif"
+                    >
+                        No data
+                    </text>
+                </svg>
+            </div>
+        );
+    }
+
+    // Build offset arcs
+    let accumulatedOffset = 0;
+
+    return (
+        <div id={id} className={`flex flex-col items-center ${className}`}>
+            <svg
+                width={size}
+                height={size}
+                viewBox={`0 0 ${size} ${size}`}
+                role="img"
+                aria-label={`Donut chart: ${segments.map(s => `${s.label} ${s.value}`).join(', ')}`}
+            >
+                {/* Background ring */}
+                <circle
+                    cx={center}
+                    cy={center}
+                    r={radius}
+                    fill="none"
+                    stroke="#1e293b"
+                    strokeWidth={strokeWidth}
+                />
+
+                {/* Data segments */}
+                {segments.map((seg) => {
+                    if (seg.value <= 0) return null;
+                    const segPercent = seg.value / total;
+                    const dashLength = circumference * segPercent;
+                    const dashGap = circumference - dashLength;
+                    const offset = circumference * accumulatedOffset;
+
+                    accumulatedOffset += segPercent;
+
+                    return (
+                        <circle
+                            key={seg.label}
+                            cx={center}
+                            cy={center}
+                            r={radius}
+                            fill="none"
+                            stroke={seg.color}
+                            strokeWidth={strokeWidth}
+                            strokeDasharray={`${dashLength} ${dashGap}`}
+                            strokeDashoffset={-offset}
+                            strokeLinecap="butt"
+                            transform={`rotate(-90 ${center} ${center})`}
+                            className="transition-all duration-500"
+                        >
+                            <title>{`${seg.label}: ${seg.value} (${(segPercent * 100).toFixed(1)}%)`}</title>
+                        </circle>
+                    );
+                })}
+
+                {/* Center label */}
+                {centerLabel && (
+                    <text
+                        x={center}
+                        y={centerSub ? center - 6 : center}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="#f1f5f9"
+                        fontSize="22"
+                        fontWeight="700"
+                        fontFamily="Inter, system-ui, sans-serif"
+                    >
+                        {centerLabel}
+                    </text>
+                )}
+                {centerSub && (
+                    <text
+                        x={center}
+                        y={center + 14}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="#94a3b8"
+                        fontSize="11"
+                        fontFamily="Inter, system-ui, sans-serif"
+                    >
+                        {centerSub}
+                    </text>
+                )}
+            </svg>
+
+            {/* Legend */}
+            {showLegend && (
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
+                    {segments.map((seg) => (
+                        <div key={seg.label} className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <span
+                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: seg.color }}
+                            />
+                            <span>{seg.label}</span>
+                            <span className="text-slate-500 tabular-nums">({seg.value})</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}

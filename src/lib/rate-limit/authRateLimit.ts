@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { env } from '@/env';
+import { edgeLogger } from '@/lib/observability/edge-logger';
 
 // Define logical tiers for endpoints
 type EndpointTier = 'high' | 'medium' | 'low';
@@ -37,7 +38,7 @@ function initUpstash() {
             low: new Ratelimit({ redis: _redis, limiter: Ratelimit.slidingWindow(60, '60 s') })
         };
     } catch (error) {
-        console.error('[RateLimit] Failed to initialize Upstash Redis:', error);
+        edgeLogger.error('Failed to initialize Upstash Redis', { component: 'rate-limit', err: String(error) });
     }
 }
 
@@ -178,7 +179,7 @@ export async function checkAuthRateLimit(req: NextRequest): Promise<{
         });
 
         if (!rlResult.ok) {
-            console.warn(`[RateLimit block] IP exceeded limit for tier ${tier} on ${pathname}`);
+            edgeLogger.warn('Rate limit exceeded', { component: 'rate-limit', tier, pathname });
             rlHeaders.set('Retry-After', rlResult.retryAfter.toString());
 
             // Return appropriate 429 response structure
@@ -196,7 +197,7 @@ export async function checkAuthRateLimit(req: NextRequest): Promise<{
     } catch (error) {
         // GLOBAL CIRCUIT BREAKER
         // If everything crashes (e.g. Upstash offline), we fail-open so people can still login to the SaaS.
-        console.error('[RateLimit exception] Failing open globally:', error);
+        edgeLogger.error('Rate limit exception, failing open', { component: 'rate-limit', err: String(error) });
         return { ok: true };
     }
 }

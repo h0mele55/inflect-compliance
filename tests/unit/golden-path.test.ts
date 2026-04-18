@@ -10,6 +10,7 @@
  */
 
 import type { RequestContext } from '@/app-layer/types';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 // ─── Mock appendAuditEntry BEFORE importing logEvent ───
 
@@ -39,6 +40,7 @@ function createCtx(overrides: Partial<RequestContext> = {}): RequestContext {
             canAudit: true,
             canExport: true,
         },
+        appPermissions: getPermissionsForRole((overrides.role ?? 'ADMIN') as any),
         ...overrides,
     };
 }

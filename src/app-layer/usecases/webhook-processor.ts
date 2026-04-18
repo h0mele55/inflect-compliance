@@ -25,6 +25,7 @@ import { PrismaLocalStore } from '../integrations/prisma-local-store';
 import { extractSignature, verifyHmacSha256, verifyGitHubSignature } from '../integrations/webhook-crypto';
 import { decryptField } from '@/lib/security/encryption';
 import { logger } from '@/lib/observability/logger';
+import { getPermissionsForRole } from '@/lib/permissions';
 import crypto from 'crypto';
 
 /** Dedup window: ignore duplicate payloads within this period */
@@ -255,6 +256,7 @@ export async function processIncomingWebhook(input: WebhookInput): Promise<Webho
         requestId,
         role: 'ADMIN' as const,
         permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
+        appPermissions: getPermissionsForRole('ADMIN'),
     };
 
     // 8. Dispatch to provider handler if it supports webhooks

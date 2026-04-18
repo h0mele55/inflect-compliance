@@ -1,6 +1,7 @@
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { appendAuditEntry } from '@/lib/audit';
+import { validateAuditDetailsJson } from '../schemas/json-columns.schemas';
 
 export interface AuditEventPayload {
     action: string;
@@ -39,7 +40,7 @@ export async function logEvent(_db: PrismaTx, ctx: RequestContext, payload: Audi
         entityId: payload.entityId,
         action: payload.action,
         details: combinedDetails,
-        detailsJson: payload.detailsJson,
+        detailsJson: validateAuditDetailsJson(payload.detailsJson),
         requestId: ctx.requestId,
         metadataJson: safeMetadata,
     });

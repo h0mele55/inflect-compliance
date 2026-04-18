@@ -9,6 +9,7 @@
  */
 import { RequestContext } from '@/app-layer/types';
 import { computePermissions } from '@/lib/tenant-context';
+import { getPermissionsForRole } from '@/lib/permissions';
 import type { Role } from '@prisma/client';
 
 // Mock appendAuditEntry to avoid Prisma dependency
@@ -47,6 +48,7 @@ function makeCtx(role: Role, userId = 'user-1'): RequestContext {
         tenantSlug: 'acme-co',
         role,
         permissions: computePermissions(role),
+        appPermissions: getPermissionsForRole(role),
     };
 }
 

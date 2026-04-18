@@ -91,7 +91,7 @@ function makeFrameworkResult(action: 'created' | 'updated' | 'skipped', urn: str
         urn,
         requirementStats: { created: 10, updated: 0, deprecated: 0, unchanged: 0, total: 10 },
         durationMs: 50,
-    } as ImportResult;
+    } as unknown as ImportResult;
 }
 
 function makeMappingResult(overrides: Partial<ImportMappingSetResult> = {}): ImportMappingSetResult {

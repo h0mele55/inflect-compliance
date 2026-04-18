@@ -11,6 +11,7 @@ import {
 } from '@/app-layer/policies/risk.policies';
 import { RequestContext } from '@/app-layer/types';
 import { Role } from '@prisma/client';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 function makeCtx(role: Role): RequestContext {
     const canRead = true; // All roles can read
@@ -30,6 +31,7 @@ function makeCtx(role: Role): RequestContext {
             canAudit,
             canExport: canRead,
         },
+        appPermissions: getPermissionsForRole(role),
     };
 }
 

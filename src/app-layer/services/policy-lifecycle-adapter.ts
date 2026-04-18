@@ -119,7 +119,7 @@ export const POLICY_AUDIT_CONFIG: LifecycleAuditConfig = {
     actionPrefix: 'POLICY',
 };
 
-// ─── Validation ──────────────────────────────────────────────────────
+import { badRequest } from '@/lib/errors/types';
 
 /**
  * Pre-publish validation for policy content.
@@ -130,10 +130,10 @@ export const POLICY_AUDIT_CONFIG: LifecycleAuditConfig = {
  */
 export const validatePolicyPayload: PublishValidator<PolicyPayload> = (draft) => {
     if (draft.contentType === 'EXTERNAL_LINK' && !draft.externalUrl) {
-        throw new Error('externalUrl is required for EXTERNAL_LINK content type');
+        throw badRequest('externalUrl is required for EXTERNAL_LINK content type');
     }
     if ((draft.contentType === 'MARKDOWN' || draft.contentType === 'HTML') && !draft.contentText) {
-        throw new Error('contentText is required for MARKDOWN/HTML content type');
+        throw badRequest('contentText is required for MARKDOWN/HTML content type');
     }
 };
 

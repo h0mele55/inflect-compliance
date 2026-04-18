@@ -1,7 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { listAssets } from '@/app-layer/usecases/asset';
-import { getPermissionsForRole } from '@/lib/permissions';
 import { AssetsClient } from './AssetsClient';
 
 export const dynamic = 'force-dynamic';

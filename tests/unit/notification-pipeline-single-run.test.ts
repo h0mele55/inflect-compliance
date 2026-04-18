@@ -1,3 +1,4 @@
+export {};
 /**
  * Notification Pipeline — Single-Run Architecture Tests
  *
@@ -268,7 +269,7 @@ describe('Structural: notification-dispatch uses single-pass architecture', () =
         // These should NOT appear as separate scheduled entries
         // (they appear in comments/docs, which is fine)
         const nameEntries = source.match(/name:\s*'[^']+'/g) || [];
-        const scheduledNames = nameEntries.map(e => e.match(/'([^']+)'/)?.[1]);
+        const scheduledNames = nameEntries.map((e: string) => e.match(/'([^']+)'/)?.[1]);
 
         expect(scheduledNames).not.toContain('deadline-monitor');
         expect(scheduledNames).not.toContain('evidence-expiry-monitor');

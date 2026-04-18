@@ -15,6 +15,7 @@ jest.mock('@/app-layer/context', () => ({
 import { requireAdminCtx, requireWriteCtx, requireRoleCtx } from '@/lib/auth/require-admin';
 import { AppError } from '@/lib/errors/types';
 import type { RequestContext } from '@/app-layer/types';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 // ─── Helpers ───
 
@@ -32,6 +33,7 @@ function makeCtx(role: string): RequestContext {
             canAudit: role === 'AUDITOR' || role === 'ADMIN',
             canExport: role !== 'READER',
         },
+        appPermissions: getPermissionsForRole(role as RequestContext['role']),
     };
 }
 

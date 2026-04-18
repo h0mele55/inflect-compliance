@@ -53,7 +53,6 @@ import type {
     ConflictCheckResult,
     WebhookPullInput,
     WebhookPullResult,
-    WebhookPullResult,
     SyncEvent,
 } from './sync-types';
 import { enqueue } from '../jobs/queue';

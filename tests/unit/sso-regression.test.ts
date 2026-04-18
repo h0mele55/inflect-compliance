@@ -57,29 +57,12 @@ describe('SSO Logging Safety', () => {
     });
 
     it('ssoLog does not throw for any level', () => {
-        // Capture console output
-        const origLog = console.log;
-        const origWarn = console.warn;
-        const origError = console.error;
-        console.log = jest.fn();
-        console.warn = jest.fn();
-        console.error = jest.fn();
-
-        try {
-            expect(() => ssoLog('info', 'test', { requestId: 'test-1' })).not.toThrow();
-            expect(() => ssoLog('warn', 'test', { stage: 'start' })).not.toThrow();
-            expect(() => ssoLog('error', 'test', { tenantSlug: 'acme' })).not.toThrow();
-
-            // Verify JSON output
-            const logCall = (console.log as jest.Mock).mock.calls[0][0];
-            const parsed = JSON.parse(logCall);
-            expect(parsed.component).toBe('sso');
-            expect(parsed.timestamp).toBeDefined();
-        } finally {
-            console.log = origLog;
-            console.warn = origWarn;
-            console.error = origError;
-        }
+        // ssoLog now delegates to Pino, which handles its own transport.
+        // We verify ssoLog doesn't throw for any level — the JSON structure
+        // is tested in the observability-foundation.test.ts suite.
+        expect(() => ssoLog('info', 'test', { requestId: 'test-1' })).not.toThrow();
+        expect(() => ssoLog('warn', 'test', { stage: 'start' })).not.toThrow();
+        expect(() => ssoLog('error', 'test', { tenantSlug: 'acme' })).not.toThrow();
     });
 });
 

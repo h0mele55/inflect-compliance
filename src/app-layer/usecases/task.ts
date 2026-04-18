@@ -5,6 +5,7 @@ import { logEvent } from '../events/audit';
 import { enqueueEmail } from '../notifications/enqueue';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
+import { validateTaskMetadata } from '../schemas/json-columns.schemas';
 import { logger } from '@/lib/observability/logger';
 import type { PrismaTx } from '@/lib/db-context';
 
@@ -88,6 +89,10 @@ export async function createTask(ctx: RequestContext, input: {
 }) {
     assertCanWriteTasks(ctx);
     return runInTenantContext(ctx, async (db) => {
+        // Validate metadataJson on write
+        if (input.metadataJson !== undefined) {
+            input.metadataJson = validateTaskMetadata(input.metadataJson);
+        }
         const task = await WorkItemRepository.create(db, ctx, input);
 
         // Type-specific validation (deferred: allow creation, then check after links can be added)
@@ -134,6 +139,10 @@ export async function updateTask(ctx: RequestContext, taskId: string, patch: {
 }) {
     assertCanWriteTasks(ctx);
     return runInTenantContext(ctx, async (db) => {
+        // Validate metadataJson on write
+        if (patch.metadataJson !== undefined) {
+            patch.metadataJson = validateTaskMetadata(patch.metadataJson);
+        }
         const task = await WorkItemRepository.update(db, ctx, taskId, patch);
         if (!task) throw notFound('Task not found');
         await logEvent(db, ctx, {

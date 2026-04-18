@@ -2,6 +2,7 @@ import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
 import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
+import { validateVendorTags } from '../schemas/json-columns.schemas';
 import type { PaginatedResponse } from '@/lib/dto/pagination';
 
 export interface VendorFilters {
@@ -117,7 +118,7 @@ export class VendorRepository {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 dataAccess: (data.dataAccess as any) || null,
                 isSubprocessor: data.isSubprocessor ?? false,
-                tags: data.tags || null,
+                tags: data.tags ? validateVendorTags(data.tags) : Prisma.JsonNull,
                 nextReviewAt: data.nextReviewAt ? new Date(data.nextReviewAt) : null,
                 contractRenewalAt: data.contractRenewalAt ? new Date(data.contractRenewalAt) : null,
             },
@@ -151,7 +152,7 @@ export class VendorRepository {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 ...(data.dataAccess !== undefined && { dataAccess: (data.dataAccess as any) || null }),
                 ...(data.isSubprocessor !== undefined && { isSubprocessor: data.isSubprocessor }),
-                ...(data.tags !== undefined && { tags: data.tags }),
+                ...(data.tags !== undefined && { tags: data.tags ? validateVendorTags(data.tags) : Prisma.JsonNull }),
                 ...(data.nextReviewAt !== undefined && { nextReviewAt: data.nextReviewAt ? new Date(data.nextReviewAt) : null }),
                 ...(data.contractRenewalAt !== undefined && { contractRenewalAt: data.contractRenewalAt ? new Date(data.contractRenewalAt) : null }),
             },

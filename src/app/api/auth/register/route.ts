@@ -5,6 +5,7 @@ import { withValidatedBody } from '@/lib/validation/route';
 import { AuthActionSchema } from '@/lib/schemas';
 import { env } from '@/env';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { logger } from '@/lib/observability/logger';
 
 export const POST = withApiErrorHandling(withValidatedBody(AuthActionSchema, async (req, ctx, body) => {
     try {
@@ -17,7 +18,7 @@ export const POST = withApiErrorHandling(withValidatedBody(AuthActionSchema, asy
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-        console.error('Auth error:', error);
+        logger.error('Auth error', { component: 'auth', error: error instanceof Error ? error.message : String(error) });
         return NextResponse.json({ error: error.message || 'Auth failed' }, { status: 500 });
     }
 }));
@@ -41,20 +42,18 @@ async function handleRegister(body: any) {
         data: { name: orgName, slug },
     });
 
-    // Create user (role on User is deprecated but kept for backward compat)
+    // Create user (no role/tenantId — membership is sole authority)
     const passwordHash = await hashPassword(password);
     const user = await prisma.user.create({
         data: {
-            tenantId: tenant.id,
             email,
             passwordHash,
             name,
-            role: 'ADMIN',
         },
     });
 
-    // Create TenantMembership (authoritative source of role)
-    await prisma.tenantMembership.create({
+    // Create TenantMembership (sole source of role + tenant binding)
+    const membership = await prisma.tenantMembership.create({
         data: {
             tenantId: tenant.id,
             userId: user.id,
@@ -66,11 +65,11 @@ async function handleRegister(body: any) {
         userId: user.id,
         tenantId: tenant.id,
         email: user.email,
-        role: user.role,
+        role: membership.role,
     });
 
     const response = NextResponse.json({
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: { id: user.id, email: user.email, name: user.name, role: membership.role },
         tenant: { id: tenant.id, name: tenant.name },
     });
 
@@ -94,23 +93,33 @@ async function handleLogin(body: any) {
 
     const user = await prisma.user.findFirst({
         where: { email },
-        include: { tenant: true },
+        include: {
+            tenantMemberships: {
+                where: { status: 'ACTIVE' },
+                orderBy: { createdAt: 'asc' },
+                take: 1,
+                include: { tenant: true },
+            },
+        },
     });
 
     if (!user || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
         return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
+    // Resolve tenant and role from membership (sole authority)
+    const membership = user.tenantMemberships[0];
+
     const token = signToken({
         userId: user.id,
-        tenantId: user.tenantId ?? '',
+        tenantId: membership?.tenantId ?? '',
         email: user.email,
-        role: user.role,
+        role: membership?.role ?? 'READER',
     });
 
     const response = NextResponse.json({
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
-        tenant: user.tenant ? { id: user.tenant.id, name: user.tenant.name } : null,
+        user: { id: user.id, email: user.email, name: user.name, role: membership?.role ?? 'READER' },
+        tenant: membership?.tenant ? { id: membership.tenant.id, name: membership.tenant.name } : null,
     });
 
     response.cookies.set('token', token, {

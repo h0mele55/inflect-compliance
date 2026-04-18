@@ -46,13 +46,27 @@ jest.mock('@/app-layer/jobs/queue', () => ({
     enqueue: jest.fn().mockResolvedValue({ id: 'mock-job' }),
 }));
 import { enqueue } from '@/app-layer/jobs/queue';
+import type { Role } from '@prisma/client';
 
 export const mockCtx: RequestContext = {
     tenantId: 'tenant-1',
     userId: 'system',
     requestId: 'req-1',
-    role: 'ADMIN',
+    role: 'ADMIN' as Role,
     permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
+    appPermissions: {
+        controls: { view: true, create: true, edit: true },
+        evidence: { view: true, upload: true, edit: true, download: true },
+        policies: { view: true, create: true, edit: true, approve: true },
+        tasks: { view: true, create: true, edit: true, assign: true },
+        risks: { view: true, create: true, edit: true },
+        vendors: { view: true, create: true, edit: true },
+        tests: { view: true, create: true, execute: true },
+        frameworks: { view: true, install: true },
+        audits: { view: true, manage: true, freeze: true, share: true },
+        reports: { view: true, export: true },
+        admin: { view: true, manage: true, members: true, sso: true, scim: true },
+    },
 };
 
 // ── In-Memory Sync Mapping Store ──
@@ -213,7 +227,7 @@ class StubOrchestrator extends BaseSyncOrchestrator {
         const key = `${localEntityType}:${localEntityId}`;
         const existing = this.localEntities.get(key) ?? {};
         this.localEntities.set(key, { ...existing, ...localData });
-        this.appliedChanges.push({ ctx: mockCtx, type: localEntityType, id: localEntityId, data: localData });
+        this.appliedChanges.push({ type: localEntityType, id: localEntityId, data: localData });
         return Object.keys(localData);
     }
 

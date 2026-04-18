@@ -24,6 +24,7 @@ import type { SyncMapping, SyncMappingKey, SyncMappingCreateData, SyncMappingSta
 import type { SyncMappingStore, SyncEventLogger } from '@/app-layer/integrations/sync-orchestrator';
 import type { SyncEvent } from '@/app-layer/integrations/sync-types';
 import type { RequestContext } from '@/app-layer/types';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 jest.mock('@/app-layer/jobs/queue', () => ({
     enqueue: jest.fn().mockResolvedValue({ id: 'mock-job' }),
@@ -35,6 +36,7 @@ export const mockCtx: RequestContext = {
     requestId: 'req-1',
     role: 'ADMIN',
     permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
+    appPermissions: getPermissionsForRole('ADMIN'),
 };
 
 // ─── Test Fixtures ───────────────────────────────────────────────────

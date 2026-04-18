@@ -1,15 +1,19 @@
 # ───────────────────────────────────────────────────────────────
 #  CI — Enterprise-grade pipeline
-#  Jobs: lint · typecheck · test · build · e2e · security · docker
+#  Jobs: lint · typecheck · test · coverage · build · e2e
+#        security · codeql · docker · trivy
 #
 #  Job graph:
 #    lint ─────────────┐
 #    typecheck ────────┤
-#    test (jest) ──────┼──→ (PR merge gate)
+#    test ─────────────┤
+#    coverage ─────────┼──→ (PR merge gate)
 #    build ────────────┤
 #      ├──→ e2e ───────┤
-#      └──→ docker ────┘
-#    security ─────────┘
+#      └──→ docker ────┤
+#           └──→ trivy ┤
+#    security ─────────┤
+#    codeql ───────────┘
 #
 #  Runs on PRs and pushes to main.
 # ───────────────────────────────────────────────────────────────
@@ -28,6 +32,8 @@ concurrency:
 permissions:
   contents: read
   pull-requests: write   # dependency-review comments
+  security-events: write # CodeQL SARIF upload
+  actions: read          # CodeQL analysis
 
 env:
   NODE_VERSION: "22"
@@ -177,23 +183,82 @@ jobs:
       - name: "Run tests: architectural guards"
         run: npx jest tests/guards/ --runInBand --forceExit --no-coverage
 
-      # ── Coverage (main only, non-blocking) ──
-      - name: Run tests with coverage
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: npm run test:coverage || true
-        continue-on-error: true
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 4: Coverage — enforce minimum test coverage threshold
+  #  Blocking gate: fails if coverage drops below 60%.
+  #  Runs on PRs AND main pushes to catch regressions everywhere.
+  # ═══════════════════════════════════════════════════════════════
+  coverage:
+    name: "Coverage (≥60%)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
-      - name: Upload coverage artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      DIRECT_DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d ci_testdb"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Prisma client
+        run: ./node_modules/.bin/prisma generate
+
+      # ── Create roles required by RLS migrations ──
+      - name: Create PostgreSQL roles for RLS
+        run: |
+          PGPASSWORD=ci_password psql -h localhost -U ci -d ci_testdb <<'SQL'
+          DO $$ BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_user') THEN CREATE ROLE app_user NOLOGIN; END IF;
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'postgres') THEN CREATE ROLE postgres NOLOGIN; END IF;
+          END $$;
+          GRANT app_user TO ci;
+          GRANT app_user TO postgres;
+          SQL
+
+      - name: Apply Prisma migrations
+        run: ./node_modules/.bin/prisma migrate deploy
+
+      # ── Coverage gate: Jest enforces thresholds via jest.config.js ──
+      # jest.config.js coverageThreshold.global: 60% branches/functions/lines/statements
+      # Jest exits non-zero if any threshold is violated — no continue-on-error.
+      - name: "Gate: test coverage ≥ 60%"
+        run: npx jest --coverage --forceExit --runInBand
+
+      - name: Upload coverage report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/
-          retention-days: 7
+          retention-days: 14
         continue-on-error: true
 
   # ═══════════════════════════════════════════════════════════════
-  #  Job 4: Build — production build verification
+  #  Job 5: Build — production build verification
   #  No DB needed. Verifies `next build` succeeds cleanly.
   # ═══════════════════════════════════════════════════════════════
   build:
@@ -230,7 +295,7 @@ jobs:
         continue-on-error: true
 
   # ═══════════════════════════════════════════════════════════════
-  #  Job 5: E2E — Playwright browser tests
+  #  Job 6: E2E — Playwright browser tests
   #  Needs: build (validates app compiles before expensive E2E)
   # ═══════════════════════════════════════════════════════════════
   e2e:
@@ -353,7 +418,8 @@ jobs:
         continue-on-error: true
 
   # ═══════════════════════════════════════════════════════════════
-  #  Job 6: Security — supply chain and dependency checks
+  #  Job 7: Security — supply chain and dependency checks
+  #  npm audit is BLOCKING for high+ severity vulnerabilities.
   # ═══════════════════════════════════════════════════════════════
   security:
     name: Security
@@ -370,7 +436,6 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: always
-        continue-on-error: true
 
       - uses: actions/setup-node@v4
         with:
@@ -380,21 +445,62 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # ── npm audit (production deps, blocking on high/critical) ──
-      - name: "Audit: production deps (blocking on high+)"
-        run: npm audit --omit=dev --audit-level=high || true
+      # ── npm audit: BLOCKING on high+ severity (production deps) ──
+      # No `|| true`, no `continue-on-error` — this is a merge gate.
+      - name: "Gate: npm audit (high+ blocks merge)"
+        run: npm audit --omit=dev --audit-level=high
 
-      # ── Full audit (informational) ──
-      - name: "Audit: all deps (informational)"
-        run: npm audit --audit-level=critical 2>&1 || echo "::warning::npm audit found vulnerabilities (see above)"
+      # ── Full audit (informational — dev deps included) ──
+      - name: "Info: npm audit (all deps)"
+        run: npm audit --audit-level=critical 2>&1 || echo "::warning::npm audit found vulnerabilities in dev dependencies (see above)"
         continue-on-error: true
 
   # ═══════════════════════════════════════════════════════════════
-  #  Job 7: Docker — verify Dockerfile builds correctly
+  #  Job 8: CodeQL — SAST (Static Application Security Testing)
+  #  Scans JavaScript/TypeScript for security vulnerabilities.
+  #  Runs on every PR and push to main.
+  # ═══════════════════════════════════════════════════════════════
+  codeql:
+    name: "CodeQL SAST"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Use extended query suite for deeper analysis
+          queries: security-extended
+
+      # CodeQL auto-builds JavaScript/TypeScript — no manual build needed.
+      # The autobuild step handles source extraction.
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 9: Docker — verify Dockerfile builds correctly
   #  Needs: build (no point testing Docker if app doesn't compile)
   # ═══════════════════════════════════════════════════════════════
   docker:
-    name: Docker
+    name: Docker Build
     needs: [build]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -413,3 +519,67 @@ jobs:
           tags: inflect-compliance:ci-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Export to local Docker daemon for Trivy scanning
+          load: true
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 10: Trivy — container image vulnerability scanning
+  #  Scans the built Docker image for OS and library CVEs.
+  #  Blocks on CRITICAL and HIGH severity vulnerabilities.
+  #  Needs: docker (image must be built first)
+  # ═══════════════════════════════════════════════════════════════
+  trivy:
+    name: "Trivy Image Scan"
+    needs: [docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Rebuild image locally — docker job uses GHA cache so this is fast
+      - name: Build Docker image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: inflect-compliance:ci-${{ github.sha }}
+          cache-from: type=gha
+          load: true
+
+      # ── Trivy scan: BLOCKING on critical and high CVEs ──
+      # No continue-on-error — this is a merge gate.
+      - name: "Gate: Trivy vulnerability scan (critical+high)"
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          image-ref: "inflect-compliance:ci-${{ github.sha }}"
+          format: "table"
+          exit-code: "1"
+          severity: "CRITICAL,HIGH"
+          # Ignore unfixed vulnerabilities — only block on actionable issues
+          ignore-unfixed: true
+          # Scan OS packages and application dependencies
+          vuln-type: "os,library"
+
+      # ── SARIF upload for GitHub Security tab (informational) ──
+      - name: "Trivy SARIF report (all severities)"
+        if: always()
+        uses: aquasecurity/trivy-action@v0.28.0
+        with:
+          image-ref: "inflect-compliance:ci-${{ github.sha }}"
+          format: "sarif"
+          output: "trivy-results.sarif"
+          severity: "CRITICAL,HIGH,MEDIUM"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+
+      - name: Upload Trivy SARIF to GitHub Security
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: "trivy-results.sarif"
+          category: "trivy-container-scan"
+        continue-on-error: true

@@ -57,7 +57,7 @@ async function main() {
     results.push(await check(
         'Readiness probe (/api/readyz)',
         `${BASE_URL}/api/readyz`,
-        (d) => d.ready === true && d.migrations > 0
+        (d) => d.status === 'ready' && d.checks?.database?.status === 'ok'
     ));
 
     // 3. Auth session (should return empty session for unauthenticated)

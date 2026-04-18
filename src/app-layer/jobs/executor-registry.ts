@@ -30,6 +30,7 @@
  * @module app-layer/jobs/executor-registry
  */
 import { logger } from '@/lib/observability/logger';
+import { recordJobMetrics } from '@/lib/observability/metrics';
 import type { JobName, JobPayload, JobRunResult } from './types';
 
 // ─── Executor Contract ──────────────────────────────────────────────
@@ -125,6 +126,12 @@ export const executorRegistry = {
 
         try {
             const result = await executor(payload);
+            // ── Record job success metric ──
+            recordJobMetrics({
+                jobName: name,
+                success: result.success,
+                durationMs: result.durationMs ?? Math.round(performance.now() - startMs),
+            });
             return result;
         } catch (error) {
             const durationMs = Math.round(performance.now() - startMs);
@@ -139,6 +146,9 @@ export const executorRegistry = {
                 durationMs,
                 error: errorMessage,
             });
+
+            // ── Record job failure metric ──
+            recordJobMetrics({ jobName: name, success: false, durationMs });
 
             return {
                 jobName: name,
@@ -403,5 +413,28 @@ executorRegistry.register('sync-pull', async (payload) => {
         provider: payload.mappingKey.provider,
         remoteEntityType: payload.mappingKey.remoteEntityType,
     });
+});
+
+// ── compliance-snapshot ──────────────────────────────────────────────
+
+executorRegistry.register('compliance-snapshot', async (payload) => {
+    const { runSnapshotJob } = await import('./snapshot');
+    const { result } = await runSnapshotJob({
+        tenantId: payload.tenantId,
+        date: payload.date ? new Date(payload.date) : undefined,
+    });
+    return result;
+});
+
+// ── compliance-digest ────────────────────────────────────────────────
+
+executorRegistry.register('compliance-digest', async (payload) => {
+    const { runComplianceDigest } = await import('./compliance-digest');
+    const { result } = await runComplianceDigest({
+        tenantId: payload.tenantId,
+        recipientOverrides: payload.recipientOverrides,
+        trendDays: payload.trendDays,
+    });
+    return result;
 });
 

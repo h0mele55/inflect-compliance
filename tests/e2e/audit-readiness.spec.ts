@@ -139,8 +139,18 @@ test.describe('Audit Readiness', () => {
     test('auditor can view shared pack', async () => {
         if (!shareToken) { test.skip(); return; }
 
-        await page.goto(`/audit/shared/${shareToken}`);
-        await page.waitForSelector('#shared-pack-name', { timeout: 15000 });
+        // Shared pack page may need cold-compilation (client component + API route)
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const resp = await page.goto(`/audit/shared/${shareToken}`);
+                if (resp && resp.status() < 500) break;
+            } catch {
+                // net:: errors during heavy compilation
+            }
+            if (attempt < 2) await page.waitForTimeout(5000);
+        }
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await page.waitForSelector('#shared-pack-name', { timeout: 60000 });
         await expect(page.locator('#shared-pack-name')).toBeVisible();
         await expect(page.locator('#shared-pack-summary')).toBeVisible();
         await expect(page.locator('text=Read-only view')).toBeVisible();

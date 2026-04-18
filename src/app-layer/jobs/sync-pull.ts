@@ -93,7 +93,7 @@ export async function runSyncPull(payload: SyncPullPayload): Promise<void> {
     });
 
     const result = await orchestrator.pull({
-        ctx,
+        ctx: ctx as import('@/app-layer/types').RequestContext,
         mappingKey,
         remoteData,
         remoteUpdatedAt,

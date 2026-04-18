@@ -12,6 +12,7 @@
  */
 
 import type { RequestContext } from '../../src/app-layer/types';
+import { getPermissionsForRole } from '../../src/lib/permissions';
 import {
     assertCanExport,
     assertCanImport,
@@ -38,6 +39,7 @@ function makeCtx(overrides: Partial<RequestContext> = {}): RequestContext {
             canAudit: true,
             canExport: true,
         },
+        appPermissions: getPermissionsForRole((overrides.role ?? 'ADMIN') as any),
         ...overrides,
     };
 }

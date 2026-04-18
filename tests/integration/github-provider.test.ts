@@ -22,6 +22,7 @@ import {
 import type { CheckInput, ParsedAutomationKey } from '@/app-layer/integrations/types';
 import { registry } from '@/app-layer/integrations/registry';
 import { computeHmacSha256 } from '@/app-layer/integrations/webhook-crypto';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 // ─── Mock Data ───────────────────────────────────────────────────────
 
@@ -359,7 +360,7 @@ describe('GitHub Branch Protection Provider', () => {
 
     describe('GitHubProvider.handleWebhook', () => {
         const provider = new GitHubProvider();
-        const ctx = { tenantId: 'tenant-1', userId: 'sys', requestId: 'test-req-1', role: 'ADMIN' as const, permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true } };
+        const ctx = { tenantId: 'tenant-1', userId: 'sys', requestId: 'test-req-1', role: 'ADMIN' as const, permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true }, appPermissions: getPermissionsForRole('ADMIN') };
 
         it('triggers branch_protection check on rule edit', async () => {
             const result = await provider.handleWebhook(ctx, {

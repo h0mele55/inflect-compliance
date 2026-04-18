@@ -9,8 +9,8 @@
  */
 import prisma from './prisma';
 import { notFound, forbidden } from '@/lib/errors/types';
-import type { Role, Tenant, TenantMembership } from '@prisma/client';
-import { getPermissionsForRole, type PermissionSet } from '@/lib/permissions';
+import type { Role, Tenant, TenantMembership, TenantCustomRole } from '@prisma/client';
+import { getPermissionsForRole, parsePermissionsJson, type PermissionSet } from '@/lib/permissions';
 
 // ─── Permission shape ───
 
@@ -24,8 +24,9 @@ export interface Permissions {
 
 export interface TenantContext {
     tenant: Tenant;
-    membership: TenantMembership;
+    membership: TenantMembership & { customRole: TenantCustomRole | null };
     role: Role;
+    customRole: TenantCustomRole | null;
     permissions: Permissions;
     appPermissions: PermissionSet;
 }
@@ -81,6 +82,9 @@ export async function resolveTenantContext(
                 userId,
             },
         },
+        include: {
+            customRole: true,
+        },
     });
 
     if (!membership) {
@@ -97,12 +101,19 @@ export async function resolveTenantContext(
         throw forbidden('You are no longer a member of this tenant.');
     }
 
+    // Resolve permissions: custom role overrides enum-based defaults when present
+    const effectiveRole = membership.customRole?.baseRole ?? membership.role;
+    const appPermissions = membership.customRole
+        ? parsePermissionsJson(membership.customRole.permissionsJson, membership.customRole.baseRole)
+        : getPermissionsForRole(membership.role);
+
     return {
         tenant,
         membership,
-        role: membership.role,
-        permissions: computePermissions(membership.role),
-        appPermissions: getPermissionsForRole(membership.role),
+        role: effectiveRole,
+        customRole: membership.customRole,
+        permissions: computePermissions(effectiveRole),
+        appPermissions,
     };
 }
 

@@ -45,7 +45,11 @@ test.describe('Framework Coverage UI', () => {
             return;
         }
         await viewBtn.click();
-        await page.waitForSelector('#framework-detail-heading', { timeout: 15000 });
+        // Framework detail is a client page that fetches 4 API endpoints.
+        // On first access, Next.js JIT-compiles the page + all API routes,
+        // which can take 30-60s in cold environments.
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await page.waitForSelector('#framework-detail-heading', { timeout: 60000 });
         await expect(page.locator('#framework-detail-heading')).toBeVisible();
     });
 

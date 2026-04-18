@@ -175,6 +175,22 @@ export interface NotificationDispatchPayload {
     windows?: number[];
 }
 
+/** Daily compliance snapshot — KPI trend storage */
+export interface ComplianceSnapshotPayload {
+    tenantId?: string;
+    /** Override snapshot date (ISO string). Default: today UTC */
+    date?: string;
+}
+
+/** Weekly compliance digest — executive summary email */
+export interface ComplianceDigestPayload {
+    tenantId?: string;
+    /** Override recipient emails (default: tenant ADMIN/OWNER members) */
+    recipientOverrides?: string[];
+    /** Number of days to include in trend summary (default: 7) */
+    trendDays?: number;
+}
+
 /** Webhook-driven sync pull */
 export interface SyncPullPayload {
     ctx: {
@@ -226,6 +242,8 @@ export interface JobPayloadMap {
     'evidence-expiry-monitor': EvidenceExpiryMonitorPayload;
     'notification-dispatch': NotificationDispatchPayload;
     'sync-pull': SyncPullPayload;
+    'compliance-snapshot': ComplianceSnapshotPayload;
+    'compliance-digest': ComplianceDigestPayload;
 }
 
 /** Union of all valid job names */
@@ -307,6 +325,18 @@ export const JOB_DEFAULTS: Record<JobName, {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: 100, // Important for dedupe: allow same id after completion
+        removeOnFail: 500,
+    },
+    'compliance-snapshot': {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 10000 },
+        removeOnComplete: 200,
+        removeOnFail: 500,
+    },
+    'compliance-digest': {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 15000 },
+        removeOnComplete: 100,
         removeOnFail: 500,
     },
 };

@@ -30,6 +30,8 @@ import {
     assertCanViewDraftEntity,
 } from '@/app-layer/policies/lifecycle.policies';
 import { AppError } from '@/lib/errors/types';
+import type { Role } from '@prisma/client';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 // ─── Test Fixtures ───────────────────────────────────────────────────
 
@@ -52,7 +54,7 @@ function ctx(role: string, overrides?: Partial<{ userId: string; tenantId: strin
         userId: overrides?.userId ?? 'user-1',
         tenantId: overrides?.tenantId ?? 'tenant-1',
         tenantSlug: 'acme',
-        role,
+        role: role as Role,
         permissions: {
             canRead: true,
             canWrite: ['ADMIN', 'EDITOR'].includes(role),
@@ -60,6 +62,7 @@ function ctx(role: string, overrides?: Partial<{ userId: string; tenantId: strin
             canAudit: ['ADMIN', 'AUDITOR'].includes(role),
             canExport: role === 'ADMIN',
         },
+        appPermissions: getPermissionsForRole(role as Role),
     };
 }
 
@@ -365,7 +368,7 @@ describe('assertCanViewDraftEntity', () => {
                 assertCanViewDraftEntity(
                     ctx('READER', { userId: 'user-1' }), 'DRAFT', 'other-user',
                 );
-                expect.unreachable('Should have thrown');
+                expect(true).toBe(false); // Should have thrown
             } catch (e: any) {
                 expect(e.message).toContain('draft');
                 expect(e.message).toContain('write permission');
@@ -408,6 +411,8 @@ describe('Visibility through lifecycle transitions', () => {
             currentVersion: 2,
             draft: { content: 'v2 draft' },
             published: { content: 'v1 live' },
+            publishedBy: 'admin-1',
+            publishedChangeSummary: null,
             history: [],
         };
         // But the PHASE is DRAFT, so it's hidden from non-writers

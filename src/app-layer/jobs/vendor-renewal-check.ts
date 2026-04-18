@@ -55,7 +55,7 @@ function toDueItem(v: DueVendor, now: Date): DueItem {
         urgency,
         dueDate: v.dueDate.toISOString(),
         daysRemaining,
-        ownerUserId: resolveDueItemOwner('VENDOR', v),
+        ownerUserId: resolveDueItemOwner('VENDOR', v as unknown as Record<string, unknown>),
     };
 }
 

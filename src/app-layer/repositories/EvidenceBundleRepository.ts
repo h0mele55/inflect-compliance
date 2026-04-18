@@ -5,6 +5,7 @@
  */
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
+import { deprecatedResource } from '@/lib/errors/types';
 
 export class EvidenceBundleRepository {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -19,17 +20,17 @@ export class EvidenceBundleRepository {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     static async create(_db: PrismaTx, _ctx: RequestContext, _issueId: string, _name: string): Promise<any> {
-        throw new Error('Evidence bundles are no longer supported on the Issue model. Use Task links instead.');
+        throw deprecatedResource('Evidence bundles are no longer supported on the Issue model. Use Task links instead.');
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     static async freeze(_db: PrismaTx, _ctx: RequestContext, _id: string): Promise<any | null> {
-        throw new Error('Evidence bundles are no longer supported on the Issue model.');
+        throw deprecatedResource('Evidence bundles are no longer supported on the Issue model.');
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     static async addItem(_db: PrismaTx, _ctx: RequestContext, _bundleId: string, _data: { entityType: string; entityId: string; label?: string }): Promise<any | null> {
-        throw new Error('Evidence bundles are no longer supported on the Issue model.');
+        throw deprecatedResource('Evidence bundles are no longer supported on the Issue model.');
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

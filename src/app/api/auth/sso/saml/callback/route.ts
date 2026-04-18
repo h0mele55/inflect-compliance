@@ -79,7 +79,10 @@ export async function POST(req: NextRequest) {
     // ── Parse SAML config ──
     const configResult = SamlConfigSchema.safeParse(provider.configJson);
     if (!configResult.success) {
-        console.error('[SSO-SAML] Invalid config on callback:', provider.id);
+        ssoLog('error', 'Invalid SAML config on callback', {
+            requestId, tenantSlug: relayState.tenantSlug, providerType: 'SAML',
+            providerId: provider.id, stage: 'config_load',
+        });
         return redirectToLogin(req, 'config_error');
     }
     const samlConfig = configResult.data;
@@ -96,7 +99,6 @@ export async function POST(req: NextRequest) {
     try {
         validatedResponse = await validateSamlResponse(saml, samlResponse);
     } catch (err) {
-        console.error('[SSO-SAML] Response validation failed:', (err as Error).message);
         ssoLog('error', 'SAML response validation failed', {
             requestId, tenantSlug: relayState.tenantSlug, providerType: 'SAML',
             providerId: provider.id, stage: 'response_validation',
@@ -167,7 +169,9 @@ export async function POST(req: NextRequest) {
     // ── Create JWT session ──
     const authSecret = env.AUTH_SECRET;
     if (!authSecret) {
-        console.error('[SSO-SAML] AUTH_SECRET not set');
+        ssoLog('error', 'AUTH_SECRET not set', {
+            requestId, tenantSlug: tenant.slug, providerType: 'SAML', stage: 'session_creation',
+        });
         return redirectToLogin(req, 'config_error');
     }
 

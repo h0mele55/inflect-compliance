@@ -53,6 +53,8 @@ describe('no-untyped-api-response guard', () => {
         // Soft assertion: just ensure count doesn't grow beyond current baseline
         // Bumped for Epic 7: AV webhook + storage routes
         // Bumped for Epic 12/13: SCIM provisioning + integration framework routes
-        expect(warnings.length).toBeLessThanOrEqual(450);
+        // Bumped for Epic 21: API key management routes
+        // Bumped for Epic 22: Dashboard executive route + trends route
+        expect(warnings.length).toBeLessThanOrEqual(453);
     });
 });

@@ -165,8 +165,17 @@ describe('Framework Coverage & Templates', () => {
 
     // ─── Usecase structural analysis ───
     describe('Framework usecase structure', () => {
-        const usecasePath = join(basePath, 'src/app-layer/usecases/framework.ts');
-        const content = readFileSync(usecasePath, 'utf-8');
+        const flatPath = join(basePath, 'src/app-layer/usecases/framework.ts');
+        const dirPath = join(basePath, 'src/app-layer/usecases/framework');
+        let content: string;
+        if (existsSync(flatPath)) {
+            content = readFileSync(flatPath, 'utf-8');
+        } else if (existsSync(dirPath)) {
+            const files = require('fs').readdirSync(dirPath).filter((f: string) => f.endsWith('.ts'));
+            content = files.map((f: string) => readFileSync(join(dirPath, f), 'utf-8')).join('\n');
+        } else {
+            throw new Error('Framework usecase not found');
+        }
 
         it('imports assertCanViewFrameworks', () => {
             expect(content).toContain('assertCanViewFrameworks');

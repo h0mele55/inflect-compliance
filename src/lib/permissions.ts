@@ -15,6 +15,24 @@ export type PermissionSet = {
 };
 
 /**
+ * Canonical list of all permission domain keys.
+ * Used for validation to ensure the JSON shape exactly matches PermissionSet.
+ */
+const PERMISSION_SCHEMA: Record<keyof PermissionSet, string[]> = {
+    controls: ['view', 'create', 'edit'],
+    evidence: ['view', 'upload', 'edit', 'download'],
+    policies: ['view', 'create', 'edit', 'approve'],
+    tasks: ['view', 'create', 'edit', 'assign'],
+    risks: ['view', 'create', 'edit'],
+    vendors: ['view', 'create', 'edit'],
+    tests: ['view', 'create', 'execute'],
+    frameworks: ['view', 'install'],
+    audits: ['view', 'manage', 'freeze', 'share'],
+    reports: ['view', 'export'],
+    admin: ['view', 'manage', 'members', 'sso', 'scim'],
+};
+
+/**
  * Returns a static, granular UI PermissionSet for a given Role.
  * This ensures that client UI elements can rely on a consistent set of booleans
  * instead of manually checking `role === 'ADMIN' || role === 'EDITOR'`
@@ -87,4 +105,102 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 admin: { view: false, manage: false, members: false, sso: false, scim: false },
             };
     }
+}
+
+// ─── Custom Role Helpers ───────────────────────────────────────────────────
+
+/**
+ * Validates that a JSON value conforms to the PermissionSet shape.
+ * Returns a list of error strings; empty list = valid.
+ *
+ * Used at write-time (creating/updating custom roles) to prevent
+ * saving malformed permission blobs.
+ */
+export function validatePermissionsJson(json: unknown): string[] {
+    const errors: string[] = [];
+
+    if (typeof json !== 'object' || json === null || Array.isArray(json)) {
+        return ['permissionsJson must be a non-null object'];
+    }
+
+    const obj = json as Record<string, unknown>;
+    const expectedDomains = Object.keys(PERMISSION_SCHEMA) as (keyof PermissionSet)[];
+    const actualDomains = Object.keys(obj);
+
+    // Check for missing domains
+    for (const domain of expectedDomains) {
+        if (!(domain in obj)) {
+            errors.push(`Missing permission domain: "${domain}"`);
+            continue;
+        }
+
+        const domainValue = obj[domain];
+        if (typeof domainValue !== 'object' || domainValue === null) {
+            errors.push(`Permission domain "${domain}" must be an object`);
+            continue;
+        }
+
+        const domainObj = domainValue as Record<string, unknown>;
+        const expectedActions = PERMISSION_SCHEMA[domain];
+
+        for (const action of expectedActions) {
+            if (!(action in domainObj)) {
+                errors.push(`Missing action "${domain}.${action}"`);
+            } else if (typeof domainObj[action] !== 'boolean') {
+                errors.push(`"${domain}.${action}" must be boolean, got ${typeof domainObj[action]}`);
+            }
+        }
+
+        // Check for unexpected actions
+        for (const action of Object.keys(domainObj)) {
+            if (!expectedActions.includes(action)) {
+                errors.push(`Unexpected action "${domain}.${action}"`);
+            }
+        }
+    }
+
+    // Check for unexpected domains
+    for (const domain of actualDomains) {
+        if (!expectedDomains.includes(domain as keyof PermissionSet)) {
+            errors.push(`Unexpected permission domain: "${domain}"`);
+        }
+    }
+
+    return errors;
+}
+
+/**
+ * Safely parses a permissionsJson blob from the database into a typed PermissionSet.
+ * Falls back to the baseRole's defaults for any missing or invalid fields.
+ *
+ * Used at read-time to ensure the runtime always has a complete, valid PermissionSet
+ * even if the stored JSON is partially malformed (defensive programming).
+ */
+export function parsePermissionsJson(json: unknown, baseRole: Role): PermissionSet {
+    const defaults = getPermissionsForRole(baseRole);
+
+    if (typeof json !== 'object' || json === null || Array.isArray(json)) {
+        return defaults;
+    }
+
+    const obj = json as Record<string, Record<string, unknown>>;
+    const result = { ...defaults };
+
+    for (const domain of Object.keys(PERMISSION_SCHEMA) as (keyof PermissionSet)[]) {
+        if (domain in obj && typeof obj[domain] === 'object' && obj[domain] !== null) {
+            const actions = PERMISSION_SCHEMA[domain];
+            const domainResult: Record<string, boolean> = { ...defaults[domain] };
+
+            for (const action of actions) {
+                if (action in obj[domain] && typeof obj[domain][action] === 'boolean') {
+                    domainResult[action] = obj[domain][action] as boolean;
+                }
+            }
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (result as any)[domain] = domainResult;
+        }
+    }
+
+    return result;
 }

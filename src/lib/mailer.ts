@@ -9,6 +9,7 @@
 
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { logger } from '@/lib/observability/logger';
 
 export interface EmailMessage {
     to: string;
@@ -27,14 +28,14 @@ export interface EmailProvider {
 
 export class ConsoleEmailProvider implements EmailProvider {
     async send(msg: EmailMessage): Promise<void> {
-        console.log('═══════════════════════════════════════');
-        console.log('📧 EMAIL (dev console sink)');
-        if (msg.from) console.log(`  From: ${msg.from}`);
-        console.log(`  To: ${msg.to}`);
-        if (msg.bcc) console.log(`  BCC: ${msg.bcc}`);
-        console.log(`  Subject: ${msg.subject}`);
-        console.log(`  Body: ${msg.text.substring(0, 200)}...`);
-        console.log('═══════════════════════════════════════');
+        logger.debug('Email sent (dev console sink)', {
+            component: 'mailer',
+            to: msg.to,
+            subject: msg.subject,
+            bodyPreview: msg.text.substring(0, 200),
+            ...(msg.from && { from: msg.from }),
+            ...(msg.bcc && { bcc: msg.bcc }),
+        });
     }
 }
 

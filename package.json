@@ -29,6 +29,7 @@
     "staging:up": "docker compose -f docker-compose.staging.yml up -d --build",
     "staging:down": "docker compose -f docker-compose.staging.yml down",
     "smoke:staging": "node scripts/smoke-staging.mjs",
+    "smoke:prod": "node scripts/smoke-prod.mjs",
     "prod:up": "docker compose -f docker-compose.prod.yml up -d --build",
     "prod:down": "docker compose -f docker-compose.prod.yml down"
   },
@@ -85,6 +86,14 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.1",
+    "@semantic-release/npm": "^12.0.1",
+    "@semantic-release/release-notes-generator": "^14.0.3",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
+    "semantic-release": "^24.2.1",
     "@types/archiver": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jest": "^29.5.0",

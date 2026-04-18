@@ -1,0 +1,81 @@
+# ───────────────────────────────────────────────────────────────
+#  Release — semantic versioning + changelog generation
+#
+#  Trigger: push to main (after CI passes)
+#  Tool: semantic-release (conventional commits → SemVer)
+#
+#  What it does:
+#    1. Analyzes commits since last release tag
+#    2. Determines version bump (major/minor/patch) from commit types
+#    3. Generates CHANGELOG.md entries
+#    4. Creates a GitHub Release with release notes
+#    5. Tags the commit with the version (e.g. v1.2.3)
+#    6. Updates package.json version
+#
+#  Commit conventions used:
+#    feat(scope): → minor bump
+#    fix(scope):  → patch bump
+#    perf(scope): → patch bump
+#    BREAKING CHANGE: → major bump (or feat!:)
+#    chore/refactor/test/docs: → no release (unless grouped)
+#
+#  This workflow is SEPARATE from deploy — a release does not
+#  trigger a deployment. Deploy is triggered by CI completion.
+# ───────────────────────────────────────────────────────────────
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# Only one release at a time
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write      # create tags, releases, push changelog
+  issues: write        # comment on released issues
+  pull-requests: write # comment on released PRs
+
+jobs:
+  release:
+    name: "Semantic Release"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only release from main — skip release-bot commits to prevent loops
+    if: >
+      github.ref == 'refs/heads/main' &&
+      !contains(github.event.head_commit.message, '[skip ci]') &&
+      !contains(github.event.head_commit.message, '[skip release]') &&
+      !contains(github.event.head_commit.message, 'chore(release)')
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # Full history for commit analysis
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      # semantic-release reads .releaserc.json and does everything:
+      # analyze commits → determine version → generate notes → publish
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+      - name: Post release summary
+        if: success()
+        run: |
+          echo "### 📦 Release Check Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "semantic-release analyzed commits and either:" >> $GITHUB_STEP_SUMMARY
+          echo "- Created a new release (check [Releases](/${{ github.repository }}/releases))" >> $GITHUB_STEP_SUMMARY
+          echo "- Determined no release-worthy changes exist" >> $GITHUB_STEP_SUMMARY

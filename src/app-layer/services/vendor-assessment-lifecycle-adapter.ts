@@ -138,7 +138,7 @@ export const VENDOR_ASSESSMENT_AUDIT_CONFIG: LifecycleAuditConfig = {
     actionPrefix: 'ASSESSMENT',
 };
 
-// ─── Validation ──────────────────────────────────────────────────────
+import { badRequest } from '@/lib/errors/types';
 
 /**
  * Pre-submit validation for vendor assessments.
@@ -149,7 +149,7 @@ export const VENDOR_ASSESSMENT_AUDIT_CONFIG: LifecycleAuditConfig = {
  */
 export const validateAssessmentPayload: PublishValidator<VendorAssessmentPayload> = (draft) => {
     if (!draft.answers || draft.answers.length === 0) {
-        throw new Error('Assessment must have at least one answered question before submitting');
+        throw badRequest('Assessment must have at least one answered question before submitting');
     }
 };
 

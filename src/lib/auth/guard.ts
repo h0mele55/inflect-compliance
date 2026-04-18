@@ -11,7 +11,8 @@ const PUBLIC_PATH_PREFIXES = [
     '/login',
     '/register',
     '/api/auth',         // Auth.js callbacks, session, csrf, providers
-    '/api/health',       // Health check (no auth)
+    '/api/health',       // Health check (no auth) — deprecated alias
+    '/api/livez',        // Liveness probe (no auth)
     '/api/readyz',       // Readiness probe (no auth)
     '/api/staging/seed', // Staging seed endpoint (token-gated internally)
     '/audit/shared',     // Shared audit pack read-only view (token-gated, no login)

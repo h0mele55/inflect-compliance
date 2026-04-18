@@ -11,12 +11,31 @@ export const GET = withApiErrorHandling(async () => {
 
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { id: true, email: true, name: true, role: true, tenantId: true },
+        select: {
+            id: true,
+            email: true,
+            name: true,
+            tenantMemberships: {
+                where: { status: 'ACTIVE' },
+                orderBy: { createdAt: 'asc' },
+                take: 1,
+                select: {
+                    role: true,
+                    tenant: { select: { id: true, name: true, slug: true } },
+                },
+            },
+        },
     });
 
-    const tenant = user?.tenantId
-        ? await prisma.tenant.findUnique({ where: { id: user.tenantId } })
-        : null;
+    const membership = user?.tenantMemberships[0];
 
-    return NextResponse.json({ user, tenant });
+    return NextResponse.json({
+        user: {
+            id: user?.id,
+            email: user?.email,
+            name: user?.name,
+            role: membership?.role ?? 'READER',
+        },
+        tenant: membership?.tenant ?? null,
+    });
 });

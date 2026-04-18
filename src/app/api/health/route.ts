@@ -1,10 +1,14 @@
 /**
  * GET /api/health
  *
- * Liveness + readiness probe. Checks DB connectivity.
- * Returns build info when available.
+ * LEGACY compatibility endpoint — delegates to /api/readyz.
  *
- * No auth required — this is a public health check.
+ * Retained for backward compatibility with existing monitoring
+ * configurations and load balancers. New deployments should use:
+ *   - /api/livez  — liveness probe (always 200 if process is up)
+ *   - /api/readyz — readiness probe (checks DB + Redis)
+ *
+ * @deprecated Use /api/livez and /api/readyz instead.
  */
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -20,7 +24,7 @@ export async function GET() {
         const dbStart = Date.now();
         await prisma.$queryRaw`SELECT 1`;
         checks.database = { status: 'ok', latencyMs: Date.now() - dbStart };
-    } catch (err) {
+    } catch {
         checks.database = { status: 'error', error: 'Connection failed' };
     }
 
@@ -35,6 +39,7 @@ export async function GET() {
             node: process.version,
             checks,
             latencyMs: Date.now() - start,
+            _deprecated: 'Use /api/livez and /api/readyz instead',
         },
         { status: allOk ? 200 : 503 }
     );

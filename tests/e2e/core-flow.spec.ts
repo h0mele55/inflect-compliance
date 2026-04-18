@@ -235,11 +235,16 @@ test.describe('Core Certification Flow', () => {
         // Click "Link" button
         await page.click('#confirm-control-link');
 
-        // Wait for linked controls table to appear
+        // Wait for linked controls table to appear and finish loading.
+        // After the link action, the table fetches data asynchronously —
+        // it initially shows "Loading..." which must clear before we assert.
         await expect(page.locator('#linked-controls-table')).toBeVisible({ timeout: 10000 });
 
+        // Wait for "Loading" text to disappear (data fetched)
+        await expect(page.locator('#linked-controls-table')).not.toContainText('Loading', { timeout: 30000 });
+
         // Verify our control appears in the linked table
-        await expect(page.locator('#linked-controls-table')).toContainText(CONTROL_NAME, { timeout: 5000 });
+        await expect(page.locator('#linked-controls-table')).toContainText(CONTROL_NAME, { timeout: 15000 });
     });
 
     // F) Verify bidirectional link — Control shows linked Risk

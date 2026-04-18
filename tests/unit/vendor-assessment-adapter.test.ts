@@ -265,7 +265,9 @@ describe('VendorAssessmentEditableAdapter — saveState', () => {
             currentVersion: 2,
             draft: null,
             published: publishedPayload,
-            history: [],
+            publishedBy: 'user-1',
+                publishedChangeSummary: null,
+                history: [],
         };
 
         await adapter.saveState(db, ASSESSMENT_ID, state);
@@ -288,7 +290,9 @@ describe('VendorAssessmentEditableAdapter — saveState', () => {
             currentVersion: 2,
             draft: null,
             published: publishedPayload,
-            history: [],
+            publishedBy: 'user-1',
+                publishedChangeSummary: null,
+                history: [],
         };
 
         await adapter.saveState(db, ASSESSMENT_ID, state);
@@ -307,7 +311,9 @@ describe('VendorAssessmentEditableAdapter — saveState', () => {
             currentVersion: 1,
             draft: publishedPayload,
             published: null,
-            history: [],
+            publishedBy: 'user-1',
+                publishedChangeSummary: null,
+                history: [],
         };
 
         await adapter.saveState(db, ASSESSMENT_ID, state);
@@ -327,7 +333,9 @@ describe('VendorAssessmentEditableAdapter — saveState', () => {
             currentVersion: 2,
             draft: null,
             published: null,
-            history: [],
+            publishedBy: 'user-1',
+                publishedChangeSummary: null,
+                history: [],
         };
 
         await adapter.saveState(db, ASSESSMENT_ID, state);
@@ -346,7 +354,9 @@ describe('VendorAssessmentEditableAdapter — saveState', () => {
             currentVersion: 2,
             draft: null,
             published: publishedPayload,
-            history: [],
+            publishedBy: 'user-1',
+                publishedChangeSummary: null,
+                history: [],
         };
 
         await adapter.saveState(db, ASSESSMENT_ID, state);
@@ -475,6 +485,8 @@ describe('VendorAssessmentEditableAdapter — History Persistence (GAP-5)', () =
                 currentVersion: 3,
                 draft: null,
                 published: publishedPayload,
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             };
 
@@ -491,6 +503,8 @@ describe('VendorAssessmentEditableAdapter — History Persistence (GAP-5)', () =
                 currentVersion: 2,
                 draft: publishedPayload,
                 published: null,
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             };
 
@@ -507,6 +521,8 @@ describe('VendorAssessmentEditableAdapter — History Persistence (GAP-5)', () =
                 currentVersion: 4,
                 draft: null,
                 published: null,
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             };
 
@@ -523,6 +539,8 @@ describe('VendorAssessmentEditableAdapter — History Persistence (GAP-5)', () =
                 currentVersion: 3,
                 draft: null,
                 published: publishedPayload,
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [HISTORY_ENTRY as any],
             };
 
@@ -539,6 +557,8 @@ describe('VendorAssessmentEditableAdapter — History Persistence (GAP-5)', () =
                 currentVersion: 2,
                 draft: null,
                 published: publishedPayload,
+                publishedBy: 'user-1',
+                publishedChangeSummary: null,
                 history: [],
             };
 

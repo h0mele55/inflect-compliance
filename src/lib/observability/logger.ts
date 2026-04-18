@@ -97,8 +97,8 @@ export interface LogFields {
     component?: string;
     /** Duration in ms */
     durationMs?: number;
-    /** Error metadata — auto-extracted if an Error instance is passed */
-    error?: { name: string; message: string; stack?: string };
+    /** Error metadata — a string message or structured error info */
+    error?: string | { name: string; message: string; stack?: string };
     /** Serialized error for Pino's err convention */
     err?: Error;
     /** Any additional safe metadata */
@@ -137,6 +137,8 @@ export const logger = {
     warn: (msg: string, fields?: LogFields) => log('warn', msg, fields),
     error: (msg: string, fields?: LogFields) => log('error', msg, fields),
     fatal: (msg: string, fields?: LogFields) => log('fatal', msg, fields),
+    /** Create a child logger with fixed bindings for a subsystem. */
+    child: (bindings: Record<string, unknown>): pino.Logger => pinoInstance.child(bindings),
 } as const;
 
 /**

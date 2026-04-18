@@ -1,0 +1,75 @@
+# OpenTelemetry Collector Configuration for inflect-compliance
+#
+# This config receives OTLP metrics and traces from the application,
+# and exports them to Prometheus (metrics) and Jaeger/Tempo (traces).
+#
+# Deploy alongside the application. The app sends to OTEL_EXPORTER_OTLP_ENDPOINT
+# which defaults to http://localhost:4318.
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 1024
+
+  # Filter out health probe spans to reduce trace storage costs
+  filter/health:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["http.route"] == "/api/livez"'
+        - 'attributes["http.route"] == "/api/readyz"'
+        - 'attributes["http.route"] == "/api/health"'
+
+  # Add resource attributes for environment identification
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: "${DEPLOYMENT_ENV:-production}"
+        action: upsert
+
+exporters:
+  # Prometheus remote-write — sends metrics to Prometheus
+  prometheusremotewrite:
+    endpoint: "${PROMETHEUS_REMOTE_WRITE_URL:-http://prometheus:9090/api/v1/write}"
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # OTLP exporter for traces — sends to Jaeger, Tempo, or any OTLP-compatible backend
+  otlp/traces:
+    endpoint: "${TRACE_BACKEND_URL:-jaeger:4317}"
+    tls:
+      insecure: ${TRACE_BACKEND_INSECURE:-true}
+
+  # Debug exporter — useful for local development
+  debug:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+service:
+  pipelines:
+    # Metrics pipeline: receive OTLP → batch → write to Prometheus
+    metrics:
+      receivers: [otlp]
+      processors: [batch, resource]
+      exporters: [prometheusremotewrite]
+
+    # Traces pipeline: receive OTLP → filter health probes → batch → send to trace backend
+    traces:
+      receivers: [otlp]
+      processors: [filter/health, batch, resource]
+      exporters: [otlp/traces]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: 0.0.0.0:8888

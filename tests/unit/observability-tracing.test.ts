@@ -11,6 +11,7 @@ import { trace, SpanStatusCode, context as otelContext } from '@opentelemetry/ap
 import { traceUsecase, traceOperation, getTracer } from '@/lib/observability/tracing';
 import { runWithRequestContext } from '@/lib/observability/context';
 import type { RequestContext } from '@/app-layer/types';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 // We use the InMemorySpanExporter to capture spans for assertions.
 // This requires setting up a real (but in-memory) tracer provider.
@@ -50,6 +51,7 @@ function makeMockCtx(overrides?: Partial<RequestContext>): RequestContext {
             canAudit: true,
             canExport: true,
         },
+        appPermissions: getPermissionsForRole('ADMIN'),
         ...overrides,
     };
 }

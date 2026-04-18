@@ -50,11 +50,23 @@ describe('Tenant Isolation — runInTenantContext enforcement', () => {
         const fs = require('fs');
         const path = require('path');
         const usecasesDir = path.resolve(__dirname, '../../src/app-layer/usecases');
-        const criticalFiles = ['risk.ts', 'control.ts', 'evidence.ts'];
+        const criticalModules = ['risk', 'control', 'evidence'];
 
-        for (const file of criticalFiles) {
-            const content = fs.readFileSync(path.join(usecasesDir, file), 'utf-8');
-            expect(content).toContain("import { runInTenantContext } from '@/lib/db-context'");
+        for (const mod of criticalModules) {
+            // Support both flat file (risk.ts) and directory barrel (control/index.ts)
+            const flatPath = path.join(usecasesDir, `${mod}.ts`);
+            const dirPath = path.join(usecasesDir, mod);
+            let content: string;
+            if (fs.existsSync(flatPath)) {
+                content = fs.readFileSync(flatPath, 'utf-8');
+            } else if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
+                // Read all .ts files in the directory and concatenate
+                const files = fs.readdirSync(dirPath).filter((f: string) => f.endsWith('.ts'));
+                content = files.map((f: string) => fs.readFileSync(path.join(dirPath, f), 'utf-8')).join('\n');
+            } else {
+                throw new Error(`Critical usecase module not found: ${mod}`);
+            }
+            expect(content).toContain('runInTenantContext');
         }
     });
 });
@@ -98,13 +110,21 @@ describe('Tenant Isolation — Repository code analysis', () => {
         const files = fs.readdirSync(usecasesDir).filter((f: string) => f.endsWith('.ts'));
         const criticalFiles = ['risk.ts', 'control.ts', 'evidence.ts'];
 
-        for (const file of criticalFiles) {
-            if (!files.includes(file)) continue;
-            const content = fs.readFileSync(path.join(usecasesDir, file), 'utf-8');
+        for (const mod of criticalFiles) {
+            const modName = mod.replace('.ts', '');
+            const flatPath = path.join(usecasesDir, mod);
+            const dirPath = path.join(usecasesDir, modName);
+            let content: string;
+            if (fs.existsSync(flatPath)) {
+                content = fs.readFileSync(flatPath, 'utf-8');
+            } else if (fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory()) {
+                const files = fs.readdirSync(dirPath).filter((f: string) => f.endsWith('.ts') && f !== 'index.ts');
+                content = files.map((f: string) => fs.readFileSync(path.join(dirPath, f), 'utf-8')).join('\n');
+            } else {
+                continue;
+            }
             // Should use runInTenantContext
             expect(content).toContain('runInTenantContext');
-            // Should NOT use raw prisma queries (except for global lookups)
-            // Count direct prisma usage vs runInTenantContext usage
             const tenantCtxCount = (content.match(/runInTenantContext/g) || []).length;
             expect(tenantCtxCount).toBeGreaterThan(0);
         }

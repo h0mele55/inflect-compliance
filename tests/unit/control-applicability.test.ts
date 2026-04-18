@@ -32,6 +32,7 @@ jest.mock('@/app-layer/events/audit', () => ({
 }));
 
 import { RequestContext } from '@/app-layer/types';
+import { getPermissionsForRole } from '@/lib/permissions';
 import { ControlRepository } from '@/app-layer/repositories/ControlRepository';
 import { logEvent } from '@/app-layer/events/audit';
 import { setControlApplicability, listControls } from '@/app-layer/usecases/control';
@@ -42,6 +43,7 @@ const adminCtx: RequestContext = {
     tenantId: 'tenant-1',
     role: 'ADMIN' as any,
     permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
+    appPermissions: getPermissionsForRole('ADMIN'),
 };
 
 const readerCtx: RequestContext = {
@@ -50,6 +52,7 @@ const readerCtx: RequestContext = {
     tenantId: 'tenant-1',
     role: 'READER' as any,
     permissions: { canRead: true, canWrite: false, canAdmin: false, canAudit: false, canExport: false },
+    appPermissions: getPermissionsForRole('READER'),
 };
 
 describe('setControlApplicability', () => {

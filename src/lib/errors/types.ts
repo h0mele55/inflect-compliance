@@ -40,33 +40,132 @@ export class AppError extends Error {
 
         // Ensure accurate stack traces in V8 environments
         if (Error.captureStackTrace) {
-            Error.captureStackTrace(this, AppError);
+            Error.captureStackTrace(this, this.constructor);
         }
     }
 }
 
-// ── Shortcut Helpers for Common HTTP Errors ──
+// ── Typed Error Subclasses ──
+// These allow `instanceof` discrimination in catch blocks and tests,
+// while preserving the same code/status/expose semantics as the base AppError.
+
+export class ValidationError extends AppError {
+    constructor(message: string, details?: unknown) {
+        super(message, 'BAD_REQUEST', 400, true, details);
+        this.name = 'ValidationError';
+    }
+}
+
+export class NotFoundError extends AppError {
+    constructor(message: string = 'Not Found') {
+        super(message, 'NOT_FOUND', 404, true);
+        this.name = 'NotFoundError';
+    }
+}
+
+export class ForbiddenError extends AppError {
+    constructor(message: string = 'Forbidden') {
+        super(message, 'FORBIDDEN', 403, true);
+        this.name = 'ForbiddenError';
+    }
+}
+
+export class UnauthorizedError extends AppError {
+    constructor(message: string = 'Unauthorized') {
+        super(message, 'UNAUTHORIZED', 401, true);
+        this.name = 'UnauthorizedError';
+    }
+}
+
+export class ConflictError extends AppError {
+    constructor(message: string = 'Conflict', details?: unknown) {
+        super(message, 'CONFLICT', 409, true, details);
+        this.name = 'ConflictError';
+    }
+}
+
+export class RateLimitedError extends AppError {
+    constructor(message: string = 'Too many requests') {
+        super(message, 'RATE_LIMITED', 429, true);
+        this.name = 'RateLimitedError';
+    }
+}
+
+export class InternalError extends AppError {
+    constructor(message: string = 'Internal Server Error') {
+        super(message, 'INTERNAL', 500, false);
+        this.name = 'InternalError';
+    }
+}
+
+// ── Domain-Specific Error Codes ──
+// Use these for errors that need machine-readable discrimination beyond HTTP status.
+
+export type DomainErrorCode =
+    | 'TENANT_ISOLATION_VIOLATION'
+    | 'STALE_DATA'
+    | 'DEPRECATED_RESOURCE'
+    | 'CONFIGURATION_ERROR'
+    | 'EXTERNAL_SERVICE_ERROR'
+    | 'PAYLOAD_TOO_LARGE';
+
+export class DomainError extends AppError {
+    public readonly domainCode: DomainErrorCode;
+
+    constructor(message: string, domainCode: DomainErrorCode, status: number = 400, details?: unknown) {
+        super(message, domainCode, status, status < 500, details);
+        this.name = 'DomainError';
+        this.domainCode = domainCode;
+    }
+}
+
+// ── Type Guard ──
+
+export function isAppError(error: unknown): error is AppError {
+    return error instanceof AppError;
+}
+
+// ── Shortcut Factory Helpers (backward-compatible) ──
+// These now return typed subclass instances for instanceof discrimination
+// while preserving the same API: throw badRequest('msg')
 
 export const badRequest = (message: string, details?: unknown) =>
-    new AppError(message, 'BAD_REQUEST', 400, true, details);
+    new ValidationError(message, details);
 
 export const unauthorized = (message: string = 'Unauthorized') =>
-    new AppError(message, 'UNAUTHORIZED', 401, true);
+    new UnauthorizedError(message);
 
 export const forbidden = (message: string = 'Forbidden') =>
-    new AppError(message, 'FORBIDDEN', 403, true);
+    new ForbiddenError(message);
 
 export const notFound = (message: string = 'Not Found') =>
-    new AppError(message, 'NOT_FOUND', 404, true);
+    new NotFoundError(message);
 
 export const conflict = (message: string = 'Conflict') =>
-    new AppError(message, 'CONFLICT', 409, true);
+    new ConflictError(message);
 
 export const rateLimited = (message: string = 'Too many requests') =>
-    new AppError(message, 'RATE_LIMITED', 429, true);
+    new RateLimitedError(message);
 
 export const internal = (message: string = 'Internal Server Error') =>
-    new AppError(message, 'INTERNAL', 500, false); // Expose = false to hide details safely
+    new InternalError(message);
+
+// ── Domain-Specific Factories ──
+
+export const tenantIsolationViolation = (message: string = 'Tenant isolation violation') =>
+    new DomainError(message, 'TENANT_ISOLATION_VIOLATION', 403);
+
+export const staleData = (message: string = 'Data has been modified by another user') =>
+    new DomainError(message, 'STALE_DATA', 409);
+
+export const deprecatedResource = (message: string = 'This resource is no longer supported') =>
+    new DomainError(message, 'DEPRECATED_RESOURCE', 410);
+
+export const configurationError = (message: string) =>
+    new DomainError(message, 'CONFIGURATION_ERROR', 500);
+
+export const externalServiceError = (message: string) =>
+    new DomainError(message, 'EXTERNAL_SERVICE_ERROR', 502);
 
 /**
  * Converts ANY thrown error into a safe ApiErrorResponse payload

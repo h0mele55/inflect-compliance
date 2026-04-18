@@ -102,10 +102,10 @@ export async function exportBundle(
         userId: ctx.userId,
     });
 
-    log.info('export initiated', {
+    log.info({
         domains: request.domains ?? ['FULL_TENANT'],
         description: request.description,
-    });
+    }, 'export initiated');
 
     const result = await exportTenantData({
         tenantId: ctx.tenantId,
@@ -144,7 +144,7 @@ export async function exportBundle(
         });
     });
 
-    log.info('export completed', {
+    log.info({
         entityCount: result.stats.entityCount,
         relationshipCount: result.stats.relationshipCount,
         durationMs: result.stats.durationMs,
@@ -152,7 +152,7 @@ export async function exportBundle(
         rawSize: serialized.rawSize,
         outputSize: serialized.outputSize,
         compressionRatio: serialized.compressionRatio,
-    });
+    }, 'export completed');
 
     return {
         envelope: result.envelope,
@@ -213,12 +213,12 @@ export async function importBundle(
 
     const dryRun = request.dryRun ?? false;
 
-    log.info('import initiated', {
+    log.info({
         conflictStrategy: request.conflictStrategy,
         dryRun,
         sourceTenant: request.envelope.metadata.tenantId,
         formatVersion: request.envelope.formatVersion,
-    });
+    }, 'import initiated');
 
     const options: ImportOptions = {
         targetTenantId,
@@ -255,14 +255,14 @@ export async function importBundle(
         });
     });
 
-    log.info('import completed', {
+    log.info({
         success: result.success,
         dryRun,
         imported: result.imported,
         skipped: result.skipped,
         errorCount: result.errors.length,
         durationMs: result.durationMs,
-    });
+    }, 'import completed');
 
     return result;
 }

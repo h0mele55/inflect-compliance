@@ -1,3 +1,4 @@
+export {};
 /**
  * Vendor Ownership — Due Item Routing Tests
  *

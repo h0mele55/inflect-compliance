@@ -54,6 +54,8 @@ import { getTenantCtx } from '@/app-layer/context';
 import { runAutomationForControl } from '@/app-layer/usecases/integrations';
 import { PrismaSyncMappingStore } from '@/app-layer/integrations/prisma-sync-store';
 import { runInTenantContext } from '@/lib/db-context';
+import type { Role } from '@prisma/client';
+import { getPermissionsForRole } from '@/lib/permissions';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -61,16 +63,20 @@ const adminCtx = {
     tenantId: 'tenant-1',
     userId: 'user-admin',
     requestId: 'req-test',
-    role: 'ADMIN',
+    tenantSlug: 'acme',
+    role: 'ADMIN' as Role,
     permissions: { canRead: true, canWrite: true, canAdmin: true, canAudit: true, canExport: true },
+    appPermissions: getPermissionsForRole('ADMIN'),
 };
 
 const readerCtx = {
     tenantId: 'tenant-1',
     userId: 'user-reader',
     requestId: 'req-test',
-    role: 'READER',
+    tenantSlug: 'acme',
+    role: 'READER' as Role,
     permissions: { canRead: true, canWrite: false, canAdmin: false, canAudit: false, canExport: false },
+    appPermissions: getPermissionsForRole('READER'),
 };
 
 const mockParams = { tenantSlug: 'acme', controlId: 'ctrl-1' };
@@ -132,7 +138,7 @@ describe('POST /controls/[controlId]/sync — usecase integration', () => {
 
         const result = await runAutomationForControl(adminCtx, 'ctrl-1', { triggeredBy: 'manual' });
         expect(result.execution.status).toBe('ERROR');
-        expect(result.execution.errorMessage).toBe('Network timeout');
+        expect((result.execution as any).errorMessage).toBe('Network timeout');
     });
 });
 

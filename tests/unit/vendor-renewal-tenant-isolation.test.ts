@@ -1,3 +1,4 @@
+export {};
 /**
  * Vendor Renewal Check — Tenant Isolation Tests
  *

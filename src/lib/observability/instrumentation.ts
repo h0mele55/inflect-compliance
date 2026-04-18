@@ -87,7 +87,9 @@ export async function initTelemetry(): Promise<void> {
     metrics.setGlobalMeterProvider(meterProvider);
 
     _initialized = true;
-    console.log(`[otel] Telemetry initialized — service=${serviceName} endpoint=${otlpEndpoint}`);
+    // Use pinoInstance directly since request context is not available during bootstrap
+    const { pinoInstance: pino } = require('./logger');
+    pino.info({ component: 'otel', serviceName, otlpEndpoint }, 'Telemetry initialized');
 }
 
 /** Check if OTel has been initialized (useful for tests). */

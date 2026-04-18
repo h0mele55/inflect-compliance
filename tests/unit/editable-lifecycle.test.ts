@@ -646,6 +646,8 @@ describe('Editable Lifecycle', () => {
                 currentVersion: 1,
                 draft: null,
                 published: null,
+                publishedBy: null,
+                publishedChangeSummary: null,
                 history: [],
             };
 

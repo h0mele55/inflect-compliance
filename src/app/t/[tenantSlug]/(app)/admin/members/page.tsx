@@ -10,10 +10,18 @@ import {
 
 // ─── Types ───
 
+interface CustomRoleOption {
+    id: string;
+    name: string;
+    baseRole: string;
+}
+
 interface Member {
     id: string;
     userId: string;
     role: string;
+    customRoleId: string | null;
+    customRole: { id: string; name: string } | null;
     status: string;
     invitedAt: string | null;
     deactivatedAt: string | null;
@@ -71,7 +79,11 @@ export default function MembersAdminPage() {
     // Role change
     const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
     const [pendingRole, setPendingRole] = useState<string>('');
+    const [pendingCustomRoleId, setPendingCustomRoleId] = useState<string | null>(null);
     const [changingRole, setChangingRole] = useState(false);
+
+    // Custom roles
+    const [customRoles, setCustomRoles] = useState<CustomRoleOption[]>([]);
 
     // Action menu
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -79,12 +91,17 @@ export default function MembersAdminPage() {
     // ─── Data fetching ───
     const fetchMembers = useCallback(async () => {
         try {
-            const [membersRes, invitesRes] = await Promise.all([
+            const [membersRes, invitesRes, rolesRes] = await Promise.all([
                 fetch(apiUrl('/admin/members')),
                 fetch(apiUrl('/admin/members?view=invites')),
+                fetch(apiUrl('/admin/roles')),
             ]);
             if (membersRes.ok) setMembers(await membersRes.json());
             if (invitesRes.ok) setInvites(await invitesRes.json());
+            if (rolesRes.ok) {
+                const allRoles = await rolesRes.json();
+                setCustomRoles(allRoles.filter((r: CustomRoleOption & { isActive: boolean }) => r.isActive));
+            }
         } catch {
             setError('Failed to load members');
         } finally {
@@ -139,10 +156,27 @@ export default function MembersAdminPage() {
         setChangingRole(true);
 
         try {
+            // Build patch payload
+            const member = members.find(m => m.id === membershipId);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const payload: Record<string, any> = {};
+            if (pendingRole && pendingRole !== member?.role) {
+                payload.role = pendingRole;
+            }
+            // Always include customRoleId to handle assign/unassign
+            if (pendingCustomRoleId !== (member?.customRoleId ?? null)) {
+                payload.customRoleId = pendingCustomRoleId;
+            }
+
+            if (Object.keys(payload).length === 0) {
+                setEditingRoleId(null);
+                return;
+            }
+
             const res = await fetch(apiUrl(`/admin/members/${membershipId}`), {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ role: pendingRole }),
+                body: JSON.stringify(payload),
             });
 
             if (!res.ok) {
@@ -352,47 +386,70 @@ export default function MembersAdminPage() {
                                 <td className="text-xs text-slate-400">{m.user.email}</td>
                                 <td>
                                     {editingRoleId === m.id ? (
-                                        <div className="flex items-center gap-1">
-                                            <select
-                                                value={pendingRole}
-                                                onChange={(e) => setPendingRole(e.target.value)}
-                                                className="input text-xs py-1 px-2 w-full sm:w-28"
-                                                id={`role-select-${m.id}`}
-                                            >
-                                                {ROLES.map((r) => (
-                                                    <option key={r} value={r}>{r}</option>
-                                                ))}
-                                            </select>
-                                            <button
-                                                onClick={() => handleRoleChange(m.id)}
-                                                disabled={changingRole || pendingRole === m.role}
-                                                className="btn btn-primary text-xs py-1 px-2"
-                                                id={`role-save-${m.id}`}
-                                            >
-                                                {changingRole ? '...' : 'Save'}
-                                            </button>
-                                            <button
-                                                onClick={() => setEditingRoleId(null)}
-                                                className="btn btn-secondary text-xs py-1 px-2"
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-1">
+                                                <select
+                                                    value={pendingRole}
+                                                    onChange={(e) => setPendingRole(e.target.value)}
+                                                    className="input text-xs py-1 px-2 w-full sm:w-28"
+                                                    id={`role-select-${m.id}`}
                                                 >
-                                                    <XCircle className="w-3 h-3" />
+                                                    {ROLES.map((r) => (
+                                                        <option key={r} value={r}>{r}</option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    onClick={() => handleRoleChange(m.id)}
+                                                    disabled={changingRole}
+                                                    className="btn btn-primary text-xs py-1 px-2"
+                                                    id={`role-save-${m.id}`}
+                                                >
+                                                    {changingRole ? '...' : 'Save'}
                                                 </button>
+                                                <button
+                                                    onClick={() => setEditingRoleId(null)}
+                                                    className="btn btn-secondary text-xs py-1 px-2"
+                                                    >
+                                                        <XCircle className="w-3 h-3" />
+                                                    </button>
+                                            </div>
+                                            {customRoles.length > 0 && (
+                                                <select
+                                                    value={pendingCustomRoleId ?? ''}
+                                                    onChange={(e) => setPendingCustomRoleId(e.target.value || null)}
+                                                    className="input text-xs py-1 px-2 w-full sm:w-48"
+                                                    id={`custom-role-select-${m.id}`}
+                                                >
+                                                    <option value="">No custom role (use base role)</option>
+                                                    {customRoles.map((cr) => (
+                                                        <option key={cr.id} value={cr.id}>{cr.name}</option>
+                                                    ))}
+                                                </select>
+                                            )}
                                         </div>
                                     ) : (
-                                        <button
-                                            className={`badge ${ROLE_COLORS[m.role] || 'badge-neutral'} cursor-pointer hover:opacity-80 transition`}
-                                            onClick={() => {
-                                                if (m.status === 'ACTIVE') {
-                                                    setEditingRoleId(m.id);
-                                                    setPendingRole(m.role);
-                                                }
-                                            }}
-                                            title={m.status === 'ACTIVE' ? 'Click to change role' : ''}
-                                            id={`role-badge-${m.id}`}
-                                        >
-                                            {m.role}
-                                            {m.status === 'ACTIVE' && <ChevronDown className="w-3 h-3 ml-0.5" />}
-                                        </button>
+                                        <div className="flex items-center gap-1 flex-wrap">
+                                            <button
+                                                className={`badge ${ROLE_COLORS[m.role] || 'badge-neutral'} cursor-pointer hover:opacity-80 transition`}
+                                                onClick={() => {
+                                                    if (m.status === 'ACTIVE') {
+                                                        setEditingRoleId(m.id);
+                                                        setPendingRole(m.role);
+                                                        setPendingCustomRoleId(m.customRoleId);
+                                                    }
+                                                }}
+                                                title={m.status === 'ACTIVE' ? 'Click to change role' : ''}
+                                                id={`role-badge-${m.id}`}
+                                            >
+                                                {m.role}
+                                                {m.status === 'ACTIVE' && <ChevronDown className="w-3 h-3 ml-0.5" />}
+                                            </button>
+                                            {m.customRole && (
+                                                <span className="badge bg-purple-500/20 text-purple-300 border-purple-500/30 text-[10px]" title={`Custom role: ${m.customRole.name}`}>
+                                                    {m.customRole.name}
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
                                 </td>
                                 <td>

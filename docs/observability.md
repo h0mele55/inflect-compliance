@@ -203,3 +203,125 @@ export async function myNewJob() {
 - **Forbidden** in `src/app-layer/` and `src/app/api/` — use `logger.*` instead
 - **Allowed** in infrastructure modules (`src/lib/`) with allowlist (mailer dev sink, rate-limit, CSP, Prisma audit middleware)
 - **Enforced** by regression guard test: `observability-guards.test.ts`
+
+---
+
+## SLOs, Dashboards & Alerting
+
+Production observability infrastructure is defined in `infra/`:
+
+| Resource | Path | Purpose |
+|---|---|---|
+| **SLO Definitions** | [`docs/slos.md`](slos.md) | Availability, latency, error rate, health check SLOs |
+| **Grafana Dashboard** | `infra/dashboards/grafana-api-slos.json` | Importable dashboard with 14 panels |
+| **Alert Rules** | `infra/alerts/rules.yml` | 10 Prometheus/Grafana alerting rules |
+| **OTel Collector** | `infra/otel-collector/config.yml` | Collector config (app → Prometheus + traces) |
+
+See `infra/README.md` for deployment instructions and complete metrics inventory.
+
+---
+
+## Health Probes
+
+The application exposes three health endpoints:
+
+| Endpoint | Purpose | Dependencies | Auth |
+|---|---|---|---|
+| `GET /api/livez` | Liveness probe — is the process alive? | None | Public |
+| `GET /api/readyz` | Readiness probe — can the process accept traffic? | Postgres, Redis | Public |
+| `GET /api/health` | **Deprecated** — same as readyz, kept for backward compat | Postgres | Public |
+
+### Kubernetes / Docker configuration
+
+```yaml
+# Kubernetes pod spec:
+livenessProbe:
+  httpGet:
+    path: /api/livez
+    port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 10
+readinessProbe:
+  httpGet:
+    path: /api/readyz
+    port: 3000
+  initialDelaySeconds: 10
+  periodSeconds: 15
+```
+
+### When readyz fails
+
+`/api/readyz` returns HTTP 503 with a JSON body describing which dependency is down:
+```json
+{
+  "status": "not_ready",
+  "checks": {
+    "database": { "status": "error", "error": "Connection refused" },
+    "redis": { "status": "ok", "latencyMs": 2 }
+  }
+}
+```
+
+---
+
+## Operational Runbook
+
+### Simulating dependency failures
+
+```bash
+# 1. Simulate database outage (readyz should return 503):
+docker stop inflect-postgres
+curl -s http://localhost:3000/api/readyz | jq .
+#   → { "status": "not_ready", "checks": { "database": { "status": "error" } } }
+
+# 2. Simulate Redis outage:
+docker stop inflect-redis
+curl -s http://localhost:3000/api/readyz | jq .
+#   → livez still returns 200, readyz returns 503
+
+# 3. Verify livez is unaffected:
+curl -s http://localhost:3000/api/livez | jq .
+#   → { "status": "alive" }
+```
+
+### Generating error spikes (alert validation)
+
+```bash
+# Send 100 requests to a non-existent route (generates 404s — NOT 5xx):
+for i in $(seq 1 100); do curl -s -o /dev/null http://localhost:3000/api/nonexistent; done
+
+# Send requests that will 500 (e.g. malformed payload to a POST endpoint):
+for i in $(seq 1 50); do
+  curl -s -X POST http://localhost:3000/api/t/test/controls \
+    -H "Content-Type: application/json" -d '{"invalid": true}' > /dev/null
+done
+# Check the error rate panel in Grafana — should spike above 1%
+```
+
+### Verifying dashboard panels with real data
+
+```bash
+OTEL_ENABLED=true npm run dev
+
+# Generate traffic with varied latency:
+for i in $(seq 1 20); do curl -s http://localhost:3000/api/livez > /dev/null; done
+
+# Open Grafana → import infra/dashboards/grafana-api-slos.json
+# Verify panels show data:
+#   ✓ Request Rate should show > 0 req/s
+#   ✓ Latency Percentiles should show P50/P95/P99 lines
+#   ✓ Request Volume should show 2xx bars
+```
+
+### Verifying job metrics
+
+```bash
+# Run the health-check job:
+npx ts-node -e "
+  require('./src/app-layer/jobs/executor-registry');
+  const { executorRegistry } = require('./src/app-layer/jobs/executor-registry');
+  executorRegistry.execute('health-check', { enqueuedAt: new Date().toISOString() })
+    .then(r => console.log(JSON.stringify(r, null, 2)));
+"
+# Job Execution Rate panel should show a success tick for 'health-check'
+```

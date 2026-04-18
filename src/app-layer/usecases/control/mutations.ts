@@ -1,0 +1,254 @@
+import { RequestContext } from '../../types';
+import { ControlRepository } from '../../repositories/ControlRepository';
+import {
+    assertCanCreateControl, assertCanUpdateControl,
+    assertCanSetApplicability,
+} from '../../policies/control.policies';
+import { logEvent } from '../../events/audit';
+import { notFound, forbidden, badRequest } from '@/lib/errors/types';
+import { runInTenantContext } from '@/lib/db-context';
+import { computeNextDueAt } from '../../utils/cadence';
+import { restoreEntity, purgeEntity } from '../soft-delete-operations';
+import { assertCanAdmin } from '../../policies/common';
+
+// ─── Create / Update ───
+
+export async function createControl(ctx: RequestContext, data: {
+    code?: string | null;
+    name: string;
+    description?: string | null;
+    category?: string | null;
+    status?: string;
+    frequency?: string | null;
+    ownerUserId?: string | null;
+    evidenceSource?: string | null;
+    automationKey?: string | null;
+    annexId?: string | null;
+    intent?: string | null;
+    isCustom?: boolean;
+}) {
+    assertCanCreateControl(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const control = await ControlRepository.create(db, ctx, {
+            code: data.code || null,
+            annexId: data.annexId || null,
+            name: data.name,
+            description: data.description || null,
+            intent: data.intent || null,
+            category: data.category || null,
+            status: (data.status as 'NOT_STARTED') || 'NOT_STARTED',
+            frequency: (data.frequency as 'MONTHLY') || null,
+            ownerUserId: data.ownerUserId || null,
+            createdByUserId: ctx.userId,
+            evidenceSource: (data.evidenceSource as 'MANUAL') || null,
+            automationKey: data.automationKey || null,
+            isCustom: data.isCustom ?? true,
+        });
+
+        await logEvent(db, ctx, {
+            action: 'CONTROL_CREATED',
+            entityType: 'Control',
+            entityId: control.id,
+            details: `Created control: ${control.code || control.name}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'created', after: { code: control.code, name: control.name }, summary: `Created control: ${control.code || control.name}` },
+        });
+
+        return control;
+    });
+}
+
+export async function updateControl(ctx: RequestContext, id: string, data: {
+    name?: string;
+    description?: string | null;
+    category?: string | null;
+    code?: string | null;
+    frequency?: string | null;
+    evidenceSource?: string | null;
+    automationKey?: string | null;
+    intent?: string | null;
+}) {
+    assertCanUpdateControl(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const control = await ControlRepository.update(db, ctx, id, {
+            ...(data.name !== undefined && { name: data.name }),
+            ...(data.description !== undefined && { description: data.description }),
+            ...(data.category !== undefined && { category: data.category }),
+            ...(data.code !== undefined && { code: data.code }),
+            ...(data.frequency !== undefined && { frequency: data.frequency as 'MONTHLY' | null }),
+            ...(data.evidenceSource !== undefined && { evidenceSource: data.evidenceSource as 'MANUAL' | null }),
+            ...(data.automationKey !== undefined && { automationKey: data.automationKey }),
+            ...(data.intent !== undefined && { intent: data.intent }),
+        });
+
+        if (!control) {
+            const existingAny = await ControlRepository.getById(db, ctx, id);
+            if (existingAny) throw forbidden('Cannot modify global library controls');
+            throw notFound('Control not found');
+        }
+
+        await logEvent(db, ctx, {
+            action: 'CONTROL_UPDATED',
+            entityType: 'Control',
+            entityId: id,
+            details: JSON.stringify(data),
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'updated', changedFields: Object.keys(data).filter(k => data[k as keyof typeof data] !== undefined), summary: 'Control updated' },
+        });
+
+        return control;
+    });
+}
+
+// ─── Status ───
+
+export async function setControlStatus(ctx: RequestContext, id: string, status: string) {
+    assertCanUpdateControl(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const existing = await ControlRepository.getById(db, ctx, id);
+        if (!existing) throw notFound('Control not found');
+        if (!existing.tenantId) throw forbidden('Cannot change status of global library controls');
+
+        const oldStatus = existing.status;
+        const control = await ControlRepository.update(db, ctx, id, { status: status as 'NOT_STARTED' });
+        if (!control) throw notFound('Control not found');
+
+        await logEvent(db, ctx, {
+            action: 'CONTROL_STATUS_CHANGED',
+            entityType: 'Control',
+            entityId: id,
+            details: `Status changed: ${oldStatus} → ${status}`,
+            detailsJson: { category: 'status_change', entityName: 'Control', fromStatus: oldStatus, toStatus: status },
+        });
+        return control;
+    });
+}
+
+// ─── Applicability ───
+
+export async function setControlApplicability(
+    ctx: RequestContext,
+    controlId: string,
+    applicability: 'APPLICABLE' | 'NOT_APPLICABLE',
+    justification: string | null
+) {
+    assertCanSetApplicability(ctx);
+
+    if (applicability === 'NOT_APPLICABLE' && !justification) {
+        throw badRequest('Justification is required when marking a control as NOT_APPLICABLE');
+    }
+
+    return runInTenantContext(ctx, async (db) => {
+        const existing = await ControlRepository.getById(db, ctx, controlId);
+        if (!existing) throw notFound('Control not found');
+        if (!existing.tenantId) throw forbidden('Cannot change applicability of global library controls');
+
+        const oldApplicability = existing.applicability;
+        const updated = await ControlRepository.setApplicability(db, ctx, controlId, applicability, justification);
+        if (!updated) throw notFound('Control not found');
+
+        await logEvent(db, ctx, {
+            action: 'CONTROL_APPLICABILITY_CHANGED',
+            entityType: 'Control',
+            entityId: controlId,
+            details: `Applicability changed: ${oldApplicability} → ${applicability}`,
+            detailsJson: { category: 'status_change', entityName: 'Control', fromStatus: oldApplicability || 'APPLICABLE', toStatus: applicability, reason: justification || undefined },
+            metadata: { oldApplicability, newApplicability: applicability, justification },
+        });
+
+        return updated;
+    });
+}
+
+// ─── Owner ───
+
+export async function setControlOwner(ctx: RequestContext, id: string, ownerUserId: string | null) {
+    assertCanUpdateControl(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        // Validate the user exists before updating
+        if (ownerUserId) {
+            const userExists = await db.$queryRawUnsafe<Array<{ id: string }>>(
+                `SELECT id FROM "User" WHERE id = $1 LIMIT 1`, ownerUserId
+            );
+            if (!userExists || userExists.length === 0) {
+                throw badRequest(`User "${ownerUserId}" not found. Please enter a valid user ID.`);
+            }
+        }
+        const control = await ControlRepository.setOwner(db, ctx, id, ownerUserId);
+        if (!control) throw notFound('Control not found');
+
+        await logEvent(db, ctx, {
+            action: 'CONTROL_OWNER_CHANGED',
+            entityType: 'Control',
+            entityId: id,
+            details: `Owner set to: ${ownerUserId || 'none'}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'updated', changedFields: ['ownerUserId'], after: { ownerUserId }, summary: `Owner set to: ${ownerUserId || 'none'}` },
+        });
+        return control;
+    });
+}
+
+// ─── Cadence: Mark Test Completed ───
+
+export async function markControlTestCompleted(ctx: RequestContext, controlId: string) {
+    assertCanUpdateControl(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const existing = await ControlRepository.getById(db, ctx, controlId);
+        if (!existing) throw notFound('Control not found');
+        if (!existing.tenantId) throw forbidden('Cannot modify global library controls');
+        if (existing.applicability === 'NOT_APPLICABLE') {
+            throw badRequest('Cannot mark test completed for NOT_APPLICABLE controls');
+        }
+
+        const now = new Date();
+        const nextDue = computeNextDueAt(existing.frequency, now);
+
+        const updated = await ControlRepository.update(db, ctx, controlId, {
+            lastTested: now,
+            nextDueAt: nextDue,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+
+        await logEvent(db, ctx, {
+            action: 'CONTROL_TEST_COMPLETED',
+            entityType: 'Control',
+            entityId: controlId,
+            details: `Test completed. Next due: ${nextDue ? nextDue.toISOString().slice(0, 10) : 'N/A (ad hoc)'}`,
+            detailsJson: { category: 'custom', event: 'test_completed', lastTested: now.toISOString(), nextDueAt: nextDue?.toISOString() ?? null },
+            metadata: { lastTested: now.toISOString(), nextDueAt: nextDue?.toISOString() ?? null },
+        });
+
+        return updated;
+    });
+}
+
+// ─── Soft Delete / Restore / Purge ───
+
+export async function deleteControl(ctx: RequestContext, id: string) {
+    assertCanAdmin(ctx);
+    return runInTenantContext(ctx, async (db) => {
+        const control = await ControlRepository.getById(db, ctx, id);
+        if (!control) throw notFound('Control not found');
+        if (!control.tenantId) throw forbidden('Cannot delete global library controls');
+
+        await db.control.delete({ where: { id } });
+
+        await logEvent(db, ctx, {
+            action: 'SOFT_DELETE',
+            entityType: 'Control',
+            entityId: id,
+            details: `Control soft-deleted: ${control.code || control.name}`,
+            detailsJson: { category: 'entity_lifecycle', entityName: 'Control', operation: 'deleted', summary: `Control soft-deleted: ${control.code || control.name}` },
+        });
+        return { success: true };
+    });
+}
+
+export async function restoreControl(ctx: RequestContext, id: string) {
+    return restoreEntity(ctx, 'Control', id);
+}
+
+export async function purgeControl(ctx: RequestContext, id: string) {
+    return purgeEntity(ctx, 'Control', id);
+}

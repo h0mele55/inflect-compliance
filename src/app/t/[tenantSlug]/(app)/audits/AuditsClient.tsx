@@ -126,7 +126,7 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                    {audits.map(a => (
+                    {audits.map((a: any) => (
                         <button key={a.id} onClick={() => loadAudit(a.id)}
                             className={`w-full text-left glass-card p-4 hover:bg-slate-700/30 transition ${selected?.id === a.id ? 'ring-2 ring-brand-500' : ''}`}>
                             <div className="flex items-center justify-between">

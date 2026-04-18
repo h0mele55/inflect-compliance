@@ -20,6 +20,7 @@ import { runWithRequestContext } from './context';
 import { logger } from './logger';
 import { traceOperation } from './tracing';
 import { captureError } from './sentry';
+import { recordJobMetrics } from './metrics';
 
 /**
  * Run a background job with full observability context.
@@ -53,11 +54,17 @@ export async function runJob<T>(
                     const result = await fn();
                     const durationMs = Math.round(performance.now() - startTime);
 
+                    // ── Record job success metric ──
+                    recordJobMetrics({ jobName, success: true, durationMs });
+
                     logger.info('job completed', { ...meta, durationMs });
 
                     return result;
                 } catch (error) {
                     const durationMs = Math.round(performance.now() - startTime);
+
+                    // ── Record job failure metric ──
+                    recordJobMetrics({ jobName, success: false, durationMs });
 
                     logger.error('job failed', {
                         ...meta,

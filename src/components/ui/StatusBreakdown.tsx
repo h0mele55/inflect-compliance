@@ -1,0 +1,100 @@
+/**
+ * StatusBreakdown — Horizontal stacked bar with legend.
+ *
+ * Shows distribution of items across statuses (e.g., risk by severity,
+ * tasks by status). Renders as a compact card suitable for dashboard grids.
+ *
+ * @example
+ * ```tsx
+ * <StatusBreakdown
+ *     label="Risks by Severity"
+ *     items={[
+ *         { label: 'Critical', value: 3, color: 'bg-red-500' },
+ *         { label: 'High', value: 8, color: 'bg-orange-500' },
+ *         { label: 'Medium', value: 12, color: 'bg-amber-500' },
+ *         { label: 'Low', value: 5, color: 'bg-emerald-500' },
+ *     ]}
+ * />
+ * ```
+ */
+
+// ─── Props ──────────────────────────────────────────────────────────
+
+export interface StatusItem {
+    label: string;
+    value: number;
+    /** Tailwind bg color class */
+    color: string;
+}
+
+export interface StatusBreakdownProps {
+    /** Card heading */
+    label: string;
+    /** Status items */
+    items: StatusItem[];
+    /** Show numeric total in the header */
+    showTotal?: boolean;
+    /** Optional CSS class */
+    className?: string;
+    /** Optional test-id */
+    id?: string;
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+export default function StatusBreakdown({
+    label,
+    items,
+    showTotal = true,
+    className = '',
+    id,
+}: StatusBreakdownProps) {
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+
+    return (
+        <div id={id} className={`glass-card p-5 ${className}`}>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-300">{label}</h3>
+                {showTotal && (
+                    <span className="text-xs text-slate-500 tabular-nums">{total} total</span>
+                )}
+            </div>
+
+            {/* Stacked bar */}
+            <div className="bg-slate-800 rounded-full h-3 overflow-hidden">
+                {total > 0 ? (
+                    <div className="flex h-full">
+                        {items.map((item) => {
+                            if (item.value <= 0) return null;
+                            const percent = (item.value / total) * 100;
+                            return (
+                                <div
+                                    key={item.label}
+                                    className={`h-full ${item.color} transition-all duration-500`}
+                                    style={{ width: `${percent}%` }}
+                                    title={`${item.label}: ${item.value} (${percent.toFixed(1)}%)`}
+                                />
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="h-full w-full bg-slate-700/50" title="No data" />
+                )}
+            </div>
+
+            {/* Legend */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-3">
+                {items.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
+                            <span className="text-slate-400">{item.label}</span>
+                        </div>
+                        <span className="text-slate-300 font-medium tabular-nums">{item.value}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}

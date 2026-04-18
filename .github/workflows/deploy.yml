@@ -1,12 +1,24 @@
 # ───────────────────────────────────────────────────────────────
-#  Deploy — automated staging + manual production
-#  Triggers: push to main (staging), manual dispatch (production)
+#  Deploy — automated staging on CI pass + manual production
+#
+#  Triggers:
+#    1. workflow_run: CI passes on main → auto-deploy to staging
+#    2. workflow_dispatch: manual deploy to staging or production
 #
 #  REQUIRED GITHUB CONFIGURATION:
-#  - Environment "staging" with secrets: DEPLOY_HOST, DEPLOY_USER,
-#    DEPLOY_SSH_KEY, DEPLOY_PATH and optional variable: STAGING_URL
-#  - Environment "production" with secrets: DEPLOY_HOST, DEPLOY_USER,
-#    DEPLOY_SSH_KEY, DEPLOY_PATH and optional variable: PRODUCTION_URL
+#  ┌──────────────┬──────────────────────────────────────────────┐
+#  │ Environment   │ Required Secrets                             │
+#  ├──────────────┼──────────────────────────────────────────────┤
+#  │ staging       │ DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY,   │
+#  │               │ DEPLOY_PATH                                 │
+#  │ production    │ DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY,   │
+#  │               │ DEPLOY_PATH (+ required reviewers)          │
+#  └──────────────┴──────────────────────────────────────────────┘
+#  Optional environment vars: STAGING_URL, PRODUCTION_URL
+#
+#  Flow:
+#    gate → validate-secrets → build-image → deploy-staging  → smoke-staging
+#                                          → deploy-production → smoke-production
 # ───────────────────────────────────────────────────────────────
 name: Deploy
 
@@ -17,7 +29,7 @@ on:
     types: [completed]
     branches: [main]
 
-  # Manual production deploy
+  # Manual deploy (staging re-deploy or production promote)
   workflow_dispatch:
     inputs:
       environment:
@@ -29,7 +41,7 @@ on:
           - production
         default: staging
       ref:
-        description: "Git ref to deploy (branch, tag, SHA)"
+        description: "Git ref to deploy (branch, tag, SHA). Blank = current main."
         required: false
         default: ""
 
@@ -47,24 +59,70 @@ env:
 
 jobs:
   # ═══════════════════════════════════════════════════════════════
-  #  Gate — only deploy if CI succeeded
+  #  1. Gate — only proceed if CI succeeded (auto-deploy path)
   # ═══════════════════════════════════════════════════════════════
   gate:
     name: "Gate: CI Status"
     runs-on: ubuntu-latest
-    # Skip if workflow_run failed (auto-deploy scenario)
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    outputs:
+      target-env: ${{ steps.resolve.outputs.environment }}
+      deploy-ref: ${{ steps.resolve.outputs.ref }}
+      smoke-url: ${{ steps.resolve.outputs.smoke_url }}
     steps:
-      - run: echo "CI passed — proceeding with deploy"
+      - name: Resolve target environment and ref
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+            REF="${{ github.event.inputs.ref || github.sha }}"
+          else
+            ENV="staging"
+            REF="${{ github.event.workflow_run.head_sha }}"
+          fi
+          echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          echo "ref=${REF}" >> $GITHUB_OUTPUT
+          echo "::notice::Deploy target: ${ENV} @ ${REF:0:12}"
 
   # ═══════════════════════════════════════════════════════════════
-  #  Build & Push — container image to GHCR
+  #  2. Validate Secrets — fail fast and clearly if deployment
+  #     secrets are not configured.
+  # ═══════════════════════════════════════════════════════════════
+  validate-secrets:
+    name: "Validate: Deploy Secrets"
+    needs: [gate]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.gate.outputs.target-env }}
+    steps:
+      - name: "Gate: required deployment secrets"
+        env:
+          _HOST: ${{ secrets['DEPLOY_HOST'] }}
+          _USER: ${{ secrets['DEPLOY_USER'] }}
+          _KEY: ${{ secrets['DEPLOY_SSH_KEY'] }}
+          _PATH: ${{ secrets['DEPLOY_PATH'] }}
+        run: |
+          MISSING=()
+          [ -z "$_HOST" ] && MISSING+=("DEPLOY_HOST")
+          [ -z "$_USER" ] && MISSING+=("DEPLOY_USER")
+          [ -z "$_KEY"  ] && MISSING+=("DEPLOY_SSH_KEY")
+          [ -z "$_PATH" ] && MISSING+=("DEPLOY_PATH")
+
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::Missing required secrets for '${{ needs.gate.outputs.target-env }}' environment: ${MISSING[*]}"
+            echo ""
+            echo "Configure these in: Settings → Environments → ${{ needs.gate.outputs.target-env }} → Secrets"
+            exit 1
+          fi
+          echo "✓ All required deployment secrets are configured"
+
+  # ═══════════════════════════════════════════════════════════════
+  #  3. Build & Push — container image to GHCR
   # ═══════════════════════════════════════════════════════════════
   build-image:
     name: "Build & Push Image"
-    needs: [gate]
+    needs: [gate, validate-secrets]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -74,7 +132,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.ref || github.sha }}
+          ref: ${{ needs.gate.outputs.deploy-ref }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -107,19 +165,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Emit deploy summary
+        run: |
+          echo "### 🐳 Image Built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Tags** | \`${{ steps.meta.outputs.tags }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Digest** | \`${{ steps.build.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Target** | ${{ needs.gate.outputs.target-env }} |" >> $GITHUB_STEP_SUMMARY
+
   # ═══════════════════════════════════════════════════════════════
-  #  Deploy Staging — auto on main, manual via dispatch
+  #  4a. Deploy Staging — automatic on main merge, manual re-deploy
   # ═══════════════════════════════════════════════════════════════
   deploy-staging:
     name: "Deploy: Staging"
-    needs: [build-image]
+    needs: [gate, build-image]
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_run' ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
-    environment:
-      name: staging
-      url: https://staging.example.com
+    if: needs.gate.outputs.target-env == 'staging'
+    environment: ${{ needs.gate.outputs.target-env }}
     timeout-minutes: 10
 
     steps:
@@ -128,51 +192,51 @@ jobs:
       - name: Deploy to staging
         uses: appleboy/ssh-action@v1
         env:
-          APP_PATH: ${{ secrets.DEPLOY_PATH }}
+          APP_PATH: ${{ secrets['DEPLOY_PATH'] }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.gate.outputs.deploy-ref }}
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ secrets['DEPLOY_HOST'] }}
+          username: ${{ secrets['DEPLOY_USER'] }}
+          key: ${{ secrets['DEPLOY_SSH_KEY'] }}
+          envs: APP_PATH,IMAGE
           script: |
             set -euo pipefail
-            cd "${APP_PATH:-/opt/inflect-compliance}"
-            
-            # Pull latest image
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-            
+            cd "${APP_PATH}"
+
+            echo "── Pulling image: ${IMAGE} ──"
+            docker pull "${IMAGE}" || {
+              echo "::error::Failed to pull image. Falling back to SHA tag."
+              docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" || exit 1
+            }
+
             # Tag as staging-current for compose
-            docker tag \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-              inflect-compliance:staging-current
-            
+            docker tag "${IMAGE}" inflect-compliance:staging-current 2>/dev/null || \
+            docker tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" inflect-compliance:staging-current
+
             # Deploy with compose
             docker compose -f docker-compose.staging.yml up -d --no-build
-            
-            # Wait for health check
-            echo "Waiting for app health..."
-            for i in $(seq 1 30); do
-              if curl -sf http://localhost:3000/api/auth/session > /dev/null 2>&1; then
-                echo "✓ Staging is healthy"
+
+            # Quick container boot check (full validation in smoke job)
+            echo "── Waiting for container boot ──"
+            for i in $(seq 1 15); do
+              if curl -sf http://localhost:3000/api/livez > /dev/null 2>&1; then
+                echo "✓ Container is responding (attempt ${i})"
                 exit 0
               fi
               sleep 2
             done
-            echo "::error::Staging health check failed after 60s"
+            echo "::error::Container failed to respond within 30s"
             exit 1
 
   # ═══════════════════════════════════════════════════════════════
-  #  Deploy Production — manual only, requires approval
+  #  4b. Deploy Production — manual only, requires environment approval
   # ═══════════════════════════════════════════════════════════════
   deploy-production:
     name: "Deploy: Production"
-    needs: [build-image]
+    needs: [gate, build-image]
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' &&
-      github.event.inputs.environment == 'production'
-    environment:
-      name: production
-      url: https://app.example.com
+    if: needs.gate.outputs.target-env == 'production'
+    environment: ${{ needs.gate.outputs.target-env }}
     timeout-minutes: 10
 
     steps:
@@ -181,34 +245,114 @@ jobs:
       - name: Deploy to production
         uses: appleboy/ssh-action@v1
         env:
-          APP_PATH: ${{ secrets.DEPLOY_PATH }}
+          APP_PATH: ${{ secrets['DEPLOY_PATH'] }}
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.gate.outputs.deploy-ref }}
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ secrets['DEPLOY_HOST'] }}
+          username: ${{ secrets['DEPLOY_USER'] }}
+          key: ${{ secrets['DEPLOY_SSH_KEY'] }}
+          envs: APP_PATH,IMAGE
           script: |
             set -euo pipefail
-            cd "${APP_PATH:-/opt/inflect-compliance}"
-            
-            # Pull latest image
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-            
+            cd "${APP_PATH}"
+
+            echo "── Pulling image: ${IMAGE} ──"
+            docker pull "${IMAGE}" || {
+              echo "::error::Failed to pull image. Falling back to SHA tag."
+              docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" || exit 1
+            }
+
             # Tag as prod-current for compose
-            docker tag \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-              inflect-compliance:prod-current
-            
+            docker tag "${IMAGE}" inflect-compliance:prod-current 2>/dev/null || \
+            docker tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" inflect-compliance:prod-current
+
             # Deploy with compose
             docker compose -f docker-compose.prod.yml up -d --no-build
-            
-            # Wait for health check
-            echo "Waiting for app health..."
-            for i in $(seq 1 30); do
-              if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
-                echo "✓ Production is healthy"
+
+            # Quick container boot check (full validation in smoke job)
+            echo "── Waiting for container boot ──"
+            for i in $(seq 1 15); do
+              if curl -sf http://localhost:3000/api/livez > /dev/null 2>&1; then
+                echo "✓ Container is responding (attempt ${i})"
                 exit 0
               fi
               sleep 2
             done
-            echo "::error::Production health check failed after 60s"
+            echo "::error::Container failed to respond within 30s"
             exit 1
+
+  # ═══════════════════════════════════════════════════════════════
+  #  5a. Smoke: Staging — post-deploy validation
+  #  Runs the smoke test script against the deployed staging env.
+  #  Fails the pipeline if any health/readiness check doesn't pass.
+  # ═══════════════════════════════════════════════════════════════
+  smoke-staging:
+    name: "Smoke: Staging"
+    needs: [gate, deploy-staging]
+    runs-on: ubuntu-latest
+    if: needs.gate.outputs.target-env == 'staging'
+    environment: ${{ needs.gate.outputs.target-env }}
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: "Gate: post-deploy smoke test"
+        env:
+          SMOKE_URL: https://staging.example.com
+          SMOKE_RETRIES: "5"
+          SMOKE_RETRY_DELAY: "10000"
+          SMOKE_TIMEOUT_MS: "15000"
+        run: node scripts/smoke-prod.mjs
+
+      - name: Post smoke summary
+        if: success()
+        run: |
+          echo "### ✅ Staging Deploy + Smoke Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ref:** \`${{ needs.gate.outputs.deploy-ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** staging" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validated:** livez, readyz, health, login, auth session" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+  # ═══════════════════════════════════════════════════════════════
+  #  5b. Smoke: Production — post-deploy validation
+  #  Runs the smoke test script against the deployed production env.
+  #  Fails the pipeline if any health/readiness check doesn't pass.
+  # ═══════════════════════════════════════════════════════════════
+  smoke-production:
+    name: "Smoke: Production"
+    needs: [gate, deploy-production]
+    runs-on: ubuntu-latest
+    if: needs.gate.outputs.target-env == 'production'
+    environment: ${{ needs.gate.outputs.target-env }}
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: "Gate: post-deploy smoke test"
+        env:
+          SMOKE_URL: https://app.example.com
+          SMOKE_RETRIES: "5"
+          SMOKE_RETRY_DELAY: "10000"
+          SMOKE_TIMEOUT_MS: "15000"
+        run: node scripts/smoke-prod.mjs
+
+      - name: Post smoke summary
+        if: success()
+        run: |
+          echo "### ✅ Production Deploy + Smoke Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Ref:** \`${{ needs.gate.outputs.deploy-ref }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Validated:** livez, readyz, health, login, auth session" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY

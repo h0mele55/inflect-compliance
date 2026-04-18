@@ -36,6 +36,9 @@ export {
 export {
     recordRequestMetrics,
     recordRequestError,
+    recordJobMetrics,
+    startQueueDepthReporting,
+    normalizeRoute,
 } from './metrics';
 
 export {

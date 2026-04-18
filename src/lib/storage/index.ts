@@ -13,6 +13,8 @@
 import crypto from 'crypto';
 import path from 'path';
 import { env } from '@/env';
+import { logger } from '@/lib/observability/logger';
+import { badRequest, tenantIsolationViolation } from '@/lib/errors/types';
 import type { StorageProvider, StorageProviderType } from './types';
 
 // Re-export types for consumers
@@ -46,10 +48,9 @@ export function getStorageProvider(): StorageProvider {
     // Production guard: warn (not fail) if local is used in production.
     // This allows migration windows while ensuring visibility.
     if (providerType === 'local' && env.NODE_ENV === 'production') {
-        console.warn(
-            '[STORAGE] ⚠️  WARNING: Using local filesystem storage in production. ' +
-            'Set STORAGE_PROVIDER=s3 for cloud storage. ' +
-            'Local storage is intended for development/test only.'
+        logger.warn(
+            'Using local filesystem storage in production — set STORAGE_PROVIDER=s3',
+            { component: 'storage', providerType },
         );
     }
 
@@ -170,13 +171,13 @@ export function buildTenantObjectKey(
     opts?: Omit<BuildKeyOptions, 'domain'>,
 ): string {
     if (!tenantId || typeof tenantId !== 'string') {
-        throw new Error('tenantId is required for object key generation');
+        throw badRequest('tenantId is required for object key generation');
     }
     if (!VALID_DOMAINS.includes(domain)) {
-        throw new Error(`Invalid storage domain: ${domain}. Must be one of: ${VALID_DOMAINS.join(', ')}`);
+        throw badRequest(`Invalid storage domain: ${domain}. Must be one of: ${VALID_DOMAINS.join(', ')}`);
     }
     if (!originalName || typeof originalName !== 'string') {
-        throw new Error('originalName is required for object key generation');
+        throw badRequest('originalName is required for object key generation');
     }
 
     const now = opts?.date ?? new Date();
@@ -208,7 +209,7 @@ const TENANT_KEY_REGEX = /^tenants\/([^/]+)\/(evidence|reports|exports|temp|gene
  */
 export function assertTenantKey(pathKey: string, expectedTenantId: string): void {
     if (!pathKey.startsWith(`tenants/${expectedTenantId}/`)) {
-        throw new Error(`Tenant isolation violation: key "${pathKey}" does not belong to tenant "${expectedTenantId}"`);
+        throw tenantIsolationViolation(`Tenant isolation violation: key "${pathKey}" does not belong to tenant "${expectedTenantId}"`);
     }
 }
 
@@ -263,11 +264,11 @@ export function validateFile(file: File, options?: { maxSizeMB?: number; allowed
     const allowedTypes = options?.allowedMimeTypes || FILE_ALLOWED_MIME;
 
     if (file.size > maxSize) {
-        throw new Error(`File size validation failed: max size is ${options?.maxSizeMB || 10}MB`);
+        throw badRequest(`File size validation failed: max size is ${options?.maxSizeMB || 10}MB`);
     }
 
     if (!allowedTypes.includes(file.type)) {
-        throw new Error(`File type validation failed: ${file.type} is not allowed`);
+        throw badRequest(`File type validation failed: ${file.type} is not allowed`);
     }
 
     return true;

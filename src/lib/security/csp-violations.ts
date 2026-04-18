@@ -19,6 +19,8 @@
 
 // ─── Types ───────────────────────────────────────────────────────────
 
+import { logger } from '@/lib/observability/logger';
+
 /**
  * Normalized CSP violation record.
  * Sourced from either legacy `csp-report` or modern `Report-To` payloads.
@@ -130,16 +132,15 @@ export function storeViolation(violation: CspViolation): void {
     violations.push(violation);
 
     // Structured log for SIEM / log aggregator ingestion
-    console.warn('[CSP-VIOLATION]', JSON.stringify({
+    logger.warn('CSP violation', {
+        component: 'csp',
         documentUri: violation.documentUri,
         violatedDirective: violation.violatedDirective,
         blockedUri: violation.blockedUri,
         sourceFile: violation.sourceFile,
         lineNumber: violation.lineNumber,
         disposition: violation.disposition,
-        clientIp: violation.clientIp,
-        createdAt: violation.createdAt,
-    }));
+    });
 }
 
 /**

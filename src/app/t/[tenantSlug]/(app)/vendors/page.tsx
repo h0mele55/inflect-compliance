@@ -1,6 +1,5 @@
 import { getTenantCtx } from '@/app-layer/context';
 import { listVendors } from '@/app-layer/usecases/vendor';
-import { getPermissionsForRole } from '@/lib/permissions';
 import { VendorsClient } from './VendorsClient';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +27,6 @@ export default async function VendorRegisterPage({
         if (typeof val === 'string' && val) filters[key] = val;
     }
 
-    const appPerms = getPermissionsForRole(ctx.role);
     const vendors = await listVendors(ctx, Object.keys(filters).length > 0 ? filters : undefined);
 
     return (
@@ -38,7 +36,7 @@ export default async function VendorRegisterPage({
                 initialFilters={filters}
                 tenantSlug={tenantSlug}
                 permissions={{
-                    canCreate: appPerms.vendors.create,
+                    canCreate: ctx.appPermissions.vendors.create,
                 }}
             />
         </div>

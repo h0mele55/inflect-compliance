@@ -1,0 +1,187 @@
+/**
+ * RiskHeatmap — Likelihood × Impact matrix visualization.
+ *
+ * Renders a 5×5 grid where each cell shows the count of risks at
+ * that (likelihood, impact) intersection. Color intensity encodes
+ * the inherent risk level (likelihood × impact score).
+ *
+ * Color scheme:
+ *   1-4:  green  (low)
+ *   5-9:  amber  (medium)
+ *   10-14: orange (high)
+ *   15-25: red    (critical)
+ *
+ * @example
+ * ```tsx
+ * <RiskHeatmap
+ *     cells={[
+ *         { likelihood: 3, impact: 4, count: 2 },
+ *         { likelihood: 5, impact: 5, count: 1 },
+ *     ]}
+ *     scale={5}
+ * />
+ * ```
+ */
+
+// ─── Props ──────────────────────────────────────────────────────────
+
+export interface HeatmapCell {
+    likelihood: number;
+    impact: number;
+    count: number;
+}
+
+export interface RiskHeatmapProps {
+    /** Sparse cell data from backend */
+    cells: HeatmapCell[];
+    /** Maximum scale (default: 5) */
+    scale?: number;
+    /** Optional CSS class */
+    className?: string;
+    /** Optional test-id */
+    id?: string;
+}
+
+// ─── Color Logic ────────────────────────────────────────────────────
+
+function getCellColor(likelihood: number, impact: number, count: number): string {
+    if (count === 0) return 'bg-slate-800/40';
+    const score = likelihood * impact;
+    if (score >= 15) return 'bg-red-500/80 text-white';
+    if (score >= 10) return 'bg-orange-500/70 text-white';
+    if (score >= 5)  return 'bg-amber-500/60 text-slate-900';
+    return 'bg-emerald-500/50 text-slate-900';
+}
+
+function getScoreLabel(score: number): string {
+    if (score >= 15) return 'Critical';
+    if (score >= 10) return 'High';
+    if (score >= 5)  return 'Medium';
+    return 'Low';
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+export default function RiskHeatmap({
+    cells,
+    scale = 5,
+    className = '',
+    id,
+}: RiskHeatmapProps) {
+    // Build lookup: `${likelihood}-${impact}` → count
+    const lookup = new Map<string, number>();
+    for (const cell of cells) {
+        lookup.set(`${cell.likelihood}-${cell.impact}`, cell.count);
+    }
+
+    const totalRisks = cells.reduce((sum, c) => sum + c.count, 0);
+
+    // Empty state
+    if (totalRisks === 0) {
+        return (
+            <div id={id} className={`glass-card p-5 ${className}`}>
+                <h3 className="text-sm font-semibold text-slate-300 mb-3">Risk Heatmap</h3>
+                <p className="text-xs text-slate-500">No risks registered yet.</p>
+            </div>
+        );
+    }
+
+    // Axes: likelihood = rows (top=5), impact = columns (left=1)
+    const rows = Array.from({ length: scale }, (_, i) => scale - i); // 5,4,3,2,1
+    const cols = Array.from({ length: scale }, (_, i) => i + 1);     // 1,2,3,4,5
+
+    return (
+        <div id={id} className={`glass-card p-5 ${className}`}>
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-300">Risk Heatmap</h3>
+                <span className="text-xs text-slate-500 tabular-nums">{totalRisks} risks</span>
+            </div>
+
+            <div className="flex gap-2">
+                {/* Y-axis label */}
+                <div className="flex flex-col items-center justify-center -mr-1">
+                    <span className="text-[10px] text-slate-500 [writing-mode:vertical-lr] rotate-180 tracking-widest uppercase">
+                        Likelihood
+                    </span>
+                </div>
+
+                <div className="flex-1">
+                    {/* Grid */}
+                    <div
+                        className="grid gap-[3px]"
+                        style={{
+                            gridTemplateColumns: `24px repeat(${scale}, 1fr)`,
+                            gridTemplateRows: `repeat(${scale}, 1fr) 20px`,
+                        }}
+                    >
+                        {rows.map((likelihood) => (
+                            <>
+                                {/* Row label */}
+                                <div
+                                    key={`label-${likelihood}`}
+                                    className="flex items-center justify-center text-[10px] text-slate-500 tabular-nums"
+                                >
+                                    {likelihood}
+                                </div>
+
+                                {cols.map((impact) => {
+                                    const count = lookup.get(`${likelihood}-${impact}`) ?? 0;
+                                    const score = likelihood * impact;
+                                    return (
+                                        <div
+                                            key={`${likelihood}-${impact}`}
+                                            className={`
+                                                flex items-center justify-center
+                                                rounded-sm min-h-[28px]
+                                                text-xs font-semibold tabular-nums
+                                                transition-all duration-200
+                                                ${getCellColor(likelihood, impact, count)}
+                                                ${count > 0 ? 'hover:scale-110 cursor-default' : ''}
+                                            `.trim()}
+                                            title={`L${likelihood} × I${impact} = ${score} (${getScoreLabel(score)}) — ${count} risk${count !== 1 ? 's' : ''}`}
+                                        >
+                                            {count > 0 ? count : ''}
+                                        </div>
+                                    );
+                                })}
+                            </>
+                        ))}
+
+                        {/* X-axis labels */}
+                        <div /> {/* spacer for row label column */}
+                        {cols.map((impact) => (
+                            <div
+                                key={`col-${impact}`}
+                                className="flex items-center justify-center text-[10px] text-slate-500 tabular-nums"
+                            >
+                                {impact}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* X-axis title */}
+                    <div className="text-center mt-1">
+                        <span className="text-[10px] text-slate-500 uppercase tracking-widest">
+                            Impact
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Legend */}
+            <div className="flex justify-center gap-3 mt-3">
+                {[
+                    { label: 'Low', color: 'bg-emerald-500/50' },
+                    { label: 'Medium', color: 'bg-amber-500/60' },
+                    { label: 'High', color: 'bg-orange-500/70' },
+                    { label: 'Critical', color: 'bg-red-500/80' },
+                ].map((item) => (
+                    <div key={item.label} className="flex items-center gap-1 text-[10px] text-slate-400">
+                        <span className={`w-2.5 h-2.5 rounded-sm ${item.color}`} />
+                        <span>{item.label}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}

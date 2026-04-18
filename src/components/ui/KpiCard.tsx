@@ -1,0 +1,141 @@
+/**
+ * KpiCard — Reusable executive KPI stat card.
+ *
+ * Renders a headline numeric value with label, optional subtitle,
+ * optional delta/trend indicator, and optional icon.
+ *
+ * Design language:
+ *   - glass-card container with hover lift
+ *   - gradient text for the headline value
+ *   - Inter font (inherited from globals)
+ *   - Dark theme compatible (slate-400/500 for secondary text)
+ *
+ * @example
+ * ```tsx
+ * <KpiCard
+ *     label="Control Coverage"
+ *     value={75.3}
+ *     format="percent"
+ *     icon={ShieldCheck}
+ *     gradient="from-emerald-500 to-teal-500"
+ *     subtitle="15 of 20 implemented"
+ * />
+ * ```
+ */
+import { type LucideIcon } from 'lucide-react';
+
+// ─── Props ──────────────────────────────────────────────────────────
+
+export type KpiFormat = 'number' | 'percent' | 'compact';
+
+export interface KpiCardProps {
+    /** Card label (top-left, small caps) */
+    label: string;
+    /** Headline value */
+    value: number | null | undefined;
+    /** How to format the value */
+    format?: KpiFormat;
+    /** Optional Lucide icon */
+    icon?: LucideIcon;
+    /** Tailwind gradient classes for headline text, e.g. "from-blue-500 to-cyan-500" */
+    gradient?: string;
+    /** Secondary text below the value */
+    subtitle?: string;
+    /** Delta from previous period — shows as ▲/▼ with color */
+    delta?: number | null;
+    /** What the delta represents */
+    deltaLabel?: string;
+    /** Optional CSS class on the outer container */
+    className?: string;
+    /** Optional test-id */
+    id?: string;
+}
+
+// ─── Formatters ─────────────────────────────────────────────────────
+
+function formatValue(value: number | null | undefined, format: KpiFormat): string {
+    if (value === null || value === undefined) return '—';
+    switch (format) {
+        case 'percent':
+            return `${value.toFixed(1)}%`;
+        case 'compact':
+            if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+            if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+            return value.toLocaleString();
+        case 'number':
+        default:
+            return value.toLocaleString();
+    }
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+export default function KpiCard({
+    label,
+    value,
+    format = 'number',
+    icon: Icon,
+    gradient = 'from-brand-500 to-indigo-400',
+    subtitle,
+    delta,
+    deltaLabel,
+    className = '',
+    id,
+}: KpiCardProps) {
+    const formatted = formatValue(value, format);
+    const isEmpty = value === null || value === undefined;
+
+    return (
+        <div
+            id={id}
+            className={`glass-card p-4 hover:scale-[1.02] transition-transform ${className}`}
+        >
+            {/* Header: icon + label */}
+            <div className="flex items-center gap-2 mb-2">
+                {Icon && <Icon className="w-4 h-4 text-slate-400" aria-hidden="true" />}
+                <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">
+                    {label}
+                </span>
+            </div>
+
+            {/* Headline value */}
+            <p
+                className={`text-2xl font-bold ${
+                    isEmpty
+                        ? 'text-slate-600'
+                        : `bg-gradient-to-r ${gradient} bg-clip-text text-transparent`
+                }`}
+            >
+                {formatted}
+            </p>
+
+            {/* Delta indicator */}
+            {delta !== null && delta !== undefined && (
+                <div className="flex items-center gap-1 mt-1">
+                    <span
+                        className={`text-xs font-medium ${
+                            delta > 0
+                                ? 'text-emerald-400'
+                                : delta < 0
+                                  ? 'text-red-400'
+                                  : 'text-slate-500'
+                        }`}
+                    >
+                        {delta > 0 ? '▲' : delta < 0 ? '▼' : '—'}
+                        {' '}
+                        {Math.abs(delta).toFixed(1)}
+                        {format === 'percent' ? 'pp' : ''}
+                    </span>
+                    {deltaLabel && (
+                        <span className="text-xs text-slate-500">{deltaLabel}</span>
+                    )}
+                </div>
+            )}
+
+            {/* Subtitle */}
+            {subtitle && (
+                <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
+            )}
+        </div>
+    );
+}

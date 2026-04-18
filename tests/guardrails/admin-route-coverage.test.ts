@@ -30,6 +30,10 @@ const ADMIN_ONLY_ROUTES = [
     'admin/scim/route.ts',
     'admin/integrations/route.ts',
     'admin/integrations/diagnostics/route.ts',
+    'admin/roles/route.ts',
+    'admin/roles/[roleId]/route.ts',
+    'admin/api-keys/route.ts',
+    'admin/api-keys/[keyId]/route.ts',
 
     // Billing routes (admin-only)
     'billing/checkout/route.ts',

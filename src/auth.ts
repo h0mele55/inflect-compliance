@@ -10,6 +10,7 @@ import type { Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 import { env } from '@/env';
+import { edgeLogger } from '@/lib/observability/edge-logger';
 
 // Note: AUTH_SECRET is required at runtime. Auth.js v5 will
 // throw a descriptive error if it is missing at request time.
@@ -184,15 +185,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 if (dbUser) {
                     token.userId = dbUser.id;
                     token.sessionVersion = dbUser.sessionVersion;
-                    // Resolve from TenantMembership (authoritative)
+                    // Resolve from TenantMembership (sole authority)
                     const defaultMembership = dbUser.tenantMemberships[0];
                     if (defaultMembership) {
                         token.tenantId = defaultMembership.tenantId;
                         token.role = defaultMembership.role;
                     } else {
-                        // Fallback to deprecated User fields during migration
-                        token.tenantId = dbUser.tenantId;
-                        token.role = dbUser.role;
+                        // No membership — user has no tenant access yet
+                        token.tenantId = null;
+                        token.role = 'READER' as Role;
                     }
                 } else {
                     token.userId = user.id!;
@@ -294,7 +295,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         },
                     });
                 } catch (error) {
-                    console.error('[auth] Token refresh failed, forcing reauth');
+                    edgeLogger.error('Token refresh failed, forcing reauth', { component: 'auth' });
                     token.error = 'RefreshTokenError';
                 }
             }

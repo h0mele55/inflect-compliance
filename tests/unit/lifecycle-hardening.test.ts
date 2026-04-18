@@ -38,6 +38,9 @@ import {
 } from '@/app-layer/policies/lifecycle.policies';
 import { AppError } from '@/lib/errors/types';
 
+import type { Role } from '@prisma/client';
+import { getPermissionsForRole } from '@/lib/permissions';
+
 // ─── Mock audit + logger ─────────────────────────────────────────────
 
 const mockLogEvent = jest.fn();
@@ -69,7 +72,7 @@ function ctx(role: string, overrides?: Partial<{ userId: string; tenantId: strin
         userId: overrides?.userId ?? 'user-1',
         tenantId: overrides?.tenantId ?? 'tenant-1',
         tenantSlug: 'acme',
-        role,
+        role: role as Role,
         permissions: {
             canRead: true,
             canWrite: ['ADMIN', 'EDITOR'].includes(role),
@@ -77,6 +80,7 @@ function ctx(role: string, overrides?: Partial<{ userId: string; tenantId: strin
             canAudit: ['ADMIN', 'AUDITOR'].includes(role),
             canExport: role === 'ADMIN',
         },
+        appPermissions: getPermissionsForRole(role as Role),
     };
 }
 

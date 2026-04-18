@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '@/lib/observability/logger';
 
 export async function POST(req: NextRequest) {
     // ── Gate 1: Environment check ──
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const providedToken = req.headers.get('x-seed-token');
     if (providedToken !== seedToken) {
-        console.warn(`[staging-seed] Unauthorized attempt from ${req.headers.get('x-forwarded-for') || 'unknown'}`);
+        logger.warn('Unauthorized staging seed attempt', { component: 'staging-seed' });
         return NextResponse.json(
             { error: 'Invalid seed token' },
             { status: 401 }
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Gate 3: Execute seed ──
-    console.log('[staging-seed] Seed triggered via API');
+    logger.info('Staging seed triggered via API', { component: 'staging-seed' });
     const prisma = new PrismaClient();
 
     try {
@@ -53,20 +54,17 @@ export async function POST(req: NextRequest) {
             create: { name: 'Acme Corp', slug: 'acme-corp', industry: 'Technology', maxRiskScale: 5 },
         });
 
-        await prisma.user.upsert({
+        const admin = await prisma.user.upsert({
             where: { email: 'admin@acme.com' },
             update: {},
-            create: { tenantId: tenant.id, email: 'admin@acme.com', passwordHash: pwd, name: 'Alice Admin', role: 'ADMIN' },
+            create: { email: 'admin@acme.com', passwordHash: pwd, name: 'Alice Admin' },
         });
 
-        const admin = await prisma.user.findUnique({ where: { email: 'admin@acme.com' } });
-        if (admin) {
-            await prisma.tenantMembership.upsert({
-                where: { tenantId_userId: { tenantId: tenant.id, userId: admin.id } },
-                update: {},
-                create: { tenantId: tenant.id, userId: admin.id, role: 'ADMIN' },
-            });
-        }
+        await prisma.tenantMembership.upsert({
+            where: { tenantId_userId: { tenantId: tenant.id, userId: admin.id } },
+            update: {},
+            create: { tenantId: tenant.id, userId: admin.id, role: 'ADMIN' },
+        });
 
         const counts = {
             tenants: await prisma.tenant.count(),
@@ -76,7 +74,7 @@ export async function POST(req: NextRequest) {
             frameworks: await prisma.framework.count(),
         };
 
-        console.log('[staging-seed] Seed completed:', counts);
+        logger.info('Staging seed completed', { component: 'staging-seed', ...counts });
 
         return NextResponse.json({
             success: true,
@@ -85,7 +83,7 @@ export async function POST(req: NextRequest) {
             login: { email: 'admin@acme.com', password: 'password123' },
         });
     } catch (err) {
-        console.error('[staging-seed] Seed failed:', err);
+        logger.error('Staging seed failed', { component: 'staging-seed', error: err instanceof Error ? err.message : String(err) });
         return NextResponse.json(
             { error: 'Seed failed', details: String(err) },
             { status: 500 }
