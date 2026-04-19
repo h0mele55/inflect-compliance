@@ -1,10 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { SoAClient } from './soa/SoAClient';
 import { PdfExportButton } from '@/components/PdfExportButton';
 import { RequirePermission } from '@/components/require-permission';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import type { SoAReportDTO } from '@/lib/dto/soa';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 interface ControlOption {
     id: string;
@@ -39,6 +40,62 @@ export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, 
         const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const riskColumns = useMemo(() => createColumns<any>([
+        {
+            accessorKey: 'title',
+            header: t.risk,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="font-medium text-sm text-white">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'asset',
+            header: t.asset,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'threat',
+            header: t.threat,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs text-slate-400">{getValue()}</span>,
+        },
+        {
+            id: 'lxi',
+            header: 'L×I',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            accessorFn: (r: any) => `${r.likelihood}×${r.impact}`,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'score',
+            header: t.score,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="font-bold">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'treatment',
+            header: t.treatment,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'owner',
+            header: t.owner,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span>,
+        },
+        {
+            id: 'controls',
+            header: t.controls,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            accessorFn: (r: any) => r.controls || '—',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs text-slate-400">{getValue()}</span>,
+        },
+    ]), [t]);
+
     return (
         <>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -71,26 +128,14 @@ export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, 
                     canEdit={canEdit}
                 />
             ) : (
-                <div className="glass-card overflow-auto">
-                    <table className="data-table" id="risk-table">
-                        <thead><tr><th>{t.risk}</th><th>{t.asset}</th><th>{t.threat}</th><th>L×I</th><th>{t.score}</th><th>{t.treatment}</th><th>{t.owner}</th><th>{t.controls}</th></tr></thead>
-                        <tbody>
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                            {data.riskRegister.map((r: any) => (
-                                <tr key={r.id}>
-                                    <td className="font-medium text-sm text-white">{r.title}</td>
-                                    <td className="text-xs">{r.asset}</td>
-                                    <td className="text-xs text-slate-400">{r.threat}</td>
-                                    <td className="text-xs">{r.likelihood}×{r.impact}</td>
-                                    <td className="font-bold">{r.score}</td>
-                                    <td className="text-xs">{r.treatment}</td>
-                                    <td className="text-xs">{r.owner}</td>
-                                    <td className="text-xs text-slate-400">{r.controls || '—'}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable
+                    data={data.riskRegister}
+                    columns={riskColumns}
+                    getRowId={(r: any) => r.id}
+                    emptyState="No risks in the register"
+                    resourceName={(p) => p ? 'risks' : 'risk'}
+                    data-testid="risk-register-table"
+                />
             )}
         </>
     );

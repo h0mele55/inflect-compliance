@@ -1,11 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { risksFilterConfig } from '@/components/filters/configs';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 interface RiskListItem {
     id: string;
@@ -73,6 +75,7 @@ export function RisksClient({
 }: RisksClientProps) {
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
+    const router = useRouter();
     const [view, setView] = useState<'register' | 'heatmap'>('register');
 
     // URL-driven filter state
@@ -98,6 +101,7 @@ export function RisksClient({
     });
 
     const risks = risksQuery.data ?? [];
+    const loading = risksQuery.isLoading && !risksQuery.data;
 
     // ── KPI Computations ──
     const total = risks.length;
@@ -116,6 +120,72 @@ export function RisksClient({
         if (score <= 18) return { label: t.high, class: 'badge-danger' };
         return { label: t.critical, class: 'badge-danger' };
     };
+
+    // ── Column Definitions ──
+    const riskColumns = useMemo(() => createColumns<RiskListItem>([
+        {
+            accessorKey: 'title',
+            header: t.riskTitle,
+            cell: ({ getValue }) => (
+                <span className="font-medium text-white text-sm">{getValue<string>()}</span>
+            ),
+        },
+        {
+            accessorFn: (r) => r.asset?.name || '—',
+            id: 'asset',
+            header: t.asset,
+            cell: ({ getValue }) => (
+                <span className="text-xs">{getValue<string>()}</span>
+            ),
+        },
+        {
+            accessorKey: 'threat',
+            header: t.threat,
+            cell: ({ getValue }) => (
+                <span className="text-xs text-slate-400">{getValue<string>()}</span>
+            ),
+        },
+        {
+            id: 'lxi',
+            header: 'L×I',
+            accessorFn: (r) => `${r.likelihood}×${r.impact}`,
+            cell: ({ getValue }) => (
+                <span className="text-xs">{getValue<string>()}</span>
+            ),
+        },
+        {
+            accessorKey: 'inherentScore',
+            header: t.score,
+            cell: ({ getValue }) => (
+                <span className="font-bold">{getValue<number>()}</span>
+            ),
+        },
+        {
+            id: 'level',
+            header: t.level,
+            accessorFn: (r) => r.inherentScore,
+            cell: ({ getValue }) => {
+                const level = getRiskLevel(getValue<number>());
+                return <span className={`badge ${level.class}`}>{level.label}</span>;
+            },
+        },
+        {
+            id: 'treatment',
+            header: t.treatment,
+            accessorFn: (r) => r.treatment || t.untreated,
+            cell: ({ getValue }) => (
+                <span className="text-xs">{getValue<string>()}</span>
+            ),
+        },
+        {
+            id: 'controls',
+            header: t.controlsCol,
+            accessorFn: (r) => r.controls?.length || 0,
+            cell: ({ getValue }) => (
+                <span className="text-xs">{getValue<number>()}</span>
+            ),
+        },
+    ]), [t, getRiskLevel]);
 
     return (
         <div className="space-y-6 animate-fadeIn">
@@ -197,33 +267,20 @@ export function RisksClient({
                     </div>
                 </div>
             ) : (
-                <div className="glass-card overflow-hidden">
-                    <table className="data-table">
-                        <thead><tr><th>{t.riskTitle}</th><th>{t.asset}</th><th>{t.threat}</th><th>L×I</th><th>{t.score}</th><th>{t.level}</th><th>{t.treatment}</th><th>{t.controlsCol}</th></tr></thead>
-                        <tbody>
-                            {risks.map(r => {
-                                const level = getRiskLevel(r.inherentScore);
-                                return (
-                                    <tr key={r.id}>
-                                        <td className="font-medium text-white text-sm">{r.title}</td>
-                                        <td className="text-xs">{r.asset?.name || '—'}</td>
-                                        <td className="text-xs text-slate-400">{r.threat}</td>
-                                        <td className="text-xs">{r.likelihood}×{r.impact}</td>
-                                        <td className="font-bold">{r.inherentScore}</td>
-                                        <td><span className={`badge ${level.class}`}>{level.label}</span></td>
-                                        <td className="text-xs">{r.treatment || t.untreated}</td>
-                                        <td className="text-xs">{r.controls?.length || 0}</td>
-                                    </tr>
-                                );
-                            })}
-                            {risks.length === 0 && (
-                                <tr><td colSpan={8} className="text-center text-slate-500 py-8">
-                                    {hasActiveFilters ? 'No risks match your filters' : t.noRisks}
-                                </td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable<RiskListItem>
+                    data={risks}
+                    columns={riskColumns}
+                    loading={loading}
+                    getRowId={(r) => r.id}
+                    onRowClick={(row) => router.push(tenantHref(`/risks/${row.original.id}`))}
+                    emptyState={
+                        hasActiveFilters
+                            ? 'No risks match your filters'
+                            : t.noRisks
+                    }
+                    resourceName={(p) => p ? 'risks' : 'risk'}
+                    data-testid="risks-table"
+                />
             )}
         </div>
     );

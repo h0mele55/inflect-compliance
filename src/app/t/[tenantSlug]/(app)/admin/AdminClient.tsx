@@ -1,7 +1,8 @@
 'use client';
 import { formatDateTime } from '@/lib/format-date';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 interface AdminClientProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,6 +37,44 @@ export function AdminClient({ auditLog, tenantSlug, translations: t }: AdminClie
         'supplierSecurity', 'backup', 'changeManagement', 'cryptography', 'logging',
     ] as const;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const logColumns = useMemo(() => createColumns<any>([
+        {
+            id: 'time',
+            header: t.time,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            accessorFn: (e: any) => e.createdAt,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs whitespace-nowrap">{formatDateTime(getValue())}</span>,
+        },
+        {
+            id: 'user',
+            header: t.user,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            accessorFn: (e: any) => e.user?.name || '—',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'action',
+            header: t.action,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="badge badge-info">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'entity',
+            header: t.entity,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'details',
+            header: t.details,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs text-slate-400 max-w-xs truncate">{getValue()}</span>,
+        },
+    ]), [t]);
+
     return (
         <>
             <div className="flex gap-2">
@@ -44,23 +83,14 @@ export function AdminClient({ auditLog, tenantSlug, translations: t }: AdminClie
             </div>
 
             {tab === 'log' ? (
-                <div className="glass-card overflow-hidden">
-                    <table className="data-table">
-                        <thead><tr><th>{t.time}</th><th>{t.user}</th><th>{t.action}</th><th>{t.entity}</th><th>{t.details}</th></tr></thead>
-                        <tbody>
-                            {auditLog.map(e => (
-                                <tr key={e.id}>
-                                    <td className="text-xs whitespace-nowrap">{formatDateTime(e.createdAt)}</td>
-                                    <td className="text-xs">{e.user?.name || '—'}</td>
-                                    <td><span className="badge badge-info">{e.action}</span></td>
-                                    <td className="text-xs">{e.entity}</td>
-                                    <td className="text-xs text-slate-400 max-w-xs truncate">{e.details}</td>
-                                </tr>
-                            ))}
-                            {auditLog.length === 0 && <tr><td colSpan={5} className="text-center text-slate-500 py-8">{t.noEntries}</td></tr>}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable
+                    data={auditLog}
+                    columns={logColumns}
+                    getRowId={(e: any) => e.id}
+                    emptyState={t.noEntries}
+                    resourceName={(p) => p ? 'log entries' : 'log entry'}
+                    data-testid="audit-log-table"
+                />
             ) : (
                 <div className="glass-card p-6">
                     <p className="text-sm text-slate-400 mb-4">{t.templateDescription}</p>

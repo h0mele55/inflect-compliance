@@ -1,13 +1,14 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
 import { queryKeys } from '@/lib/queryKeys';
-import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { controlsFilterConfig } from '@/components/filters/configs';
 import { AppIcon } from '@/components/icons/AppIcon';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 // ─── Constants ───
 
@@ -78,6 +79,7 @@ export function ControlsClient({
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
     const queryClient = useQueryClient();
+    const router = useRouter();
 
     // URL-driven filter state
     const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'applicability'], initialFilters);
@@ -242,6 +244,124 @@ export function ControlsClient({
         return { total, done };
     };
 
+    // ── Column definitions ──
+    const controlColumns = useMemo(() => createColumns<ControlListItem>([
+        {
+            accessorFn: (c) => c.code || c.annexId || '',
+            id: 'code',
+            header: 'Code',
+            cell: ({ getValue }) => (
+                <span className="text-xs text-slate-400 font-mono">{getValue<string>() || '—'}</span>
+            ),
+        },
+        {
+            accessorKey: 'name',
+            header: 'Title',
+            cell: ({ row }) => (
+                <div>
+                    <Link
+                        href={tenantHref(`/controls/${row.original.id}`)}
+                        className="font-medium text-white hover:text-brand-400 transition"
+                        id={`control-link-${row.original.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {row.original.name}
+                    </Link>
+                    {row.original.description && (
+                        <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{row.original.description}</p>
+                    )}
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'status',
+            header: 'Status',
+            cell: ({ row }) => {
+                const c = row.original;
+                return appPermissions.controls.edit ? (
+                    <button
+                        type="button"
+                        className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
+                        onClick={(e) => { e.stopPropagation(); handleStatusClick(c.id); }}
+                        title="Click to advance status"
+                        aria-label={`Advance status for control ${c.code || c.annexId || c.name}`}
+                        id={`status-pill-${c.id}`}
+                    >
+                        {STATUS_LABELS[c.status] || c.status}
+                    </button>
+                ) : (
+                    <span className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'}`}>
+                        {STATUS_LABELS[c.status] || c.status}
+                    </span>
+                );
+            },
+        },
+        {
+            accessorKey: 'applicability',
+            header: 'Applicability',
+            cell: ({ row }) => {
+                const c = row.original;
+                const code = c.code || c.annexId || '';
+                return appPermissions.controls.edit ? (
+                    <button
+                        type="button"
+                        className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
+                        onClick={(e) => { e.stopPropagation(); handleApplicabilityClick(c.id, code); }}
+                        title={c.applicability === 'NOT_APPLICABLE' ? 'Click to mark applicable' : 'Click to mark not applicable'}
+                        aria-label={`Toggle applicability for control ${code || c.name}`}
+                        id={`applicability-pill-${c.id}`}
+                    >
+                        {c.applicability === 'NOT_APPLICABLE' ? 'N/A' : 'Yes'}
+                    </button>
+                ) : (
+                    <span className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'}`}>
+                        {c.applicability === 'NOT_APPLICABLE' ? 'N/A' : 'Yes'}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'owner',
+            header: 'Owner',
+            accessorFn: (c) => c.owner?.name || '—',
+            cell: ({ getValue }) => (
+                <span className="text-xs text-slate-400">{getValue<string>()}</span>
+            ),
+        },
+        {
+            id: 'frequency',
+            header: 'Frequency',
+            accessorFn: (c) => c.frequency ? FREQ_LABELS[c.frequency] || c.frequency : '—',
+            cell: ({ getValue }) => (
+                <span className="text-xs text-slate-400">{getValue<string>()}</span>
+            ),
+        },
+        {
+            id: 'tasks',
+            header: 'Tasks',
+            accessorFn: (c) => {
+                const ts = taskStats(c);
+                return `${ts.done}/${ts.total}`;
+            },
+            cell: ({ row }) => {
+                const ts = taskStats(row.original);
+                return (
+                    <span className={ts.total > 0 && ts.done === ts.total ? 'text-emerald-400 text-xs' : 'text-slate-400 text-xs'}>
+                        {ts.done}/{ts.total}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'evidence',
+            header: 'Evidence',
+            accessorFn: (c) => c._count?.evidenceLinks ?? 0,
+            cell: ({ getValue }) => (
+                <span className="text-xs text-slate-400">{getValue<number>()}</span>
+            ),
+        },
+    ]), [appPermissions, handleStatusClick, handleApplicabilityClick, tenantHref, taskStats]);
+
     return (
         <div className="space-y-6 animate-fadeIn">
             {/* Header */}
@@ -272,117 +392,20 @@ export function ControlsClient({
             <CompactFilterBar config={controlsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="control" />
 
             {/* Table */}
-            <div className="glass-card overflow-hidden">
-                {loading ? (
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Title</th>
-                                <th>Status</th>
-                                <th>Applicability</th>
-                                <th>Owner</th>
-                                <th>Frequency</th>
-                                <th>Tasks</th>
-                                <th>Evidence</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {Array.from({ length: 10 }).map((_, i) => (
-                                <SkeletonTableRow key={i} cols={8} />
-                            ))}
-                        </tbody>
-                    </table>
-                ) : controls.length === 0 ? (
-                    <div className="p-12 text-center text-slate-500">
-                        <p className="text-lg mb-2">{hasActiveFilters ? 'No controls match your filters' : 'No controls found'}</p>
-                        <p className="text-sm">{hasActiveFilters ? 'Try adjusting your search or filters.' : 'Install from templates or create a new control.'}</p>
-                        {hasActiveFilters && (
-                            <button type="button" className="btn btn-sm btn-secondary mt-3" onClick={clearFilters}>Clear filters</button>
-                        )}
-                    </div>
-                ) : (
-                    <table className="data-table" id="controls-table">
-                        <thead>
-                            <tr>
-                                <th>Code</th>
-                                <th>Title</th>
-                                <th>Status</th>
-                                <th>Applicability</th>
-                                <th>Owner</th>
-                                <th>Frequency</th>
-                                <th>Tasks</th>
-                                <th>Evidence</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {controls.map(c => {
-                                const ts = taskStats(c);
-                                const code = c.code || c.annexId || '';
-                                return (
-                                    <tr key={c.id} className="hover:bg-slate-700/30 transition">
-                                        <td className="text-xs text-slate-400 font-mono">{code || '—'}</td>
-                                        <td>
-                                            <Link href={tenantHref(`/controls/${c.id}`)} className="font-medium text-white hover:text-brand-400 transition" id={`control-link-${c.id}`}>
-                                                {c.name}
-                                            </Link>
-                                            {c.description && (
-                                                <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{c.description}</p>
-                                            )}
-                                        </td>
-                                        {/* Status pill */}
-                                        <td>
-                                            {appPermissions.controls.edit ? (
-                                                <button
-                                                    type="button"
-                                                    className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
-                                                    onClick={(e) => { e.stopPropagation(); handleStatusClick(c.id); }}
-                                                    title="Click to advance status"
-                                                    aria-label={`Advance status for control ${code || c.name}`}
-                                                    id={`status-pill-${c.id}`}
-                                                >
-                                                    {STATUS_LABELS[c.status] || c.status}
-                                                </button>
-                                            ) : (
-                                                <span className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'}`}>
-                                                    {STATUS_LABELS[c.status] || c.status}
-                                                </span>
-                                            )}
-                                        </td>
-                                        {/* Applicability pill */}
-                                        <td>
-                                            {appPermissions.controls.edit ? (
-                                                <button
-                                                    type="button"
-                                                    className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
-                                                    onClick={(e) => { e.stopPropagation(); handleApplicabilityClick(c.id, code); }}
-                                                    title={c.applicability === 'NOT_APPLICABLE' ? 'Click to mark applicable' : 'Click to mark not applicable'}
-                                                    aria-label={`Toggle applicability for control ${code || c.name}`}
-                                                    id={`applicability-pill-${c.id}`}
-                                                >
-                                                    {c.applicability === 'NOT_APPLICABLE' ? 'N/A' : 'Yes'}
-                                                </button>
-                                            ) : (
-                                                <span className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'}`}>
-                                                    {c.applicability === 'NOT_APPLICABLE' ? 'N/A' : 'Yes'}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="text-xs text-slate-400">{c.owner?.name || '—'}</td>
-                                        <td className="text-xs text-slate-400">{c.frequency ? FREQ_LABELS[c.frequency] || c.frequency : '—'}</td>
-                                        <td className="text-xs">
-                                            <span className={ts.total > 0 && ts.done === ts.total ? 'text-emerald-400' : 'text-slate-400'}>
-                                                {ts.done}/{ts.total}
-                                            </span>
-                                        </td>
-                                        <td className="text-xs text-slate-400">{c._count?.evidenceLinks ?? 0}</td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+            <DataTable<ControlListItem>
+                data={controls}
+                columns={controlColumns}
+                loading={loading}
+                getRowId={(c) => c.id}
+                onRowClick={(row) => router.push(tenantHref(`/controls/${row.original.id}`))}
+                emptyState={
+                    hasActiveFilters
+                        ? 'No controls match your filters. Try adjusting your search or filters.'
+                        : 'No controls found. Install from templates or create a new control.'
+                }
+                resourceName={(p) => p ? 'controls' : 'control'}
+                data-testid="controls-table"
+            />
 
             {/* Justification Modal */}
             {justificationModal && (

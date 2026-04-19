@@ -1,14 +1,15 @@
 'use client';
 import { formatDate } from '@/lib/format-date';
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { policiesFilterConfig } from '@/components/filters/configs';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral',
@@ -43,8 +44,9 @@ export function PoliciesClient({
     permissions,
     translations: t,
 }: PoliciesClientProps) {
-    const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
+    const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
+    const router = useRouter();
 
     // URL-driven filter state
     const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'category'], initialFilters);
@@ -76,6 +78,64 @@ export function PoliciesClient({
         return map[s] || s;
     };
 
+    const policyColumns = useMemo(() => createColumns<any>([
+        {
+            accessorKey: 'title',
+            header: 'Title',
+            cell: ({ row }: any) => (
+                <div>
+                    <Link href={tenantHref(`/policies/${row.original.id}`)} className="font-medium text-white hover:text-brand-400 transition" onClick={(e) => e.stopPropagation()}>
+                        {row.original.title}
+                    </Link>
+                    {row.original.description && (
+                        <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{row.original.description}</p>
+                    )}
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'status',
+            header: 'Status',
+            cell: ({ row }: any) => (
+                <span className={`badge ${STATUS_BADGE[row.original.status] || 'badge-neutral'}`}>{statusLabel(row.original.status)}</span>
+            ),
+        },
+        {
+            id: 'category',
+            header: 'Category',
+            accessorFn: (p: any) => p.category || '—',
+            cell: ({ getValue }: any) => <span className="text-xs text-slate-400">{getValue()}</span>,
+        },
+        {
+            id: 'owner',
+            header: 'Owner',
+            accessorFn: (p: any) => p.owner?.name || '—',
+            cell: ({ getValue }: any) => <span className="text-xs text-slate-400">{getValue()}</span>,
+        },
+        {
+            id: 'nextReviewAt',
+            header: 'Next Review',
+            cell: ({ row }: any) => {
+                const p = row.original;
+                if (!p.nextReviewAt) return <span className="text-xs text-slate-400">—</span>;
+                return (
+                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                        {formatDate(p.nextReviewAt)}
+                        {new Date(p.nextReviewAt) < new Date() && p.status !== 'ARCHIVED' && (
+                            <span className="badge badge-danger text-xs">Overdue</span>
+                        )}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'updatedAt',
+            header: 'Updated',
+            accessorFn: (p: any) => p.updatedAt,
+            cell: ({ getValue }: any) => <span className="text-xs text-slate-500">{formatDate(getValue())}</span>,
+        },
+    ]), [tenantHref]);
+
     return (
         <div className="space-y-6 animate-fadeIn">
             {/* Header */}
@@ -100,78 +160,16 @@ export function PoliciesClient({
             <CompactFilterBar config={policiesFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="policy" />
 
             {/* Table */}
-            <div className="glass-card overflow-hidden">
-                {loading ? (
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Status</th>
-                                <th>Category</th>
-                                <th>Owner</th>
-                                <th>Next Review</th>
-                                <th>Updated</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {Array.from({ length: 8 }).map((_, i) => (
-                                <SkeletonTableRow key={i} cols={6} />
-                            ))}
-                        </tbody>
-                    </table>
-                ) : policies.length === 0 ? (
-                    <div className="p-12 text-center text-slate-500">
-                        <p className="text-lg mb-2">{hasActiveFilters ? 'No policies match your filters' : 'No policies found'}</p>
-                        <p className="text-sm">{hasActiveFilters ? 'Try adjusting your search or filters.' : 'Create your first policy to get started.'}</p>
-                        {hasActiveFilters && (
-                            <button type="button" className="btn btn-sm btn-secondary mt-3" onClick={clearFilters}>Clear filters</button>
-                        )}
-                    </div>
-                ) : (
-                    <table className="data-table" id="policies-table">
-                        <thead>
-                            <tr>
-                                <th>Title</th>
-                                <th>Status</th>
-                                <th>Category</th>
-                                <th>Owner</th>
-                                <th>Next Review</th>
-                                <th>Updated</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {policies.map((p: any) => (
-                                <tr key={p.id} className="cursor-pointer hover:bg-slate-700/30 transition">
-                                    <td>
-                                        <Link href={tenantHref(`/policies/${p.id}`)} className="font-medium text-white hover:text-brand-400 transition">
-                                            {p.title}
-                                        </Link>
-                                        {p.description && (
-                                            <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{p.description}</p>
-                                        )}
-                                    </td>
-                                    <td><span className={`badge ${STATUS_BADGE[p.status] || 'badge-neutral'}`}>{statusLabel(p.status)}</span></td>
-                                    <td className="text-xs text-slate-400">{p.category || '—'}</td>
-                                    <td className="text-xs text-slate-400">{p.owner?.name || '—'}</td>
-                                    <td className="text-xs text-slate-400">
-                                        {p.nextReviewAt ? (
-                                            <span className="flex items-center gap-1">
-                                                {formatDate(p.nextReviewAt)}
-                                                {new Date(p.nextReviewAt) < new Date() && p.status !== 'ARCHIVED' && (
-                                                    <span className="badge badge-danger text-xs">Overdue</span>
-                                                )}
-                                            </span>
-                                        ) : '—'}
-                                    </td>
-                                    <td className="text-xs text-slate-500">
-                                        {formatDate(p.updatedAt)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+            <DataTable
+                data={policies}
+                columns={policyColumns}
+                loading={loading}
+                getRowId={(p: any) => p.id}
+                onRowClick={(row) => router.push(tenantHref(`/policies/${row.original.id}`))}
+                emptyState={hasActiveFilters ? 'No policies match your filters' : 'No policies found. Create your first policy to get started.'}
+                resourceName={(p) => p ? 'policies' : 'policy'}
+                data-testid="policies-table"
+            />
         </div>
     );
 }

@@ -1,7 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 const SEV_BADGE: Record<string, string> = { LOW: 'badge-info', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
 const STATUS_BADGE: Record<string, string> = { OPEN: 'badge-danger', IN_PROGRESS: 'badge-info', READY_FOR_VERIFICATION: 'badge-warning', CLOSED: 'badge-success' };
@@ -61,6 +62,7 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
     const findings = findingsQuery.data ?? [];
 
     const createMutation = useMutation({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         mutationFn: async (newFinding: any) => {
             const res = await fetch(apiUrl('/findings'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newFinding) });
             if (!res.ok) throw new Error('Failed to create finding');
@@ -84,15 +86,18 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
             if (!res.ok) throw new Error('Failed to update status');
             return res.json();
         },
-        onMutate: async ({ id, status }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        onMutate: async ({ id, status }: { id: string; status: string }) => {
             await queryClient.cancelQueries({ queryKey: queryKeys.findings.list(tenantSlug) });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const prev = queryClient.getQueryData<any[]>(queryKeys.findings.list(tenantSlug));
             if (prev) {
-                queryClient.setQueryData(queryKeys.findings.list(tenantSlug), prev.map(f => f.id === id ? { ...f, status } : f));
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                queryClient.setQueryData(queryKeys.findings.list(tenantSlug), prev.map((f: any) => f.id === id ? { ...f, status } : f));
             }
             return { prev };
         },
-        onError: (err, variables, context) => {
+        onError: (_err, _variables, context) => {
             if (context?.prev) {
                 queryClient.setQueryData(queryKeys.findings.list(tenantSlug), context.prev);
             }
@@ -121,9 +126,63 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
         return map[status] || status;
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const findingColumns = useMemo(() => createColumns<any>([
+        {
+            accessorKey: 'title',
+            header: t.findingTitle,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="font-medium text-white text-sm">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'severity',
+            header: t.severity,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: any) => <span className={`badge ${SEV_BADGE[row.original.severity]}`}>{sevLabel(row.original.severity)}</span>,
+        },
+        {
+            accessorKey: 'type',
+            header: t.type,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: any) => <span className="text-xs">{typeLabel(row.original.type)}</span>,
+        },
+        {
+            id: 'owner',
+            header: t.owner,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            accessorFn: (f: any) => f.owner || '—',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'status',
+            header: t.status,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: any) => <span className={`badge ${STATUS_BADGE[row.original.status]}`}>{statusLabel(row.original.status)}</span>,
+        },
+        {
+            id: 'actions',
+            header: t.actions,
+            enableHiding: false,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: any) => {
+                const f = row.original;
+                return (
+                    <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                        {f.status === 'OPEN' && <button onClick={() => updateStatus(f.id, 'IN_PROGRESS')} className="btn btn-sm btn-secondary">{t.inProgress}</button>}
+                        {f.status === 'IN_PROGRESS' && <button onClick={() => updateStatus(f.id, 'READY_FOR_VERIFICATION')} className="btn btn-sm btn-secondary">{t.readyForVerification}</button>}
+                        {f.status === 'READY_FOR_VERIFICATION' && <button onClick={() => updateStatus(f.id, 'CLOSED')} className="btn btn-sm btn-success">{t.closed}</button>}
+                    </div>
+                );
+            },
+        },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ]), [t]);
+
     return (
         <>
             <div className="flex items-center justify-between">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-slate-400 text-sm">{findings.filter((f: any) => f.status !== 'CLOSED').length} {t.open.toLowerCase()}</p></div>
                 <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t.newFinding}</button>
             </div>
@@ -142,28 +201,14 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
                 </form>
             )}
 
-            <div className="glass-card overflow-hidden">
-                <table className="data-table">
-                    <thead><tr><th>{t.findingTitle}</th><th>{t.severity}</th><th>{t.type}</th><th>{t.owner}</th><th>{t.status}</th><th>{t.actions}</th></tr></thead>
-                    <tbody>
-                        {findings.map((f: any) => (
-                            <tr key={f.id}>
-                                <td className="font-medium text-white text-sm">{f.title}</td>
-                                <td><span className={`badge ${SEV_BADGE[f.severity]}`}>{sevLabel(f.severity)}</span></td>
-                                <td className="text-xs">{typeLabel(f.type)}</td>
-                                <td className="text-xs">{f.owner || '—'}</td>
-                                <td><span className={`badge ${STATUS_BADGE[f.status]}`}>{statusLabel(f.status)}</span></td>
-                                <td className="flex gap-1">
-                                    {f.status === 'OPEN' && <button onClick={() => updateStatus(f.id, 'IN_PROGRESS')} className="btn btn-sm btn-secondary">{t.inProgress}</button>}
-                                    {f.status === 'IN_PROGRESS' && <button onClick={() => updateStatus(f.id, 'READY_FOR_VERIFICATION')} className="btn btn-sm btn-secondary">{t.readyForVerification}</button>}
-                                    {f.status === 'READY_FOR_VERIFICATION' && <button onClick={() => updateStatus(f.id, 'CLOSED')} className="btn btn-sm btn-success">{t.closed}</button>}
-                                </td>
-                            </tr>
-                        ))}
-                        {findings.length === 0 && <tr><td colSpan={6} className="text-center text-slate-500 py-8">{t.noFindings}</td></tr>}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                data={findings}
+                columns={findingColumns}
+                getRowId={(f: any) => f.id}
+                emptyState={t.noFindings}
+                resourceName={(p) => p ? 'findings' : 'finding'}
+                data-testid="findings-table"
+            />
         </>
     );
 }

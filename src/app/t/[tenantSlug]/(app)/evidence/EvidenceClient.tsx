@@ -1,11 +1,12 @@
 'use client';
 import { formatDate } from '@/lib/format-date';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { evidenceFilterConfig } from '@/components/filters/configs';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 interface Permissions {
     canRead: boolean;
@@ -284,12 +285,22 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
     // ─── Retention actions ───
 
     const archiveEvidence = async (id: string) => {
-        await fetch(apiUrl(`/evidence/${id}/archive`), { method: 'POST' });
+        const res = await fetch(apiUrl(`/evidence/${id}/archive`), { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            alert(err?.error?.message || 'Failed to archive evidence');
+            return;
+        }
         invalidateEvidence();
     };
 
     const unarchiveEvidence = async (id: string) => {
-        await fetch(apiUrl(`/evidence/${id}/unarchive`), { method: 'POST' });
+        const res = await fetch(apiUrl(`/evidence/${id}/unarchive`), { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            alert(err?.error?.message || 'Failed to unarchive evidence');
+            return;
+        }
         invalidateEvidence();
     };
 
@@ -334,8 +345,149 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
     });
     const archivedEvidence = evidence.filter(ev => ev.isArchived || ev.expiredAt);
 
-    // ─── Filtered evidence list ───
-    const displayEvidence = evidence.filter(ev => !ev.deletedAt);
+    // ─── Filtered evidence list (respects the active retention tab) ───
+    const displayEvidence = retentionFilter === 'archived'
+        ? archivedEvidence
+        : retentionFilter === 'expiring'
+            ? expiringEvidence
+            : activeEvidence;
+
+    // ── Evidence Column Definitions ──
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const evidenceColumns = useMemo(() => createColumns<any>([
+        {
+            accessorKey: 'title',
+            header: t.evidenceTitle,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: { row: any }) => {
+                const ev = row.original;
+                return (
+                    <div>
+                        <div className="font-medium text-white text-sm">{ev.title}</div>
+                        {ev.fileName && ev.fileName !== ev.title && (
+                            <div className="text-xs text-slate-500">{ev.fileName}</div>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
+            accessorKey: 'type',
+            header: t.type,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: { row: any }) => {
+                const ev = row.original;
+                return (
+                    <span className={`badge ${ev.type === 'FILE' ? 'badge-success' : 'badge-info'}`}>
+                        {ev.type === 'FILE' ? 'FILE' : ev.type}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'control',
+            header: t.control,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            accessorFn: (ev: any) => ev.control ? `${ev.control.annexId || ''} ${ev.control.name}` : '\u2014',
+            cell: ({ getValue }: { getValue: () => string }) => (
+                <span className="text-xs text-slate-400">{getValue()}</span>
+            ),
+        },
+        {
+            id: 'retention',
+            header: 'Retention',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: { row: any }) => {
+                const ev = row.original;
+                const rs = getRetentionStatus(ev);
+                return (
+                    <div className="text-xs">
+                        <div className="flex items-center gap-1.5">
+                            <span className={`badge ${rs.badge}`} id={`retention-status-${ev.id}`}>
+                                {rs.icon} {rs.label}
+                            </span>
+                        </div>
+                        {ev.retentionUntil && !ev.isArchived && (
+                            <div className="text-slate-500 mt-0.5">{formatDate(ev.retentionUntil)}</div>
+                        )}
+                        {editingRetention === ev.id && (
+                            <div className="mt-2 flex gap-1 items-center">
+                                <input
+                                    type="date"
+                                    className="input text-xs py-0.5 px-1 w-32"
+                                    value={editRetentionDate}
+                                    onChange={e => setEditRetentionDate(e.target.value)}
+                                    id={`retention-edit-${ev.id}`}
+                                />
+                                <button onClick={() => saveRetention(ev.id)} className="btn btn-sm btn-primary text-xs py-0.5 px-1.5">Save</button>
+                                <button onClick={() => setEditingRetention(null)} className="btn btn-sm btn-secondary text-xs py-0.5 px-1.5" aria-label="Cancel">×</button>
+                            </div>
+                        )}
+                    </div>
+                );
+            },
+            meta: { disableTruncate: true },
+        },
+        {
+            accessorKey: 'status',
+            header: t.status,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: { row: any }) => {
+                const ev = row.original;
+                return <span className={`badge ${STATUS_BADGE[ev.status]}`}>{statusLabel(ev.status)}</span>;
+            },
+        },
+        {
+            id: 'owner',
+            header: t.ownerLabel,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            accessorFn: (ev: any) => ev.owner || '\u2014',
+            cell: ({ getValue }: { getValue: () => string }) => (
+                <span className="text-xs">{getValue()}</span>
+            ),
+        },
+        {
+            id: 'actions',
+            header: t.actions,
+            enableHiding: false,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: { row: any }) => {
+                const ev = row.original;
+                const isPending = ev.id?.startsWith('temp:');
+                if (isPending) return <span className="text-xs text-slate-500">Uploading...</span>;
+                return (
+                    <div className="flex gap-1 flex-wrap" onClick={e => e.stopPropagation()}>
+                        {ev.type === 'FILE' && ev.fileRecordId && (
+                            <a href={apiUrl(`/evidence/files/${ev.fileRecordId}/download`)} className="btn btn-sm btn-secondary" download id={`download-${ev.id}`}>⬇</a>
+                        )}
+                        {permissions.canWrite && !ev.isArchived && (
+                            <button onClick={() => { setEditingRetention(ev.id); setEditRetentionDate(ev.retentionUntil ? ev.retentionUntil.split('T')[0] : ''); }} className="btn btn-sm btn-secondary" title="Edit retention date" id={`edit-retention-${ev.id}`}>Edit</button>
+                        )}
+                        {permissions.canWrite && !ev.isArchived && (
+                            <button onClick={() => archiveEvidence(ev.id)} className="btn btn-sm btn-secondary" title="Archive this evidence" id={`archive-${ev.id}`}>Archive</button>
+                        )}
+                        {permissions.canWrite && ev.isArchived && (
+                            <button onClick={() => unarchiveEvidence(ev.id)} className="btn btn-sm btn-primary" title="Unarchive this evidence" id={`unarchive-${ev.id}`}>Unarchive</button>
+                        )}
+                        {permissions.canWrite && ev.status === 'DRAFT' && (
+                            <button onClick={() => submitReview(ev.id, 'SUBMITTED')} className="btn btn-sm btn-secondary">{t.submitForReview}</button>
+                        )}
+                        {permissions.canWrite && ev.status === 'SUBMITTED' && (
+                            <>
+                                <button onClick={() => submitReview(ev.id, 'APPROVED')} className="btn btn-sm btn-success">{t.approveEvidence}</button>
+                                <button onClick={() => submitReview(ev.id, 'REJECTED', 'Needs improvement')} className="btn btn-sm btn-danger">{t.rejectEvidence}</button>
+                            </>
+                        )}
+                        {permissions.canWrite && ev.status === 'REJECTED' && (
+                            <button onClick={() => submitReview(ev.id, 'SUBMITTED')} className="btn btn-sm btn-secondary">{t.submitForReview}</button>
+                        )}
+                    </div>
+                );
+            },
+            meta: { disableTruncate: true },
+        },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ]), [t, permissions, editingRetention, editRetentionDate, apiUrl]);
 
     return (
         <div className="space-y-6 animate-fadeIn">
@@ -537,139 +689,20 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
             )}
 
             {/* Evidence table */}
-            <div className="glass-card overflow-hidden">
-                <table className="data-table" id="evidence-table">
-                    <thead>
-                        <tr>
-                            <th>{t.evidenceTitle}</th>
-                            <th>{t.type}</th>
-                            <th>{t.control}</th>
-                            <th>Retention</th>
-                            <th>{t.status}</th>
-                            <th>{t.ownerLabel}</th>
-                            <th>{t.actions}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {displayEvidence.map(ev => {
-                            const rs = getRetentionStatus(ev);
-                            const isPending = ev.id?.startsWith('temp:');
-                            return (
-                            <tr key={ev.id} className={`${ev.isArchived ? 'opacity-60' : ''} ${isPending ? 'opacity-50 animate-pulse' : ''}`}>
-                                <td className="font-medium text-white text-sm">
-                                    <div>{ev.title}</div>
-                                    {ev.fileName && ev.fileName !== ev.title && (
-                                        <div className="text-xs text-slate-500">{ev.fileName}</div>
-                                    )}
-                                </td>
-                                <td>
-                                    <span className={`badge ${ev.type === 'FILE' ? 'badge-success' : 'badge-info'}`}>
-                                        {ev.type === 'FILE' ? 'FILE' : ev.type}
-                                    </span>
-                                </td>
-                                <td className="text-xs text-slate-400">
-                                    {ev.control ? `${ev.control.annexId || ''} ${ev.control.name}` : '—'}
-                                </td>
-                                <td className="text-xs">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`badge ${rs.badge}`} id={`retention-status-${ev.id}`}>
-                                            {rs.icon} {rs.label}
-                                        </span>
-                                    </div>
-                                    {ev.retentionUntil && !ev.isArchived && (
-                                        <div className="text-slate-500 mt-0.5">{formatDate(ev.retentionUntil)}</div>
-                                    )}
-                                    {/* Inline retention editor */}
-                                    {editingRetention === ev.id && (
-                                        <div className="mt-2 flex gap-1 items-center">
-                                            <input
-                                                type="date"
-                                                className="input text-xs py-0.5 px-1 w-32"
-                                                value={editRetentionDate}
-                                                onChange={e => setEditRetentionDate(e.target.value)}
-                                                id={`retention-edit-${ev.id}`}
-                                            />
-                                            <button onClick={() => saveRetention(ev.id)} className="btn btn-sm btn-primary text-xs py-0.5 px-1.5">Save</button>
-                                            <button onClick={() => setEditingRetention(null)} className="btn btn-sm btn-secondary text-xs py-0.5 px-1.5" aria-label="Cancel">×</button>
-                                        </div>
-                                    )}
-                                </td>
-                                <td><span className={`badge ${STATUS_BADGE[ev.status]}`}>{statusLabel(ev.status)}</span></td>
-                                <td className="text-xs">{ev.owner || '—'}</td>
-                                <td>
-                                    {isPending ? (
-                                        <span className="text-xs text-slate-500">Uploading...</span>
-                                    ) : (
-                                    <div className="flex gap-1 flex-wrap">
-                                        {/* Download */}
-                                        {ev.type === 'FILE' && ev.fileRecordId && (
-                                            <a
-                                                href={apiUrl(`/evidence/files/${ev.fileRecordId}/download`)}
-                                                className="btn btn-sm btn-secondary"
-                                                download
-                                                id={`download-${ev.id}`}
-                                            >
-                                                ⬇
-                                            </a>
-                                        )}
-                                        {/* Retention actions — ADMIN/EDITOR only */}
-                                        {permissions.canWrite && !ev.isArchived && (
-                                            <button
-                                                onClick={() => { setEditingRetention(ev.id); setEditRetentionDate(ev.retentionUntil ? ev.retentionUntil.split('T')[0] : ''); }}
-                                                className="btn btn-sm btn-secondary"
-                                                title="Edit retention date"
-                                                id={`edit-retention-${ev.id}`}
-                                            >
-                                                Edit
-                                            </button>
-                                        )}
-                                        {permissions.canWrite && !ev.isArchived && (
-                                            <button
-                                                onClick={() => archiveEvidence(ev.id)}
-                                                className="btn btn-sm btn-secondary"
-                                                title="Archive this evidence"
-                                                id={`archive-${ev.id}`}
-                                            >
-                                                Archive
-                                            </button>
-                                        )}
-                                        {permissions.canWrite && ev.isArchived && (
-                                            <button
-                                                onClick={() => unarchiveEvidence(ev.id)}
-                                                className="btn btn-sm btn-primary"
-                                                title="Unarchive this evidence"
-                                                id={`unarchive-${ev.id}`}
-                                            >
-                                                Unarchive
-                                            </button>
-                                        )}
-                                        {/* Review actions */}
-                                        {permissions.canWrite && ev.status === 'DRAFT' && (
-                                            <button onClick={() => submitReview(ev.id, 'SUBMITTED')} className="btn btn-sm btn-secondary">{t.submitForReview}</button>
-                                        )}
-                                        {permissions.canWrite && ev.status === 'SUBMITTED' && (
-                                            <>
-                                                <button onClick={() => submitReview(ev.id, 'APPROVED')} className="btn btn-sm btn-success">{t.approveEvidence}</button>
-                                                <button onClick={() => submitReview(ev.id, 'REJECTED', 'Needs improvement')} className="btn btn-sm btn-danger">{t.rejectEvidence}</button>
-                                            </>
-                                        )}
-                                        {permissions.canWrite && ev.status === 'REJECTED' && (
-                                            <button onClick={() => submitReview(ev.id, 'SUBMITTED')} className="btn btn-sm btn-secondary">{t.submitForReview}</button>
-                                        )}
-                                    </div>
-                                    )}
-                                </td>
-                            </tr>
-                            );
-                        })}
-                        {displayEvidence.length === 0 && (
-                            <tr><td colSpan={7} className="text-center text-slate-500 py-8">
-                                {retentionFilter === 'archived' ? 'No archived evidence' : retentionFilter === 'expiring' ? 'No evidence expiring soon' : t.noEvidence}
-                            </td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                data={displayEvidence}
+                columns={evidenceColumns}
+                getRowId={(ev: any) => ev.id}
+                emptyState={
+                    retentionFilter === 'archived'
+                        ? 'No archived evidence'
+                        : retentionFilter === 'expiring'
+                            ? 'No evidence expiring soon'
+                            : t.noEvidence
+                }
+                resourceName={(p) => p ? 'evidence items' : 'evidence item'}
+                data-testid="evidence-table"
+            />
         </div>
     );
 }

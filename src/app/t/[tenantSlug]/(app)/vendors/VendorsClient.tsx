@@ -1,6 +1,7 @@
 'use client';
 import { formatDate } from '@/lib/format-date';
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -8,13 +9,17 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { vendorsFilterConfig } from '@/components/filters/configs';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@dub/utils';
+import { DataTable, createColumns } from '@/components/ui/table';
 
-const STATUS_BADGE: Record<string, string> = {
-    ACTIVE: 'badge-success', ONBOARDING: 'badge-info',
-    OFFBOARDING: 'badge-warning', OFFBOARDED: 'badge-neutral',
+const STATUS_VARIANT: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
+    ACTIVE: 'success', ONBOARDING: 'info',
+    OFFBOARDING: 'warning', OFFBOARDED: 'neutral',
 };
-const CRIT_BADGE: Record<string, string> = {
-    LOW: 'badge-neutral', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger',
+const CRIT_VARIANT: Record<string, 'neutral' | 'warning' | 'error'> = {
+    LOW: 'neutral', MEDIUM: 'warning', HIGH: 'error', CRITICAL: 'error',
 };
 
 function fmtDate(d: string | null) {
@@ -68,19 +73,85 @@ export function VendorsClient({ initialVendors, initialFilters, tenantSlug, perm
 
     const vendors = vendorsQuery.data ?? [];
 
+    const vendorColumns = useMemo(() => createColumns<any>([
+        {
+            accessorKey: 'name',
+            header: 'Name',
+            cell: ({ row }: any) => (
+                <div className="font-medium">
+                    <Link href={tenantHref(`/vendors/${row.original.id}`)} className="text-brand-400 hover:underline" id={`vendor-link-${row.original.id}`} onClick={(e) => e.stopPropagation()}>
+                        {row.original.name}
+                    </Link>
+                    {row.original.isSubprocessor && <span className="ml-2 text-xs bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">Sub-processor</span>}
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'status',
+            header: 'Status',
+            cell: ({ row }: any) => (
+                <StatusBadge variant={STATUS_VARIANT[row.original.status] || 'neutral'} icon={null}>{row.original.status}</StatusBadge>
+            ),
+        },
+        {
+            accessorKey: 'criticality',
+            header: 'Criticality',
+            cell: ({ row }: any) => (
+                <StatusBadge variant={CRIT_VARIANT[row.original.criticality] || 'neutral'} icon={null}>{row.original.criticality}</StatusBadge>
+            ),
+        },
+        {
+            id: 'risk',
+            header: 'Risk',
+            accessorFn: (v: any) => v.inherentRisk || '',
+            cell: ({ row }: any) => {
+                const v = row.original;
+                return v.inherentRisk
+                    ? <StatusBadge variant={CRIT_VARIANT[v.inherentRisk] || 'neutral'} icon={null}>{v.inherentRisk}</StatusBadge>
+                    : <span>—</span>;
+            },
+        },
+        {
+            id: 'nextReviewAt',
+            header: 'Next Review',
+            cell: ({ row }: any) => (
+                <span>
+                    {fmtDate(row.original.nextReviewAt)}
+                    {isOverdue(row.original.nextReviewAt) && <span className="ml-1 text-xs text-content-error font-semibold">Overdue</span>}
+                </span>
+            ),
+        },
+        {
+            id: 'contractRenewalAt',
+            header: 'Contract Renewal',
+            cell: ({ row }: any) => (
+                <span>
+                    {fmtDate(row.original.contractRenewalAt)}
+                    {isOverdue(row.original.contractRenewalAt) && <span className="ml-1 text-xs text-content-warning font-semibold">Due</span>}
+                </span>
+            ),
+        },
+        {
+            id: 'owner',
+            header: 'Owner',
+            accessorFn: (v: any) => v.owner?.name || '—',
+            cell: ({ getValue }: any) => <span className="text-content-muted">{getValue()}</span>,
+        },
+    ]), [tenantHref]);
+
     return (
         <>
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">Vendor Register</h1>
-                    <p className="text-slate-400 text-sm">{vendors.length} vendors</p>
+                    <h1 className="text-2xl font-bold text-content-emphasis">Vendor Register</h1>
+                    <p className="text-content-muted text-sm">{vendors.length} vendors</p>
                 </div>
                 <div className="flex gap-2">
-                    <Link href={tenantHref('/vendors/dashboard')} className="btn btn-secondary" id="vendor-dashboard-btn">
+                    <Link href={tenantHref('/vendors/dashboard')} className={cn(buttonVariants({ variant: 'secondary', size: 'md' }))} id="vendor-dashboard-btn">
                         Dashboard
                     </Link>
                     {permissions.canCreate && (
-                        <Link href={tenantHref('/vendors/new')} className="btn btn-primary" id="new-vendor-btn">
+                        <Link href={tenantHref('/vendors/new')} className={cn(buttonVariants({ variant: 'primary', size: 'md' }))} id="new-vendor-btn">
                             + New Vendor
                         </Link>
                     )}
@@ -91,53 +162,15 @@ export function VendorsClient({ initialVendors, initialFilters, tenantSlug, perm
             <CompactFilterBar config={vendorsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="vendor" />
 
             {/* Table */}
-            <div className="card overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="border-b border-slate-700 text-left text-xs uppercase text-slate-400">
-                            <th className="p-3">Name</th>
-                            <th className="p-3">Status</th>
-                            <th className="p-3">Criticality</th>
-                            <th className="p-3">Risk</th>
-                            <th className="p-3">Next Review</th>
-                            <th className="p-3">Contract Renewal</th>
-                            <th className="p-3">Owner</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {vendors.map((v: any) => (
-                            <tr key={v.id} className="border-b border-slate-800 hover:bg-slate-800/50 cursor-pointer"
-                                onClick={() => router.push(tenantHref(`/vendors/${v.id}`))}>
-                                <td className="p-3 font-medium">
-                                    <Link href={tenantHref(`/vendors/${v.id}`)} className="text-blue-400 hover:underline" id={`vendor-link-${v.id}`}>
-                                        {v.name}
-                                    </Link>
-                                    {v.isSubprocessor && <span className="ml-2 text-xs bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">Sub-processor</span>}
-                                </td>
-                                <td className="p-3"><span className={`badge ${STATUS_BADGE[v.status] || 'badge-neutral'}`}>{v.status}</span></td>
-                                <td className="p-3"><span className={`badge ${CRIT_BADGE[v.criticality] || 'badge-neutral'}`}>{v.criticality}</span></td>
-                                <td className="p-3">
-                                    {v.inherentRisk ? <span className={`badge ${CRIT_BADGE[v.inherentRisk]}`}>{v.inherentRisk}</span> : '—'}
-                                </td>
-                                <td className="p-3">
-                                    {fmtDate(v.nextReviewAt)}
-                                    {isOverdue(v.nextReviewAt) && <span className="ml-1 text-xs text-red-400 font-semibold">Overdue</span>}
-                                </td>
-                                <td className="p-3">
-                                    {fmtDate(v.contractRenewalAt)}
-                                    {isOverdue(v.contractRenewalAt) && <span className="ml-1 text-xs text-orange-400 font-semibold">Due</span>}
-                                </td>
-                                <td className="p-3 text-slate-400">{v.owner?.name || '—'}</td>
-                            </tr>
-                        ))}
-                        {vendors.length === 0 && (
-                            <tr><td colSpan={7} className="text-center text-slate-500 py-8">
-                                {hasActiveFilters ? 'No vendors match your filters' : 'No vendors found'}
-                            </td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                data={vendors}
+                columns={vendorColumns}
+                getRowId={(v: any) => v.id}
+                onRowClick={(row) => router.push(tenantHref(`/vendors/${row.original.id}`))}
+                emptyState={hasActiveFilters ? 'No vendors match your filters' : 'No vendors found. Add your first vendor to get started.'}
+                resourceName={(p) => p ? 'vendors' : 'vendor'}
+                data-testid="vendors-table"
+            />
         </>
     );
 }

@@ -1,16 +1,16 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { SkeletonTableRow } from '@/components/ui/skeleton';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { tasksFilterConfig } from '@/components/filters/configs';
 import { formatDate } from '@/lib/format-date';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -192,6 +192,95 @@ export function TasksClient({
         bulkMutation.mutate({ action: bulkAction, value: bulkValue, ids: Array.from(selected) });
     };
 
+    // ── Column definitions ──
+    const taskColumns = useMemo(() => {
+        const cols: ReturnType<typeof createColumns<TaskListItem>> = [];
+
+        if (appPermissions.tasks.edit) {
+            cols.push({
+                id: 'select',
+                header: () => (
+                    <input type="checkbox" checked={selected.size === tasks.length && tasks.length > 0} onChange={toggleSelectAll} id="select-all-checkbox" />
+                ),
+                cell: ({ row }) => (
+                    <input
+                        type="checkbox"
+                        checked={selected.has(row.original.id)}
+                        onChange={() => toggleSelect(row.original.id)}
+                        onClick={e => e.stopPropagation()}
+                        className="task-checkbox"
+                    />
+                ),
+                enableHiding: false,
+                size: 32,
+            });
+        }
+
+        cols.push(
+            {
+                id: 'title',
+                header: 'Key / Title',
+                accessorFn: (t) => t.title,
+                cell: ({ row }) => {
+                    const task = row.original;
+                    const slaLabel = getSlaLabel(task.severity, task.createdAt, task.status);
+                    return (
+                        <div>
+                            <Link href={tenantHref(`/tasks/${task.id}`)} className="font-medium text-white hover:text-brand-400 transition" onClick={(e) => e.stopPropagation()}>
+                                {task.key && <span className="text-xs font-mono text-slate-500 mr-2">{task.key}</span>}
+                                {task.title}
+                            </Link>
+                            {isOverdue(task) && <span className="badge badge-danger text-xs ml-2">Overdue</span>}
+                            {slaLabel && <span className="badge badge-danger text-xs ml-1" title="SLA Breached">SLA</span>}
+                        </div>
+                    );
+                },
+            },
+            {
+                accessorKey: 'type',
+                header: 'Type',
+                cell: ({ getValue }) => <span className="text-xs text-slate-400">{TYPE_LABELS[getValue<string>()] || getValue<string>()}</span>,
+            },
+            {
+                accessorKey: 'severity',
+                header: 'Severity',
+                cell: ({ row }) => (
+                    <span className={`badge ${SEVERITY_BADGE[row.original.severity] || 'badge-neutral'}`}>
+                        {row.original.severity}
+                    </span>
+                ),
+            },
+            {
+                accessorKey: 'status',
+                header: 'Status',
+                cell: ({ row }) => (
+                    <span className={`badge ${STATUS_BADGE[row.original.status] || 'badge-neutral'}`}>
+                        {STATUS_LABELS[row.original.status] || row.original.status}
+                    </span>
+                ),
+            },
+            {
+                id: 'assignee',
+                header: 'Assignee',
+                accessorFn: (t) => t.assignee?.name || '—',
+                cell: ({ getValue }) => <span className="text-xs text-slate-400">{getValue<string>()}</span>,
+            },
+            {
+                id: 'dueAt',
+                header: 'Due Date',
+                cell: ({ row }) => <span className="text-xs text-slate-400">{row.original.dueAt ? formatDate(row.original.dueAt) : '—'}</span>,
+            },
+            {
+                id: 'updatedAt',
+                header: 'Updated',
+                cell: ({ row }) => <span className="text-xs text-slate-400">{formatDate(row.original.updatedAt)}</span>,
+            },
+        );
+
+        return cols;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [appPermissions.tasks.edit, selected, tasks.length, tenantHref]);
+
     return (
         <div className="space-y-6 animate-fadeIn" data-hydrated={hydrated || undefined}>
             {/* Header */}
@@ -248,98 +337,16 @@ export function TasksClient({
             )}
 
             {/* Table */}
-            <div className="glass-card overflow-hidden">
-                {loading ? (
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>Key / Title</th>
-                                <th>Type</th>
-                                <th>Severity</th>
-                                <th>Status</th>
-                                <th>Assignee</th>
-                                <th>Due Date</th>
-                                <th>Updated</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {Array.from({ length: 10 }).map((_, i) => (
-                                <SkeletonTableRow key={i} cols={7} />
-                            ))}
-                        </tbody>
-                    </table>
-                ) : tasks.length === 0 ? (
-                    <div className="p-12 text-center text-slate-500">
-                        <p className="text-lg mb-2">No tasks found</p>
-                        <p className="text-sm">Create a task to get started.</p>
-                    </div>
-                ) : (
-                    <table className="data-table" id="tasks-table">
-                        <thead>
-                            <tr>
-                                {appPermissions.tasks.edit && (
-                                    <th className="w-8">
-                                        <input type="checkbox" checked={selected.size === tasks.length && tasks.length > 0} onChange={toggleSelectAll} id="select-all-checkbox" />
-                                    </th>
-                                )}
-                                <th>Key / Title</th>
-                                <th>Type</th>
-                                <th>Severity</th>
-                                <th>Status</th>
-                                <th>Assignee</th>
-                                <th>Due Date</th>
-                                <th>Updated</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {tasks.map(task => {
-                                const slaLabel = getSlaLabel(task.severity, task.createdAt, task.status);
-                                return (
-                                    <tr key={task.id} className="cursor-pointer hover:bg-slate-700/30 transition" onClick={() => router.push(tenantHref(`/tasks/${task.id}`))}>
-                                        {appPermissions.tasks.edit && (
-                                            <td>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selected.has(task.id)}
-                                                    onChange={() => toggleSelect(task.id)}
-                                                    onClick={e => e.stopPropagation()}
-                                                    className="task-checkbox"
-                                                />
-                                            </td>
-                                        )}
-                                        <td>
-                                            <Link href={tenantHref(`/tasks/${task.id}`)} className="font-medium text-white hover:text-brand-400 transition">
-                                                {task.key && <span className="text-xs font-mono text-slate-500 mr-2">{task.key}</span>}
-                                                {task.title}
-                                            </Link>
-                                            {isOverdue(task) && <span className="badge badge-danger text-xs ml-2">Overdue</span>}
-                                            {slaLabel && <span className="badge badge-danger text-xs ml-1" title="SLA Breached">SLA</span>}
-                                        </td>
-                                        <td className="text-xs text-slate-400">{TYPE_LABELS[task.type] || task.type}</td>
-                                        <td>
-                                            <span className={`badge ${SEVERITY_BADGE[task.severity] || 'badge-neutral'}`}>
-                                                {task.severity}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span className={`badge ${STATUS_BADGE[task.status] || 'badge-neutral'}`}>
-                                                {STATUS_LABELS[task.status] || task.status}
-                                            </span>
-                                        </td>
-                                        <td className="text-xs text-slate-400">{task.assignee?.name || '—'}</td>
-                                        <td className="text-xs text-slate-400">
-                                            {task.dueAt ? formatDate(task.dueAt) : '—'}
-                                        </td>
-                                        <td className="text-xs text-slate-400">
-                                            {formatDate(task.updatedAt)}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+            <DataTable<TaskListItem>
+                data={tasks}
+                columns={taskColumns}
+                loading={loading}
+                getRowId={(t) => t.id}
+                onRowClick={(row) => router.push(tenantHref(`/tasks/${row.original.id}`))}
+                emptyState="No tasks found. Create a task to get started."
+                resourceName={(p) => p ? 'tasks' : 'task'}
+                data-testid="tasks-table"
+            />
         </div>
     );
 }

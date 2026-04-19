@@ -1,6 +1,6 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
 import { assetsFilterConfig } from '@/components/filters/configs';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 const ASSET_TYPES = ['INFORMATION', 'APPLICATION', 'SYSTEM', 'SERVICE', 'DATA_STORE', 'INFRASTRUCTURE', 'VENDOR', 'PROCESS', 'PEOPLE_PROCESS', 'OTHER'];
 
@@ -91,6 +92,41 @@ export function AssetsClient({ initialAssets, initialFilters, tenantSlug, permis
         createMutation.mutate(form);
     };
 
+    const assetColumns = useMemo(() => createColumns<any>([
+        {
+            accessorKey: 'name',
+            header: t.name,
+            cell: ({ getValue }: any) => <span className="font-medium text-white">{getValue()}</span>,
+        },
+        {
+            accessorKey: 'type',
+            header: t.type,
+            cell: ({ getValue }: any) => <span className="badge badge-info">{String(getValue()).replace(/_/g, ' ')}</span>,
+        },
+        {
+            id: 'classification',
+            header: t.classification,
+            accessorFn: (a: any) => a.classification || '—',
+        },
+        {
+            id: 'owner',
+            header: t.owner,
+            accessorFn: (a: any) => a.owner || '—',
+        },
+        {
+            id: 'cia',
+            header: t.cia,
+            accessorFn: (a: any) => `${a.confidentiality}/${a.integrity}/${a.availability}`,
+            cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span>,
+        },
+        {
+            id: 'controls',
+            header: t.controlsCol,
+            accessorFn: (a: any) => a._count?.controls || 0,
+            cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span>,
+        },
+    ]), [t]);
+
     return (
         <>
             <div className="flex items-center justify-between">
@@ -124,28 +160,15 @@ export function AssetsClient({ initialAssets, initialFilters, tenantSlug, permis
                 </form>
             )}
 
-            <div className="glass-card overflow-hidden">
-                <table className="data-table">
-                    <thead><tr><th>{t.name}</th><th>{t.type}</th><th>{t.classification}</th><th>{t.owner}</th><th>{t.cia}</th><th>{t.controlsCol}</th></tr></thead>
-                    <tbody>
-                        {assets.map((a: any) => (
-                            <tr key={a.id} className="cursor-pointer hover:bg-slate-700/30" onClick={() => router.push(tenantHref(`/assets/${a.id}`))}>
-                                <td className="font-medium text-white">{a.name}</td>
-                                <td><span className="badge badge-info">{a.type.replace(/_/g, ' ')}</span></td>
-                                <td>{a.classification || '—'}</td>
-                                <td>{a.owner || '—'}</td>
-                                <td className="text-xs">{a.confidentiality}/{a.integrity}/{a.availability}</td>
-                                <td className="text-xs">{a._count?.controls || 0}</td>
-                            </tr>
-                        ))}
-                        {assets.length === 0 && (
-                            <tr><td colSpan={6} className="text-center text-slate-500 py-8">
-                                {hasActiveFilters ? 'No assets match your filters' : t.noAssets}
-                            </td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable
+                data={assets}
+                columns={assetColumns}
+                getRowId={(a: any) => a.id}
+                onRowClick={(row) => router.push(tenantHref(`/assets/${row.original.id}`))}
+                emptyState={hasActiveFilters ? 'No assets match your filters' : t.noAssets}
+                resourceName={(p) => p ? 'assets' : 'asset'}
+                data-testid="assets-table"
+            />
         </>
     );
 }
