@@ -37,7 +37,7 @@ test.describe('Admin SSO Configuration', () => {
         await page.waitForLoadState('networkidle').catch(() => {});
 
         // Page header — wait up to 60s for first cold-compile
-        await expect(page.getByRole('heading', { name: /SSO/i })).toBeVisible({ timeout: 60000 });
+        await expect(page.getByRole('heading', { name: /SSO & Identity/i })).toBeVisible({ timeout: 60000 });
 
         // Protocol tabs — only render after loading=false (API response received)
         await expect(page.getByRole('button', { name: 'OIDC' })).toBeVisible({ timeout: 30000 });

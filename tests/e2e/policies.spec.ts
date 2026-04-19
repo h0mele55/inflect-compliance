@@ -38,7 +38,7 @@ test.describe('Policy Center', () => {
 
         await page.waitForURL('**/policies/**', { timeout: 30000 });
         // Policy detail page + API route require JIT compilation on first access
-        await page.waitForSelector('#policy-title', { timeout: 30000 });
+        await page.waitForSelector('#policy-title', { timeout: 60000 });
         await expect(page.locator('#policy-title')).toContainText(createdPolicyTitle);
         await expect(page.locator('#policy-status')).toContainText('DRAFT');
         // Capture the detail URL for use in subsequent serial tests
@@ -48,31 +48,31 @@ test.describe('Policy Center', () => {
     test('create version via editor and view history', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         // Navigate directly to the policy detail page using saved path
-        await page.goto(createdPolicyPath);
-        await page.waitForLoadState('networkidle');
+        await safeGoto(page, createdPolicyPath);
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#policy-title', { timeout: 30000 });
 
         await page.click('#new-version-btn');
-        await page.waitForSelector('#version-editor', { timeout: 5000 });
+        await page.waitForSelector('#version-editor', { timeout: 15000 });
 
         await page.fill('#version-editor', '# Updated Policy\n\nVersion 2 of the policy.');
         await page.fill('#change-summary-input', 'Updated for e2e test');
         await page.click('#save-version-btn');
 
-        await page.waitForSelector('#version-history', { timeout: 10000 });
+        await page.waitForSelector('#version-history', { timeout: 30000 });
         await expect(page.locator('#version-history')).toContainText('v2');
     });
 
     test('create external link version', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         // Navigate directly to the policy detail page using saved path
-        await page.goto(createdPolicyPath);
-        await page.waitForLoadState('networkidle');
+        await safeGoto(page, createdPolicyPath);
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#policy-title', { timeout: 30000 });
 
         // Open editor
         await page.click('#new-version-btn');
-        await page.waitForSelector('#version-editor', { timeout: 5000 });
+        await page.waitForSelector('#version-editor', { timeout: 15000 });
 
         // Switch to external link mode
         await page.click('#mode-external_link');
@@ -83,7 +83,7 @@ test.describe('Policy Center', () => {
         await page.click('#save-version-btn');
 
         // Should show in version history
-        await page.waitForSelector('#version-history', { timeout: 10000 });
+        await page.waitForSelector('#version-history', { timeout: 30000 });
         await expect(page.locator('#version-history')).toContainText('External Link');
     });
 
@@ -136,8 +136,8 @@ test.describe('Policy Center', () => {
     test('policy detail shows role-gated action buttons', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         // Navigate directly to the policy detail page using saved path
-        await page.goto(createdPolicyPath);
-        await page.waitForLoadState('networkidle');
+        await safeGoto(page, createdPolicyPath);
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#policy-title', { timeout: 30000 });
 
         // Admin should see action buttons

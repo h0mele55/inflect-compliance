@@ -113,9 +113,12 @@ export async function loginAndGetTenant(
 
         if (navigated) break;
 
+        // Navigation may have completed just after the timeout — re-check URL.
+        const url = page.url();
+        if (/\/t\/[^/]+\/dashboard/.test(url)) break;
+
         // Still on /login after submit? Retry — CSRF failures can manifest as
         // visible "MissingCSRF" text, a URL error param, or a silent redirect back.
-        const url = page.url();
         if (attempt < LOGIN_ATTEMPTS && url.includes('/login')) {
             console.warn(`[loginAndGetTenant] Login failed on attempt ${attempt} (URL: ${url}), retrying...`);
             await page.waitForTimeout(3000);

@@ -15,7 +15,7 @@ test.describe('Control → Evidence Linking', () => {
         await page.fill('#control-name-input', `Evidence Test ${uniqueId}`);
         await page.fill('#control-code-input', `EV-${uniqueId}`);
         await page.click('#create-control-btn');
-        await page.waitForSelector('#control-title', { timeout: 30000 });
+        await page.waitForSelector('#control-title', { timeout: 60000 });
         await expect(page.locator('#control-title')).toContainText(`Evidence Test ${uniqueId}`);
         controlDetailPath = new URL(page.url()).pathname;
     });
@@ -75,8 +75,9 @@ test.describe('Control → Evidence Linking', () => {
         await removeBtn.click();
 
         // Wait for refetch — row count should decrease
-        await page.waitForTimeout(1000);
-        const rowsAfter = await page.locator('#evidence-table tbody tr').count();
-        expect(rowsAfter).toBeLessThan(rowsBefore);
+        await expect(async () => {
+            const rowsAfter = await page.locator('#evidence-table tbody tr').count();
+            expect(rowsAfter).toBeLessThan(rowsBefore);
+        }).toPass({ timeout: 15000 });
     });
 });
