@@ -476,7 +476,8 @@ export default function ControlDetailPage() {
     const tabs: { key: Tab; label: string; count?: number }[] = [
         { key: 'overview', label: 'Overview' },
         { key: 'tasks', label: 'Tasks', count: totalTasks },
-        { key: 'evidence', label: 'Evidence', count: control.evidenceLinks?.length ?? 0 },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { key: 'evidence', label: 'Evidence', count: (control.evidenceLinks?.length ?? 0) + ((control.evidence ?? []).filter((e: any) => !e.fileRecordId || !control.evidenceLinks?.some((l: EvidenceLinkDTO) => l.fileId === e.fileRecordId)).length) },
         { key: 'mappings', label: 'Mappings', count: control.frameworkMappings?.length ?? 0 },
         { key: 'traceability', label: 'Traceability' },
         { key: 'activity', label: 'Activity' },
@@ -979,34 +980,58 @@ export default function ControlDetailPage() {
                         </form>
                     )}
                     <div className="glass-card overflow-hidden">
-                        {(control.evidenceLinks?.length ?? 0) === 0 ? (
-                            <div className="p-8 text-center text-slate-500 text-sm" id="no-evidence">No evidence linked</div>
-                        ) : (
-                            <table className="data-table" id="evidence-table">
-                                <thead>
-                                    <tr><th>Type</th><th>URL / Note</th><th>Added By</th><th>Date</th>{permissions.canWrite && <th>Actions</th>}</tr>
-                                </thead>
-                                <tbody>
-                                    {control.evidenceLinks?.map((el: EvidenceLinkDTO) => (
-                                        <tr key={el.id}>
-                                            <td><span className={`badge ${el.kind === 'FILE' ? 'badge-success' : 'badge-info'} text-xs`}>{el.kind === 'FILE' ? 'FILE' : el.kind}</span></td>
-                                            <td className="text-sm">
-                                                {el.url ? <a href={el.url} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">{el.url}</a> : (el.note || '—')}
-                                            </td>
-                                            <td className="text-xs text-slate-400">{el.createdBy?.name || '—'}</td>
-                                            <td className="text-xs text-slate-400">{el.createdAt ? formatDate(el.createdAt) : '—'}</td>
-                                            {permissions.canWrite && (
-                                                <td>
-                                                    <button className="text-red-400 text-xs hover:text-red-300" onClick={() => unlinkEvidence(el.id)} id={`unlink-${el.id}`}>
-                                                        × Remove
-                                                    </button>
+                        {(() => {
+                            const linkedFileIds = new Set(control.evidenceLinks?.map((l: EvidenceLinkDTO) => l.fileId).filter(Boolean) ?? []);
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const directEvidence = (control.evidence ?? []).filter((e: any) => !e.fileRecordId || !linkedFileIds.has(e.fileRecordId));
+                            const hasLinks = (control.evidenceLinks?.length ?? 0) > 0;
+                            const hasEvidence = directEvidence.length > 0;
+                            if (!hasLinks && !hasEvidence) {
+                                return <div className="p-8 text-center text-slate-500 text-sm" id="no-evidence">No evidence linked</div>;
+                            }
+                            return (
+                                <table className="data-table" id="evidence-table">
+                                    <thead>
+                                        <tr><th>Type</th><th>Title / URL</th><th>Status</th><th>Date</th>{permissions.canWrite && <th>Actions</th>}</tr>
+                                    </thead>
+                                    <tbody>
+                                        {control.evidenceLinks?.map((el: EvidenceLinkDTO) => (
+                                            <tr key={`link-${el.id}`}>
+                                                <td><span className={`badge ${el.kind === 'FILE' ? 'badge-success' : 'badge-info'} text-xs`}>{el.kind}</span></td>
+                                                <td className="text-sm">
+                                                    {el.url ? <a href={el.url} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">{el.url}</a> : (el.note || '—')}
                                                 </td>
-                                            )}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        )}
+                                                <td className="text-xs text-slate-400">{el.createdBy?.name || '—'}</td>
+                                                <td className="text-xs text-slate-400">{el.createdAt ? formatDate(el.createdAt) : '—'}</td>
+                                                {permissions.canWrite && (
+                                                    <td>
+                                                        <button className="text-red-400 text-xs hover:text-red-300" onClick={() => unlinkEvidence(el.id)} id={`unlink-${el.id}`}>
+                                                            × Remove
+                                                        </button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ))}
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                                        {directEvidence.map((ev: any) => (
+                                            <tr key={`ev-${ev.id}`}>
+                                                <td><span className={`badge ${ev.type === 'FILE' ? 'badge-success' : ev.type === 'TEXT' ? 'badge-neutral' : 'badge-info'} text-xs`}>{ev.type}</span></td>
+                                                <td className="text-sm">
+                                                    <Link href={tenantHref(`/evidence`)} className="text-brand-400 hover:underline">{ev.title}</Link>
+                                                </td>
+                                                <td>
+                                                    <span className={`badge text-xs ${ev.status === 'APPROVED' ? 'badge-success' : ev.status === 'REJECTED' ? 'badge-danger' : ev.status === 'SUBMITTED' ? 'badge-info' : 'badge-neutral'}`}>
+                                                        {ev.status}
+                                                    </span>
+                                                </td>
+                                                <td className="text-xs text-slate-400">{ev.createdAt ? formatDate(ev.createdAt) : '—'}</td>
+                                                {permissions.canWrite && <td />}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            );
+                        })()}
                     </div>
                 </div>
             )}

@@ -41,15 +41,6 @@ import { shouldBlockAdminRequest } from '@/lib/security/admin-session-guard';
 const authMiddleware = auth(async (req) => {
     const { pathname } = req.nextUrl;
 
-    // ── 0. Rate Limit Auth Endpoints ──
-    if (pathname.startsWith('/api/auth/')) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rlResult = await checkAuthRateLimit(req as any);
-        if (!rlResult.ok && rlResult.response) {
-            return rlResult.response;
-        }
-    }
-
     // ── 1. Allow public paths (login, auth callbacks, static, etc.) ──
     if (isPublicPath(pathname)) {
         return NextResponse.next();
@@ -129,7 +120,7 @@ const authMiddleware = auth(async (req) => {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default async function middleware(req: any, ctx: any) {
+export default async function middleware(req: any, ctx: any): Promise<NextResponse> {
     const { pathname } = req.nextUrl;
 
     // ── CSP Nonce — generated once per request ──
@@ -169,10 +160,60 @@ export default async function middleware(req: any, ctx: any) {
         return new NextResponse(null, { status: 204, headers: preflightHeaders });
     }
 
-    // ── Process through auth middleware (with nonce on request headers) ──
-    const res = await authMiddleware(req, ctx) || NextResponse.next({
-        request: { headers: requestHeaders },
-    });
+    // ── Rate Limit Auth Endpoints ──
+    if (pathname.startsWith('/api/auth/')) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rlResult = await checkAuthRateLimit(req as any);
+        if (!rlResult.ok && rlResult.response) {
+            return rlResult.response;
+        }
+    }
+
+    // ── Auth API routes bypass: let the route handler process these directly.
+    // The auth() middleware wrapper calls reqWithEnvURL() which constructs a new
+    // Request, consuming the original body stream. The downstream route handler
+    // then receives an empty body and cannot read the CSRF token, causing
+    // MissingCSRF errors. These routes are public and self-authenticating, so
+    // skipping the session-checking wrapper is safe. ──
+    let authRes: Response | undefined;
+    if (pathname.startsWith('/api/auth/')) {
+        authRes = NextResponse.next();
+    } else {
+        const result = await authMiddleware(req, ctx);
+        // auth() callback may return void; treat as pass-through
+        authRes = result ?? undefined;
+    }
+
+    // If auth returned a redirect (3xx) or error (4xx/5xx), use it directly.
+    // Otherwise create a NextResponse.next() that forwards the modified request
+    // headers — critically including x-csp-nonce, which Next.js reads to stamp
+    // its <script> tags with the matching nonce.
+    //
+    // For /api/auth/ routes we must NOT pass { request: { headers } } because
+    // Next.js internally re-creates the Request to apply header overrides,
+    // which can consume the body stream. The downstream NextAuth route handler
+    // then calls reqWithEnvURL(req) → new NextRequest(url, req) on an already-
+    // drained body, losing the CSRF token and triggering MissingCSRF.
+    // API routes don't need the x-csp-nonce request header anyway.
+    const isAuthApi = pathname.startsWith('/api/auth/');
+    const isPassThrough = !authRes
+        || (authRes.status === 200 && !authRes.headers.get('location'));
+
+    let res: NextResponse;
+    if (!isPassThrough && authRes) {
+        // authRes is a redirect/error Response — wrap as NextResponse if needed
+        res = authRes instanceof NextResponse
+            ? authRes
+            : new NextResponse(authRes.body, {
+                status: authRes.status,
+                statusText: authRes.statusText,
+                headers: authRes.headers,
+            });
+    } else if (isAuthApi) {
+        res = NextResponse.next();
+    } else {
+        res = NextResponse.next({ request: { headers: requestHeaders } });
+    }
 
     // ── Security Headers — applied to ALL responses ──
     applySecurityHeaders(res.headers, isProduction);

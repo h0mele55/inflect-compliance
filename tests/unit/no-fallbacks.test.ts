@@ -48,6 +48,8 @@ describe('Static Analysis: No process.env fallbacks', () => {
             if (file.endsWith('redis.ts') && file.includes('lib')) continue;
             // Edge middleware reads CSP_REPORT_ONLY before env validation (optional runtime toggle)
             if (file.endsWith('middleware.ts') && !file.includes('pii-middleware')) continue;
+            // Dub-ported utility files use process.env by upstream design
+            if (file.includes('dub-utils')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 

@@ -27,6 +27,7 @@ export const AuditDetailsJsonSchema = z.object({
     /** Event category — required discriminator */
     category: z.enum([
         'entity_lifecycle',
+        'data_lifecycle',
         'status_change',
         'relationship',
         'access',

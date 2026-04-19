@@ -38,6 +38,15 @@ describe('console.* usage guard', () => {
             'lib/api-client.ts',
         ]);
 
+        // Dub-ported utility files — these use console.* by upstream design
+        const ALLOWED_PREFIXES = [
+            'lib/dub-utils/',
+            'components/ui/charts/',
+            'components/ui/hooks/',
+            'components/ui/filter/',
+            'components/ui/file-upload.tsx',
+        ];
+
         const CONSOLE_PATTERN = /console\.(log|warn|error|info|debug)\s*\(/;
 
         function scanDir(dir: string) {
@@ -61,6 +70,7 @@ describe('console.* usage guard', () => {
 
                 const relPath = path.relative(srcDir, fullPath).replace(/\\/g, '/');
                 if (ALLOWED_FILES.has(relPath)) continue;
+                if (ALLOWED_PREFIXES.some(p => relPath.startsWith(p))) continue;
 
                 const content = fs.readFileSync(fullPath, 'utf-8');
                 const lines = content.split('\n');

@@ -65,15 +65,13 @@ describe('Validation Layer Integration', () => {
         });
     });
 
-    describe('Multipart Form Validation', () => {
-        it('POST /api/evidence returns 400 when attempting to upload without required fields', async () => {
-            const formData = new FormData();
-            formData.append('type', 'FILE');
-            // Missing 'title' which is strictly required by CreateEvidenceFormSchema
-
+    describe('JSON Body Validation — Evidence', () => {
+        it('POST /api/evidence returns 400 when required fields are missing', async () => {
             const req = new NextRequest('http://localhost/api/evidence', {
                 method: 'POST',
-                body: formData as any,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'FILE' }),
+                // Missing 'title' which is strictly required by CreateEvidenceSchema
             });
             const res = await EvidencePost(req, { params: {} } as any);
 

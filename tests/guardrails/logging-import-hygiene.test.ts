@@ -40,6 +40,15 @@ describe('No console.* in backend server code', () => {
         'lib/api-client.ts',                   // Client-side dev validation
     ]);
 
+    // Dub-ported modules use console.* by upstream design
+    const CONSOLE_ALLOWLIST_PREFIXES = [
+        'lib/dub-utils/',
+        'components/ui/charts/',
+        'components/ui/hooks/',
+        'components/ui/filter/',
+        'components/ui/file-upload.tsx',
+    ];
+
     // Client components (browser-side) are always allowed
     function isClientComponent(content: string): boolean {
         // Check first non-empty line for 'use client'
@@ -53,6 +62,7 @@ describe('No console.* in backend server code', () => {
 
         for (const file of tsFiles) {
             if (CONSOLE_ALLOWLIST.has(file)) continue;
+            if (CONSOLE_ALLOWLIST_PREFIXES.some(p => file.startsWith(p))) continue;
             // Skip node_modules just in case
             if (file.includes('node_modules')) continue;
 

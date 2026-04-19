@@ -7,6 +7,9 @@ import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantContext, useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { cn } from '@dub/utils';
 
 const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
     loading: () => <div className="animate-pulse h-48" aria-busy="true" />,
@@ -41,16 +44,22 @@ const CATEGORIES = [
     'Financial', 'Reputational', 'Physical', 'Human Resources',
 ];
 
+const STATUS_VARIANT: Record<string, 'warning' | 'success' | 'info' | 'neutral'> = {
+    OPEN: 'warning',
+    MITIGATING: 'info',
+    ACCEPTED: 'neutral',
+    CLOSED: 'success',
+};
+
 function isOverdue(nextReviewAt: string | null): boolean {
     if (!nextReviewAt) return false;
     return new Date(nextReviewAt) < new Date();
 }
 
-function getRiskBadge(score: number) {
-    if (score <= 5) return { label: 'Low', cls: 'badge-success' };
-    if (score <= 12) return { label: 'Medium', cls: 'badge-warning' };
-    if (score <= 18) return { label: 'High', cls: 'badge-danger' };
-    return { label: 'Critical', cls: 'badge-danger' };
+function getRiskBadge(score: number): { label: string; variant: 'success' | 'warning' | 'error' } {
+    if (score <= 5) return { label: 'Low', variant: 'success' };
+    if (score <= 12) return { label: 'Medium', variant: 'warning' };
+    return { label: 'High', variant: 'error' };
 }
 
 export default function RiskDetailPage() {
@@ -170,7 +179,7 @@ export default function RiskDetailPage() {
     if (loading) {
         return (
             <div className="space-y-6 animate-fadeIn">
-                <div className="glass-card p-12 text-center text-slate-500 animate-pulse">Loading risk…</div>
+                <div className="glass-card p-12 text-center text-content-subtle animate-pulse">Loading risk…</div>
             </div>
         );
     }
@@ -178,9 +187,11 @@ export default function RiskDetailPage() {
     if (error && !risk) {
         return (
             <div className="space-y-6 animate-fadeIn">
-                <div className="glass-card p-8 text-center text-red-400">
+                <div className="glass-card p-8 text-center text-content-error">
                     {error}
-                    <div className="mt-4"><Link href={href('/risks')} className="btn btn-secondary">← Back to Risks</Link></div>
+                    <div className="mt-4">
+                        <Link href={href('/risks')} className={cn(buttonVariants({ variant: 'secondary' }))}>← Back to Risks</Link>
+                    </div>
                 </div>
             </div>
         );
@@ -196,21 +207,23 @@ export default function RiskDetailPage() {
             {/* Header */}
             <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                    <Link href={href('/risks')} className="text-slate-400 hover:text-white transition text-lg">←</Link>
+                    <Link href={href('/risks')} className="text-content-muted hover:text-content-emphasis transition text-lg">←</Link>
                     <div>
-                        <h1 className="text-2xl font-bold" id="risk-title-heading">{risk.title}</h1>
+                        <h1 className="text-2xl font-bold text-content-emphasis" id="risk-title-heading">{risk.title}</h1>
                         <div className="flex items-center gap-2 mt-1">
-                            <span className={`badge ${risk.status === 'OPEN' ? 'badge-warning' : risk.status === 'CLOSED' ? 'badge-success' : 'badge-info'}`}>
+                            <StatusBadge variant={STATUS_VARIANT[risk.status] || 'neutral'} icon={null}>
                                 {risk.status}
-                            </span>
-                            <span className={`badge ${badge.cls}`}>{risk.inherentScore} · {badge.label}</span>
-                            {overdue && <span className="badge badge-danger">Overdue Review</span>}
+                            </StatusBadge>
+                            <StatusBadge variant={badge.variant} icon={null}>
+                                {risk.inherentScore} · {badge.label}
+                            </StatusBadge>
+                            {overdue && <StatusBadge variant="error" icon={null}>Overdue Review</StatusBadge>}
                         </div>
                     </div>
                 </div>
                 {canWrite && !editing && (
                     <div className="flex gap-2">
-                        <button onClick={startEditing} className="btn btn-secondary" id="edit-risk-btn">Edit</button>
+                        <Button variant="secondary" onClick={startEditing} id="edit-risk-btn">Edit</Button>
                         <select
                             className="input w-36 text-sm"
                             value={risk.status}
@@ -224,7 +237,7 @@ export default function RiskDetailPage() {
             </div>
 
             {error && (
-                <div className="glass-card p-4 border-red-500/50 text-red-400 text-sm">{error}</div>
+                <div className="glass-card p-4 border-border-error text-content-error text-sm">{error}</div>
             )}
 
             {/* Detail / Edit Card */}
@@ -264,7 +277,7 @@ export default function RiskDetailPage() {
                             </div>
                             <div>
                                 <label className="input-label">Score</label>
-                                <div className="input bg-slate-800/50 flex items-center text-lg font-bold">
+                                <div className="input bg-bg-subtle flex items-center text-lg font-bold">
                                     {(editForm.likelihood ?? 3) * (editForm.impact ?? 3)}
                                 </div>
                             </div>
@@ -290,10 +303,10 @@ export default function RiskDetailPage() {
                             <textarea className="input min-h-[80px]" value={editForm.treatmentNotes ?? ''} onChange={set('treatmentNotes')} />
                         </div>
                         <div className="flex gap-3 pt-2">
-                            <button onClick={handleSave} disabled={saving} className="btn btn-primary" id="save-risk-btn">
-                                {saving ? 'Saving…' : 'Save'}
-                            </button>
-                            <button onClick={() => setEditing(false)} className="btn btn-secondary">Cancel</button>
+                            <Button variant="primary" onClick={handleSave} disabled={saving} loading={saving} id="save-risk-btn">
+                                Save
+                            </Button>
+                            <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
                         </div>
                     </>
                 ) : (
@@ -301,42 +314,42 @@ export default function RiskDetailPage() {
                     <>
                         {risk.description && (
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Description</h3>
-                                <p className="text-sm text-slate-300 whitespace-pre-wrap">{risk.description}</p>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Description</h3>
+                                <p className="text-sm text-content-default whitespace-pre-wrap">{risk.description}</p>
                             </div>
                         )}
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Category</h3>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Category</h3>
                                 <p className="text-sm">{risk.category || '—'}</p>
                             </div>
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Treatment Owner</h3>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Treatment Owner</h3>
                                 <p className="text-sm">{risk.treatmentOwner || '—'}</p>
                             </div>
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Treatment</h3>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Treatment</h3>
                                 <p className="text-sm">{risk.treatment || 'Untreated'}</p>
                             </div>
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Target Date</h3>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Target Date</h3>
                                 <p className="text-sm">{risk.targetDate ? formatDate(risk.targetDate) : '—'}</p>
                             </div>
                         </div>
 
                         <div className="grid grid-cols-3 gap-4">
                             <div className="glass-card p-4 text-center">
-                                <p className="text-xs text-slate-400 uppercase">Likelihood</p>
+                                <p className="text-xs text-content-muted uppercase">Likelihood</p>
                                 <p className="text-2xl font-bold mt-1">{risk.likelihood}</p>
                             </div>
                             <div className="glass-card p-4 text-center">
-                                <p className="text-xs text-slate-400 uppercase">Impact</p>
+                                <p className="text-xs text-content-muted uppercase">Impact</p>
                                 <p className="text-2xl font-bold mt-1">{risk.impact}</p>
                             </div>
                             <div className="glass-card p-4 text-center">
-                                <p className="text-xs text-slate-400 uppercase">Inherent Score</p>
-                                <p className={`text-2xl font-bold mt-1 ${risk.inherentScore > 12 ? 'text-red-400' : risk.inherentScore > 5 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                <p className="text-xs text-content-muted uppercase">Inherent Score</p>
+                                <p className={`text-2xl font-bold mt-1 ${risk.inherentScore > 12 ? 'text-content-error' : risk.inherentScore > 5 ? 'text-content-warning' : 'text-content-success'}`}>
                                     {risk.inherentScore}
                                 </p>
                             </div>
@@ -344,27 +357,27 @@ export default function RiskDetailPage() {
 
                         {risk.threat && (
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Threat</h3>
-                                <p className="text-sm text-slate-300">{risk.threat}</p>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Threat</h3>
+                                <p className="text-sm text-content-default">{risk.threat}</p>
                             </div>
                         )}
                         {risk.vulnerability && (
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Vulnerability</h3>
-                                <p className="text-sm text-slate-300 whitespace-pre-wrap">{risk.vulnerability}</p>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Vulnerability</h3>
+                                <p className="text-sm text-content-default whitespace-pre-wrap">{risk.vulnerability}</p>
                             </div>
                         )}
                         {risk.treatmentNotes && (
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Treatment Notes</h3>
-                                <p className="text-sm text-slate-300 whitespace-pre-wrap">{risk.treatmentNotes}</p>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Treatment Notes</h3>
+                                <p className="text-sm text-content-default whitespace-pre-wrap">{risk.treatmentNotes}</p>
                             </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-4 border-t border-slate-700/50 pt-4">
+                        <div className="grid grid-cols-2 gap-4 border-t border-border-subtle pt-4">
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Next Review</h3>
-                                <p className={`text-sm ${overdue ? 'text-red-400 font-semibold' : ''}`}>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Next Review</h3>
+                                <p className={`text-sm ${overdue ? 'text-content-error font-semibold' : ''}`}>
                                     {risk.nextReviewAt
                                         ? `${overdue ? '! ' : ''}${formatDate(risk.nextReviewAt)}`
                                         : '—'
@@ -372,8 +385,8 @@ export default function RiskDetailPage() {
                                 </p>
                             </div>
                             <div>
-                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Created</h3>
-                                <p className="text-sm text-slate-400">{formatDate(risk.createdAt)}</p>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Created</h3>
+                                <p className="text-sm text-content-muted">{formatDate(risk.createdAt)}</p>
                             </div>
                         </div>
                     </>
@@ -382,7 +395,7 @@ export default function RiskDetailPage() {
 
             {/* Linked Tasks */}
             <div className="glass-card p-6">
-                <h2 className="text-lg font-semibold text-white mb-4 inline-flex items-center gap-2"><AppIcon name="tasks" size={18} /> Linked Tasks</h2>
+                <h2 className="text-lg font-semibold text-content-emphasis mb-4 inline-flex items-center gap-2"><AppIcon name="tasks" size={18} /> Linked Tasks</h2>
                 <LinkedTasksPanel
                     apiBase={apiUrl('')}
                     entityType="RISK"
@@ -393,7 +406,7 @@ export default function RiskDetailPage() {
 
             {/* Traceability */}
             <div className="glass-card p-6">
-                <h2 className="text-lg font-semibold text-white mb-4 inline-flex items-center gap-2"><AppIcon name="link" size={18} /> Traceability</h2>
+                <h2 className="text-lg font-semibold text-content-emphasis mb-4 inline-flex items-center gap-2"><AppIcon name="link" size={18} /> Traceability</h2>
                 <TraceabilityPanel
                     apiBase={apiUrl('')}
                     entityType="risk"

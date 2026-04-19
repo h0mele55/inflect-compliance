@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLegacyCtx } from '@/app-layer/context';
 import { listEvidence, createEvidence } from '@/app-layer/usecases/evidence';
-import { withValidatedForm } from '@/lib/validation/route';
-import { CreateEvidenceFormSchema } from '@/lib/schemas';
+import { withValidatedBody } from '@/lib/validation/route';
+import { CreateEvidenceSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 
 export const GET = withApiErrorHandling(async (req: NextRequest) => {
@@ -11,7 +11,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest) => {
     return NextResponse.json(evidence);
 });
 
-export const POST = withApiErrorHandling(withValidatedForm(CreateEvidenceFormSchema, async (req, _ctx, body) => {
+export const POST = withApiErrorHandling(withValidatedBody(CreateEvidenceSchema, async (req, _ctx, body) => {
     const ctx = await getLegacyCtx(req);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const item = await createEvidence(ctx, body as any);

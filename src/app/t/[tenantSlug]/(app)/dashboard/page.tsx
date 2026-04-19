@@ -13,6 +13,7 @@ import {
     Bell,
     FileText,
     Building2,
+    TrendingUp,
 } from 'lucide-react';
 import OnboardingBanner from '@/components/onboarding/OnboardingBanner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +25,10 @@ import StatusBreakdown from '@/components/ui/StatusBreakdown';
 import RiskHeatmap from '@/components/ui/RiskHeatmap';
 import ExpiryCalendar from '@/components/ui/ExpiryCalendar';
 import RecentActivityCard from './RecentActivityCard';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { buttonVariants } from '@/components/ui/button-variants';
+import { cn } from '@dub/utils';
 
 import type { ExecutiveDashboardPayload } from '@/app-layer/repositories/DashboardRepository';
 
@@ -34,21 +39,6 @@ export const dynamic = 'force-dynamic';
  *
  * Fetches the full executive KPI payload + trend data server-side.
  * Uses reusable widget components for a polished, data-rich layout.
- *
- * Layout:
- *   ┌────────────────────────────────────────────────────┐
- *   │  Header (title + notification bell)                │
- *   ├────────┬────────┬────────┬────────┬────────┬──────┤
- *   │ KPI 1  │ KPI 2  │ KPI 3  │ KPI 4  │ KPI 5  │KPI 6│
- *   ├────────────────────┬──────────────────────────────┤
- *   │  Control Coverage  │  Risk Distribution            │
- *   ├────────────────────┼──────────────────────────────┤
- *   │  Evidence Status   │  Compliance Alerts            │
- *   ├────────────────────┴──────────────────────────────┤
- *   │  Trend Line (Suspense-wrapped)                     │
- *   ├────────────────────┬──────────────────────────────┤
- *   │  Quick Actions     │  Recent Activity (Suspense)  │
- *   └────────────────────┴──────────────────────────────┘
  */
 export default async function DashboardPage({
     params,
@@ -72,14 +62,14 @@ export default async function DashboardPage({
             {/* ─── Header ─── */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl font-bold">{t('title')}</h1>
-                    <p className="text-slate-400 text-sm mt-1">{t('subtitle')}</p>
+                    <h1 className="text-2xl font-bold text-content-emphasis">{t('title')}</h1>
+                    <p className="text-content-muted text-sm mt-1">{t('subtitle')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     {exec.stats.unreadNotifications > 0 && (
-                        <Link href={href('/notifications')} className="btn btn-ghost btn-sm">
+                        <Link href={href('/notifications')} className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
                             <Bell className="w-4 h-4" aria-hidden="true" />
-                            <span className="badge badge-danger">{exec.stats.unreadNotifications}</span>
+                            <StatusBadge variant="error" icon={null} size="sm">{exec.stats.unreadNotifications}</StatusBadge>
                         </Link>
                     )}
                 </div>
@@ -125,14 +115,14 @@ export default async function DashboardPage({
             {/* ─── Quick Actions + Recent Activity ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="glass-card p-5">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-3">{t('quickActions')}</h3>
+                    <h3 className="text-sm font-semibold text-content-default mb-3">{t('quickActions')}</h3>
                     <div className="grid grid-cols-2 gap-2">
-                        <Link href={href('/assets')} className="btn btn-secondary btn-sm text-xs">{t('addAsset')}</Link>
-                        <Link href={href('/risks')} className="btn btn-secondary btn-sm text-xs">{t('addRisk')}</Link>
-                        <Link href={href('/evidence')} className="btn btn-secondary btn-sm text-xs">{t('addEvidence')}</Link>
-                        <Link href={href('/audits')} className="btn btn-secondary btn-sm text-xs">{t('newAudit')}</Link>
-                        <Link href={href('/policies')} className="btn btn-secondary btn-sm text-xs">{t('newPolicy')}</Link>
-                        <Link href={href('/reports')} className="btn btn-secondary btn-sm text-xs">{t('exportReports')}</Link>
+                        <Link href={href('/assets')} className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}>{t('addAsset')}</Link>
+                        <Link href={href('/risks')} className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}>{t('addRisk')}</Link>
+                        <Link href={href('/evidence')} className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}>{t('addEvidence')}</Link>
+                        <Link href={href('/audits')} className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}>{t('newAudit')}</Link>
+                        <Link href={href('/policies')} className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}>{t('newPolicy')}</Link>
+                        <Link href={href('/reports')} className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}>{t('exportReports')}</Link>
                     </div>
                 </div>
 
@@ -250,7 +240,7 @@ function RiskDistributionSection({ exec }: { exec: ExecutiveDashboardPayload }) 
 
     return (
         <div className="glass-card p-5" id="risk-distribution">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">Risk Distribution</h3>
+            <h3 className="text-sm font-semibold text-content-default mb-3">Risk Distribution</h3>
             <div className="grid grid-cols-2 gap-4 items-center">
                 {/* Donut: severity */}
                 <DonutChart
@@ -278,14 +268,14 @@ function RiskDistributionSection({ exec }: { exec: ExecutiveDashboardPayload }) 
                         <div key={item.label} className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-1.5">
                                 <span className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
-                                <span className="text-slate-400">{item.label}</span>
+                                <span className="text-content-muted">{item.label}</span>
                             </div>
-                            <span className="text-slate-300 font-medium tabular-nums">{item.value}</span>
+                            <span className="text-content-default font-medium tabular-nums">{item.value}</span>
                         </div>
                     ))}
-                    <div className="border-t border-slate-700/50 pt-2 mt-2 flex items-center justify-between text-xs">
-                        <span className="text-slate-400">Open / Mitigating</span>
-                        <span className="text-slate-300 font-medium tabular-nums">
+                    <div className="border-t border-border-subtle pt-2 mt-2 flex items-center justify-between text-xs">
+                        <span className="text-content-muted">Open / Mitigating</span>
+                        <span className="text-content-default font-medium tabular-nums">
                             {riskByStatus.open} / {riskByStatus.mitigating}
                         </span>
                     </div>
@@ -331,15 +321,15 @@ function ComplianceAlerts({ exec, t }: { exec: ExecutiveDashboardPayload; t: (ke
 
     return (
         <div className="glass-card p-5" id="compliance-alerts">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">{t('complianceAlerts')}</h3>
+            <h3 className="text-sm font-semibold text-content-default mb-3">{t('complianceAlerts')}</h3>
             <div className="space-y-2">
                 {alerts.length === 0 ? (
-                    <p className="text-emerald-400 text-sm">{t('noAlerts')}</p>
+                    <p className="text-content-success text-sm">{t('noAlerts')}</p>
                 ) : (
                     alerts.map((alert, i) => (
                         <div key={i} className="flex items-center gap-2 text-sm">
                             <span className={`w-2 h-2 rounded-full ${alert.color} shrink-0`} />
-                            <span className="text-slate-400">{alert.text}</span>
+                            <span className="text-content-muted">{alert.text}</span>
                         </div>
                     ))
                 )}
@@ -355,19 +345,17 @@ async function TrendSection({ ctx }: { ctx: Parameters<typeof getComplianceTrend
     try {
         trends = await getComplianceTrends(ctx, 30);
     } catch {
-        // Trend data may not be available yet (no snapshots generated)
         return null;
     }
 
-    // No trend data yet — show a helpful empty state
     if (trends.daysAvailable < 2) {
         return (
-            <div className="glass-card p-5" id="trend-section">
-                <h3 className="text-sm font-semibold text-slate-300 mb-2">Compliance Trends</h3>
-                <p className="text-xs text-slate-500">
-                    Trend charts will appear here after the daily compliance snapshot runs.
-                    Snapshots are generated automatically at 05:00 UTC.
-                </p>
+            <div className="glass-card" id="trend-section">
+                <EmptyState
+                    icon={TrendingUp}
+                    title="Compliance Trends"
+                    description="Trend charts will appear here after the daily compliance snapshot runs. Snapshots are generated automatically at 05:00 UTC."
+                />
             </div>
         );
     }
@@ -380,8 +368,8 @@ async function TrendSection({ ctx }: { ctx: Parameters<typeof getComplianceTrend
     return (
         <div className="glass-card p-5" id="trend-section">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-slate-300">Compliance Trends</h3>
-                <span className="text-xs text-slate-500">{trends.daysAvailable} day{trends.daysAvailable !== 1 ? 's' : ''} of data</span>
+                <h3 className="text-sm font-semibold text-content-default">Compliance Trends</h3>
+                <span className="text-xs text-content-subtle">{trends.daysAvailable} day{trends.daysAvailable !== 1 ? 's' : ''} of data</span>
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <TrendCard
@@ -425,8 +413,8 @@ function TrendCard({ label, value, format, data, color }: {
     return (
         <div className="space-y-1">
             <div className="flex items-baseline justify-between">
-                <span className="text-xs text-slate-400">{label}</span>
-                <span className="text-sm font-semibold text-slate-200 tabular-nums">
+                <span className="text-xs text-content-muted">{label}</span>
+                <span className="text-sm font-semibold text-content-emphasis tabular-nums">
                     {value}{format ?? ''}
                 </span>
             </div>

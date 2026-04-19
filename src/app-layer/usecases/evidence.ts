@@ -67,8 +67,19 @@ export async function createEvidence(ctx: RequestContext, data: {
     }
 
     return runInTenantContext(ctx, async (db) => {
+        const controlId = data.controlId || null;
+
+        // Validate control belongs to the same tenant
+        if (controlId) {
+            const control = await db.control.findFirst({
+                where: { id: controlId, tenantId: ctx.tenantId },
+                select: { id: true },
+            });
+            if (!control) throw badRequest('INVALID_CONTROL', 'Control not found or belongs to a different tenant');
+        }
+
         const evidence = await EvidenceRepository.create(db, ctx, {
-            controlId: data.controlId || null,
+            controlId,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum boundary
             type: data.type as EvidenceType,
             title: data.title,
@@ -83,6 +94,26 @@ export async function createEvidence(ctx: RequestContext, data: {
             nextReviewDate: data.nextReviewDate ? new Date(data.nextReviewDate) : null,
             status: 'DRAFT',
         });
+
+        // Bridge: create ControlEvidenceLink so evidence shows in the control evidence tab
+        if (controlId) {
+            const linkKind = data.type === 'LINK' ? 'LINK' : 'FILE';
+            try {
+                await db.controlEvidenceLink.create({
+                    data: {
+                        tenantId: ctx.tenantId,
+                        controlId,
+                        kind: linkKind,
+                        fileId: evidence.fileRecordId || null,
+                        url: data.type === 'LINK' ? (content || null) : null,
+                        note: evidence.title,
+                        createdByUserId: ctx.userId,
+                    },
+                });
+            } catch {
+                // Duplicate link is acceptable — don't fail the whole creation
+            }
+        }
 
         await logEvent(db, ctx, {
             action: 'CREATE',
@@ -380,6 +411,17 @@ export async function uploadEvidenceFile(
 
     // Create FileRecord + Evidence in a transaction
     return runInTenantContext(ctx, async (db) => {
+        const controlId = metadata.controlId || null;
+
+        // Validate control belongs to the same tenant
+        if (controlId) {
+            const control = await db.control.findFirst({
+                where: { id: controlId, tenantId: ctx.tenantId },
+                select: { id: true },
+            });
+            if (!control) throw badRequest('INVALID_CONTROL', 'Control not found or belongs to a different tenant');
+        }
+
         // ─── SHA-256 Dedup ───
         const existingFile = await FileRepository.findBySha256(db, ctx.tenantId, writeResult.sha256);
         let fileRecordId: string;
@@ -414,7 +456,7 @@ export async function uploadEvidenceFile(
             fileName: originalName,
             fileSize: writeResult.sizeBytes,
             fileRecordId,
-            controlId: metadata.controlId || null,
+            controlId,
             category: metadata.category || undefined,
             owner: metadata.owner || undefined,
             ownerUserId: metadata.ownerUserId || null,
@@ -422,6 +464,24 @@ export async function uploadEvidenceFile(
             nextReviewDate: metadata.nextReviewDate ? new Date(metadata.nextReviewDate) : null,
             status: 'DRAFT',
         });
+
+        // Bridge: create ControlEvidenceLink so evidence shows in the control evidence tab
+        if (controlId) {
+            try {
+                await db.controlEvidenceLink.create({
+                    data: {
+                        tenantId: ctx.tenantId,
+                        controlId,
+                        kind: 'FILE',
+                        fileId: fileRecordId,
+                        note: evidence.title,
+                        createdByUserId: ctx.userId,
+                    },
+                });
+            } catch {
+                // Duplicate link is acceptable — don't fail the whole creation
+            }
+        }
 
         const eventAction = deduplicated ? 'FILE_DEDUP_REUSED' : 'EVIDENCE_FILE_UPLOADED';
         await logEvent(db, ctx, {

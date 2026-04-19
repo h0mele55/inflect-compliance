@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { listEvidence, listEvidencePaginated, createEvidence, listEvidenceWithDeleted } from '@/app-layer/usecases/evidence';
-import { withValidatedForm } from '@/lib/validation/route';
-import { CreateEvidenceFormSchema } from '@/lib/schemas';
+import { withValidatedBody } from '@/lib/validation/route';
+import { CreateEvidenceSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
@@ -51,7 +51,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     return NextResponse.json(evidence);
 });
 
-export const POST = withApiErrorHandling(withValidatedForm(CreateEvidenceFormSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
+export const POST = withApiErrorHandling(withValidatedBody(CreateEvidenceSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const evidence = await createEvidence(ctx, body as any);

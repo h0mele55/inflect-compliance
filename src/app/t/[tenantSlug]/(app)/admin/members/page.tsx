@@ -7,6 +7,11 @@ import {
     Users, UserPlus, ChevronDown, Shield, XCircle, CheckCircle,
     Search, MoreVertical, UserMinus, Mail,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { statusBadgeVariants } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { cn } from '@dub/utils';
 
 // ─── Types ───
 
@@ -46,17 +51,17 @@ interface Invite {
 }
 
 const ROLES = ['ADMIN', 'EDITOR', 'AUDITOR', 'READER'] as const;
-const ROLE_COLORS: Record<string, string> = {
-    ADMIN: 'badge-danger',
-    EDITOR: 'badge-info',
-    AUDITOR: 'badge-warning',
-    READER: 'badge-neutral',
+const ROLE_VARIANT: Record<string, 'error' | 'info' | 'warning' | 'neutral'> = {
+    ADMIN: 'error',
+    EDITOR: 'info',
+    AUDITOR: 'warning',
+    READER: 'neutral',
 };
-const STATUS_COLORS: Record<string, string> = {
-    ACTIVE: 'text-emerald-400',
-    INVITED: 'text-amber-400',
-    DEACTIVATED: 'text-red-400',
-    REMOVED: 'text-slate-500',
+const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error' | 'neutral'> = {
+    ACTIVE: 'success',
+    INVITED: 'warning',
+    DEACTIVATED: 'error',
+    REMOVED: 'neutral',
 };
 
 export default function MembersAdminPage() {
@@ -237,14 +242,14 @@ export default function MembersAdminPage() {
     if (loading) {
         return (
             <div className="space-y-6 animate-fadeIn">
-                <h1 className="text-2xl font-bold flex items-center gap-2">
+                <h1 className="text-2xl font-bold flex items-center gap-2 text-content-emphasis">
                     <Users className="w-6 h-6 text-brand-400" />
                     Members &amp; Roles
                 </h1>
                 <div className="glass-card p-8 space-y-4">
-                    <div className="h-4 bg-slate-700/50 rounded w-1/3 animate-pulse" />
-                    <div className="h-4 bg-slate-700/50 rounded w-2/3 animate-pulse" />
-                    <div className="h-4 bg-slate-700/50 rounded w-1/2 animate-pulse" />
+                    <div className="h-4 bg-bg-subtle rounded w-1/3 animate-pulse" />
+                    <div className="h-4 bg-bg-subtle rounded w-2/3 animate-pulse" />
+                    <div className="h-4 bg-bg-subtle rounded w-1/2 animate-pulse" />
                 </div>
             </div>
         );
@@ -255,40 +260,40 @@ export default function MembersAdminPage() {
             {/* Header */}
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
+                    <h1 className="text-2xl font-bold flex items-center gap-2 text-content-emphasis">
                         <Users className="w-6 h-6 text-brand-400" />
                         Members &amp; Roles
                     </h1>
-                    <p className="text-sm text-slate-400 mt-1">
+                    <p className="text-sm text-content-muted mt-1">
                         {members.filter(m => m.status === 'ACTIVE').length} active members
                         {invites.length > 0 && ` · ${invites.length} pending invites`}
                     </p>
                 </div>
-                <button
+                <Button
+                    variant="primary"
                     onClick={() => setShowInvite(true)}
-                    className="btn btn-primary"
+                    icon={<UserPlus className="w-3.5 h-3.5" />}
                     id="invite-member-btn"
                 >
-                    <UserPlus className="w-3.5 h-3.5" />
                     Invite Member
-                </button>
+                </Button>
             </div>
 
             {/* Messages */}
             {error && (
-                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2" id="members-error">
-                    <XCircle className="w-4 h-4 text-red-400" />
-                    <span className="text-sm text-red-400">{error}</span>
-                    <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300">
+                <div className="p-3 bg-bg-error border border-border-error rounded-lg flex items-center gap-2" id="members-error">
+                    <XCircle className="w-4 h-4 text-content-error" />
+                    <span className="text-sm text-content-error">{error}</span>
+                    <button onClick={() => setError(null)} className="ml-auto text-content-error hover:opacity-75">
                         <XCircle className="w-3.5 h-3.5" />
                     </button>
                 </div>
             )}
             {success && (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center gap-2" id="members-success">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                    <span className="text-sm text-emerald-400">{success}</span>
-                    <button onClick={() => setSuccess(null)} className="ml-auto text-emerald-400 hover:text-emerald-300">
+                <div className="p-3 bg-bg-success border border-border-success rounded-lg flex items-center gap-2" id="members-success">
+                    <CheckCircle className="w-4 h-4 text-content-success" />
+                    <span className="text-sm text-content-success">{success}</span>
+                    <button onClick={() => setSuccess(null)} className="ml-auto text-content-success hover:opacity-75">
                         <XCircle className="w-3.5 h-3.5" />
                     </button>
                 </div>
@@ -297,10 +302,10 @@ export default function MembersAdminPage() {
             {/* Invite Form */}
             {showInvite && (
                 <div className="glass-card p-6 border border-brand-500/30" id="invite-form">
-                    <h3 className="text-sm font-semibold text-white mb-4">Invite a New Member</h3>
+                    <h3 className="text-sm font-semibold text-content-emphasis mb-4">Invite a New Member</h3>
                     <div className="flex gap-3 items-end flex-wrap">
                         <div className="flex-1 min-w-[200px]">
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">
                                 Email Address
                             </label>
                             <input
@@ -314,7 +319,7 @@ export default function MembersAdminPage() {
                             />
                         </div>
                         <div className="w-full sm:w-40">
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">
                                 Role
                             </label>
                             <select
@@ -328,28 +333,29 @@ export default function MembersAdminPage() {
                                 ))}
                             </select>
                         </div>
-                        <button
+                        <Button
+                            variant="primary"
                             onClick={handleInvite}
                             disabled={inviting || !inviteEmail.trim()}
-                            className="btn btn-primary"
+                            loading={inviting}
+                            icon={<Mail className="w-3.5 h-3.5" />}
                             id="send-invite-btn"
                         >
-                            <Mail className="w-3.5 h-3.5" />
-                            {inviting ? 'Sending...' : 'Send Invite'}
-                        </button>
-                        <button
+                            Send Invite
+                        </Button>
+                        <Button
+                            variant="secondary"
                             onClick={() => { setShowInvite(false); setInviteEmail(''); }}
-                            className="btn btn-secondary"
                         >
                             Cancel
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}
 
             {/* Search / filter */}
             <div className="relative max-w-xs">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-content-subtle" />
                 <input
                     id="member-search"
                     value={search}
@@ -375,7 +381,7 @@ export default function MembersAdminPage() {
                     <tbody>
                         {filteredMembers.map((m) => (
                             <tr key={m.id} data-member-id={m.id}>
-                                <td className="text-sm font-medium text-white">
+                                <td className="text-sm font-medium text-content-emphasis">
                                     <div className="flex items-center gap-2">
                                         <div className="w-7 h-7 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-semibold">
                                             {(m.user.name || m.user.email).charAt(0).toUpperCase()}
@@ -383,7 +389,7 @@ export default function MembersAdminPage() {
                                         {m.user.name || '—'}
                                     </div>
                                 </td>
-                                <td className="text-xs text-slate-400">{m.user.email}</td>
+                                <td className="text-xs text-content-muted">{m.user.email}</td>
                                 <td>
                                     {editingRoleId === m.id ? (
                                         <div className="space-y-1">
@@ -398,20 +404,22 @@ export default function MembersAdminPage() {
                                                         <option key={r} value={r}>{r}</option>
                                                     ))}
                                                 </select>
-                                                <button
+                                                <Button
+                                                    variant="primary"
+                                                    size="xs"
                                                     onClick={() => handleRoleChange(m.id)}
                                                     disabled={changingRole}
-                                                    className="btn btn-primary text-xs py-1 px-2"
+                                                    loading={changingRole}
                                                     id={`role-save-${m.id}`}
                                                 >
-                                                    {changingRole ? '...' : 'Save'}
-                                                </button>
-                                                <button
+                                                    Save
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="xs"
                                                     onClick={() => setEditingRoleId(null)}
-                                                    className="btn btn-secondary text-xs py-1 px-2"
-                                                    >
-                                                        <XCircle className="w-3 h-3" />
-                                                    </button>
+                                                    icon={<XCircle className="w-3 h-3" />}
+                                                />
                                             </div>
                                             {customRoles.length > 0 && (
                                                 <select
@@ -430,7 +438,10 @@ export default function MembersAdminPage() {
                                     ) : (
                                         <div className="flex items-center gap-1 flex-wrap">
                                             <button
-                                                className={`badge ${ROLE_COLORS[m.role] || 'badge-neutral'} cursor-pointer hover:opacity-80 transition`}
+                                                className={cn(
+                                                    statusBadgeVariants({ variant: ROLE_VARIANT[m.role] || 'neutral' }),
+                                                    'cursor-pointer hover:opacity-80 transition',
+                                                )}
                                                 onClick={() => {
                                                     if (m.status === 'ACTIVE') {
                                                         setEditingRoleId(m.id);
@@ -445,7 +456,7 @@ export default function MembersAdminPage() {
                                                 {m.status === 'ACTIVE' && <ChevronDown className="w-3 h-3 ml-0.5" />}
                                             </button>
                                             {m.customRole && (
-                                                <span className="badge bg-purple-500/20 text-purple-300 border-purple-500/30 text-[10px]" title={`Custom role: ${m.customRole.name}`}>
+                                                <span className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30" title={`Custom role: ${m.customRole.name}`}>
                                                     {m.customRole.name}
                                                 </span>
                                             )}
@@ -453,32 +464,32 @@ export default function MembersAdminPage() {
                                     )}
                                 </td>
                                 <td>
-                                    <span className={`text-xs font-medium ${STATUS_COLORS[m.status] || 'text-slate-500'}`}>
+                                    <StatusBadge variant={STATUS_VARIANT[m.status] || 'neutral'} icon={null} size="sm">
                                         {m.status}
-                                    </span>
+                                    </StatusBadge>
                                 </td>
-                                <td className="text-xs text-slate-500">
+                                <td className="text-xs text-content-subtle">
                                     {formatDate(m.createdAt)}
                                 </td>
                                 <td className="text-right relative">
                                     {m.status === 'ACTIVE' && (
                                         <div className="relative inline-block">
-                                            <button
+                                            <Button
+                                                variant="secondary"
+                                                size="xs"
                                                 onClick={() => setOpenMenuId(openMenuId === m.id ? null : m.id)}
-                                                className="btn btn-secondary text-xs py-1 px-1.5"
+                                                icon={<MoreVertical className="w-3.5 h-3.5" />}
                                                 id={`member-menu-${m.id}`}
-                                            >
-                                                <MoreVertical className="w-3.5 h-3.5" />
-                                            </button>
+                                            />
                                             {openMenuId === m.id && (
-                                                <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 min-w-[160px]">
+                                                <div className="absolute right-0 top-full mt-1 bg-bg-default border border-border-default rounded-lg shadow-lg z-20 min-w-[160px]">
                                                     <button
                                                         onClick={() => {
                                                             setEditingRoleId(m.id);
                                                             setPendingRole(m.role);
                                                             setOpenMenuId(null);
                                                         }}
-                                                        className="w-full text-left px-3 py-2 text-xs text-white hover:bg-slate-700/50 flex items-center gap-2"
+                                                        className="w-full text-left px-3 py-2 text-xs text-content-emphasis hover:bg-bg-muted flex items-center gap-2"
                                                         id={`action-change-role-${m.id}`}
                                                     >
                                                         <Shield className="w-3 h-3" />
@@ -486,7 +497,7 @@ export default function MembersAdminPage() {
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeactivate(m.id, m.user.email)}
-                                                        className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2"
+                                                        className="w-full text-left px-3 py-2 text-xs text-content-error hover:bg-bg-error flex items-center gap-2"
                                                         id={`action-deactivate-${m.id}`}
                                                     >
                                                         <UserMinus className="w-3 h-3" />
@@ -501,8 +512,12 @@ export default function MembersAdminPage() {
                         ))}
                         {filteredMembers.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="text-center text-slate-500 py-8">
-                                    {search ? 'No members match your search.' : 'No members found.'}
+                                <td colSpan={6}>
+                                    <EmptyState
+                                        icon={search ? Search : Users}
+                                        title={search ? 'No members match your search' : 'No members found'}
+                                        description={search ? 'Try adjusting your search term.' : undefined}
+                                    />
                                 </td>
                             </tr>
                         )}
@@ -513,7 +528,7 @@ export default function MembersAdminPage() {
             {/* Pending Invites */}
             {invites.length > 0 && (
                 <div>
-                    <h2 className="text-lg font-semibold mb-3">Pending Invitations</h2>
+                    <h2 className="text-lg font-semibold text-content-emphasis mb-3">Pending Invitations</h2>
                     <div className="glass-card overflow-hidden" id="invites-table-card">
                         <table className="data-table" id="invites-table">
                             <thead>
@@ -527,16 +542,16 @@ export default function MembersAdminPage() {
                             <tbody>
                                 {invites.map((inv) => (
                                     <tr key={inv.id}>
-                                        <td className="text-sm text-white">{inv.email}</td>
+                                        <td className="text-sm text-content-emphasis">{inv.email}</td>
                                         <td>
-                                            <span className={`badge ${ROLE_COLORS[inv.role] || 'badge-neutral'}`}>
+                                            <StatusBadge variant={ROLE_VARIANT[inv.role] || 'neutral'} icon={null}>
                                                 {inv.role}
-                                            </span>
+                                            </StatusBadge>
                                         </td>
-                                        <td className="text-xs text-slate-400">
+                                        <td className="text-xs text-content-muted">
                                             {inv.invitedBy?.name || '—'}
                                         </td>
-                                        <td className="text-xs text-slate-500">
+                                        <td className="text-xs text-content-subtle">
                                             {formatDate(inv.expiresAt)}
                                         </td>
                                     </tr>

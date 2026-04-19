@@ -1,0 +1,196 @@
+/**
+ * Guardrail: token migration — representative pages
+ *
+ * Verifies that the four representative pages migrated in Epic 51 use
+ * the new design system primitives (Button, StatusBadge, EmptyState)
+ * and semantic token classes instead of raw Tailwind colors.
+ */
+import * as fs from 'fs';
+import * as path from 'path';
+
+const SRC = path.resolve(__dirname, '../../src');
+
+function read(...segments: string[]): string {
+    return fs.readFileSync(path.join(SRC, ...segments), 'utf-8');
+}
+
+describe('Dashboard page token migration', () => {
+    const src = read('app/t/[tenantSlug]/(app)/dashboard/page.tsx');
+
+    it('imports buttonVariants', () => {
+        expect(src).toContain("from '@/components/ui/button-variants'");
+        expect(src).toContain('buttonVariants');
+    });
+
+    it('imports StatusBadge', () => {
+        expect(src).toContain("from '@/components/ui/status-badge'");
+    });
+
+    it('imports EmptyState', () => {
+        expect(src).toContain("from '@/components/ui/empty-state'");
+    });
+
+    it('uses semantic text tokens', () => {
+        expect(src).toContain('text-content-emphasis');
+        expect(src).toContain('text-content-muted');
+        expect(src).toContain('text-content-default');
+    });
+
+    it('uses buttonVariants for Link elements', () => {
+        expect(src).toContain("buttonVariants({ variant: 'secondary'");
+        expect(src).toContain("buttonVariants({ variant: 'ghost'");
+    });
+
+    it('does not use legacy badge CSS classes', () => {
+        expect(src).not.toMatch(/className="badge badge-/);
+    });
+
+    it('does not use legacy btn CSS classes', () => {
+        expect(src).not.toMatch(/className="btn btn-/);
+    });
+});
+
+describe('Vendors list page token migration', () => {
+    const src = read('app/t/[tenantSlug]/(app)/vendors/VendorsClient.tsx');
+
+    it('imports StatusBadge', () => {
+        expect(src).toContain("from '@/components/ui/status-badge'");
+    });
+
+    it('imports EmptyState', () => {
+        expect(src).toContain("from '@/components/ui/empty-state'");
+    });
+
+    it('imports buttonVariants', () => {
+        expect(src).toContain("from '@/components/ui/button'");
+    });
+
+    it('uses semantic tokens for table styling', () => {
+        expect(src).toContain('border-border-default');
+        expect(src).toContain('text-content-muted');
+        expect(src).toContain('hover:bg-bg-muted');
+    });
+
+    it('uses StatusBadge for status and criticality', () => {
+        expect(src).toContain('<StatusBadge');
+        expect(src).toContain('STATUS_VARIANT');
+        expect(src).toContain('CRIT_VARIANT');
+    });
+
+    it('uses EmptyState for empty table', () => {
+        expect(src).toContain('<EmptyState');
+    });
+
+    it('does not use legacy badge CSS classes', () => {
+        expect(src).not.toMatch(/className=\{`badge \$/);
+        expect(src).not.toMatch(/className="badge badge-/);
+    });
+
+    it('does not use legacy btn CSS classes', () => {
+        expect(src).not.toMatch(/className="btn btn-/);
+    });
+});
+
+describe('Risk detail page token migration', () => {
+    const src = read('app/t/[tenantSlug]/(app)/risks/[riskId]/page.tsx');
+
+    it('imports Button and buttonVariants', () => {
+        expect(src).toContain("from '@/components/ui/button'");
+        expect(src).toContain('Button');
+        expect(src).toContain('buttonVariants');
+    });
+
+    it('imports StatusBadge', () => {
+        expect(src).toContain("from '@/components/ui/status-badge'");
+    });
+
+    it('uses Button for save/cancel/edit actions', () => {
+        expect(src).toContain('<Button variant="primary"');
+        expect(src).toContain('<Button variant="secondary"');
+    });
+
+    it('uses StatusBadge for risk status and severity', () => {
+        expect(src).toContain('<StatusBadge');
+        expect(src).toContain('STATUS_VARIANT');
+    });
+
+    it('uses semantic tokens for text content', () => {
+        expect(src).toContain('text-content-muted');
+        expect(src).toContain('text-content-default');
+        expect(src).toContain('text-content-emphasis');
+        expect(src).toContain('text-content-error');
+    });
+
+    it('uses semantic tokens for borders', () => {
+        expect(src).toContain('border-border-subtle');
+    });
+
+    it('does not use legacy btn CSS classes', () => {
+        expect(src).not.toMatch(/className="btn btn-/);
+    });
+
+    it('does not use legacy badge CSS classes', () => {
+        expect(src).not.toMatch(/className=\{`badge \$/);
+        expect(src).not.toMatch(/className="badge badge-/);
+    });
+});
+
+describe('Admin members page token migration', () => {
+    const src = read('app/t/[tenantSlug]/(app)/admin/members/page.tsx');
+
+    it('imports Button', () => {
+        expect(src).toContain("from '@/components/ui/button'");
+    });
+
+    it('imports StatusBadge and statusBadgeVariants', () => {
+        expect(src).toContain("from '@/components/ui/status-badge'");
+        expect(src).toContain('statusBadgeVariants');
+    });
+
+    it('imports EmptyState', () => {
+        expect(src).toContain("from '@/components/ui/empty-state'");
+    });
+
+    it('uses Button for primary actions', () => {
+        expect(src).toContain('<Button');
+        expect(src).toContain('variant="primary"');
+    });
+
+    it('uses StatusBadge for member status', () => {
+        expect(src).toContain('<StatusBadge');
+        expect(src).toContain('STATUS_VARIANT');
+    });
+
+    it('uses statusBadgeVariants for clickable role badges', () => {
+        expect(src).toContain('statusBadgeVariants({');
+    });
+
+    it('uses semantic tokens for alerts', () => {
+        expect(src).toContain('bg-bg-error');
+        expect(src).toContain('border-border-error');
+        expect(src).toContain('text-content-error');
+        expect(src).toContain('bg-bg-success');
+        expect(src).toContain('border-border-success');
+        expect(src).toContain('text-content-success');
+    });
+
+    it('uses semantic tokens for dropdown menu', () => {
+        expect(src).toContain('bg-bg-default');
+        expect(src).toContain('border-border-default');
+        expect(src).toContain('hover:bg-bg-muted');
+        expect(src).toContain('hover:bg-bg-error');
+    });
+
+    it('uses EmptyState for empty table', () => {
+        expect(src).toContain('<EmptyState');
+    });
+
+    it('does not use legacy btn CSS classes', () => {
+        expect(src).not.toMatch(/className="btn btn-/);
+    });
+
+    it('does not use legacy badge CSS classes', () => {
+        expect(src).not.toMatch(/className=\{`badge \$/);
+        expect(src).not.toMatch(/className="badge badge-/);
+    });
+});

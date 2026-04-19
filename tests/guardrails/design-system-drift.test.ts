@@ -1,0 +1,156 @@
+/**
+ * Guardrail: design system anti-drift.
+ *
+ * Prevents raw Tailwind color utilities from creeping back into pages
+ * that have been migrated to the semantic token system. Also detects
+ * duplicate button/badge component implementations.
+ *
+ * Two modes:
+ * 1. Migrated pages: strict — no raw slate/gray/neutral color classes allowed
+ * 2. All new pages: advisory — should use semantic tokens from the start
+ */
+import * as fs from 'fs';
+import * as path from 'path';
+
+const TENANT_ROUTES_DIR = path.resolve(__dirname, '../../src/app/t/[tenantSlug]/(app)');
+const COMPONENTS_DIR = path.resolve(__dirname, '../../src/components');
+
+/**
+ * Pages fully migrated to the design system in Epic 51.
+ * These pages must NOT regress to raw color utilities.
+ */
+const MIGRATED_PAGES = [
+    'dashboard/page.tsx',
+    'vendors/VendorsClient.tsx',
+    'risks/[riskId]/page.tsx',
+    'admin/members/page.tsx',
+];
+
+const RAW_COLOR_RE = /\b(?:text|bg|border)-(?:slate|gray|neutral|zinc)-\d{2,3}\b/g;
+
+const LEGACY_BTN_RE = /className="btn btn-/g;
+const LEGACY_BADGE_RE = /className="badge badge-|className=\{`badge \$/g;
+
+function readFile(...segments: string[]): string {
+    return fs.readFileSync(path.join(TENANT_ROUTES_DIR, ...segments), 'utf-8');
+}
+
+describe('Migrated page anti-drift', () => {
+    it.each(MIGRATED_PAGES)('%s uses no raw Tailwind color utilities', (rel) => {
+        const src = readFile(rel);
+        const lines = src.split('\n');
+        const violations: string[] = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (line.trim().startsWith('//') || line.trim().startsWith('*') || line.trim().startsWith('import')) continue;
+            // Data-viz segment colors (progress bars, charts) are intentional literal values
+            if (/color:\s*['"]bg-/.test(line)) continue;
+
+            for (const m of line.matchAll(RAW_COLOR_RE)) {
+                violations.push(`  Line ${i + 1}: "${m[0]}" — use semantic token instead`);
+            }
+        }
+
+        expect(violations).toEqual([]);
+    });
+
+    it.each(MIGRATED_PAGES)('%s uses no legacy .btn CSS classes', (rel) => {
+        const src = readFile(rel);
+        expect(src).not.toMatch(LEGACY_BTN_RE);
+    });
+
+    it.each(MIGRATED_PAGES)('%s uses no legacy .badge CSS classes', (rel) => {
+        const src = readFile(rel);
+        expect(src).not.toMatch(LEGACY_BADGE_RE);
+    });
+});
+
+describe('Duplicate implementation detector', () => {
+    function findComponentFiles(dir: string, acc: string[] = []): string[] {
+        if (!fs.existsSync(dir)) return acc;
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) findComponentFiles(full, acc);
+            else if (entry.name.endsWith('.tsx')) acc.push(full);
+        }
+        return acc;
+    }
+
+    const componentFiles = findComponentFiles(COMPONENTS_DIR);
+
+    it('only one Button component exists (src/components/ui/button.tsx)', () => {
+        const buttonFiles = componentFiles.filter(f => {
+            const base = path.basename(f).toLowerCase();
+            return (base === 'button.tsx' || base === 'btn.tsx' || base === 'appbutton.tsx')
+                && !f.includes('node_modules');
+        });
+        const rel = buttonFiles.map(f => path.relative(COMPONENTS_DIR, f).replace(/\\/g, '/'));
+        expect(rel).toEqual(['ui/button.tsx']);
+    });
+
+    it('only one StatusBadge component exists (src/components/ui/status-badge.tsx)', () => {
+        const badgeFiles = componentFiles.filter(f => {
+            const base = path.basename(f).toLowerCase();
+            return (base === 'status-badge.tsx' || base === 'statusbadge.tsx')
+                && !f.includes('node_modules');
+        });
+        const rel = badgeFiles.map(f => path.relative(COMPONENTS_DIR, f).replace(/\\/g, '/'));
+        expect(rel).toEqual(['ui/status-badge.tsx']);
+    });
+
+    it('only one EmptyState component exists (src/components/ui/empty-state.tsx)', () => {
+        const emptyFiles = componentFiles.filter(f => {
+            const base = path.basename(f).toLowerCase();
+            return (base === 'empty-state.tsx' || base === 'emptystate.tsx')
+                && !f.includes('node_modules');
+        });
+        const rel = emptyFiles.map(f => path.relative(COMPONENTS_DIR, f).replace(/\\/g, '/'));
+        expect(rel).toEqual(['ui/empty-state.tsx']);
+    });
+
+    it('no parallel CVA button definitions outside ui/button.tsx', () => {
+        const violations: string[] = [];
+        for (const f of componentFiles) {
+            if (f.endsWith('button.tsx') && f.includes(path.join('ui', 'button.tsx'))) continue;
+            const content = fs.readFileSync(f, 'utf-8');
+            if (/\bcva\b.*variant/.test(content) && /button/i.test(path.basename(f))) {
+                violations.push(path.relative(COMPONENTS_DIR, f).replace(/\\/g, '/'));
+            }
+        }
+        expect(violations).toEqual([]);
+    });
+});
+
+describe('New page token discipline', () => {
+    function findPageFiles(dir: string, acc: string[] = []): string[] {
+        if (!fs.existsSync(dir)) return acc;
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const full = path.join(dir, entry.name);
+            if (entry.isDirectory()) findPageFiles(full, acc);
+            else if (entry.name === 'page.tsx' || entry.name.endsWith('Client.tsx') || entry.name.endsWith('Browser.tsx')) {
+                acc.push(full);
+            }
+        }
+        return acc;
+    }
+
+    const allPages = findPageFiles(TENANT_ROUTES_DIR);
+    const migratedSet = new Set(MIGRATED_PAGES);
+
+    const unmigrated = allPages.filter(f => {
+        const rel = path.relative(TENANT_ROUTES_DIR, f).replace(/\\/g, '/');
+        return !migratedSet.has(rel);
+    });
+
+    it('tracks unmigrated page count (should decrease over time)', () => {
+        expect(unmigrated.length).toBeLessThanOrEqual(85);
+    });
+
+    it('migrated page count is at least 4', () => {
+        const existing = MIGRATED_PAGES.filter(rel => {
+            try { readFile(rel); return true; } catch { return false; }
+        });
+        expect(existing.length).toBeGreaterThanOrEqual(4);
+    });
+});
