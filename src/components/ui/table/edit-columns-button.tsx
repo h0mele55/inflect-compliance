@@ -1,0 +1,163 @@
+"use client";
+
+/**
+ * EditColumnsButton — popover UI for toggling column visibility.
+ *
+ * Features:
+ * - Lists all hideable columns with toggle checkboxes
+ * - "Reset to defaults" action
+ * - Keyboard-navigable via cmdk
+ * - Respects `enableHiding: false` on columns
+ * - Shows column header text or falls back to column ID
+ *
+ * Usage:
+ *   <EditColumnsButton table={table} />
+ *   <EditColumnsButton table={table} onReset={() => setVisibility(defaults)} />
+ */
+
+import { cn } from "./table-utils";
+import { Table } from "@tanstack/react-table";
+import { Command } from "cmdk";
+import { RotateCcw, Settings } from "lucide-react";
+import { useState } from "react";
+import { Button } from "../button";
+import { Popover } from "../popover";
+import { ScrollContainer } from "../scroll-container";
+
+// ── Types ───────────────────────────────────────────────────────────
+
+export interface EditColumnsButtonProps<T> {
+  /** The TanStack table instance. */
+  table: Table<T>;
+
+  /** Callback to reset column visibility to defaults. */
+  onReset?: () => void;
+
+  /** Optional className for the trigger button. */
+  className?: string;
+
+  /** Optional tooltip text for the trigger. */
+  title?: string;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Extract a human-readable label from a column definition.
+ * Prefers the `header` property if it's a string, falls back to the column ID.
+ */
+function getColumnLabel(column: { id: string; columnDef: { header?: unknown } }): string {
+  const header = column.columnDef.header;
+  if (typeof header === "string" && header.length > 0) return header;
+  // Capitalize & humanize the column ID as fallback
+  return column.id
+    .replace(/([A-Z])/g, " $1")
+    .replace(/[_-]/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase())
+    .trim();
+}
+
+// ── Component ───────────────────────────────────────────────────────
+
+export function EditColumnsButton<T>({
+  table,
+  onReset,
+  className,
+  title = "Edit columns",
+}: EditColumnsButtonProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const hideableColumns = table.getAllColumns().filter((c) => c.getCanHide());
+  const allVisible = hideableColumns.every((c) => c.getIsVisible());
+  const someHidden = hideableColumns.some((c) => !c.getIsVisible());
+
+  return (
+    <Popover
+      openPopover={isOpen}
+      setOpenPopover={setIsOpen}
+      content={
+        <ScrollContainer className="max-h-[50vh]">
+          <Command tabIndex={0} loop>
+            <Command.List className="flex w-screen flex-col gap-0.5 p-1 text-sm focus-visible:outline-none sm:w-auto sm:min-w-[180px]">
+              {hideableColumns.map((column) => (
+                <Command.Item
+                  key={column.id}
+                  className={cn(
+                    "flex cursor-pointer select-none items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-1.5",
+                    "text-slate-300 hover:text-slate-100",
+                    "data-[selected=true]:bg-slate-700",
+                  )}
+                  onSelect={() => column.toggleVisibility()}
+                  data-testid={`column-toggle-${column.id}`}
+                >
+                  <div
+                    className={cn(
+                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                      column.getIsVisible()
+                        ? "border-brand-500 bg-brand-600 text-white"
+                        : "border-slate-500 bg-transparent",
+                    )}
+                  >
+                    {column.getIsVisible() && (
+                      <svg
+                        className="h-3 w-3"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="truncate">{getColumnLabel(column)}</span>
+                </Command.Item>
+              ))}
+
+              {/* Reset to defaults */}
+              {onReset && someHidden && (
+                <>
+                  <div className="bg-slate-700/50 my-1 h-px" />
+                  <Command.Item
+                    className={cn(
+                      "flex cursor-pointer select-none items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-1.5",
+                      "text-slate-400 hover:text-slate-200",
+                      "data-[selected=true]:bg-slate-700",
+                    )}
+                    onSelect={() => {
+                      onReset();
+                      setIsOpen(false);
+                    }}
+                    data-testid="column-reset"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+                    <span>Reset to defaults</span>
+                  </Command.Item>
+                </>
+              )}
+            </Command.List>
+          </Command>
+        </ScrollContainer>
+      }
+      align="end"
+    >
+      <Button
+        type="button"
+        className={cn(
+          "size-8 shrink-0 whitespace-nowrap rounded-lg p-0",
+          someHidden && "ring-brand-500/30 ring-1",
+          className,
+        )}
+        variant="outline"
+        icon={<Settings className="h-4 w-4 shrink-0" />}
+        title={title}
+        aria-label={title}
+        data-testid="edit-columns-button"
+      />
+    </Popover>
+  );
+}
