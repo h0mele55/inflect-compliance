@@ -88,17 +88,45 @@ export async function loginAndGetTenant(
         return form && Object.keys(form).some(k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber'));
     }, { timeout: 30000 });
 
-    await emailInput.click();
-    await emailInput.fill(user.email);
-    
-    await page.locator('input[type="password"]').fill(user.password);
-    await page.locator('button[type="submit"]').click();
-    
-    await page.waitForURL(/\/t\/[^/]+\/dashboard/, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(async (e) => {
-        console.error("LOGIN TIMEOUT! URL is:", page.url());
+    // Retry loop: MissingCSRF can occur transiently when the dev server is
+    // compiling routes — the request body stream drains before NextAuth reads it.
+    // Retrying the full login flow resolves it once compilation finishes.
+    const LOGIN_ATTEMPTS = 3;
+    for (let attempt = 1; attempt <= LOGIN_ATTEMPTS; attempt++) {
+        if (attempt > 1) {
+            await safeGoto(page, '/login', { timeout: 60_000 });
+            await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
+            await page.waitForFunction(() => {
+                const form = document.querySelector('form');
+                return form && Object.keys(form).some(k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber'));
+            }, { timeout: 15000 });
+        }
+
+        await emailInput.click();
+        await emailInput.fill(user.email);
+        await page.locator('input[type="password"]').fill(user.password);
+        await page.locator('button[type="submit"]').click();
+
+        const navigated = await page.waitForURL(/\/t\/[^/]+\/dashboard/, { waitUntil: 'domcontentloaded', timeout: 30000 })
+            .then(() => true)
+            .catch(() => false);
+
+        if (navigated) break;
+
+        // Still on /login after submit? Retry — CSRF failures can manifest as
+        // visible "MissingCSRF" text, a URL error param, or a silent redirect back.
+        const url = page.url();
+        if (attempt < LOGIN_ATTEMPTS && url.includes('/login')) {
+            console.warn(`[loginAndGetTenant] Login failed on attempt ${attempt} (URL: ${url}), retrying...`);
+            await page.waitForTimeout(3000);
+            continue;
+        }
+
+        // Final attempt — fail with diagnostics
+        console.error("LOGIN TIMEOUT! URL is:", url);
         console.error("PAGE CONTENT:", await page.content());
-        throw e;
-    });
+        throw new Error(`Login failed after ${attempt} attempts. URL: ${url}`);
+    }
     const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
     if (!match) throw new Error('Could not extract tenant slug from ' + page.url());
     const slug = match[1];
