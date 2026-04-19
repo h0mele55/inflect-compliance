@@ -1,0 +1,163 @@
+/*
+ * Design Token Foundation — Inflect Compliance
+ *
+ * Semantic CSS custom properties that all components target instead of
+ * raw Tailwind color utilities. The Tailwind config maps these tokens
+ * to utility classes like bg-bg-default, text-content-emphasis, etc.
+ *
+ * Current theme: dark (Inflect glassmorphism). Light mode values are
+ * stubbed under [data-theme="light"] for future activation — they are
+ * NOT shipped to the UI yet.
+ *
+ * Palette origin: Tailwind Slate + Indigo (brand).
+ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   DARK THEME (default)
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Surfaces ──────────────────────────────────────────────────── */
+  --bg-page:      #0f172a;                  /* slate-900  — app/page background, deepest layer */
+  --bg-default:   #1e293b;                  /* slate-800  — cards, panels, tables, modals, popovers */
+  --bg-muted:     #253447;                  /* ~slate-750 — hover surfaces, pressed/active states */
+  --bg-subtle:    rgba(51, 65, 85, 0.30);   /* slate-700 @ 30% — selection bg, disabled surfaces, faint tints */
+  --bg-elevated:  #334155;                  /* slate-700  — tooltips, dropdowns sitting above default */
+  --bg-inverted:  #f1f5f9;                  /* slate-100  — inverted surface (primary button bg) */
+  --bg-overlay:   rgba(0, 0, 0, 0.60);      /* backdrop behind modals/drawers */
+
+  /* ── Content / Text ────────────────────────────────────────────── */
+  --content-emphasis: #f1f5f9;   /* slate-100 — headings, selected items, bold labels */
+  --content-default:  #cbd5e1;   /* slate-300 — body text, table cells, default content */
+  --content-muted:    #94a3b8;   /* slate-400 — secondary text, placeholders, captions */
+  --content-subtle:   #64748b;   /* slate-500 — disabled text, hints, tertiary info */
+  --content-inverted: #0f172a;   /* slate-900 — text on inverted/light surfaces */
+
+  /* ── Borders / Dividers ────────────────────────────────────────── */
+  --border-default:  #334155;               /* slate-700 — standard borders */
+  --border-subtle:   rgba(51, 65, 85, 0.50); /* slate-700 @ 50% — soft dividers, card edges */
+  --border-emphasis: #475569;               /* slate-600 — focused inputs, emphasized outlines */
+
+  /* ── Brand / Primary ───────────────────────────────────────────── */
+  --brand-default:  #6366f1;                /* indigo-500 — brand accent, links */
+  --brand-emphasis: #4f46e5;                /* indigo-600 — primary buttons, active brand */
+  --brand-muted:    #818cf8;                /* indigo-400 — hover accent, lighter brand */
+  --brand-subtle:   rgba(99, 102, 241, 0.20); /* indigo-500 @ 20% — brand tint backgrounds */
+
+  /* ── Status: Success ───────────────────────────────────────────── */
+  --bg-success:      rgba(16, 185, 129, 0.15);  /* emerald-500 @ 15% */
+  --content-success: #34d399;                    /* emerald-400 */
+  --border-success:  rgba(16, 185, 129, 0.30);  /* emerald-500 @ 30% */
+
+  /* ── Status: Warning ───────────────────────────────────────────── */
+  --bg-warning:      rgba(245, 158, 11, 0.15);  /* amber-500 @ 15% */
+  --content-warning: #fbbf24;                    /* amber-400 */
+  --border-warning:  rgba(245, 158, 11, 0.30);  /* amber-500 @ 30% */
+
+  /* ── Status: Error / Danger ────────────────────────────────────── */
+  --bg-error:      rgba(239, 68, 68, 0.15);     /* red-500 @ 15% */
+  --content-error: #f87171;                      /* red-400 */
+  --border-error:  rgba(239, 68, 68, 0.30);      /* red-500 @ 30% */
+
+  /* ── Status: Info ──────────────────────────────────────────────── */
+  --bg-info:      rgba(59, 130, 246, 0.15);      /* blue-500 @ 15% */
+  --content-info: #60a5fa;                       /* blue-400 */
+  --border-info:  rgba(59, 130, 246, 0.30);      /* blue-500 @ 30% */
+
+  /* ── Status: Attention (pending / needs-action) ────────────────── */
+  --bg-attention:      rgba(251, 191, 36, 0.15); /* amber-400 @ 15% */
+  --content-attention: #fbbf24;                  /* amber-400 */
+  --border-attention:  rgba(251, 191, 36, 0.30); /* amber-400 @ 30% */
+
+  /* ── Interactive / Focus ───────────────────────────────────────── */
+  --ring-default: rgba(99, 102, 241, 0.50);  /* brand focus ring */
+  --focus-ring:   rgba(99, 102, 241, 0.50);  /* alias for components that use a different name */
+
+  /* shadcn / Radix compatibility tokens */
+  --ring:                   rgba(99, 102, 241, 0.50);
+  --ring-offset-background: #0f172a;
+  --primary:                #6366f1;
+
+  /* ── Glass ─────────────────────────────────────────────────────── */
+  --glass-bg:     rgba(30, 41, 59, 0.80);    /* glass-card background */
+  --glass-border: rgba(51, 65, 85, 0.50);    /* glass-card border */
+  --glass-blur:   12px;                      /* backdrop blur radius */
+
+  /* ── Radius ────────────────────────────────────────────────────── */
+  --radius-sm:   6px;
+  --radius:      8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-full: 9999px;
+
+  /* ── Shadows ───────────────────────────────────────────────────── */
+  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow:     0 4px 12px rgba(0, 0, 0, 0.40);
+  --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.50);
+
+  /* ── Transitions ───────────────────────────────────────────────── */
+  --duration-fast:    100ms;
+  --duration-default: 150ms;
+  --duration-slow:    300ms;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   LIGHT THEME (future — activate via data-theme="light" on <html>)
+   Only surfaces, content, borders, and status colors change.
+   Brand, radius, shadow, and transitions stay the same.
+   ═══════════════════════════════════════════════════════════════════ */
+[data-theme="light"] {
+  /* Surfaces */
+  --bg-page:      #f8fafc;                  /* slate-50 */
+  --bg-default:   #ffffff;                  /* white */
+  --bg-muted:     #f1f5f9;                  /* slate-100 */
+  --bg-subtle:    rgba(148, 163, 184, 0.10); /* slate-400 @ 10% */
+  --bg-elevated:  #ffffff;                  /* white */
+  --bg-inverted:  #0f172a;                  /* slate-900 */
+  --bg-overlay:   rgba(15, 23, 42, 0.40);   /* slate-900 @ 40% */
+
+  /* Content */
+  --content-emphasis: #0f172a;   /* slate-900 */
+  --content-default:  #334155;   /* slate-700 */
+  --content-muted:    #64748b;   /* slate-500 */
+  --content-subtle:   #94a3b8;   /* slate-400 */
+  --content-inverted: #f1f5f9;   /* slate-100 */
+
+  /* Borders */
+  --border-default:  #e2e8f0;               /* slate-200 */
+  --border-subtle:   rgba(226, 232, 240, 0.60); /* slate-200 @ 60% */
+  --border-emphasis: #cbd5e1;               /* slate-300 */
+
+  /* Status — brighter backgrounds, darker text for light bg */
+  --bg-success:      rgba(16, 185, 129, 0.10);
+  --content-success: #059669;               /* emerald-600 */
+  --border-success:  rgba(16, 185, 129, 0.25);
+
+  --bg-warning:      rgba(245, 158, 11, 0.10);
+  --content-warning: #d97706;               /* amber-600 */
+  --border-warning:  rgba(245, 158, 11, 0.25);
+
+  --bg-error:      rgba(239, 68, 68, 0.10);
+  --content-error: #dc2626;                 /* red-600 */
+  --border-error:  rgba(239, 68, 68, 0.25);
+
+  --bg-info:      rgba(59, 130, 246, 0.10);
+  --content-info: #2563eb;                  /* blue-600 */
+  --border-info:  rgba(59, 130, 246, 0.25);
+
+  --bg-attention:      rgba(251, 191, 36, 0.10);
+  --content-attention: #d97706;             /* amber-600 */
+  --border-attention:  rgba(251, 191, 36, 0.25);
+
+  /* Interactive */
+  --ring-offset-background: #ffffff;
+
+  /* Glass (light variant) */
+  --glass-bg:     rgba(255, 255, 255, 0.80);
+  --glass-border: rgba(226, 232, 240, 0.60);
+
+  /* Shadows — lighter in light mode */
+  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow:     0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.12);
+}
