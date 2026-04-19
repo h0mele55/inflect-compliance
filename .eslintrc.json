@@ -8,13 +8,36 @@
     "@typescript-eslint/ban-ts-comment": ["warn", {
       "ts-ignore": "allow-with-description",
       "ts-expect-error": "allow-with-description"
+    }],
+    "no-restricted-imports": ["warn", {
+      "patterns": [{
+        "group": ["@/components/ui/table/*"],
+        "message": "Import from '@/components/ui/table' (barrel) instead of deep sub-modules."
+      }]
     }]
   },
   "overrides": [
     {
       "files": ["tests/**/*", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts"],
       "rules": {
-        "@typescript-eslint/no-explicit-any": "warn"
+        "@typescript-eslint/no-explicit-any": "warn",
+        "no-restricted-imports": "off"
+      }
+    },
+    {
+      "files": ["src/app/**/*(Client).tsx"],
+      "rules": {
+        "no-restricted-imports": ["warn", {
+          "paths": [{
+            "name": "@/components/ui/skeleton",
+            "importNames": ["SkeletonTableRow", "SkeletonDataTable"],
+            "message": "Use DataTable's `loading` prop instead of SkeletonTableRow. See src/components/ui/table/GUIDE.md"
+          }],
+          "patterns": [{
+            "group": ["@/components/ui/table/*"],
+            "message": "Import from '@/components/ui/table' (barrel) instead of deep sub-modules."
+          }]
+        }]
       }
     }
   ]

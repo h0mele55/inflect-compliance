@@ -79,6 +79,12 @@ export function SkeletonDetailPage() {
 
 // ─── Composites ───
 
+/**
+ * @deprecated Use `<DataTable loading />` instead.
+ * This component is only retained for backward compatibility with detail-page
+ * sub-tables that have not yet been migrated. Do NOT use in new code.
+ * See: src/components/ui/table/GUIDE.md
+ */
 export function SkeletonTableRow({ cols = 8 }: { cols?: number }) {
     return (
         <tr>
@@ -134,6 +140,12 @@ export function SkeletonFilterBar() {
     );
 }
 
+/**
+ * @deprecated Use `<DataTable loading />` instead.
+ * This component is only retained for backward compatibility with detail-page
+ * sub-tables that have not yet been migrated. Do NOT use in new code.
+ * See: src/components/ui/table/GUIDE.md
+ */
 export function SkeletonDataTable({ rows = 8, cols = 8 }: { rows?: number; cols?: number }) {
     return (
         <div className="glass-card overflow-hidden">
