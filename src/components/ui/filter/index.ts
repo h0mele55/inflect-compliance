@@ -1,0 +1,69 @@
+/**
+ * Filter module — enterprise-grade, reusable filter system.
+ *
+ * Public API:
+ *   Filter.Select  — the command-palette filter picker
+ *   Filter.List    — active filter pills with remove/operator controls
+ *
+ * State management:
+ *   useFilterContext / FilterProvider / useFilters
+ *
+ * Definitions:
+ *   createFilterDefs / optionsFromEnum / optionsFromArray
+ *
+ * Pure state functions:
+ *   parseUrlToFilterState / filterStateToUrlParams / etc.
+ */
+
+import { FilterList } from "./filter-list";
+import { FilterSelect } from "./filter-select";
+
+const Filter = { Select: FilterSelect, List: FilterList };
+
+// ── Components ──
+export { Filter };
+
+// ── Types ──
+export type {
+  ActiveFilter,
+  ActiveFilterInput,
+  Filter as FilterType,
+  FilterOption,
+  FilterOperator,
+} from "./types";
+export { encodeRangeToken, normalizeActiveFilter, parseRangeToken } from "./types";
+
+// ── State Management ──
+export type { FilterState, FilterUrlConfig } from "./filter-state";
+export {
+  activeFiltersToFilterState,
+  addFilterValue,
+  clearAllFilters,
+  countActiveFilterKeys,
+  countActiveFilters,
+  extractFilterOptions,
+  filterStateToActiveFilters,
+  filterStateToUrlParams,
+  fromCompactFilterState,
+  hasActiveFilters,
+  isFilterActive,
+  isValueSelected,
+  parseUrlToFilterState,
+  removeFilter,
+  removeFilterValue,
+  setFilterValue,
+  toCompactFilterState,
+  toggleFilterValue,
+} from "./filter-state";
+
+// ── Definitions ──
+export type { FilterDef, FilterDefInput } from "./filter-definitions";
+export {
+  createFilterDefs,
+  optionsFromArray,
+  optionsFromEnum,
+} from "./filter-definitions";
+
+// ── Context & Hooks ──
+export type { FilterContextValue, UseFilterContextOptions } from "./filter-context";
+export { FilterProvider, useFilterContext, useFilters } from "./filter-context";
