@@ -25,6 +25,12 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@dub/utils": [
+        "./src/lib/dub-utils"
+      ],
+      "@dub/utils/*": [
+        "./src/lib/dub-utils/*"
       ]
     },
     "baseUrl": "."
@@ -39,6 +45,7 @@
   "exclude": [
     "node_modules",
     "scripts",
-    "prisma/seed.ts"
+    "prisma/seed.ts",
+    "dub-reference"
   ]
 }

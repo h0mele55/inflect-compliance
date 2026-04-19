@@ -10,7 +10,7 @@ module.exports = {
         '^@/(.*)$': '<rootDir>/src/$1',
     },
     testMatch: ['**/*.test.ts', '**/*.test.js'],
-    testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/', '<rootDir>/tests/e2e/'],
+    testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/', '<rootDir>/tests/e2e/', '<rootDir>/dub-reference/'],
 
     // ── Coverage ──
     collectCoverageFrom: [

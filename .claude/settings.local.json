@@ -1,7 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls -la /d/git/inflect-compliance/inflect-compliance/.env*)"
+      "Bash(ls -la /d/git/inflect-compliance/inflect-compliance/.env*)",
+      "Bash(npx tsc *)",
+      "Bash(npx jest *)",
+      "Bash(git status *)",
+      "Bash(npx next *)",
+      "Bash(node -e ' *)",
+      "Bash(awk -F- '{print $NF}')",
+      "Bash(npm run *)",
+      "Bash(grep *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s http://localhost:3000/login)",
+      "Bash(curl -s http://localhost:3000/_next/static/css/app/layout.css)",
+      "Bash(curl *)",
+      "mcp__MCP_DOCKER__browser_navigate",
+      "mcp__MCP_DOCKER__browser_take_screenshot",
+      "mcp__MCP_DOCKER__browser_console_messages",
+      "Bash(npx playwright *)",
+      "Bash(wc *)"
     ]
   }
 }

@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Reference repos (porting source — not part of the project)
+dub-reference/
+
 # Next.js
 .next/
 .next-test/
