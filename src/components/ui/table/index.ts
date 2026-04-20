@@ -1,4 +1,5 @@
 export * from "./column-visibility-utils";
+export * from "./columns-dropdown";
 export * from "./data-table";
 export * from "./edit-columns-button";
 export * from "./pagination-controls";
@@ -8,4 +9,5 @@ export * from "./table";
 export * from "./table-empty-state";
 export * from "./table-utils";
 export * from "./types";
+export * from "./use-list-pagination";
 export * from "./use-table-pagination";

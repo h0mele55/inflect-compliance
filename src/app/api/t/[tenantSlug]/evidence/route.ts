@@ -11,6 +11,7 @@ const EvidenceQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
     cursor: z.string().optional(),
     type: z.string().optional(),
+    status: z.enum(['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED']).optional(),
     controlId: z.string().optional(),
     q: z.string().optional().transform(normalizeQ),
     archived: z.enum(['true', 'false']).optional(),
@@ -30,6 +31,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     const filters = {
         type: query.type,
+        status: query.status,
         controlId: query.controlId,
         q: query.q,
         archived: query.archived === 'true' ? true : query.archived === 'false' ? false : undefined,

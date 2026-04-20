@@ -18,7 +18,11 @@ test.describe('Controls Center', () => {
         await expect(page.locator('#new-control-btn')).toBeVisible({ timeout: 5000 });
         await expect(page.locator('#install-templates-btn')).toBeVisible();
         await expect(page.locator('#control-search')).toBeVisible();
-        await expect(page.locator('#control-status-filter')).toBeVisible();
+        // Epic 53: the per-field `#control-status-filter` dropdown has been
+        // replaced by the consolidated FilterSelect picker. Assert the picker
+        // trigger is visible (the shared primitive renders a `ListFilter`
+        // icon + the "Filter" label).
+        await expect(page.getByRole('button', { name: /filter/i }).first()).toBeVisible();
     });
 
     test('create a new control and see detail', async ({ page }) => {

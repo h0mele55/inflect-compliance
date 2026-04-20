@@ -87,7 +87,7 @@ export function FilterList({
                     key={`loader-${values?.[0] ?? 0}`}
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="h-9 w-48 animate-pulse rounded-md border border-neutral-200 bg-white"
+                    className="h-9 w-48 animate-pulse rounded-md border border-border-default bg-bg-muted"
                   />
                 );
               }
@@ -148,7 +148,7 @@ export function FilterList({
                     filter.icon;
 
                   iconDisplay = (
-                    <span className="shrink-0 text-neutral-600">
+                    <span className="shrink-0 text-content-muted">
                       {isReactNode(OptionIcon) ? (
                         OptionIcon
                       ) : (
@@ -178,7 +178,7 @@ export function FilterList({
                         return (
                           <span
                             key={idx}
-                            className="inline-flex text-neutral-600"
+                            className="inline-flex text-content-muted"
                             style={{ zIndex: displayValues.length - idx }}
                           >
                             {isReactNode(OptionIcon) ? (
@@ -193,7 +193,7 @@ export function FilterList({
                   );
                 } else {
                   iconDisplay = (
-                    <span className="shrink-0 text-neutral-600">
+                    <span className="shrink-0 text-content-muted">
                       {isReactNode(filter.icon) ? (
                         filter.icon
                       ) : (
@@ -248,16 +248,16 @@ export function FilterList({
           <button
             type="button"
             className={cn(
-              "group mt-px flex h-[38px] items-center gap-2 whitespace-nowrap rounded-lg border border-transparent px-3 py-2 text-sm text-neutral-500 ring-inset ring-neutral-500",
+              "group mt-px flex h-[38px] items-center gap-2 whitespace-nowrap rounded-lg border border-transparent px-3 py-2 text-sm text-content-muted",
               "transition-[color,border-color,background-color,transform] duration-150 ease-out motion-reduce:transition-none",
-              "hover:border-neutral-200 hover:bg-white hover:text-black [@media(hover:none)]:hover:border-transparent [@media(hover:none)]:hover:bg-transparent",
+              "hover:border-border-default hover:bg-bg-muted hover:text-content-emphasis [@media(hover:none)]:hover:border-transparent [@media(hover:none)]:hover:bg-transparent",
               "active:scale-[0.98] motion-reduce:active:scale-100",
               "focus:outline-none",
             )}
             onClick={onRemoveAll}
           >
             Clear Filters
-            <kbd className="rounded-md border border-neutral-200 px-1.5 py-0.5 text-xs text-neutral-950 group-hover:bg-neutral-50">
+            <kbd className="rounded-md border border-border-default px-1.5 py-0.5 text-xs text-content-emphasis group-hover:bg-bg-muted">
               ESC
             </kbd>
           </button>
@@ -341,10 +341,10 @@ function OperatorFilterPill({
       <motion.div
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex min-h-9 items-stretch divide-x divide-neutral-200 overflow-hidden rounded-md border border-neutral-200 bg-white text-sm text-black"
+        className="flex min-h-9 items-stretch divide-x divide-border-default overflow-hidden rounded-md border border-border-default bg-bg-default text-sm text-content-emphasis"
       >
         <div className="flex items-center gap-2.5 px-3 py-2">
-          <span className="shrink-0 text-neutral-500">
+          <span className="shrink-0 text-content-muted">
             {isReactNode(filter.icon) ? (
               filter.icon
             ) : (
@@ -352,12 +352,12 @@ function OperatorFilterPill({
             )}
           </span>
 
-          <span className="text-sm font-medium text-neutral-900">
+          <span className="text-sm font-medium text-content-emphasis">
             {filter.label}
           </span>
         </div>
 
-        <div className="flex items-center px-3 py-2 text-sm text-neutral-500">
+        <div className="flex items-center px-3 py-2 text-sm text-content-muted">
           is
         </div>
 
@@ -407,9 +407,9 @@ function OperatorFilterPill({
           <button
             type="button"
             className={cn(
-              "flex min-w-0 flex-1 items-center px-3 py-2 text-left text-sm font-medium tracking-tight text-neutral-900",
+              "flex min-w-0 flex-1 items-center px-3 py-2 text-left text-sm font-medium tracking-tight text-content-emphasis",
               "transition-[background-color,transform] duration-150 ease-out motion-reduce:transition-none",
-              "hover:bg-neutral-50 active:scale-[0.99] motion-reduce:active:scale-100 [@media(hover:none)]:hover:bg-transparent",
+              "hover:bg-bg-muted active:scale-[0.99] motion-reduce:active:scale-100 [@media(hover:none)]:hover:bg-transparent",
             )}
           >
             <span className="truncate">{rangeLabel}</span>
@@ -419,9 +419,9 @@ function OperatorFilterPill({
         <button
           type="button"
           className={cn(
-            "h-full rounded-r-md p-2 text-neutral-500 ring-inset ring-neutral-500",
+            "h-full rounded-r-md p-2 text-content-muted ring-inset ring-border-emphasis",
             "transition-[color,background-color,transform] duration-150 ease-out motion-reduce:transition-none",
-            "hover:bg-neutral-100 hover:text-neutral-800 [@media(hover:none)]:hover:bg-transparent",
+            "hover:bg-bg-muted hover:text-content-emphasis [@media(hover:none)]:hover:bg-transparent",
             "active:scale-[0.97] motion-reduce:active:scale-100",
             "focus:outline-none focus-visible:ring-1",
           )}
@@ -443,10 +443,10 @@ function OperatorFilterPill({
     <motion.div
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      className="flex items-center divide-x rounded-lg border border-neutral-200 bg-white text-sm text-black"
+      className="flex items-center divide-x divide-border-default rounded-lg border border-border-default bg-bg-default text-sm text-content-emphasis"
     >
       <div className="flex items-center gap-2.5 px-3 py-2">
-        <span className="shrink-0 text-neutral-600">
+        <span className="shrink-0 text-content-muted">
           {isReactNode(filter.icon) ? (
             filter.icon
           ) : (
@@ -469,9 +469,9 @@ function OperatorFilterPill({
                 className={cn(
                   "flex w-full items-center rounded-md px-3 py-2 text-left text-sm",
                   "transition-[background-color,transform] duration-100 ease-out motion-reduce:transition-none",
-                  "hover:bg-neutral-100 [@media(hover:none)]:hover:bg-transparent",
+                  "hover:bg-bg-muted [@media(hover:none)]:hover:bg-transparent",
                   "active:scale-[0.99] motion-reduce:active:scale-100",
-                  !operator.includes("NOT") && "bg-neutral-50",
+                  !operator.includes("NOT") && "bg-bg-subtle",
                 )}
                 onClick={() => {
                   if (operator.includes("NOT")) {
@@ -487,9 +487,9 @@ function OperatorFilterPill({
                 className={cn(
                   "flex w-full items-center rounded-md px-3 py-2 text-left text-sm",
                   "transition-[background-color,transform] duration-100 ease-out motion-reduce:transition-none",
-                  "hover:bg-neutral-100 [@media(hover:none)]:hover:bg-transparent",
+                  "hover:bg-bg-muted [@media(hover:none)]:hover:bg-transparent",
                   "active:scale-[0.99] motion-reduce:active:scale-100",
-                  operator.includes("NOT") && "bg-neutral-50",
+                  operator.includes("NOT") && "bg-bg-subtle",
                 )}
                 onClick={() => {
                   if (!operator.includes("NOT")) {
@@ -507,9 +507,9 @@ function OperatorFilterPill({
           <button
             type="button"
             className={cn(
-              "px-3 py-2 text-neutral-500",
+              "px-3 py-2 text-content-muted",
               "transition-[color,background-color,transform] duration-150 ease-out motion-reduce:transition-none",
-              "hover:bg-neutral-50 hover:text-neutral-700 [@media(hover:none)]:hover:bg-transparent",
+              "hover:bg-bg-muted hover:text-content-default [@media(hover:none)]:hover:bg-transparent",
               "active:scale-[0.98] motion-reduce:active:scale-100",
             )}
           >
@@ -517,7 +517,7 @@ function OperatorFilterPill({
           </button>
         </Popover>
       ) : (
-        <div className="px-3 py-2 text-neutral-500">is</div>
+        <div className="px-3 py-2 text-content-muted">is</div>
       )}
 
       <Popover
@@ -533,12 +533,12 @@ function OperatorFilterPill({
           <div>
             <AnimatedSizeContainer width height className="rounded-[inherit]">
               <Command loop shouldFilter={false}>
-                <div className="flex items-center overflow-hidden rounded-t-lg border-b border-neutral-200">
+                <div className="flex items-center overflow-hidden rounded-t-lg border-b border-border-default">
                   <Command.Input
                     placeholder={`${filter.label}...`}
                     value={search}
                     onValueChange={setSearch}
-                    className="grow border-0 py-3 pl-4 pr-2 outline-none placeholder:text-neutral-400 focus:ring-0 sm:text-sm"
+                    className="grow border-0 py-3 pl-4 pr-2 outline-none placeholder:text-content-subtle focus:ring-0 sm:text-sm bg-transparent text-content-emphasis"
                     autoCapitalize="none"
                   />
                 </div>
@@ -591,7 +591,8 @@ function OperatorFilterPill({
                               "flex cursor-pointer items-center gap-3 whitespace-nowrap rounded-md px-3 py-2 text-left text-sm",
                               "transition-[background-color] duration-100 ease-out motion-reduce:transition-none",
                               "active:scale-[0.99] motion-reduce:active:scale-100",
-                              "data-[selected=true]:bg-neutral-100",
+                              "text-content-default",
+                              "data-[selected=true]:bg-bg-muted data-[selected=true]:text-content-emphasis",
                             )}
                             onSelect={() => {
                               toggleValue(option.value);
@@ -607,16 +608,16 @@ function OperatorFilterPill({
                                   className={cn(
                                     "flex h-4 w-4 items-center justify-center rounded border",
                                     isSelected
-                                      ? "border-neutral-900 bg-neutral-900"
-                                      : "border-neutral-300",
+                                      ? "border-brand-emphasis bg-brand-emphasis"
+                                      : "border-border-default",
                                   )}
                                 >
                                   {isSelected && (
-                                    <Check className="h-3 w-3 text-white" />
+                                    <Check className="h-3 w-3 text-content-inverted" />
                                   )}
                                 </div>
                               )}
-                            <span className="shrink-0 text-neutral-600">
+                            <span className="shrink-0 text-content-muted">
                               {isReactNode(OptionIcon) ? (
                                 OptionIcon
                               ) : (
@@ -626,7 +627,7 @@ function OperatorFilterPill({
                             <span className="flex-1">
                               {truncate(optionLabel, 48)}
                             </span>
-                            <div className="ml-1 flex shrink-0 justify-end text-neutral-500">
+                            <div className="ml-1 flex shrink-0 justify-end text-content-muted">
                               {(isAdvancedFilter || filter.multiple) &&
                               !filter.singleSelect ? (
                                 option.right
@@ -648,7 +649,7 @@ function OperatorFilterPill({
                             !filter.singleSelect &&
                             selectedOptions.length > 0 &&
                             unselectedOptions.length > 0 && (
-                              <Command.Separator className="-mx-1 my-1 border-b border-neutral-200" />
+                              <Command.Separator className="-mx-1 my-1 border-b border-border-subtle" />
                             )}
 
                           {unselectedOptions.map(renderOption)}
@@ -670,12 +671,12 @@ function OperatorFilterPill({
           className={cn(
             "flex items-center",
             filter.options?.length &&
-              "transition-[background-color,transform] duration-150 ease-out hover:bg-neutral-50 active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 [@media(hover:none)]:hover:bg-transparent",
+              "transition-[background-color,transform] duration-150 ease-out hover:bg-bg-muted active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 [@media(hover:none)]:hover:bg-transparent",
           )}
         >
           {!filter.options ? (
             <div className="flex items-center gap-2.5 px-3 py-2">
-              <div className="h-5 w-12 animate-pulse rounded-md bg-neutral-200" />
+              <div className="h-5 w-12 animate-pulse rounded-md bg-bg-muted" />
             </div>
           ) : (
             OptionDisplay({ className: "cursor-pointer" })
@@ -686,9 +687,9 @@ function OperatorFilterPill({
       <button
         type="button"
         className={cn(
-          "h-full rounded-r-lg p-2 text-neutral-500 ring-inset ring-neutral-500",
+          "h-full rounded-r-lg p-2 text-content-muted ring-inset ring-border-emphasis",
           "transition-[color,background-color,transform] duration-150 ease-out motion-reduce:transition-none",
-          "hover:bg-neutral-100 hover:text-neutral-800 [@media(hover:none)]:hover:bg-transparent",
+          "hover:bg-bg-muted hover:text-content-emphasis [@media(hover:none)]:hover:bg-transparent",
           "active:scale-[0.97] motion-reduce:active:scale-100",
           "focus:outline-none focus-visible:ring-1",
         )}

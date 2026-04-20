@@ -27,19 +27,40 @@ export default async function RisksPage({
         getTenantCtx({ tenantSlug }),
     ]);
 
-    // Build filters from searchParams for server-side data fetch
-    const filters: Record<string, string> = {};
-    for (const key of ['q', 'status', 'category']) {
+    // Build filters from searchParams. We maintain two views:
+    //   - `clientFilters` mirrors the UI shape (`score=min|max` token) and
+    //     hydrates `useFilterContext.serverFilters` so first-paint matches.
+    //   - `apiFilters` is the API shape (`scoreMin` + `scoreMax`) passed to
+    //     `listRisks` for the SSR data fetch. The UI ↔ API split lives in
+    //     `risks/filter-defs.RISK_API_TRANSFORMS` on the client.
+    const clientFilters: Record<string, string> = {};
+    const apiFilters: Record<string, string | number> = {};
+    for (const key of ['q', 'status', 'category', 'ownerUserId']) {
         const val = sp[key];
-        if (typeof val === 'string' && val) filters[key] = val;
+        if (typeof val === 'string' && val) {
+            clientFilters[key] = val;
+            apiFilters[key] = val;
+        }
+    }
+    const scoreToken = sp['score'];
+    if (typeof scoreToken === 'string' && scoreToken.includes('|')) {
+        clientFilters.score = scoreToken;
+        const [min, max] = scoreToken.split('|');
+        if (min && !Number.isNaN(Number(min))) apiFilters.scoreMin = Number(min);
+        if (max && !Number.isNaN(Number(max))) apiFilters.scoreMax = Number(max);
     }
 
-    const risks = await listRisks(ctx, Object.keys(filters).length > 0 ? filters : undefined);
+    const risks = await listRisks(
+        ctx,
+        Object.keys(apiFilters).length > 0
+            ? (apiFilters as unknown as Parameters<typeof listRisks>[1])
+            : undefined,
+    );
 
     return (
         <RisksClient
             initialRisks={JSON.parse(JSON.stringify(risks))}
-            initialFilters={filters}
+            initialFilters={clientFilters}
             tenantSlug={tenantSlug}
             permissions={ctx.permissions}
             translations={{

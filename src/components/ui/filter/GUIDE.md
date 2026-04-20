@@ -266,5 +266,146 @@ ensure both systems can coexist during the transition.
 ## Testing
 
 - **Pure functions**: test directly without React — see `tests/unit/filter-system.test.ts`
-- **Architecture**: 73 tests cover state mutations, URL roundtrips, compatibility bridges
+- **Architecture**: tests in `filter-system` / `filter-foundation` / `filter-contracts` /
+  `filter-primitives` / `filter-select` cover state mutations, URL roundtrips, compatibility
+  bridges, primitive contracts, and the typed filter-def model
 - **Integration**: page-level filter behavior tested via E2E specs
+- **Regression guard**: `tests/unit/filter-standardization.test.ts` enforces that every
+  DataTable-backed list page reaches the shared filter architecture (no stray CompactFilterBar
+  usage, every `filter-defs.ts` imports from the concrete sub-modules)
+
+---
+
+## Adding a filter to a new list page
+
+A complete rollout is three files and one component import.
+
+### 1. Define the filter config
+
+Colocate the defs with the page:
+
+```tsx
+// src/app/t/[tenantSlug]/(app)/my-entity/filter-defs.ts
+import type { FilterDefInput } from '@/components/ui/filter/filter-definitions';
+import { createTypedFilterDefs, optionsFromEnum } from '@/components/ui/filter/filter-definitions';
+import { CircleDot } from 'lucide-react';
+
+export const MY_ENTITY_STATUS_LABELS = {
+  OPEN: 'Open',
+  CLOSED: 'Closed',
+} as const;
+
+const STATIC_DEFS = {
+  status: {
+    label: 'Status',
+    description: 'Workflow stage.',
+    group: 'Attributes',
+    icon: CircleDot,
+    options: optionsFromEnum(MY_ENTITY_STATUS_LABELS),
+    multiple: true,
+    resetBehavior: 'clearable',
+  },
+} satisfies Record<string, FilterDefInput>;
+
+export const myEntityFilterDefs = createTypedFilterDefs()(STATIC_DEFS);
+export const MY_ENTITY_FILTER_KEYS = myEntityFilterDefs.filterKeys;
+
+export function buildMyEntityFilters() {
+  // Inject runtime-derived options here (owner lists, category dedupes).
+  // For fully-static filters, return the static filter array as-is.
+  return myEntityFilterDefs.filters;
+}
+```
+
+> **Always import from `filter-definitions` / `types` / `filter-state` directly**, not the
+> `@/components/ui/filter` barrel. The barrel pulls in `.tsx` components that jest's node env
+> cannot load; importing from sub-modules keeps the config file test-friendly.
+
+### 2. Wire the toolbar into the page
+
+Wrap the client island in a `FilterProvider` at the outer boundary, then drop `<FilterToolbar>`
+exactly where the old `CompactFilterBar` sat:
+
+```tsx
+// src/app/t/[tenantSlug]/(app)/my-entity/MyEntityClient.tsx
+'use client';
+import { FilterProvider, useFilterContext, useFilters } from '@/components/ui/filter';
+import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { toApiSearchParams } from '@/lib/filters/url-sync';
+import { buildMyEntityFilters, MY_ENTITY_FILTER_KEYS } from './filter-defs';
+
+export function MyEntityClient(props) {
+  const filterCtx = useFilterContext([], MY_ENTITY_FILTER_KEYS, {
+    serverFilters: props.initialFilters,
+  });
+  return (
+    <FilterProvider value={filterCtx}>
+      <MyEntityPageInner {...props} />
+    </FilterProvider>
+  );
+}
+
+function MyEntityPageInner({ initialRows, tenantSlug }) {
+  const { state, search } = useFilters();
+  const fetchParams = useMemo(() => toApiSearchParams(state, { search }), [state, search]);
+
+  const query = useQuery({
+    queryKey: queryKeys.myEntity.list(tenantSlug, Object.fromEntries(fetchParams)),
+    queryFn: async () => {
+      const qs = fetchParams.toString();
+      const res = await fetch(`/api/t/${tenantSlug}/my-entity${qs ? `?${qs}` : ''}`);
+      return res.json();
+    },
+    initialData: initialRows,
+  });
+
+  const liveFilters = useMemo(() => buildMyEntityFilters(), []);
+
+  return (
+    <>
+      <FilterToolbar
+        filters={liveFilters}
+        searchId="my-entity-search"
+        searchPlaceholder="Search… (Enter)"
+      />
+      <DataTable ... />
+    </>
+  );
+}
+```
+
+### 3. URL sync
+
+Nothing to do — `useFilterContext` writes to the URL, `toApiSearchParams` reads state into the
+API query. Browser back/forward replays via the context's popstate handler. For non-pass-through
+API keys (e.g. a UI range token that the API consumes as `min` + `max`), add a transform:
+
+```tsx
+import { rangeSplitTransform } from '@/lib/filters/url-sync';
+
+export const MY_ENTITY_API_TRANSFORMS = {
+  score: rangeSplitTransform('scoreMin', 'scoreMax'),
+};
+
+// In the page:
+const fetchParams = useMemo(
+  () => toApiSearchParams(state, { search, transforms: MY_ENTITY_API_TRANSFORMS }),
+  [state, search],
+);
+```
+
+### 4. Server page (optional but preferred)
+
+Widen the `searchParams → filters` ingestion in `page.tsx` so the SSR fetch matches the first
+client paint. Keys should be the same as `MY_ENTITY_FILTER_KEYS`. For range filters, split the
+UI token into the API pair there too — mirrors what `toApiSearchParams` does on the client.
+
+### 5. Do not
+
+- Do not import `CompactFilterBar` / `useUrlFilters` in a DataTable-backed list page. The
+  regression guardrail in `tests/unit/filter-standardization.test.ts` fails the build if any
+  tracked page reintroduces them.
+- Do not build a bespoke toolbar. Compose `<FilterToolbar>`; if you need a page-specific
+  gesture, add it next to the toolbar, not inside it.
+- Do not re-export `filter-defs.ts` through a package barrel. Filter defs stay colocated with
+  their page so option derivation lives next to the data fetch.

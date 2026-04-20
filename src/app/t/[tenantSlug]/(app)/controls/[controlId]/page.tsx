@@ -11,6 +11,7 @@ const PencilIcon = ({ size = 14 }: { size?: number }) => (
 );
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { extractMutationError } from '@/lib/mutations';
+import { Modal } from '@/components/ui/modal';
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 
@@ -747,110 +748,150 @@ export default function ControlDetailPage() {
                 </div>
             )}
 
-            {/* Edit Control Modal */}
-            {showEditModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={handleEditCancel} data-testid="control-edit-dialog" id="control-edit-dialog">
-                    <form onSubmit={handleEditSave} className="glass-card p-6 w-full max-w-lg space-y-4 animate-fadeIn" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-semibold text-white">Edit Control</h3>
-
+            {/* Edit Control Modal — migrated to the shared <Modal> (Epic 54) */}
+            <Modal
+                showModal={showEditModal}
+                setShowModal={(v) => {
+                    const next = typeof v === 'function' ? v(showEditModal) : v;
+                    if (!next && !savingEdit) handleEditCancel();
+                }}
+                size="lg"
+                title="Edit Control"
+                description="Update the control's metadata."
+                preventDefaultClose={savingEdit}
+            >
+                <Modal.Header title="Edit Control" description="Update the control's metadata." />
+                <Modal.Form onSubmit={handleEditSave} id="control-edit-dialog" data-testid="control-edit-dialog">
+                    <Modal.Body>
                         {editError && (
-                            <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2">{editError}</div>
+                            <div
+                                className="mb-4 rounded-lg border border-border-error bg-bg-error px-3 py-2 text-sm text-content-error"
+                                role="alert"
+                                data-testid="edit-error"
+                            >
+                                {editError}
+                            </div>
                         )}
-
-                        <div className="space-y-3">
+                        <fieldset className="space-y-4" disabled={savingEdit}>
                             <div>
-                                <label htmlFor="edit-name" className="text-xs text-slate-400 uppercase block mb-1">Title *</label>
+                                <label htmlFor="edit-name" className="mb-1 block text-sm text-content-default">
+                                    Title <span className="text-content-error">*</span>
+                                </label>
                                 <input
                                     id="edit-name"
                                     type="text"
                                     className="input w-full"
                                     value={editForm.name}
-                                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
                                     required
                                     minLength={3}
                                     data-testid="edit-name-input"
                                 />
                             </div>
                             <div>
-                                <label htmlFor="edit-description" className="text-xs text-slate-400 uppercase block mb-1">Description</label>
+                                <label htmlFor="edit-description" className="mb-1 block text-sm text-content-default">
+                                    Description
+                                </label>
                                 <textarea
                                     id="edit-description"
                                     className="input w-full"
                                     rows={3}
                                     value={editForm.description}
-                                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                                    onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
                                     data-testid="edit-description-input"
                                 />
                             </div>
                             <div>
-                                <label htmlFor="edit-intent" className="text-xs text-slate-400 uppercase block mb-1">Intent</label>
+                                <label htmlFor="edit-intent" className="mb-1 block text-sm text-content-default">
+                                    Intent
+                                </label>
                                 <textarea
                                     id="edit-intent"
                                     className="input w-full"
                                     rows={2}
                                     value={editForm.intent}
-                                    onChange={e => setEditForm(f => ({ ...f, intent: e.target.value }))}
+                                    onChange={(e) => setEditForm((f) => ({ ...f, intent: e.target.value }))}
                                     data-testid="edit-intent-input"
                                 />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <label htmlFor="edit-category" className="text-xs text-slate-400 uppercase block mb-1">Category</label>
+                                    <label htmlFor="edit-category" className="mb-1 block text-sm text-content-default">
+                                        Category
+                                    </label>
                                     <select
                                         id="edit-category"
                                         className="input w-full"
                                         value={editForm.category}
-                                        onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                                        onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
                                         data-testid="edit-category-input"
                                     >
-                                        {CATEGORY_OPTIONS.map(c => (
-                                            <option key={c} value={c}>{c ? CATEGORY_LABELS[c] || c : '— None —'}</option>
+                                        {CATEGORY_OPTIONS.map((c) => (
+                                            <option key={c} value={c}>
+                                                {c ? CATEGORY_LABELS[c] || c : '— None —'}
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label htmlFor="edit-frequency" className="text-xs text-slate-400 uppercase block mb-1">Frequency</label>
+                                    <label htmlFor="edit-frequency" className="mb-1 block text-sm text-content-default">
+                                        Frequency
+                                    </label>
                                     <select
                                         id="edit-frequency"
                                         className="input w-full"
                                         value={editForm.frequency}
-                                        onChange={e => setEditForm(f => ({ ...f, frequency: e.target.value }))}
+                                        onChange={(e) => setEditForm((f) => ({ ...f, frequency: e.target.value }))}
                                         data-testid="edit-frequency-select"
                                     >
-                                        {FREQ_OPTIONS.map(f => (
-                                            <option key={f} value={f}>{f ? FREQ_LABELS[f] || f : '— None —'}</option>
+                                        {FREQ_OPTIONS.map((f) => (
+                                            <option key={f} value={f}>
+                                                {f ? FREQ_LABELS[f] || f : '— None —'}
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
                             </div>
                             <div>
-                                <label htmlFor="edit-owner" className="text-xs text-slate-400 uppercase block mb-1">Owner</label>
+                                <label htmlFor="edit-owner" className="mb-1 block text-sm text-content-default">
+                                    Owner
+                                </label>
                                 <input
                                     id="edit-owner"
                                     type="text"
                                     className="input w-full"
                                     placeholder="User ID (leave empty to clear)"
                                     value={editForm.owner}
-                                    onChange={e => setEditForm(f => ({ ...f, owner: e.target.value }))}
+                                    onChange={(e) => setEditForm((f) => ({ ...f, owner: e.target.value }))}
                                     data-testid="edit-owner-input"
                                 />
                                 {control?.owner?.name && (
-                                    <p className="text-xs text-slate-500 mt-1">Current: {control.owner.name}</p>
+                                    <p className="mt-1 text-xs text-content-muted">Current: {control.owner.name}</p>
                                 )}
                             </div>
-                        </div>
-
-                        <div className="flex justify-end gap-2 pt-2">
-                            <button type="button" className="btn btn-secondary" onClick={handleEditCancel} data-testid="edit-cancel-button">
-                                Cancel
-                            </button>
-                            <button type="submit" className="btn btn-primary" disabled={savingEdit || editForm.name.trim().length < 3} data-testid="edit-save-button">
-                                {savingEdit ? 'Saving...' : 'Save'}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
+                        </fieldset>
+                    </Modal.Body>
+                    <Modal.Actions>
+                        <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={handleEditCancel}
+                            disabled={savingEdit}
+                            data-testid="edit-cancel-button"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="btn btn-primary btn-sm"
+                            disabled={savingEdit || editForm.name.trim().length < 3}
+                            data-testid="edit-save-button"
+                        >
+                            {savingEdit ? 'Saving...' : 'Save'}
+                        </button>
+                    </Modal.Actions>
+                </Modal.Form>
+            </Modal>
 
             {/* Success toast */}
             {editSuccess && (

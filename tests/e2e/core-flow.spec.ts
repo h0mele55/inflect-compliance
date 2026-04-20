@@ -80,42 +80,39 @@ test.describe('Core Certification Flow', () => {
         // Set title
         await page.fill('#upload-title-input', `E2E Evidence ${UNIQUE}`);
 
-        // Select the control we created — search and pick from dropdown
-        await page.fill('#control-search-input', CONTROL_CODE);
-        // Wait for filtered dropdown to show our control
-        await page.waitForLoadState('networkidle').catch(() => {}); /* replaced wait */
-
-        // Select the control from the dropdown
-        const controlSelect = page.locator('#control-select');
-        // Find an option containing our control code
-        const optionCount = await controlSelect.locator('option').count();
-        let controlFound = false;
-        for (let i = 0; i < optionCount; i++) {
-            const text = await controlSelect.locator('option').nth(i).textContent();
-            if (text && text.includes(CONTROL_CODE)) {
-                const value = await controlSelect.locator('option').nth(i).getAttribute('value');
-                if (value) {
-                    await controlSelect.selectOption(value);
-                    controlFound = true;
-                    break;
-                }
-            }
+        // Epic 55: the control linker is now a <Combobox>. Open the
+        // trigger, type into the cmdk search, click the matching option.
+        await page.click('#control-select');
+        const comboSearch = page.getByPlaceholder('Search controls…');
+        await comboSearch.fill(CONTROL_CODE);
+        // cmdk renders role="option" rows inside role="listbox".
+        const codeOption = page
+            .getByRole('option')
+            .filter({ hasText: CONTROL_CODE })
+            .first();
+        let controlFound = await codeOption
+            .waitFor({ state: 'visible', timeout: 3000 })
+            .then(() => true)
+            .catch(() => false);
+        if (controlFound) {
+            await codeOption.click();
         }
-        // If control not found in dropdown (e.g. search doesn't match), try without search
+        // Fallback: search by control name instead of code.
         if (!controlFound) {
-            await page.fill('#control-search-input', '');
+            await comboSearch.fill('');
             await page.waitForLoadState('networkidle').catch(() => {});
-            const allOptionCount = await controlSelect.locator('option').count();
-            for (let i = 0; i < allOptionCount; i++) {
-                const text = await controlSelect.locator('option').nth(i).textContent();
-                if (text && text.includes(CONTROL_NAME)) {
-                    const value = await controlSelect.locator('option').nth(i).getAttribute('value');
-                    if (value) {
-                        await controlSelect.selectOption(value);
-                        controlFound = true;
-                        break;
-                    }
-                }
+            const nameOption = page
+                .getByRole('option')
+                .filter({ hasText: CONTROL_NAME })
+                .first();
+            if (
+                await nameOption
+                    .waitFor({ state: 'visible', timeout: 3000 })
+                    .then(() => true)
+                    .catch(() => false)
+            ) {
+                await nameOption.click();
+                controlFound = true;
             }
         }
 

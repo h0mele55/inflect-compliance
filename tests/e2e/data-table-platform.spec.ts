@@ -225,10 +225,12 @@ test.describe('DataTable Platform — Filter interaction', () => {
 
         const searchInput = page.locator('#control-search');
         if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-            // Type a nonsense query that shouldn't match anything
+            // Type a nonsense query that shouldn't match anything.
+            // CompactFilterBar submits on Enter (not on every keystroke) so the query
+            // is applied to filters.q only after the keyboard event.
             await searchInput.fill('zzz-no-match-zzz');
-            // Wait for the filter to take effect
-            await page.waitForTimeout(500);
+            await searchInput.press('Enter');
+            await page.waitForLoadState('networkidle').catch(() => {});
 
             // Should show empty state or filtered results
             const tableRows = await page.locator('tbody tr').count();
@@ -237,7 +239,8 @@ test.describe('DataTable Platform — Filter interaction', () => {
 
             // Clear filter
             await searchInput.fill('');
-            await page.waitForTimeout(500);
+            await searchInput.press('Enter');
+            await page.waitForLoadState('networkidle').catch(() => {});
         }
     });
 

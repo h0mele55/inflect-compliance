@@ -1,128 +1,140 @@
-import { test, expect, Page } from '@playwright/test';
-import { loginAndGetTenant, gotoAndVerify } from './e2e-utils';
+import { test, expect } from '@playwright/test';
+import { loginAndGetTenant, safeGoto } from './e2e-utils';
 
 /**
- * Filter contract E2E tests.
+ * FilterToolbar contract — Tasks, Vendors, and URL persistence.
  *
- * Verifies that CompactFilterBar correctly updates URLs and
- * that server-side filtering works for major list pages.
+ * The Controls page has its own canonical coverage in
+ * `controls-filter-epic53.spec.ts`. This spec extends that contract to
+ * the two other migrated list pages (Tasks, Vendors) and pins the
+ * browser-refresh persistence invariant across reload.
  *
- * Uses data-testid attributes for stability.
+ * The pre-Epic-53 version of this file exercised the deprecated
+ * `CompactFilterBar` DOM (`filter-dd-status`, `filter-chip-overdue`,
+ * etc.). The shared `FilterToolbar` aggregates every filter behind a
+ * single popover, so the tests below drive the actual UI:
+ *
+ *   1. Click the trigger → the cmdk listbox appears.
+ *   2. Click the top-level filter (e.g. "Type") → value options appear.
+ *   3. Click a value → the URL picks up the param.
  */
 
-const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
+test.describe('FilterToolbar — Tasks', () => {
+    test.describe.configure({ mode: 'serial' });
 
-let TENANT = '';
+    let tenantSlug: string;
 
-test.describe('Filter contract: Controls', () => {
-    test.beforeEach(async ({ page }) => {
-        TENANT = await loginAndGetTenant(page);
-        await gotoAndVerify(page, `/t/${TENANT}/controls`, '[data-testid="filter-search"]');
+    test('search input writes q param to the URL on Enter', async ({ page }) => {
+        tenantSlug = await loginAndGetTenant(page);
+        await safeGoto(page, `/t/${tenantSlug}/tasks`);
+        await page.waitForLoadState('networkidle');
+
+        const search = page.locator('#task-search');
+        await expect(search).toBeVisible({ timeout: 15000 });
+
+        await search.fill('zzz-no-match-zzz');
+        await search.press('Enter');
+
+        await expect(page).toHaveURL(/[?&]q=zzz-no-match-zzz/, { timeout: 10000 });
     });
 
-    test('search updates URL on Enter', async ({ page }) => {
-        const searchInput = page.locator('[data-testid="filter-search"]');
-        await searchInput.fill('password');
-        await searchInput.press('Enter');
-        await expect(page).toHaveURL(/q=password/, { timeout: 15000 });
+    test('picking a type filter pushes it into the URL', async ({ page }) => {
+        tenantSlug = await loginAndGetTenant(page);
+        await safeGoto(page, `/t/${tenantSlug}/tasks`);
+        await page.waitForLoadState('networkidle');
+
+        await page.getByRole('button', { name: /^filter$/i }).first().click();
+        await expect(page.getByRole('listbox').first()).toBeVisible({ timeout: 10000 });
+
+        // Drill into Type
+        const typeRow = page.getByRole('option', { name: /^Type$/ });
+        await typeRow.waitFor({ state: 'visible', timeout: 5000 });
+        await typeRow.click();
+
+        // Pick "Incident"
+        const incident = page.getByRole('option', { name: /^Incident$/ });
+        await incident.waitFor({ state: 'visible', timeout: 5000 });
+        await incident.click();
+
+        await expect(page).toHaveURL(/[?&]type=INCIDENT/, { timeout: 10000 });
     });
 
-    test('clear X removes q param', async ({ page }) => {
-        // First set a search
-        const searchInput = page.locator('[data-testid="filter-search"]');
-        await searchInput.fill('test');
-        await searchInput.press('Enter');
-        await expect(page).toHaveURL(/q=test/, { timeout: 15000 });
+    test('picking a severity filter pushes it into the URL', async ({ page }) => {
+        tenantSlug = await loginAndGetTenant(page);
+        await safeGoto(page, `/t/${tenantSlug}/tasks`);
+        await page.waitForLoadState('networkidle');
 
-        // Then clear it
-        await page.click('[data-testid="filter-clear-search"]');
-        await expect(page).not.toHaveURL(/q=/, { timeout: 15000 });
-    });
+        await page.getByRole('button', { name: /^filter$/i }).first().click();
+        await expect(page.getByRole('listbox').first()).toBeVisible({ timeout: 10000 });
 
-    test('status dropdown updates URL', async ({ page }) => {
-        // Click status dropdown
-        await page.click('[data-testid="filter-dd-status"]');
-        // Select "Implemented"
-        await page.click('text=Implemented');
-        await expect(page).toHaveURL(/status=IMPLEMENTED/, { timeout: 15000 });
-    });
+        const severityRow = page.getByRole('option', { name: /^Severity$/ });
+        await severityRow.waitFor({ state: 'visible', timeout: 5000 });
+        await severityRow.click();
 
-    test('clear all removes all filter params', async ({ page }) => {
-        // Set a filter first
-        await page.click('[data-testid="filter-dd-status"]');
-        await page.click('text=Implemented');
-        await expect(page).toHaveURL(/status=/, { timeout: 15000 });
+        const critical = page.getByRole('option', { name: /^Critical$/ });
+        await critical.waitFor({ state: 'visible', timeout: 5000 });
+        await critical.click();
 
-        // Clear all
-        await page.click('[data-testid="filter-clear-all"]');
-        await expect(page).not.toHaveURL(/status=/, { timeout: 15000 });
-    });
-});
-
-test.describe('Filter contract: Tasks', () => {
-    test.beforeEach(async ({ page }) => {
-        TENANT = await loginAndGetTenant(page);
-        await gotoAndVerify(page, `/t/${TENANT}/tasks`, '[data-testid="filter-search"]');
-    });
-
-    test('type dropdown updates URL', async ({ page }) => {
-        await page.click('[data-testid="filter-dd-type"]');
-        // Wait for dropdown to open, then click the Incident option
-        const option = page.locator('button:has-text("Incident")');
-        await option.waitFor({ state: 'visible', timeout: 5000 });
-        await option.click();
-        // router.replace() is async — allow time for URL update
-        await expect(page).toHaveURL(/type=INCIDENT/, { timeout: 15000 });
-    });
-
-    test('overdue chip toggles URL param', async ({ page }) => {
-        // Activate
-        await page.click('[data-testid="filter-chip-overdue"]');
-        await expect(page).toHaveURL(/due=overdue/, { timeout: 15000 });
-
-        // Deactivate
-        await page.click('[data-testid="filter-chip-overdue"]');
-        await expect(page).not.toHaveURL(/due=overdue/, { timeout: 15000 });
-    });
-
-    test('severity dropdown updates URL', async ({ page }) => {
-        await page.click('[data-testid="filter-dd-severity"]');
-        const option = page.locator('button:has-text("Critical")');
-        await option.waitFor({ state: 'visible', timeout: 5000 });
-        await option.click();
-        await expect(page).toHaveURL(/severity=CRITICAL/, { timeout: 15000 });
+        // Long timeout: dev-server can be mid-recompile for /tasks after
+        // a long suite, and router.replace is async.
+        await expect(page).toHaveURL(/[?&]severity=CRITICAL/, { timeout: 30000 });
     });
 });
 
-test.describe('Filter contract: Vendors', () => {
-    test.beforeEach(async ({ page }) => {
-        TENANT = await loginAndGetTenant(page);
-        await gotoAndVerify(page, `/t/${TENANT}/vendors`, '[data-testid="filter-search"]');
+test.describe('FilterToolbar — Vendors', () => {
+    test.describe.configure({ mode: 'serial' });
+
+    let tenantSlug: string;
+
+    test('search input writes q param to the URL on Enter', async ({ page }) => {
+        tenantSlug = await loginAndGetTenant(page);
+        await safeGoto(page, `/t/${tenantSlug}/vendors`);
+        await page.waitForLoadState('networkidle');
+
+        const search = page.locator('#vendor-search');
+        await expect(search).toBeVisible({ timeout: 15000 });
+
+        await search.fill('zzz-no-match-zzz');
+        await search.press('Enter');
+
+        await expect(page).toHaveURL(/[?&]q=zzz-no-match-zzz/, { timeout: 10000 });
     });
 
-    test('criticality dropdown updates URL', async ({ page }) => {
-        await page.waitForSelector('[data-testid="filter-dd-criticality"]', { timeout: 10000 });
-        await page.click('[data-testid="filter-dd-criticality"]');
-        await page.getByRole('option', { name: 'High' }).or(page.locator('text=High')).first().click();
-        await expect(page).toHaveURL(/criticality=HIGH/, { timeout: 10000 });
-    });
+    test('picking a criticality filter pushes it into the URL', async ({ page }) => {
+        tenantSlug = await loginAndGetTenant(page);
+        await safeGoto(page, `/t/${tenantSlug}/vendors`);
+        await page.waitForLoadState('networkidle');
 
-    test('review overdue chip works', async ({ page }) => {
-        await page.click('[data-testid="filter-chip-review-overdue"]');
-        await expect(page).toHaveURL(/reviewDue=overdue/, { timeout: 15000 });
+        await page.getByRole('button', { name: /^filter$/i }).first().click();
+        await expect(page.getByRole('listbox').first()).toBeVisible({ timeout: 10000 });
+
+        const criticalityRow = page.getByRole('option', { name: /^Criticality$/ });
+        await criticalityRow.waitFor({ state: 'visible', timeout: 5000 });
+        await criticalityRow.click();
+
+        const high = page.getByRole('option', { name: /^High$/ });
+        await high.waitFor({ state: 'visible', timeout: 5000 });
+        await high.click();
+
+        await expect(page).toHaveURL(/[?&]criticality=HIGH/, { timeout: 10000 });
     });
 });
 
-test.describe('Filter contract: URL persistence', () => {
-    test('filters survive page refresh', async ({ page }) => {
-        TENANT = await loginAndGetTenant(page);
-        await gotoAndVerify(page, `/t/${TENANT}/controls?status=IMPLEMENTED&q=policy`, '[data-testid="filter-search"]');
+test.describe('FilterToolbar — URL persistence', () => {
+    test('filters survive a page refresh', async ({ page }) => {
+        const tenantSlug = await loginAndGetTenant(page);
+        await safeGoto(page, `/t/${tenantSlug}/controls?status=IMPLEMENTED&q=policy`);
+        await page.waitForLoadState('networkidle');
 
-        // Verify search input has the value
-        const searchValue = await page.locator('[data-testid="filter-search"]').inputValue();
-        expect(searchValue).toBe('policy');
+        // Search input rehydrates with the q param value.
+        const search = page.locator('#control-search');
+        await expect(search).toBeVisible({ timeout: 15000 });
+        await expect(search).toHaveValue('policy', { timeout: 10000 });
 
-        // Verify URL still has params
+        // Reload — URL params come back verbatim.
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForLoadState('networkidle');
+
         expect(page.url()).toContain('status=IMPLEMENTED');
         expect(page.url()).toContain('q=policy');
     });

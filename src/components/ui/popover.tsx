@@ -1,8 +1,31 @@
 "use client";
 
+/**
+ * Epic 54 — canonical Popover primitive.
+ *
+ * Radix Popover on desktop, Vaul Drawer on mobile (via `useMediaQuery`).
+ * Powers every contextual surface in the app — filter dropdowns, column
+ * toggles, future row-action menus — so all lightweight surfaces share
+ * one keyboard model, one Escape behaviour, and one token palette.
+ *
+ * Composite API:
+ *   - `<Popover content={…}>{trigger}</Popover>` — the canonical controlled
+ *     form, used by 30+ filter/menu sites today.
+ *   - `<Popover.Menu>` + `<Popover.Item>` — slot primitives for consistent
+ *     action-menu layout (label, icon, shortcut, disabled, destructive).
+ *     Use these inside `content` to keep every menu identical.
+ */
+
 import { cn } from "@dub/utils";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { PropsWithChildren, ReactNode, WheelEventHandler } from "react";
+import {
+  ButtonHTMLAttributes,
+  HTMLAttributes,
+  PropsWithChildren,
+  ReactNode,
+  WheelEventHandler,
+  forwardRef,
+} from "react";
 import { createPortal } from "react-dom";
 import { Drawer } from "vaul";
 import { useMediaQuery } from "./hooks";
@@ -26,7 +49,7 @@ export type PopoverProps = PropsWithChildren<{
   anchor?: ReactNode;
 }>;
 
-export function Popover({
+function PopoverRoot({
   children,
   content,
   align = "center",
@@ -114,3 +137,120 @@ export function Popover({
     </PopoverPrimitive.Root>
   );
 }
+
+// ─── Menu / Item slots ─────────────────────────────────────────────
+
+/**
+ * Standard menu container. Drop inside a Popover's `content` prop to
+ * keep every action menu aligned on padding, width, and keyboard feel.
+ */
+function Menu({
+    className,
+    children,
+    ...rest
+}: HTMLAttributes<HTMLDivElement>) {
+    return (
+        <div
+            role="menu"
+            data-popover-menu
+            className={cn(
+                "flex min-w-[180px] flex-col gap-0.5 p-1 text-sm",
+                className,
+            )}
+            {...rest}
+        >
+            {children}
+        </div>
+    );
+}
+
+export interface PopoverItemProps
+    extends ButtonHTMLAttributes<HTMLButtonElement> {
+    /** Leading icon slot. */
+    icon?: ReactNode;
+    /** Trailing element (shortcut hint, badge, chevron). */
+    right?: ReactNode;
+    /** Destructive / danger styling — use for delete/revoke actions. */
+    destructive?: boolean;
+    /** Currently selected / active state (checkmark-style menus). */
+    selected?: boolean;
+}
+
+/**
+ * Single action row inside a menu. Token-driven, keyboard-focusable,
+ * supports destructive + selected variants. Consumers supply `onClick`
+ * (or `onSelect`-style handlers) and the label as children.
+ */
+const Item = forwardRef<HTMLButtonElement, PopoverItemProps>(function Item(
+    {
+        className,
+        children,
+        icon,
+        right,
+        destructive = false,
+        selected = false,
+        disabled,
+        type = "button",
+        ...rest
+    },
+    ref,
+) {
+    return (
+        <button
+            ref={ref}
+            type={type}
+            role="menuitem"
+            data-popover-item
+            data-destructive={destructive || undefined}
+            data-selected={selected || undefined}
+            disabled={disabled}
+            className={cn(
+                "flex w-full cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left",
+                "transition-colors duration-100 ease-out motion-reduce:transition-none",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                destructive
+                    ? "text-content-error hover:bg-bg-error"
+                    : "text-content-default hover:bg-bg-muted hover:text-content-emphasis",
+                selected && !destructive && "bg-bg-subtle text-content-emphasis",
+                className,
+            )}
+            {...rest}
+        >
+            {icon ? (
+                <span className="inline-flex size-4 shrink-0 items-center justify-center text-content-muted">
+                    {icon}
+                </span>
+            ) : null}
+            <span className="flex-1 truncate">{children}</span>
+            {right ? (
+                <span className="ml-2 inline-flex shrink-0 items-center text-content-subtle">
+                    {right}
+                </span>
+            ) : null}
+        </button>
+    );
+});
+
+/** Horizontal separator inside a menu. */
+function Separator({
+    className,
+    ...rest
+}: HTMLAttributes<HTMLDivElement>) {
+    return (
+        <div
+            role="separator"
+            data-popover-separator
+            className={cn("-mx-1 my-1 h-px bg-border-subtle", className)}
+            {...rest}
+        />
+    );
+}
+
+// ─── Composite export ─────────────────────────────────────────────
+
+export const Popover = Object.assign(PopoverRoot, {
+    Menu,
+    Item,
+    Separator,
+});

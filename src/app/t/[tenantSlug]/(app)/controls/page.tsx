@@ -20,9 +20,12 @@ export default async function ControlsPage({
     const sp = await searchParams;
     const ctx = await getTenantCtx({ tenantSlug });
 
-    // Build filters from searchParams for server-side data fetch
+    // Build filters from searchParams for server-side data fetch.
+    // Keys here must stay in sync with the Controls filter config
+    // (`src/app/t/[tenantSlug]/(app)/controls/filter-defs.ts`) so SSR and
+    // client filter state agree on the first paint.
     const filters: Record<string, string> = {};
-    for (const key of ['q', 'status', 'applicability']) {
+    for (const key of ['q', 'status', 'applicability', 'ownerUserId', 'category']) {
         const val = sp[key];
         if (typeof val === 'string' && val) filters[key] = val;
     }

@@ -47,7 +47,8 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await gotoAndVerify(page, `/t/${tenantSlug}/controls`, 'h1');
 
         // Use search to find the specific control
-        await page.fill('#control-search', `Test Ctrl ${uid}`);
+        await page.locator('#control-search').fill(`Test Ctrl ${uid}`);
+        await page.locator('#control-search').press('Enter');
         await page.waitForLoadState('networkidle'); /* replaced wait */
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForLoadState('networkidle');
@@ -77,7 +78,8 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await gotoAndVerify(page, `/t/${tenantSlug}/controls`, 'h1');
 
         // Use search to find the specific control
-        await page.fill('#control-search', `Test Ctrl ${uid}`);
+        await page.locator('#control-search').fill(`Test Ctrl ${uid}`);
+        await page.locator('#control-search').press('Enter');
         await page.waitForLoadState('networkidle');
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });
@@ -123,7 +125,8 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await gotoAndVerify(page, `/t/${tenantSlug}/controls`, 'h1');
 
         // Use search to find the specific control
-        await page.fill('#control-search', `Test Ctrl ${uid}`);
+        await page.locator('#control-search').fill(`Test Ctrl ${uid}`);
+        await page.locator('#control-search').press('Enter');
         await page.waitForLoadState('networkidle');
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });

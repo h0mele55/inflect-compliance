@@ -1,0 +1,288 @@
+'use client';
+
+/**
+ * Epic 54 — Add Text/Link Evidence modal.
+ *
+ * Modal-based replacement for the inline `#text-evidence-form` that
+ * EvidenceClient rendered toggle-style above the list. Keeps the same
+ * POST `/evidence` contract (type=TEXT) and the same React-Query cache
+ * invalidation so behaviour is byte-identical to the legacy flow.
+ *
+ * Preserved form ID: `text-evidence-form` (used by existing E2E).
+ */
+
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type Dispatch,
+    type SetStateAction,
+} from 'react';
+import { Modal } from '@/components/ui/modal';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { FormField } from '@/components/ui/form-field';
+import { queryKeys } from '@/lib/queryKeys';
+
+interface ControlOption {
+    id: string;
+    name: string;
+    annexId?: string | null;
+    code?: string | null;
+}
+
+export interface NewEvidenceTextModalProps {
+    open: boolean;
+    setOpen: Dispatch<SetStateAction<boolean>>;
+    tenantSlug: string;
+    apiUrl: (path: string) => string;
+    controls: ControlOption[];
+}
+
+export function NewEvidenceTextModal({
+    open,
+    setOpen,
+    tenantSlug,
+    apiUrl,
+    controls,
+}: NewEvidenceTextModalProps) {
+    const close = useCallback(() => setOpen(false), [setOpen]);
+    const queryClient = useQueryClient();
+    const titleRef = useRef<HTMLInputElement>(null);
+
+    const [form, setForm] = useState({
+        title: '',
+        content: '',
+        controlId: '',
+        category: '',
+        owner: '',
+    });
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (!open) return;
+        setForm({
+            title: '',
+            content: '',
+            controlId: '',
+            category: '',
+            owner: '',
+        });
+        setError('');
+        const t = setTimeout(() => titleRef.current?.focus(), 60);
+        return () => clearTimeout(t);
+    }, [open]);
+
+    const update = <K extends keyof typeof form>(
+        field: K,
+        value: (typeof form)[K],
+    ) => setForm((prev) => ({ ...prev, [field]: value }));
+
+    const controlOptions = useMemo<ComboboxOption<ControlOption>[]>(
+        () =>
+            controls.map((c) => ({
+                value: c.id,
+                label: `${c.annexId || c.code || 'Custom'}: ${c.name}`,
+                meta: c,
+            })),
+        [controls],
+    );
+
+    const mutation = useMutation({
+        mutationFn: async (body: typeof form) => {
+            const res = await fetch(apiUrl('/evidence'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...body, type: 'TEXT' }),
+            });
+            if (!res.ok) {
+                const err = await res
+                    .json()
+                    .catch(() => ({ error: 'Failed to create evidence' }));
+                throw new Error(
+                    err.error || err.message || 'Failed to create evidence',
+                );
+            }
+            return res.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: queryKeys.evidence.all(tenantSlug),
+            });
+            close();
+        },
+        onError: (err) => {
+            setError(
+                err instanceof Error ? err.message : 'Failed to create evidence',
+            );
+        },
+    });
+
+    const canSubmit =
+        form.title.trim().length > 0 && !mutation.isPending;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!canSubmit) return;
+        setError('');
+        mutation.mutate(form);
+    };
+
+    return (
+        <Modal
+            showModal={open}
+            setShowModal={setOpen}
+            size="lg"
+            title="Add evidence"
+            description="Record a link, narrative, or attestation against a control."
+            preventDefaultClose={mutation.isPending}
+        >
+            <Modal.Header
+                title="Add evidence"
+                description="Record a link, narrative, or attestation against a control."
+            />
+            <Modal.Form id="text-evidence-form" onSubmit={handleSubmit}>
+                <Modal.Body>
+                    {error && (
+                        <div
+                            className="mb-4 rounded-lg border border-border-error bg-bg-error px-3 py-2 text-sm text-content-error"
+                            id="text-evidence-error"
+                            role="alert"
+                            data-testid="text-evidence-error"
+                        >
+                            {error}
+                        </div>
+                    )}
+
+                    <fieldset
+                        className="space-y-4"
+                        disabled={mutation.isPending}
+                    >
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label
+                                    className="mb-1 block text-sm text-content-default"
+                                    htmlFor="text-evidence-title-input"
+                                >
+                                    Title <span className="text-content-error">*</span>
+                                </label>
+                                <input
+                                    id="text-evidence-title-input"
+                                    ref={titleRef}
+                                    type="text"
+                                    className="input w-full"
+                                    required
+                                    value={form.title}
+                                    onChange={(e) =>
+                                        update('title', e.target.value)
+                                    }
+                                    autoComplete="off"
+                                />
+                            </div>
+                            <FormField label="Link to control">
+                                <Combobox<false, ControlOption>
+                                    id="text-evidence-control-select"
+                                    name="controlId"
+                                    options={controlOptions}
+                                    selected={
+                                        controlOptions.find(
+                                            (o) => o.value === form.controlId,
+                                        ) ?? null
+                                    }
+                                    setSelected={(option) =>
+                                        update('controlId', option?.value ?? '')
+                                    }
+                                    placeholder="— No control link"
+                                    searchPlaceholder="Search controls…"
+                                    emptyState="No controls match"
+                                    matchTriggerWidth
+                                    forceDropdown
+                                    buttonProps={{ className: 'w-full' }}
+                                    caret
+                                />
+                            </FormField>
+                            <div>
+                                <label
+                                    className="mb-1 block text-sm text-content-default"
+                                    htmlFor="text-evidence-owner-input"
+                                >
+                                    Owner
+                                </label>
+                                <input
+                                    id="text-evidence-owner-input"
+                                    type="text"
+                                    className="input w-full"
+                                    value={form.owner}
+                                    onChange={(e) =>
+                                        update('owner', e.target.value)
+                                    }
+                                    autoComplete="off"
+                                />
+                            </div>
+                            <div>
+                                <label
+                                    className="mb-1 block text-sm text-content-default"
+                                    htmlFor="text-evidence-category-input"
+                                >
+                                    Category
+                                </label>
+                                <input
+                                    id="text-evidence-category-input"
+                                    type="text"
+                                    className="input w-full"
+                                    value={form.category}
+                                    onChange={(e) =>
+                                        update('category', e.target.value)
+                                    }
+                                    autoComplete="off"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label
+                                className="mb-1 block text-sm text-content-default"
+                                htmlFor="text-evidence-content-input"
+                            >
+                                Content
+                            </label>
+                            <textarea
+                                id="text-evidence-content-input"
+                                className="input w-full"
+                                rows={4}
+                                value={form.content}
+                                onChange={(e) =>
+                                    update('content', e.target.value)
+                                }
+                                placeholder="Paste a link or narrative…"
+                            />
+                        </div>
+                    </fieldset>
+                </Modal.Body>
+
+                <Modal.Actions>
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        id="text-evidence-cancel-btn"
+                        onClick={() => {
+                            if (!mutation.isPending) close();
+                        }}
+                        disabled={mutation.isPending}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        className="btn btn-primary btn-sm"
+                        id="create-text-evidence-btn"
+                        disabled={!canSubmit}
+                    >
+                        {mutation.isPending ? 'Creating…' : 'Add evidence'}
+                    </button>
+                </Modal.Actions>
+            </Modal.Form>
+        </Modal>
+    );
+}

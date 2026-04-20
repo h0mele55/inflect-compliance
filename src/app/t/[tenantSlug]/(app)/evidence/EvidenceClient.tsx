@@ -1,12 +1,31 @@
 'use client';
 import { formatDate } from '@/lib/format-date';
-import { useState, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
-import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
-import { evidenceFilterConfig } from '@/components/filters/configs';
-import { DataTable, createColumns } from '@/components/ui/table';
+import { UploadEvidenceModal } from './UploadEvidenceModal';
+import { NewEvidenceTextModal } from './NewEvidenceTextModal';
+import {
+    ColumnsDropdown,
+    DataTable,
+    createColumns,
+    getDefaultVisibility,
+    useListPagination,
+} from '@/components/ui/table';
+import { useColumnVisibility } from '@/components/ui/hooks';
+import {
+    FilterProvider,
+    useFilterContext,
+    useFilters,
+    type FilterType,
+} from '@/components/ui/filter';
+import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { toApiSearchParams } from '@/lib/filters/url-sync';
+import {
+    buildEvidenceFilters,
+    EVIDENCE_FILTER_KEYS,
+} from './filter-defs';
 
 interface Permissions {
     canRead: boolean;
@@ -20,13 +39,6 @@ const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral', SUBMITTED: 'badge-info', APPROVED: 'badge-success', REJECTED: 'badge-danger',
     PENDING_UPLOAD: 'badge-info',
 };
-
-function formatBytes(bytes: number | null | undefined): string {
-    if (!bytes) return '—';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-}
 
 type RetentionFilter = 'active' | 'expiring' | 'archived';
 
@@ -57,33 +69,56 @@ interface EvidenceClientProps {
 /**
  * Client island for evidence — handles all interactive features.
  * Data arrives pre-fetched from the server component, hydrated into React Query.
+ *
+ * Filter architecture (Epic 53):
+ *   - `q`, `type`, `status`, `controlId` flow through `useFilterContext`
+ *     (URL-synced via the shared context).
+ *   - `tab` (retention view: active | expiring | archived) stays on
+ *     `useUrlFilters` since it's a view selector, not a filter.
  */
-export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, permissions, translations: t }: EvidenceClientProps) {
+export function EvidenceClient(props: EvidenceClientProps) {
+    const filterCtx = useFilterContext([], EVIDENCE_FILTER_KEYS, {});
+    return (
+        <FilterProvider value={filterCtx}>
+            <EvidencePageInner {...props} />
+        </FilterProvider>
+    );
+}
+
+function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permissions, translations: t }: EvidenceClientProps) {
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const queryClient = useQueryClient();
 
-    // URL-driven filter state
-    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'type', 'controlId', 'tab']);
+    // Retention-tab view selector — deliberately kept separate from filter state.
+    const { filters, setFilter } = useUrlFilters(['tab']);
+    const filterCtx = useFilters();
+    const { state, search, hasActive } = filterCtx;
+
+    // ─── Build the API query string from filter state + retention tab ───
+    const fetchParams = useMemo(() => {
+        const params = toApiSearchParams(state, { search });
+        if (filters.tab === 'archived') params.set('archived', 'true');
+        else if (filters.tab === 'expiring') params.set('expiring', 'true');
+        return params;
+    }, [state, search, filters.tab]);
+
+    const queryKeyFilters = useMemo(() => {
+        const obj: Record<string, string> = {};
+        for (const [k, v] of fetchParams) obj[k] = v;
+        return obj;
+    }, [fetchParams]);
 
     // ─── Query: evidence list (hydrated with server data) ───
-    const hasFilters = !!(filters.q || filters.type || filters.controlId || filters.tab);
+    const anyFilterActive = hasActive || !!filters.tab;
     const evidenceQuery = useQuery({
-        queryKey: queryKeys.evidence.list(tenantSlug, filters),
+        queryKey: queryKeys.evidence.list(tenantSlug, queryKeyFilters),
         queryFn: async () => {
-            const params = new URLSearchParams();
-            if (filters.q) params.set('q', filters.q);
-            if (filters.type) params.set('type', filters.type);
-            if (filters.controlId) params.set('controlId', filters.controlId);
-            if (filters.tab === 'archived') params.set('archived', 'true');
-            if (filters.tab === 'expiring') params.set('expiring', 'true');
-            const qs = params.toString();
+            const qs = fetchParams.toString();
             const res = await fetch(apiUrl(`/evidence${qs ? `?${qs}` : ''}`));
             if (!res.ok) throw new Error('Failed to fetch evidence');
             return res.json();
         },
-        // Only hydrate initialData when no filters are active (server data is unfiltered).
-        // Mark it as immediately stale so React Query refetches on any key change.
-        initialData: hasFilters ? undefined : initialEvidence,
+        initialData: anyFilterActive ? undefined : initialEvidence,
         initialDataUpdatedAt: 0,
     });
 
@@ -94,17 +129,6 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
     const retentionFilter = (filters.tab || 'active') as RetentionFilter;
     const [showUpload, setShowUpload] = useState(false);
     const [showTextForm, setShowTextForm] = useState(false);
-    const [textForm, setTextForm] = useState({ title: '', content: '', controlId: '', category: '', owner: '' });
-
-    // Upload state
-    const [uploadFile, setUploadFile] = useState<File | null>(null);
-    const [uploadTitle, setUploadTitle] = useState('');
-    const [uploadControlId, setUploadControlId] = useState('');
-    const [uploadControlSearch, setUploadControlSearch] = useState('');
-    const [uploadRetentionUntil, setUploadRetentionUntil] = useState('');
-    const [uploadError, setUploadError] = useState('');
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Retention edit state
     const [editingRetention, setEditingRetention] = useState<string | null>(null);
@@ -112,119 +136,6 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
 
     const invalidateEvidence = () => {
         queryClient.invalidateQueries({ queryKey: queryKeys.evidence.all(tenantSlug) });
-    };
-
-    // ─── Mutation: file upload with optimistic pending row ───
-
-    const uploadMutation = useMutation({
-        mutationFn: async ({ file, title, controlId, retentionUntil }: { file: File; title: string; controlId: string; retentionUntil: string }) => {
-            const formData = new FormData();
-            formData.append('file', file);
-            if (title) formData.append('title', title);
-            if (controlId) formData.append('controlId', controlId);
-            if (retentionUntil) formData.append('retentionUntil', new Date(retentionUntil).toISOString());
-
-            const res = await fetch(apiUrl('/evidence/uploads'), {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({ error: 'Upload failed' }));
-                throw new Error(err.error || err.message || 'Upload failed');
-            }
-
-            const uploaded = await res.json();
-
-            // If retentionUntil was set, update retention after upload
-            if (retentionUntil && uploaded?.id) {
-                await fetch(apiUrl(`/evidence/${uploaded.id}/retention`), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        retentionUntil: new Date(retentionUntil).toISOString(),
-                        retentionPolicy: 'FIXED_DATE',
-                    }),
-                });
-            }
-
-            return uploaded;
-        },
-        onMutate: async ({ file, title }) => {
-            await queryClient.cancelQueries({ queryKey: queryKeys.evidence.all(tenantSlug) });
-            const listKey = queryKeys.evidence.list(tenantSlug);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const previousList = queryClient.getQueryData<any[]>(listKey);
-
-            // Insert a temp pending row
-            const tempId = `temp:${crypto.randomUUID()}`;
-            if (previousList) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                queryClient.setQueryData<any[]>(listKey, [
-                    {
-                        id: tempId,
-                        title: title || file.name,
-                        fileName: file.name,
-                        type: 'FILE',
-                        status: 'PENDING_UPLOAD',
-                        owner: null,
-                        control: null,
-                        controlId: null,
-                        retentionUntil: null,
-                        isArchived: false,
-                        expiredAt: null,
-                        deletedAt: null,
-                        fileRecordId: null,
-                    },
-                    ...previousList,
-                ]);
-            }
-
-            return { previousList, listKey, tempId };
-        },
-        onError: (_err, _vars, context) => {
-            // Remove temp row
-            if (context?.previousList) {
-                queryClient.setQueryData(context.listKey, context.previousList);
-            }
-        },
-        onSuccess: (_data, _vars, context) => {
-            // Replace temp row on next invalidation
-            // Remove temp row immediately — server data will replace
-            if (context?.previousList) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const listKey = context.listKey;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const currentList = queryClient.getQueryData<any[]>(listKey);
-                if (currentList) {
-                    queryClient.setQueryData(listKey, currentList.filter((e: { id: string }) => e.id !== context.tempId));
-                }
-            }
-            setUploadFile(null);
-            setUploadTitle('');
-            setUploadControlId('');
-            setUploadControlSearch('');
-            setUploadRetentionUntil('');
-            setShowUpload(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        },
-        onSettled: () => {
-            setUploadProgress(0);
-            invalidateEvidence();
-        },
-    });
-
-    // ─── File Upload handler ───
-
-    const handleUpload = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!uploadFile) return;
-        setUploadError('');
-        setUploadProgress(30);
-        uploadMutation.mutate(
-            { file: uploadFile, title: uploadTitle, controlId: uploadControlId, retentionUntil: uploadRetentionUntil },
-            { onError: (err) => setUploadError(err instanceof Error ? err.message : 'Upload failed') }
-        );
     };
 
     // ─── Mutation: review workflow ───
@@ -264,22 +175,6 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
 
     const submitReview = (id: string, action: string, comment = '') => {
         reviewMutation.mutate({ id, action, comment });
-    };
-
-    // ─── Text/Link Evidence ───
-
-    const createTextEvidence = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const res = await fetch(apiUrl('/evidence'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...textForm, type: 'TEXT' }),
-        });
-        if (res.ok) {
-            setTextForm({ title: '', content: '', controlId: '', category: '', owner: '' });
-            setShowTextForm(false);
-            invalidateEvidence();
-        }
     };
 
     // ─── Retention actions ───
@@ -323,15 +218,6 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
         return map[status] || status;
     };
 
-    // ─── Control search filter ───
-    const filteredControls = controls.filter(c => {
-        const q = uploadControlSearch.toLowerCase();
-        if (!q) return true;
-        return (c.name || '').toLowerCase().includes(q)
-            || (c.annexId || '').toLowerCase().includes(q)
-            || (c.code || '').toLowerCase().includes(q);
-    });
-
     // ─── Retention filter counts ───
     const now = new Date();
     const in30Days = new Date(Date.now() + 30 * 86_400_000);
@@ -351,6 +237,40 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
         : retentionFilter === 'expiring'
             ? expiringEvidence
             : activeEvidence;
+
+    // ─── Pagination + column visibility (Epic 52) ───
+    // Include the retention tab in the reset key so switching tabs returns to page 1.
+    const pg = useListPagination({
+        resetKey: `${fetchParams.toString()}|${retentionFilter}`,
+    });
+    const evidenceColumnConfig = useMemo(
+        () => ({
+            all: ['title', 'type', 'control', 'retention', 'status', 'owner', 'actions'],
+            defaultVisible: ['title', 'type', 'control', 'retention', 'status', 'owner', 'actions'],
+            fixed: ['actions'],
+        }),
+        [],
+    );
+    const { columnVisibility, setColumnVisibility } = useColumnVisibility(
+        'inflect:col-vis:evidence',
+        evidenceColumnConfig,
+    );
+    const defaultEvidenceVisibility = useMemo(
+        () => getDefaultVisibility(evidenceColumnConfig),
+        [evidenceColumnConfig],
+    );
+    const evidenceColumnDropdown = useMemo(
+        () => [
+            { id: 'title', label: 'Title' },
+            { id: 'type', label: 'Type' },
+            { id: 'control', label: 'Control' },
+            { id: 'retention', label: 'Retention' },
+            { id: 'status', label: 'Status' },
+            { id: 'owner', label: 'Owner' },
+            { id: 'actions', label: 'Actions', alwaysVisible: true },
+        ],
+        [],
+    );
 
     // ── Evidence Column Definitions ──
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -500,14 +420,16 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                 {permissions.canWrite && (
                     <div className="flex gap-2">
                         <button
-                            onClick={() => { setShowUpload(!showUpload); setShowTextForm(false); }}
+                            type="button"
+                            onClick={() => setShowUpload(true)}
                             className="btn btn-primary"
                             id="upload-evidence-btn"
                         >
                             Upload File
                         </button>
                         <button
-                            onClick={() => { setShowTextForm(!showTextForm); setShowUpload(false); }}
+                            type="button"
+                            onClick={() => setShowTextForm(true)}
                             className="btn btn-secondary"
                             id="add-text-evidence-btn"
                         >
@@ -517,135 +439,23 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                 )}
             </div>
 
-            {/* File Upload Form */}
-            {showUpload && permissions.canWrite && (
-                <form onSubmit={handleUpload} className="glass-card p-6 space-y-4 animate-fadeIn" id="upload-form">
-                    <h3 className="text-sm font-semibold text-white">Upload Evidence File</h3>
-
-                    {/* File picker */}
-                    <div>
-                        <label className="input-label">File *</label>
-                        <div className="relative">
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                className="input w-full file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-brand-500 file:text-white hover:file:bg-brand-400"
-                                onChange={e => setUploadFile(e.target.files?.[0] || null)}
-                                required
-                                id="file-input"
-                                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.csv,.txt,.doc,.docx,.xlsx,.xls,.json,.zip"
-                            />
-                            {uploadFile && (
-                                <p className="text-xs text-slate-400 mt-1">
-                                    {uploadFile.name} ({formatBytes(uploadFile.size)})
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                        {/* Title */}
-                        <div>
-                            <label className="input-label">Title</label>
-                            <input
-                                className="input w-full"
-                                placeholder="Defaults to filename"
-                                value={uploadTitle}
-                                onChange={e => setUploadTitle(e.target.value)}
-                                id="upload-title-input"
-                            />
-                        </div>
-
-                        {/* Control selector with search */}
-                        <div>
-                            <label className="input-label">Link to Control</label>
-                            <input
-                                className="input w-full mb-1"
-                                placeholder="Search controls..."
-                                value={uploadControlSearch}
-                                onChange={e => setUploadControlSearch(e.target.value)}
-                                id="control-search-input"
-                            />
-                            <select
-                                className="input w-full"
-                                value={uploadControlId}
-                                onChange={e => setUploadControlId(e.target.value)}
-                                id="control-select"
-                            >
-                                <option value="">{t.none} — No control link</option>
-                                {filteredControls.map(c => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.annexId || c.code || 'Custom'}: {c.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Retention date */}
-                        <div>
-                            <label className="input-label">Retain until</label>
-                            <input
-                                type="date"
-                                className="input w-full"
-                                value={uploadRetentionUntil}
-                                onChange={e => setUploadRetentionUntil(e.target.value)}
-                                id="retention-date-input"
-                                min={new Date().toISOString().split('T')[0]}
-                            />
-                            <p className="text-xs text-slate-500 mt-1">Optional — when should this evidence expire?</p>
-                        </div>
-                    </div>
-
-                    {/* Progress bar */}
-                    {uploadMutation.isPending && (
-                        <div className="w-full bg-slate-700 rounded-full h-2">
-                            <div
-                                className="bg-brand-500 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${uploadProgress || 50}%` }}
-                            />
-                        </div>
-                    )}
-
-                    {/* Error */}
-                    {uploadError && (
-                        <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2" id="upload-error">
-                            {uploadError}
-                        </div>
-                    )}
-
-                    <div className="flex gap-2">
-                        <button
-                            type="submit"
-                            disabled={uploadMutation.isPending || !uploadFile}
-                            className="btn btn-primary"
-                            id="submit-upload-btn"
-                        >
-                            {uploadMutation.isPending ? 'Uploading...' : 'Upload'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowUpload(false)}
-                            className="btn btn-secondary"
-                        >
-                            {t.cancel}
-                        </button>
-                    </div>
-                </form>
-            )}
-
-            {/* Text/Link Evidence Form (legacy) */}
-            {showTextForm && permissions.canWrite && (
-                <form onSubmit={createTextEvidence} className="glass-card p-6 space-y-4 animate-fadeIn" id="text-evidence-form">
-                    <h3 className="text-sm font-semibold text-white">Add Text/Link Evidence</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div><label className="input-label">{t.evidenceTitle} *</label><input className="input w-full" required value={textForm.title} onChange={e => setTextForm(f => ({ ...f, title: e.target.value }))} /></div>
-                        <div><label className="input-label">{t.control}</label><select className="input w-full" value={textForm.controlId} onChange={e => setTextForm(f => ({ ...f, controlId: e.target.value }))}><option value="">{t.none}</option>{controls.map(c => <option key={c.id} value={c.id}>{c.annexId || 'Custom'}: {c.name}</option>)}</select></div>
-                        <div><label className="input-label">{t.ownerLabel}</label><input className="input w-full" value={textForm.owner} onChange={e => setTextForm(f => ({ ...f, owner: e.target.value }))} /></div>
-                        <div><label className="input-label">Category</label><input className="input w-full" value={textForm.category} onChange={e => setTextForm(f => ({ ...f, category: e.target.value }))} /></div>
-                        <div className="col-span-2"><label className="input-label">{t.content}</label><textarea className="input w-full" value={textForm.content} onChange={e => setTextForm(f => ({ ...f, content: e.target.value }))} placeholder={t.contentPlaceholder} /></div>
-                    </div>
-                    <div className="flex gap-2"><button type="submit" className="btn btn-primary">{t.createEvidence}</button><button type="button" onClick={() => setShowTextForm(false)} className="btn btn-secondary">{t.cancel}</button></div>
-                </form>
+            {permissions.canWrite && (
+                <>
+                    <UploadEvidenceModal
+                        open={showUpload}
+                        setOpen={setShowUpload}
+                        tenantSlug={tenantSlug}
+                        apiUrl={apiUrl}
+                        controls={controls}
+                    />
+                    <NewEvidenceTextModal
+                        open={showTextForm}
+                        setOpen={setShowTextForm}
+                        tenantSlug={tenantSlug}
+                        apiUrl={apiUrl}
+                        controls={controls}
+                    />
+                </>
             )}
 
             {/* Retention filter tabs + Control filter */}
@@ -674,7 +484,17 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                     </button>
                 </div>
 
-                <CompactFilterBar config={evidenceFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
+                <EvidenceFilterToolbar
+                    controls={controls}
+                    columnsDropdown={
+                        <ColumnsDropdown
+                            columns={evidenceColumnDropdown}
+                            visibility={columnVisibility}
+                            onChange={(v) => setColumnVisibility(v)}
+                            defaultVisibility={defaultEvidenceVisibility}
+                        />
+                    }
+                />
             </div>
 
             {/* Archived warning */}
@@ -690,7 +510,7 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
 
             {/* Evidence table */}
             <DataTable
-                data={displayEvidence}
+                data={pg.slice(displayEvidence)}
                 columns={evidenceColumns}
                 getRowId={(ev: any) => ev.id}
                 emptyState={
@@ -701,8 +521,36 @@ export function EvidenceClient({ initialEvidence, initialControls, tenantSlug, p
                             : t.noEvidence
                 }
                 resourceName={(p) => p ? 'evidence items' : 'evidence item'}
+                columnVisibility={columnVisibility}
+                onColumnVisibilityChange={setColumnVisibility}
+                pagination={pg.pagination}
+                onPaginationChange={pg.setPagination}
+                rowCount={displayEvidence.length}
                 data-testid="evidence-table"
             />
         </div>
+    );
+}
+
+// ─── Evidence filter toolbar ─────────────────────────────────────────
+
+function EvidenceFilterToolbar({
+    controls,
+    columnsDropdown,
+}: {
+    controls: unknown[];
+    columnsDropdown?: React.ReactNode;
+}) {
+    const filters: FilterType[] = useMemo(
+        () => buildEvidenceFilters(controls as Parameters<typeof buildEvidenceFilters>[0]),
+        [controls],
+    );
+    return (
+        <FilterToolbar
+            filters={filters}
+            searchId="evidence-search"
+            searchPlaceholder="Search evidence… (Enter)"
+            actions={columnsDropdown}
+        />
     );
 }

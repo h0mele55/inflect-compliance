@@ -240,7 +240,7 @@ export function DataTable<T>({
   const { table, ...rest } = useTable(tableProps as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   return (
-    <div data-testid={dataTestId}>
+    <div id={dataTestId} data-testid={dataTestId}>
       <Table
         {...rest}
         table={table}

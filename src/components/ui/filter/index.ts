@@ -30,6 +30,11 @@ export type {
   Filter as FilterType,
   FilterOption,
   FilterOperator,
+  FilterResetBehavior,
+  FilterValueCodec,
+  PersistableFilterValue,
+  TypedActiveFilter,
+  TypedFilterOption,
 } from "./types";
 export { encodeRangeToken, normalizeActiveFilter, parseRangeToken } from "./types";
 
@@ -59,9 +64,15 @@ export {
 // ── Definitions ──
 export type { FilterDef, FilterDefInput } from "./filter-definitions";
 export {
+  booleanCodec,
+  codecForExampleValue,
   createFilterDefs,
+  createTypedFilterDefs,
+  numberCodec,
   optionsFromArray,
   optionsFromEnum,
+  stringCodec,
+  typedOptionsFromEnum,
 } from "./filter-definitions";
 
 // ── Context & Hooks ──

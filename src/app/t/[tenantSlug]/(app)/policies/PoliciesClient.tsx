@@ -6,10 +6,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
-import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
-import { policiesFilterConfig } from '@/components/filters/configs';
 import { DataTable, createColumns } from '@/components/ui/table';
+import {
+    FilterProvider,
+    useFilterContext,
+    useFilters,
+} from '@/components/ui/filter';
+import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { toApiSearchParams } from '@/lib/filters/url-sync';
+import { buildPolicyFilters, POLICY_FILTER_KEYS } from './filter-defs';
 
 const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral',
@@ -37,7 +42,18 @@ interface PoliciesClientProps {
  * Client island for policies — handles filters, search, and interactive list.
  * Data arrives pre-fetched from the server component, hydrated into React Query.
  */
-export function PoliciesClient({
+export function PoliciesClient(props: PoliciesClientProps) {
+    const filterCtx = useFilterContext([], POLICY_FILTER_KEYS, {
+        serverFilters: props.initialFilters,
+    });
+    return (
+        <FilterProvider value={filterCtx}>
+            <PoliciesPageInner {...props} />
+        </FilterProvider>
+    );
+}
+
+function PoliciesPageInner({
     initialPolicies,
     initialFilters,
     tenantSlug,
@@ -48,20 +64,31 @@ export function PoliciesClient({
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const router = useRouter();
 
-    // URL-driven filter state
-    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'category'], initialFilters);
+    const { state, search, hasActive } = useFilters();
+    const fetchParams = useMemo(
+        () => toApiSearchParams(state, { search }),
+        [state, search],
+    );
+    const queryKeyFilters = useMemo(() => {
+        const obj: Record<string, string> = {};
+        for (const [k, v] of fetchParams) obj[k] = v;
+        return obj;
+    }, [fetchParams]);
 
-    // React Query with server-hydrated initial data
-    const hasFilters = !!(filters.q || filters.status || filters.category);
     const serverHadFilters = initialFilters && Object.keys(initialFilters).length > 0;
-    const filtersMatchInitial = serverHadFilters
-        ? JSON.stringify(filters) === JSON.stringify(initialFilters)
-        : !hasFilters;
+    const filtersMatchInitial = useMemo(() => {
+        if (!serverHadFilters) return !hasActive;
+        const keys = new Set([...Object.keys(queryKeyFilters), ...Object.keys(initialFilters!)]);
+        for (const k of keys) {
+            if ((queryKeyFilters[k] ?? '') !== (initialFilters![k] ?? '')) return false;
+        }
+        return true;
+    }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
+
     const policiesQuery = useQuery<any[]>({
-        queryKey: queryKeys.policies.list(tenantSlug, filters),
+        queryKey: queryKeys.policies.list(tenantSlug, queryKeyFilters),
         queryFn: async () => {
-            const params = new URLSearchParams(filters);
-            const qs = params.toString();
+            const qs = fetchParams.toString();
             const res = await fetch(apiUrl(`/policies${qs ? `?${qs}` : ''}`));
             if (!res.ok) throw new Error('Failed to fetch policies');
             return res.json();
@@ -72,6 +99,8 @@ export function PoliciesClient({
 
     const policies = policiesQuery.data ?? [];
     const loading = policiesQuery.isLoading && !policiesQuery.data;
+
+    const liveFilters = useMemo(() => buildPolicyFilters(policies), [policies]);
 
     const statusLabel = (s: string) => {
         const map: Record<string, string> = { DRAFT: 'Draft', PUBLISHED: 'Published', ARCHIVED: 'Archived' };
@@ -157,7 +186,11 @@ export function PoliciesClient({
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={policiesFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="policy" />
+            <FilterToolbar
+                filters={liveFilters}
+                searchId="policy-search"
+                searchPlaceholder="Search policies… (Enter)"
+            />
 
             {/* Table */}
             <DataTable
@@ -166,7 +199,7 @@ export function PoliciesClient({
                 loading={loading}
                 getRowId={(p: any) => p.id}
                 onRowClick={(row) => router.push(tenantHref(`/policies/${row.original.id}`))}
-                emptyState={hasActiveFilters ? 'No policies match your filters' : 'No policies found. Create your first policy to get started.'}
+                emptyState={hasActive ? 'No policies match your filters' : 'No policies found. Create your first policy to get started.'}
                 resourceName={(p) => p ? 'policies' : 'policy'}
                 data-testid="policies-table"
             />

@@ -1,13 +1,31 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { queryKeys } from '@/lib/queryKeys';
-import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
-import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
-import { risksFilterConfig } from '@/components/filters/configs';
-import { DataTable, createColumns } from '@/components/ui/table';
+import { NewRiskModal } from './NewRiskModal';
+import {
+    ColumnsDropdown,
+    DataTable,
+    createColumns,
+    getDefaultVisibility,
+    useListPagination,
+} from '@/components/ui/table';
+import { useColumnVisibility } from '@/components/ui/hooks';
+import {
+    FilterProvider,
+    useFilterContext,
+    useFilters,
+    type FilterType,
+} from '@/components/ui/filter';
+import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { toApiSearchParams } from '@/lib/filters/url-sync';
+import {
+    buildRiskFilters,
+    RISK_API_TRANSFORMS,
+    RISK_FILTER_KEYS,
+} from './filter-defs';
 
 interface RiskListItem {
     id: string;
@@ -16,10 +34,14 @@ interface RiskListItem {
     likelihood: number;
     impact: number;
     inherentScore: number;
+    score?: number;
+    category?: string | null;
     treatment: string | null;
     status?: string;
     nextReviewAt?: string | null;
     treatmentOwner?: string | null;
+    ownerUserId?: string | null;
+    owner?: { id: string; name: string | null; email: string | null } | null;
     asset: { name: string } | null;
     controls: unknown[];
 }
@@ -65,8 +87,24 @@ interface RisksClientProps {
 /**
  * Client island for risks — handles filters, heatmap toggle, and interactive list.
  * Data arrives pre-fetched from the server component, hydrated into React Query.
+ *
+ * Filter architecture (Epic 53):
+ *   - `useFilterContext` manages q, status, category, ownerUserId, score.
+ *   - The UI carries a single `score=min|max` token; `RISK_API_TRANSFORMS`
+ *     splits it into `scoreMin` + `scoreMax` at the API boundary.
  */
-export function RisksClient({
+export function RisksClient(props: RisksClientProps) {
+    const filterCtx = useFilterContext([], RISK_FILTER_KEYS, {
+        serverFilters: props.initialFilters,
+    });
+    return (
+        <FilterProvider value={filterCtx}>
+            <RisksPageInner {...props} />
+        </FilterProvider>
+    );
+}
+
+function RisksPageInner({
     initialRisks,
     initialFilters,
     tenantSlug,
@@ -78,20 +116,57 @@ export function RisksClient({
     const router = useRouter();
     const [view, setView] = useState<'register' | 'heatmap'>('register');
 
-    // URL-driven filter state
-    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'category'], initialFilters);
+    // Epic 54 — create-risk modal. Also auto-opens on `?create=1`, which
+    // the `/risks/new` redirect shim lands on; keeps legacy deep-links
+    // and `page.goto('/risks/new')` E2E scripts working against the
+    // modal flow. The flag is stripped after open so back/forward
+    // doesn't reopen the modal unexpectedly.
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        if (searchParams?.get('create') === '1') {
+            setIsCreateOpen(true);
+            const next = new URLSearchParams(searchParams.toString());
+            next.delete('create');
+            const qs = next.toString();
+            router.replace(
+                `/t/${tenantSlug}/risks${qs ? `?${qs}` : ''}`,
+                { scroll: false },
+            );
+        }
+        // First-mount only; filter state owns subsequent URL edits.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    // React Query with server-hydrated initial data
-    const hasFilters = !!(filters.q || filters.status || filters.category);
+    const filterCtx = useFilters();
+    const { state, search, hasActive } = filterCtx;
+
+    // ─── API query: UI state → API params (range split via transform) ───
+    const fetchParams = useMemo(
+        () => toApiSearchParams(state, { search, transforms: RISK_API_TRANSFORMS }),
+        [state, search],
+    );
+    const queryKeyFilters = useMemo(() => {
+        const obj: Record<string, string> = {};
+        for (const [k, v] of fetchParams) obj[k] = v;
+        return obj;
+    }, [fetchParams]);
+
     const serverHadFilters = initialFilters && Object.keys(initialFilters).length > 0;
-    const filtersMatchInitial = serverHadFilters
-        ? JSON.stringify(filters) === JSON.stringify(initialFilters)
-        : !hasFilters;
+    const filtersMatchInitial = useMemo(() => {
+        if (!serverHadFilters) return !hasActive;
+        const current = queryKeyFilters;
+        const keys = new Set([...Object.keys(current), ...Object.keys(initialFilters!)]);
+        for (const k of keys) {
+            if ((current[k] ?? '') !== (initialFilters![k] ?? '')) return false;
+        }
+        return true;
+    }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
+
     const risksQuery = useQuery<RiskListItem[]>({
-        queryKey: queryKeys.risks.list(tenantSlug, filters),
+        queryKey: queryKeys.risks.list(tenantSlug, queryKeyFilters),
         queryFn: async () => {
-            const params = new URLSearchParams(filters);
-            const qs = params.toString();
+            const qs = fetchParams.toString();
             const res = await fetch(apiUrl(`/risks${qs ? `?${qs}` : ''}`));
             if (!res.ok) throw new Error('Failed to fetch risks');
             return res.json();
@@ -102,6 +177,37 @@ export function RisksClient({
 
     const risks = risksQuery.data ?? [];
     const loading = risksQuery.isLoading && !risksQuery.data;
+
+    // ─── Pagination + column visibility (Epic 52) ───
+    const pg = useListPagination({ resetKey: fetchParams.toString() });
+    const riskColumnConfig = useMemo(
+        () => ({
+            all: ['title', 'asset', 'threat', 'lxi', 'inherentScore', 'level', 'treatment', 'controls'],
+            defaultVisible: ['title', 'asset', 'threat', 'lxi', 'inherentScore', 'level', 'treatment', 'controls'],
+        }),
+        [],
+    );
+    const { columnVisibility, setColumnVisibility } = useColumnVisibility(
+        'inflect:col-vis:risks',
+        riskColumnConfig,
+    );
+    const defaultRiskVisibility = useMemo(
+        () => getDefaultVisibility(riskColumnConfig),
+        [riskColumnConfig],
+    );
+    const riskColumnDropdown = useMemo(
+        () => [
+            { id: 'title', label: 'Title' },
+            { id: 'asset', label: 'Asset' },
+            { id: 'threat', label: 'Threat' },
+            { id: 'lxi', label: 'L × I' },
+            { id: 'inherentScore', label: 'Score' },
+            { id: 'level', label: 'Level' },
+            { id: 'treatment', label: 'Treatment' },
+            { id: 'controls', label: 'Controls' },
+        ],
+        [],
+    );
 
     // ── KPI Computations ──
     const total = risks.length;
@@ -206,7 +312,14 @@ export function RisksClient({
                             <Link href={tenantHref('/risks/import')} className="btn btn-secondary" id="risk-import-btn">
                                 Import
                             </Link>
-                            <Link href={tenantHref('/risks/new')} className="btn btn-primary" id="new-risk-btn">{t.addRisk}</Link>
+                            <button
+                                type="button"
+                                onClick={() => setIsCreateOpen(true)}
+                                className="btn btn-primary"
+                                id="new-risk-btn"
+                            >
+                                {t.addRisk}
+                            </button>
                         </>
                     )}
                 </div>
@@ -233,7 +346,17 @@ export function RisksClient({
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={risksFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
+            <RisksFilterToolbar
+                risks={risks}
+                columnsDropdown={
+                    <ColumnsDropdown
+                        columns={riskColumnDropdown}
+                        visibility={columnVisibility}
+                        onChange={(v) => setColumnVisibility(v)}
+                        defaultVisibility={defaultRiskVisibility}
+                    />
+                }
+            />
 
             {view === 'heatmap' ? (
                 <div className="glass-card p-6">
@@ -268,20 +391,54 @@ export function RisksClient({
                 </div>
             ) : (
                 <DataTable<RiskListItem>
-                    data={risks}
+                    data={pg.slice(risks)}
                     columns={riskColumns}
                     loading={loading}
                     getRowId={(r) => r.id}
                     onRowClick={(row) => router.push(tenantHref(`/risks/${row.original.id}`))}
                     emptyState={
-                        hasActiveFilters
+                        hasActive
                             ? 'No risks match your filters'
                             : t.noRisks
                     }
                     resourceName={(p) => p ? 'risks' : 'risk'}
+                    columnVisibility={columnVisibility}
+                    onColumnVisibilityChange={setColumnVisibility}
+                    pagination={pg.pagination}
+                    onPaginationChange={pg.setPagination}
+                    rowCount={risks.length}
                     data-testid="risks-table"
                 />
             )}
+
+            {permissions.canWrite && (
+                <NewRiskModal
+                    open={isCreateOpen}
+                    setOpen={setIsCreateOpen}
+                    tenantSlug={tenantSlug}
+                    apiUrl={apiUrl}
+                />
+            )}
         </div>
+    );
+}
+
+// ─── Risks filter toolbar ────────────────────────────────────────────
+
+function RisksFilterToolbar({
+    risks,
+    columnsDropdown,
+}: {
+    risks: RiskListItem[];
+    columnsDropdown?: React.ReactNode;
+}) {
+    const filters: FilterType[] = useMemo(() => buildRiskFilters(risks), [risks]);
+    return (
+        <FilterToolbar
+            filters={filters}
+            searchId="risk-search"
+            searchPlaceholder="Search risks… (Enter)"
+            actions={columnsDropdown}
+        />
     );
 }

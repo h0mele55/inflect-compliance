@@ -9,11 +9,30 @@ type FilterIcon =
 
 export type { FilterOperator };
 
+/**
+ * Reset behavior of a filter when the user clears all filters or returns to
+ * a list page's "default" view.
+ *
+ * - `clearable` (default): removed on `clearAllFilters` / "Reset" — the normal case.
+ * - `sticky`: survives `clearAllFilters`; used for view modes a user has opted
+ *   into (e.g. "archived shown") that the product wants to keep between resets.
+ * - `resetsToDefault`: removed from URL state, but the UI should re-apply a
+ *   documented default value. Distinct from `clearable` so page authors can
+ *   distinguish "no filter" from "default filter".
+ */
+export type FilterResetBehavior = "clearable" | "sticky" | "resetsToDefault";
+
 export type Filter = {
   key: string;
   icon: FilterIcon;
   label: string;
   labelPlural?: string; // Plural form of the label (optional, defaults to pluralize(label))
+  /** Optional short help text for accessible descriptions / tooltips. */
+  description?: string;
+  /** Optional group label for sectioning filters in dropdowns (e.g. "Attributes", "Timeline"). */
+  group?: string;
+  /** How `clearAllFilters` and "Reset" treat this filter. Default: `clearable`. */
+  resetBehavior?: FilterResetBehavior;
   options: FilterOption[] | null;
   /** When set to `range`, `FilterSelect` renders min/max controls instead of option list. */
   type?: "default" | "range";
@@ -52,7 +71,14 @@ export type Filter = {
 
 export type FilterOption = {
   value: any;
+  /** The human-facing label — what users see in the dropdown/pill. */
   label: string;
+  /**
+   * Optional display override for the active pill. Falls back to `label` when
+   * omitted. Use when the pill should read differently from the picker row
+   * (e.g. picker: "ACME Inc. — admin@acme.com", pill: "ACME Inc.").
+   */
+  displayLabel?: string;
   right?: ReactNode;
   icon?: FilterIcon;
   hideDuringSearch?: boolean;
@@ -60,9 +86,52 @@ export type FilterOption = {
   permalink?: string;
 };
 
+/**
+ * The set of primitive value shapes that can round-trip through a URL param.
+ * Any filter value encoded to the URL must flatten to one of these — complex
+ * values must provide their own `encode`/`decode` pair.
+ */
+export type PersistableFilterValue = string | number | boolean;
+
+/**
+ * Encode a filter value into its URL-safe string form and back.
+ *
+ * Scalar filters (enum/status, entity-ref ID) use the identity codec.
+ * Range filters use `encodeRangeToken` / `parseRangeToken`.
+ * Future boolean/date filters should export their own codec here rather than
+ * each page re-implementing parse logic.
+ */
+export interface FilterValueCodec<V> {
+  /** Persisted URL form. */
+  encode: (value: V) => string;
+  /** Parse URL form back into the typed value. `null` signals unparseable. */
+  decode: (raw: string) => V | null;
+}
+
+/**
+ * A strongly typed option, where the underlying value is narrowed to `V`
+ * instead of `any`. Existing components consume the loose `FilterOption`;
+ * page authors building new filters should prefer `TypedFilterOption<V>`
+ * and let the adapter coerce to `FilterOption` at the component boundary.
+ */
+export type TypedFilterOption<V> = Omit<FilterOption, "value"> & {
+  value: V;
+};
+
 export type ActiveFilter = {
   key: Filter["key"];
   values: FilterOption["value"][];
+  operator: FilterOperator;
+};
+
+/**
+ * Strongly typed active-filter form, parameterised by the filter key literal
+ * `K` and the value type `V`. Use inside generic helpers / hooks that want to
+ * statically assert which filter they're dealing with.
+ */
+export type TypedActiveFilter<K extends string, V> = {
+  key: K;
+  values: V[];
   operator: FilterOperator;
 };
 

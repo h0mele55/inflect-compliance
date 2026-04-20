@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import { Menu } from 'lucide-react';
 import { SidebarContent, MobileDrawer } from '@/components/layout/SidebarNav';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 // ─── Types ───
 
@@ -82,6 +83,9 @@ export function AppShell({ user, appName, children }: AppShellProps) {
                             <span className="text-white text-[10px] font-bold">IC</span>
                         </div>
                         <span className="text-sm font-semibold text-white">{appName}</span>
+                    </div>
+                    <div className="ml-auto">
+                        <ThemeToggle id="theme-toggle-mobile" />
                     </div>
                 </div>
 

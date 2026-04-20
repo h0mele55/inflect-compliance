@@ -5,10 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
-import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
-import { assetsFilterConfig } from '@/components/filters/configs';
 import { DataTable, createColumns } from '@/components/ui/table';
+import {
+    FilterProvider,
+    useFilterContext,
+    useFilters,
+} from '@/components/ui/filter';
+import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { toApiSearchParams } from '@/lib/filters/url-sync';
+import { buildAssetFilters, ASSET_FILTER_KEYS } from './filter-defs';
 
 const ASSET_TYPES = ['INFORMATION', 'APPLICATION', 'SYSTEM', 'SERVICE', 'DATA_STORE', 'INFRASTRUCTURE', 'VENDOR', 'PROCESS', 'PEOPLE_PROCESS', 'OTHER'];
 
@@ -44,7 +49,18 @@ interface AssetsClientProps {
  * Client island for assets — handles create form, filter interactions, and table navigation.
  * Data is pre-fetched server-side and passed via props.
  */
-export function AssetsClient({ initialAssets, initialFilters, tenantSlug, permissions, translations: t }: AssetsClientProps) {
+export function AssetsClient(props: AssetsClientProps) {
+    const filterCtx = useFilterContext([], ASSET_FILTER_KEYS, {
+        serverFilters: props.initialFilters,
+    });
+    return (
+        <FilterProvider value={filterCtx}>
+            <AssetsPageInner {...props} />
+        </FilterProvider>
+    );
+}
+
+function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permissions, translations: t }: AssetsClientProps) {
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ name: '', type: 'SYSTEM', classification: '', owner: '', location: '', confidentiality: 3, integrity: 3, availability: 3, dataResidency: '', retention: '' });
 
@@ -53,19 +69,31 @@ export function AssetsClient({ initialAssets, initialFilters, tenantSlug, permis
     const router = useRouter();
     const queryClient = useQueryClient();
 
-    // URL-driven filter state
-    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'type', 'status']);
-    const hasFilters = !!(filters.q || filters.type || filters.status);
+    const { state, search, hasActive } = useFilters();
+    const fetchParams = useMemo(
+        () => toApiSearchParams(state, { search }),
+        [state, search],
+    );
+    const queryKeyFilters = useMemo(() => {
+        const obj: Record<string, string> = {};
+        for (const [k, v] of fetchParams) obj[k] = v;
+        return obj;
+    }, [fetchParams]);
+
     const serverHadFilters = initialFilters && Object.keys(initialFilters).length > 0;
-    const filtersMatchInitial = serverHadFilters
-        ? JSON.stringify(filters) === JSON.stringify(initialFilters)
-        : !hasFilters;
+    const filtersMatchInitial = useMemo(() => {
+        if (!serverHadFilters) return !hasActive;
+        const keys = new Set([...Object.keys(queryKeyFilters), ...Object.keys(initialFilters)]);
+        for (const k of keys) {
+            if ((queryKeyFilters[k] ?? '') !== (initialFilters[k] ?? '')) return false;
+        }
+        return true;
+    }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
 
     const assetsQuery = useQuery({
-        queryKey: queryKeys.assets.list(tenantSlug, filters),
+        queryKey: queryKeys.assets.list(tenantSlug, queryKeyFilters),
         queryFn: async () => {
-            const params = new URLSearchParams(filters);
-            const qs = params.toString();
+            const qs = fetchParams.toString();
             const res = await fetch(apiUrl(`/assets${qs ? `?${qs}` : ''}`));
             if (!res.ok) throw new Error('Failed to fetch assets');
             return res.json();
@@ -73,6 +101,7 @@ export function AssetsClient({ initialAssets, initialFilters, tenantSlug, permis
         initialData: filtersMatchInitial ? initialAssets : undefined,
     });
     const assets = assetsQuery.data ?? [];
+    const liveFilters = useMemo(() => buildAssetFilters(), []);
 
     const createMutation = useMutation({
         mutationFn: async (newAsset: any) => {
@@ -141,7 +170,11 @@ export function AssetsClient({ initialAssets, initialFilters, tenantSlug, permis
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={assetsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} />
+            <FilterToolbar
+                filters={liveFilters}
+                searchId="asset-search"
+                searchPlaceholder="Search assets… (Enter)"
+            />
 
             {showForm && (
                 <form onSubmit={createAsset} className="glass-card p-6 space-y-4 animate-fadeIn">
@@ -165,7 +198,7 @@ export function AssetsClient({ initialAssets, initialFilters, tenantSlug, permis
                 columns={assetColumns}
                 getRowId={(a: any) => a.id}
                 onRowClick={(row) => router.push(tenantHref(`/assets/${row.original.id}`))}
-                emptyState={hasActiveFilters ? 'No assets match your filters' : t.noAssets}
+                emptyState={hasActive ? 'No assets match your filters' : t.noAssets}
                 resourceName={(p) => p ? 'assets' : 'asset'}
                 data-testid="assets-table"
             />

@@ -58,9 +58,10 @@ const providers: NextAuthConfig['providers'] = [
     }),
 ];
 
-// Test-only Credentials provider — gated to prevent production use
+// Credentials provider — enabled in test and dev, gated off in production
 if (
-    env.AUTH_TEST_MODE === '1'
+    env.AUTH_TEST_MODE === '1' ||
+    env.NODE_ENV !== 'production'
 ) {
     providers.push(
         Credentials({

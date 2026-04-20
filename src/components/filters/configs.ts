@@ -1,6 +1,11 @@
 import type { CompactFilterBarConfig } from './CompactFilterBar';
 
 // ─── Controls ───
+//
+// @deprecated Epic 53 — the Controls page now uses the shared filter system
+// (`src/app/t/[tenantSlug]/(app)/controls/filter-defs.ts` + FilterSelect).
+// This export remains only to avoid breaking legacy CompactFilterBar call
+// sites; no production page should import it for new work.
 
 export const controlsFilterConfig: CompactFilterBarConfig = {
     searchPlaceholder: 'Search controls… (Enter)',
@@ -29,6 +34,9 @@ export const controlsFilterConfig: CompactFilterBarConfig = {
 
 // ─── Tasks ───
 
+// @deprecated Epic 53 — Tasks page now uses
+// `src/app/t/[tenantSlug]/(app)/tasks/filter-defs.ts` + FilterSelect.
+// Kept only for the legacy CompactFilterBar API surface.
 export const tasksFilterConfig: CompactFilterBarConfig = {
     searchPlaceholder: 'Search tasks… (Enter)',
     filterKeys: ['q', 'status', 'type', 'severity', 'due'],
@@ -75,6 +83,9 @@ export const tasksFilterConfig: CompactFilterBarConfig = {
 
 // ─── Evidence ───
 
+// @deprecated Epic 53 — Evidence page now uses
+// `src/app/t/[tenantSlug]/(app)/evidence/filter-defs.ts` + FilterSelect.
+// Kept only for the legacy CompactFilterBar API surface.
 export const evidenceFilterConfig: CompactFilterBarConfig = {
     searchPlaceholder: 'Search evidence… (Enter)',
     filterKeys: ['q', 'type', 'controlId', 'tab'],
@@ -93,6 +104,9 @@ export const evidenceFilterConfig: CompactFilterBarConfig = {
 
 // ─── Risks ───
 
+// @deprecated Epic 53 — Risks page now uses
+// `src/app/t/[tenantSlug]/(app)/risks/filter-defs.ts` + FilterSelect.
+// Kept only for the legacy CompactFilterBar API surface.
 export const risksFilterConfig: CompactFilterBarConfig = {
     searchPlaceholder: 'Search risks… (Enter)',
     filterKeys: ['q', 'status', 'category'],
@@ -122,6 +136,9 @@ export const risksFilterConfig: CompactFilterBarConfig = {
 
 // ─── Policies ───
 
+// @deprecated Epic 53 — Policies page now uses
+// `src/app/t/[tenantSlug]/(app)/policies/filter-defs.ts` + FilterSelect.
+// Kept only for the legacy CompactFilterBar API surface.
 export const policiesFilterConfig: CompactFilterBarConfig = {
     searchPlaceholder: 'Search policies… (Enter)',
     filterKeys: ['q', 'status', 'category'],
@@ -158,6 +175,9 @@ export const policiesFilterConfig: CompactFilterBarConfig = {
 
 // ─── Assets ───
 
+// @deprecated Epic 53 — Assets page now uses
+// `src/app/t/[tenantSlug]/(app)/assets/filter-defs.ts` + FilterSelect.
+// Kept only for the legacy CompactFilterBar API surface.
 export const assetsFilterConfig: CompactFilterBarConfig = {
     searchPlaceholder: 'Search assets… (Enter)',
     filterKeys: ['q', 'type', 'status'],
@@ -189,6 +209,9 @@ export const assetsFilterConfig: CompactFilterBarConfig = {
 
 // ─── Vendors ───
 
+// @deprecated Epic 53 — Vendors page now uses
+// `src/app/t/[tenantSlug]/(app)/vendors/filter-defs.ts` + FilterSelect.
+// Kept only for the legacy CompactFilterBar API surface.
 export const vendorsFilterConfig: CompactFilterBarConfig = {
     searchPlaceholder: 'Search vendors… (Enter)',
     filterKeys: ['q', 'status', 'criticality', 'reviewDue'],

@@ -2,13 +2,36 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { NewControlModal } from './NewControlModal';
+import { ControlDetailSheet } from './ControlDetailSheet';
 import { queryKeys } from '@/lib/queryKeys';
-import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
-import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
-import { controlsFilterConfig } from '@/components/filters/configs';
 import { AppIcon } from '@/components/icons/AppIcon';
-import { DataTable, createColumns } from '@/components/ui/table';
+import {
+    ColumnsDropdown,
+    DataTable,
+    createColumns,
+    getDefaultVisibility,
+    useListPagination,
+} from '@/components/ui/table';
+import { useColumnVisibility } from '@/components/ui/hooks';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Modal } from '@/components/ui/modal';
+import {
+    FilterProvider,
+    filterStateToActiveFilters,
+    filterStateToUrlParams,
+    useFilterContext,
+    useFilters,
+    type ActiveFilter,
+    type FilterType,
+} from '@/components/ui/filter';
+import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import {
+    buildControlFilters,
+    CONTROL_FILTER_KEYS,
+    CONTROL_STATUS_LABELS,
+} from './filter-defs';
 
 // ─── Constants ───
 
@@ -19,10 +42,12 @@ const STATUS_BADGE: Record<string, string> = {
     NOT_STARTED: 'badge-neutral', IN_PROGRESS: 'badge-info', IMPLEMENTED: 'badge-success',
     NEEDS_REVIEW: 'badge-warning',
 };
-const STATUS_LABELS: Record<string, string> = {
-    NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress', IMPLEMENTED: 'Implemented',
-    NEEDS_REVIEW: 'Needs Review',
-};
+/**
+ * Status labels are sourced from the shared filter-defs module so the badge
+ * copy and the filter picker copy cannot drift. Keep the typed
+ * `CONTROL_STATUS_LABELS` as the single source of truth.
+ */
+const STATUS_LABELS: Record<string, string> = CONTROL_STATUS_LABELS;
 const FREQ_LABELS: Record<string, string> = {
     AD_HOC: 'Ad Hoc', DAILY: 'Daily', WEEKLY: 'Weekly',
     MONTHLY: 'Monthly', QUARTERLY: 'Quarterly', ANNUALLY: 'Annually',
@@ -43,8 +68,10 @@ interface ControlListItem {
     description: string | null;
     status: string;
     applicability: string;
+    category: string | null;
     frequency: string | null;
-    owner: { name: string } | null;
+    /** Widened to include id/email so the owner filter can resolve + display. */
+    owner: { id: string; name: string | null; email: string | null } | null;
     _count?: { controlTasks?: number; evidenceLinks?: number };
     controlTasks?: Array<{ status: string }>;
 }
@@ -68,12 +95,35 @@ interface ControlsClientProps {
 /**
  * Client island for controls — handles filters, status cycling, applicability mutations.
  * Data arrives pre-fetched from the server component, hydrated into React Query.
+ *
+ * Filter architecture (Epic 53):
+ *   - `useFilterContext` manages state + URL sync for everything except search.
+ *   - `search` is the `q` param, owned by the same context.
+ *   - Owner / Category options are derived client-side from loaded controls so
+ *     the picker reflects reality without an extra API call.
  */
-export function ControlsClient({
+export function ControlsClient(props: ControlsClientProps) {
+    // Build the filter context at the outer boundary so the provider can wrap
+    // the inner tree — the inner component consumes via `useFilters()`.
+    const filterCtx = useFilterContext(
+        // Static filter defs — options are patched in inside the inner component
+        // where `controls` are available. Outer uses the static shape for keys.
+        [],
+        CONTROL_FILTER_KEYS,
+        { serverFilters: props.initialFilters },
+    );
+
+    return (
+        <FilterProvider value={filterCtx}>
+            <ControlsPageInner {...props} />
+        </FilterProvider>
+    );
+}
+
+function ControlsPageInner({
     initialControls,
     initialFilters,
     tenantSlug,
-    permissions,
     appPermissions,
 }: ControlsClientProps) {
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
@@ -81,28 +131,72 @@ export function ControlsClient({
     const queryClient = useQueryClient();
     const router = useRouter();
 
-    // URL-driven filter state
-    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'applicability'], initialFilters);
+    const filterCtx = useFilters();
+    const { state, search, set, toggle, remove, removeAll, clearAll, hasActive } = filterCtx;
 
     // Justification modal state
     const [justificationModal, setJustificationModal] = useState<{ controlId: string; code: string } | null>(null);
     const [justification, setJustification] = useState('');
     const justificationRef = useRef<HTMLTextAreaElement>(null);
 
+    // Detail / edit Sheet state — selected control id or null for closed.
+    const [sheetControlId, setSheetControlId] = useState<string | null>(null);
+
+    // Create-control modal state. Auto-opens when the page is reached via
+    // `/controls?create=1` — the `/controls/new` page redirects here so
+    // deep links and E2E tests that `page.goto('/controls/new')` keep
+    // working against the modal-based flow.
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        if (searchParams?.get('create') === '1') {
+            setIsCreateOpen(true);
+            // Strip the flag so browser back/forward doesn't re-open the
+            // modal unexpectedly and so the URL stays clean after open.
+            const next = new URLSearchParams(searchParams.toString());
+            next.delete('create');
+            const qs = next.toString();
+            router.replace(`/t/${tenantSlug}/controls${qs ? `?${qs}` : ''}`, { scroll: false });
+        }
+        // Only run on first mount of the inner component; subsequent URL
+        // edits are driven by filter state (which does its own sync).
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ─── API query string from filter state + search ───
+    const filtersForQuery = useMemo(() => {
+        const params = filterStateToUrlParams(state);
+        if (search) params.set('q', search);
+        return params;
+    }, [state, search]);
+
+    // Flat shape for react-query cache key stability (objects with the same
+    // serialised content should hit the same cache entry).
+    const queryKeyFilters = useMemo(() => {
+        const obj: Record<string, string> = {};
+        for (const [k, v] of filtersForQuery) obj[k] = v;
+        return obj;
+    }, [filtersForQuery]);
+
     // ─── Query: controls list (hydrated with server data) ───
 
     // When server provides initialFilters, the data is already filtered server-side.
-    // Only skip initialData when the user has changed filters AFTER the initial load.
-    const hasFilters = !!(filters.q || filters.status || filters.applicability);
+    // Only use initialData when the live filter state still matches what the server saw.
     const serverHadFilters = initialFilters && Object.keys(initialFilters).length > 0;
-    const filtersMatchInitial = serverHadFilters
-        ? JSON.stringify(filters) === JSON.stringify(initialFilters)
-        : !hasFilters;
+    const filtersMatchInitial = useMemo(() => {
+        if (!serverHadFilters) return !hasActive;
+        const current = queryKeyFilters;
+        const keys = new Set([...Object.keys(current), ...Object.keys(initialFilters!)]);
+        for (const k of keys) {
+            if ((current[k] ?? '') !== (initialFilters![k] ?? '')) return false;
+        }
+        return true;
+    }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
+
     const controlsQuery = useQuery<ControlListItem[]>({
-        queryKey: queryKeys.controls.list(tenantSlug, filters),
+        queryKey: queryKeys.controls.list(tenantSlug, queryKeyFilters),
         queryFn: async () => {
-            const params = new URLSearchParams(filters);
-            const qs = params.toString();
+            const qs = filtersForQuery.toString();
             const res = await fetch(apiUrl(`/controls${qs ? `?${qs}` : ''}`));
             if (!res.ok) throw new Error('Failed to fetch controls');
             return res.json();
@@ -113,6 +207,49 @@ export function ControlsClient({
 
     const controls = controlsQuery.data ?? [];
     const loading = controlsQuery.isLoading && !controlsQuery.data;
+
+    // ─── Filter defs with runtime-derived owner/category options ───
+    const liveFilterDefs: FilterType[] = useMemo(
+        () => buildControlFilters(controls),
+        [controls],
+    );
+
+    // ─── Pagination + column visibility (Epic 52) ───
+    const pg = useListPagination({
+        resetKey: filtersForQuery.toString(),
+    });
+    const controlColumnConfig = useMemo(
+        () => ({
+            all: ['code', 'name', 'status', 'applicability', 'owner', 'frequency', 'tasks', 'evidence'],
+            defaultVisible: ['code', 'name', 'status', 'applicability', 'owner', 'tasks', 'evidence'],
+        }),
+        [],
+    );
+    const { columnVisibility, setColumnVisibility } = useColumnVisibility(
+        'inflect:col-vis:controls',
+        controlColumnConfig,
+    );
+    const columnDropdownItems = useMemo(
+        () => [
+            { id: 'code', label: 'Code' },
+            { id: 'name', label: 'Title' },
+            { id: 'status', label: 'Status' },
+            { id: 'applicability', label: 'Applicability' },
+            { id: 'owner', label: 'Owner' },
+            { id: 'frequency', label: 'Frequency' },
+            { id: 'tasks', label: 'Tasks' },
+            { id: 'evidence', label: 'Evidence' },
+        ],
+        [],
+    );
+    const defaultControlVisibility = useMemo(
+        () => getDefaultVisibility(controlColumnConfig),
+        [controlColumnConfig],
+    );
+    const activeFilters = useMemo(
+        () => filterStateToActiveFilters(state),
+        [state],
+    );
 
     // Focus justification textarea when modal opens
     useEffect(() => {
@@ -136,7 +273,7 @@ export function ControlsClient({
         onMutate: async ({ controlId, newStatus }) => {
             await queryClient.cancelQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
 
-            const listKey = queryKeys.controls.list(tenantSlug, filters);
+            const listKey = queryKeys.controls.list(tenantSlug, queryKeyFilters);
             const previousList = queryClient.getQueryData<ControlListItem[]>(listKey);
 
             if (previousList) {
@@ -179,7 +316,7 @@ export function ControlsClient({
         onMutate: async ({ controlId, applicability }) => {
             await queryClient.cancelQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
 
-            const listKey = queryKeys.controls.list(tenantSlug, filters);
+            const listKey = queryKeys.controls.list(tenantSlug, queryKeyFilters);
             const previousList = queryClient.getQueryData<ControlListItem[]>(listKey);
 
             if (previousList) {
@@ -360,6 +497,27 @@ export function ControlsClient({
                 <span className="text-xs text-slate-400">{getValue<number>()}</span>
             ),
         },
+        {
+            id: 'quick-edit',
+            header: '',
+            enableHiding: false,
+            cell: ({ row }) => (
+                appPermissions.controls.edit ? (
+                    <button
+                        type="button"
+                        aria-label="Open control detail sheet"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-content-muted transition-colors hover:bg-bg-muted hover:text-content-emphasis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        data-testid={`control-quick-edit-${row.original.id}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setSheetControlId(row.original.id);
+                        }}
+                    >
+                        <AppIcon name="edit" size={14} />
+                    </button>
+                ) : null
+            ),
+        },
     ]), [appPermissions, handleStatusClick, handleApplicabilityClick, tenantHref, taskStats]);
 
     return (
@@ -372,80 +530,141 @@ export function ControlsClient({
                 </div>
                 {appPermissions.controls.create && (
                     <div className="flex gap-2">
-                        <Link href={tenantHref('/controls/dashboard')} className="btn btn-secondary" id="controls-dashboard-btn">
+                        <Link href={tenantHref('/controls/dashboard')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="controls-dashboard-btn">
                             <AppIcon name="dashboard" size={14} /> Dashboard
                         </Link>
-                        <Link href={tenantHref('/frameworks')} className="btn btn-secondary" id="frameworks-btn">
+                        <Link href={tenantHref('/frameworks')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="frameworks-btn">
                             <AppIcon name="frameworks" size={14} /> Frameworks
                         </Link>
-                        <Link href={tenantHref('/controls/templates')} className="btn btn-secondary" id="install-templates-btn">
+                        <Link href={tenantHref('/controls/templates')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="install-templates-btn">
                             <AppIcon name="templates" size={14} /> Install from Templates
                         </Link>
-                        <Link href={tenantHref('/controls/new')} className="btn btn-primary" id="new-control-btn">
+                        <button
+                            type="button"
+                            className={buttonVariants({ variant: 'primary', size: 'sm' })}
+                            id="new-control-btn"
+                            onClick={() => setIsCreateOpen(true)}
+                        >
                             + New Control
-                        </Link>
+                        </button>
                     </div>
                 )}
             </div>
 
-            {/* Filters */}
-            <CompactFilterBar config={controlsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="control" />
+            {/* Filters — Epic 53 enterprise filter system */}
+            <FilterToolbar
+                filters={liveFilterDefs}
+                searchId="control-search"
+                searchPlaceholder="Search controls… (Enter)"
+                actions={
+                    <ColumnsDropdown
+                        columns={columnDropdownItems}
+                        visibility={columnVisibility}
+                        onChange={(v) => setColumnVisibility(v)}
+                        defaultVisibility={defaultControlVisibility}
+                    />
+                }
+            />
 
             {/* Table */}
             <DataTable<ControlListItem>
-                data={controls}
+                data={pg.slice(controls)}
                 columns={controlColumns}
                 loading={loading}
                 getRowId={(c) => c.id}
                 onRowClick={(row) => router.push(tenantHref(`/controls/${row.original.id}`))}
                 emptyState={
-                    hasActiveFilters
+                    hasActive
                         ? 'No controls match your filters. Try adjusting your search or filters.'
                         : 'No controls found. Install from templates or create a new control.'
                 }
                 resourceName={(p) => p ? 'controls' : 'control'}
+                columnVisibility={columnVisibility}
+                onColumnVisibilityChange={setColumnVisibility}
+                pagination={pg.pagination}
+                onPaginationChange={pg.setPagination}
+                rowCount={controls.length}
                 data-testid="controls-table"
             />
 
-            {/* Justification Modal */}
-            {justificationModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" id="justification-modal-backdrop" onClick={handleJustificationCancel}>
-                    <div className="glass-card p-6 w-full max-w-md space-y-4 animate-fadeIn" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-semibold text-white">Mark as Not Applicable</h3>
-                        <p className="text-sm text-slate-400">
-                            Provide justification for marking control <span className="font-mono text-white">{justificationModal.code}</span> as not applicable.
-                        </p>
-                        <textarea
-                            ref={justificationRef}
-                            className="input w-full"
-                            rows={3}
-                            placeholder="Justification is required..."
-                            value={justification}
-                            onChange={e => setJustification(e.target.value)}
-                            id="justification-input"
-                        />
-                        <div className="flex justify-end gap-2">
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
-                                onClick={handleJustificationCancel}
-                                id="justification-cancel-btn"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={handleJustificationSave}
-                                disabled={!justification.trim()}
-                                id="justification-save-btn"
-                            >
-                                Save
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Create Control Modal (Epic 54) */}
+            <NewControlModal
+                open={isCreateOpen}
+                setOpen={setIsCreateOpen}
+                tenantSlug={tenantSlug}
+            />
+
+            {/* Control Detail / Edit Sheet (Epic 54) */}
+            <ControlDetailSheet
+                controlId={sheetControlId}
+                setControlId={setSheetControlId}
+                tenantSlug={tenantSlug}
+                apiUrl={apiUrl}
+                tenantHref={tenantHref}
+                canWrite={appPermissions.controls.edit}
+            />
+
+            {/* Justification Modal — migrated to the shared <Modal> (Epic 54) */}
+            <Modal
+                showModal={!!justificationModal}
+                setShowModal={(v) => {
+                    const next = typeof v === 'function' ? v(!!justificationModal) : v;
+                    if (!next) handleJustificationCancel();
+                }}
+                size="sm"
+                title="Mark as Not Applicable"
+                description={
+                    justificationModal
+                        ? `Provide justification for marking control ${justificationModal.code} as not applicable.`
+                        : undefined
+                }
+            >
+                <Modal.Header
+                    title="Mark as Not Applicable"
+                    description={
+                        justificationModal ? (
+                            <>
+                                Provide justification for marking control{' '}
+                                <span className="font-mono text-content-emphasis">
+                                    {justificationModal.code}
+                                </span>{' '}
+                                as not applicable.
+                            </>
+                        ) : null
+                    }
+                />
+                <Modal.Body>
+                    <textarea
+                        ref={justificationRef}
+                        className="input w-full"
+                        rows={4}
+                        placeholder="Justification is required..."
+                        value={justification}
+                        onChange={(e) => setJustification(e.target.value)}
+                        id="justification-input"
+                    />
+                </Modal.Body>
+                <Modal.Actions>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleJustificationCancel}
+                        id="justification-cancel-btn"
+                        text="Cancel"
+                    />
+                    <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={handleJustificationSave}
+                        disabled={!justification.trim()}
+                        id="justification-save-btn"
+                        text="Save"
+                    />
+                </Modal.Actions>
+            </Modal>
         </div>
     );
 }
+

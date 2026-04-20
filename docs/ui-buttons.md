@@ -190,3 +190,42 @@ When migrating a page to the design system:
 | `token-migration.test.ts` | Migrated pages import and use the correct primitives |
 | `design-system-drift.test.ts` | Raw colors reappearing in migrated pages, duplicate components |
 | `button-consistency.test.ts` | Ad-hoc inline button styling in page files |
+| `legacy-ui-ratchet.test.ts` | Prevents net-new `className="btn …"` / `className="badge …"` usage — ratchet only goes down |
+| `theme-provider.test.ts` | ThemeProvider + ThemeToggle contract, legacy→semantic token alias bridge in globals.css |
+
+## Theme Switching
+
+Epic 51 also shipped runtime theme switching. `ThemeProvider` (mounted in
+`src/app/providers.tsx`) reads the user's stored preference, falls back to
+`prefers-color-scheme`, and writes `data-theme="dark"` or `"light"` on
+`<html>`. Every semantic token in `tokens.css` carries both palettes so
+every token-driven component (CSS classes **and** CVA variants) flips in
+sync.
+
+Consumers:
+
+```tsx
+import { useTheme } from '@/components/theme/ThemeProvider';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
+
+const { theme, setTheme, toggle } = useTheme();
+// or drop the ready-made icon button:
+<ThemeToggle />
+```
+
+The toggle is already mounted in the sidebar footer (desktop) and the
+mobile top bar. Don't mount a second instance — `useTheme()` is available
+from any client component inside the providers tree.
+
+### What the token bridge unlocked
+
+- `globals.css`'s `.btn`, `.badge`, `.glass-card`, `.input`, `.nav-link`,
+  `.icon-btn` all now resolve to `var(--bg-*)` / `var(--content-*)` /
+  `var(--border-*)` / `var(--brand-*)`. Swapping the active theme via
+  `[data-theme="light"]` changes those classes with zero code touch.
+- Legacy alias variables (`--bg-primary`, `--brand`, `--text-secondary`,
+  etc.) are preserved as thin delegations in `globals.css` so any remaining
+  `var(--bg-primary)` callers keep rendering.
+- The CVA primitives (`buttonVariants`, `statusBadgeVariants`) already
+  consumed the semantic tokens before Epic 51 remediation; the bridge just
+  brings the *CSS class* layer into the same palette.

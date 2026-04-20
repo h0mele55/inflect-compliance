@@ -155,8 +155,8 @@ test.describe('Reporting & Audit Narrative', () => {
         await page.click('#create-cycle-btn');
         await page.waitForSelector('#cycle-form', { timeout: 5000 });
 
-        // Fill form
-        await page.selectOption('#fw-select', 'ISO27001');
+        // Fill form — ISO27001 is the default selection in the
+        // Epic 55 Combobox migration of #fw-select, so no click needed.
         await page.fill('#cycle-name-input', `E2E Audit Cycle ${UNIQUE}`);
 
         // Submit

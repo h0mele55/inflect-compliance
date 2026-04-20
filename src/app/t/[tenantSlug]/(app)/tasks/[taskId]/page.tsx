@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonLine, SkeletonCard } from '@/components/ui/skeleton';
+import { UserCombobox } from '@/components/ui/user-combobox';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -76,7 +77,7 @@ export default function TaskDetailPage() {
     const params = useParams();
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
-    const { permissions, role } = useTenantContext();
+    const { permissions, role, tenantSlug } = useTenantContext();
     const taskId = params?.taskId as string;
 
     const [task, setTask] = useState<any>(null);
@@ -297,14 +298,19 @@ export default function TaskDetailPage() {
                         <span className="text-sm text-white font-medium" id="task-assignee">
                             {task.assignee?.name || task.assigneeUserId || 'Unassigned'}
                         </span>
-                        <input
-                            type="text"
-                            className="input w-48 text-sm"
-                            placeholder="User ID"
-                            value={assigneeInput}
-                            onChange={e => setAssigneeInput(e.target.value)}
-                            id="task-assignee-input"
-                        />
+                        <div className="w-64">
+                            <UserCombobox
+                                id="task-assignee-input"
+                                name="assigneeUserId"
+                                tenantSlug={tenantSlug}
+                                selectedId={assigneeInput || null}
+                                onChange={(userId) =>
+                                    setAssigneeInput(userId ?? '')
+                                }
+                                placeholder="Unassigned"
+                                forceDropdown={false}
+                            />
+                        </div>
                         <button className="btn btn-secondary" onClick={handleAssign} disabled={assigning} id="assign-task-btn">
                             {assigning ? 'Saving...' : 'Assign'}
                         </button>

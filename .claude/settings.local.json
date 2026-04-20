@@ -18,7 +18,12 @@
       "mcp__MCP_DOCKER__browser_take_screenshot",
       "mcp__MCP_DOCKER__browser_console_messages",
       "Bash(npx playwright *)",
-      "Bash(wc *)"
+      "Bash(wc *)",
+      "Bash(git diff *)",
+      "Bash(echo \"Started $!\")",
+      "Read(//tmp/**)",
+      "Bash(tee /tmp/e2e-run.log)",
+      "Skill(update-config)"
     ]
   }
 }

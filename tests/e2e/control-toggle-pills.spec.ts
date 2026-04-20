@@ -90,7 +90,7 @@ test.describe('Control Toggle Pills', () => {
 
         // Click to toggle to NOT_APPLICABLE — should open modal
         await targetPill.click();
-        await expect(page.locator('#justification-modal-backdrop')).toBeVisible({ timeout: 3000 });
+        await expect(page.locator('#justification-input')).toBeVisible({ timeout: 3000 });
         await expect(page.locator('#justification-input')).toBeVisible();
 
         // Save button should be disabled without justification
@@ -104,7 +104,7 @@ test.describe('Control Toggle Pills', () => {
         const resApp = page.waitForResponse(res => res.url().includes('/applicability') && res.request().method() === 'POST');
         await page.locator('#justification-save-btn').click();
         await resApp;
-        await expect(page.locator('#justification-modal-backdrop')).toBeHidden({ timeout: 3000 });
+        await expect(page.locator('#justification-input')).toBeHidden({ timeout: 3000 });
 
         // Pill should now show N/A
         const text = await targetPill.textContent();
@@ -137,11 +137,11 @@ test.describe('Control Toggle Pills', () => {
 
         // Click to open modal
         await targetPill.click();
-        await expect(page.locator('#justification-modal-backdrop')).toBeVisible({ timeout: 3000 });
+        await expect(page.locator('#justification-input')).toBeVisible({ timeout: 3000 });
 
         // Cancel
         await page.locator('#justification-cancel-btn').click();
-        await expect(page.locator('#justification-modal-backdrop')).toBeHidden({ timeout: 3000 });
+        await expect(page.locator('#justification-input')).toBeHidden({ timeout: 3000 });
 
         // Pill should still show "Yes"
         const text = await targetPill.textContent();

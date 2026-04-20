@@ -79,17 +79,9 @@ test.describe('Onboarding Wizard', () => {
     });
 
     test('non-admin cannot access onboarding', async ({ page }) => {
-        // Login as reader via the UI
-        await page.goto('/login');
-        await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-        await page.fill('input[type="email"]', 'viewer@acme.com');
-        await page.fill('input[type="password"]', 'password123');
-        await page.click('button[type="submit"]');
-        await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });
-
-        const url = new URL(page.url());
-        const match = url.pathname.match(/^\/t\/([^/]+)\//);
-        const slug = match ? match[1] : 'acme-corp';
+        // Use the resilient login helper — direct `waitForURL` after submit is flaky
+        // because the dev server occasionally returns MissingCSRF on first attempt.
+        const slug = await loginAsAdmin(page, { email: 'viewer@acme.com', password: 'password123' });
 
         await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
         await page.waitForLoadState('networkidle');

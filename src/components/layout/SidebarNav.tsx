@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTenantContext, useTenantHref, usePermissions } from '@/lib/tenant-context-provider';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import {
     X,
     LayoutDashboard,
@@ -179,10 +180,13 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
 
             {/* User */}
             <div className="p-3 border-t border-slate-700/50">
-                <div className="mb-2">
-                    <p className="text-xs font-medium text-slate-300 truncate">{user.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{tenant.tenantName}</p>
-                    <p className="text-xs text-brand-400">{tenant.role}</p>
+                <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-300 truncate">{user.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{tenant.tenantName}</p>
+                        <p className="text-xs text-brand-400">{tenant.role}</p>
+                    </div>
+                    <ThemeToggle id="theme-toggle-desktop" />
                 </div>
                 <button
                     onClick={onLogout}

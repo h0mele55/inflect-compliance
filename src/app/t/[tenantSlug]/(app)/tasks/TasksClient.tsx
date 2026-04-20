@@ -5,12 +5,17 @@ import { useRouter } from 'next/navigation';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
-import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
-import { tasksFilterConfig } from '@/components/filters/configs';
 import { formatDate } from '@/lib/format-date';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 import { DataTable, createColumns } from '@/components/ui/table';
+import {
+    FilterProvider,
+    useFilterContext,
+    useFilters,
+} from '@/components/ui/filter';
+import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { toApiSearchParams } from '@/lib/filters/url-sync';
+import { buildTaskFilters, TASK_FILTER_KEYS } from './filter-defs';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -68,7 +73,18 @@ interface TasksClientProps {
  * Client island for tasks — handles filters, bulk selection, optimistic mutations.
  * Data arrives pre-fetched from the server component, hydrated into React Query.
  */
-export function TasksClient({
+export function TasksClient(props: TasksClientProps) {
+    const filterCtx = useFilterContext([], TASK_FILTER_KEYS, {
+        serverFilters: props.initialFilters,
+    });
+    return (
+        <FilterProvider value={filterCtx}>
+            <TasksPageInner {...props} />
+        </FilterProvider>
+    );
+}
+
+function TasksPageInner({
     initialTasks,
     initialFilters,
     tenantSlug,
@@ -83,8 +99,7 @@ export function TasksClient({
     const [hydrated, setHydrated] = useState(false);
     useEffect(() => { setHydrated(true); }, []);
 
-    // URL-driven filter state
-    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'type', 'severity', 'due'], initialFilters);
+    const { state, search, hasActive } = useFilters();
 
     // Bulk selection
     const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -93,17 +108,30 @@ export function TasksClient({
 
     // ─── Query: tasks list (hydrated with server data) ───
 
-    const hasFilters = !!(filters.q || filters.status || filters.type || filters.severity || filters.due);
+    const fetchParams = useMemo(
+        () => toApiSearchParams(state, { search }),
+        [state, search],
+    );
+    const queryKeyFilters = useMemo(() => {
+        const obj: Record<string, string> = {};
+        for (const [k, v] of fetchParams) obj[k] = v;
+        return obj;
+    }, [fetchParams]);
+
     const serverHadFilters = initialFilters && Object.keys(initialFilters).length > 0;
-    const filtersMatchInitial = serverHadFilters
-        ? JSON.stringify(filters) === JSON.stringify(initialFilters)
-        : !hasFilters;
+    const filtersMatchInitial = useMemo(() => {
+        if (!serverHadFilters) return !hasActive;
+        const keys = new Set([...Object.keys(queryKeyFilters), ...Object.keys(initialFilters!)]);
+        for (const k of keys) {
+            if ((queryKeyFilters[k] ?? '') !== (initialFilters![k] ?? '')) return false;
+        }
+        return true;
+    }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
 
     const tasksQuery = useQuery<TaskListItem[]>({
-        queryKey: queryKeys.tasks.list(tenantSlug, filters),
+        queryKey: queryKeys.tasks.list(tenantSlug, queryKeyFilters),
         queryFn: async () => {
-            const params = new URLSearchParams(filters);
-            const qs = params.toString();
+            const qs = fetchParams.toString();
             const res = await fetch(apiUrl(`/tasks${qs ? `?${qs}` : ''}`));
             if (!res.ok) throw new Error('Failed to fetch tasks');
             return res.json();
@@ -116,6 +144,10 @@ export function TasksClient({
 
     const tasks = tasksQuery.data ?? [];
     const loading = tasksQuery.isLoading && !tasksQuery.data;
+    const liveFilters = useMemo(
+        () => buildTaskFilters(tasks as unknown as Parameters<typeof buildTaskFilters>[0]),
+        [tasks],
+    );
 
     const isOverdue = (task: TaskListItem) => task.dueAt && new Date(task.dueAt) < new Date() && !(TERMINAL_WORK_ITEM_STATUSES as readonly string[]).includes(task.status);
 
@@ -157,7 +189,7 @@ export function TasksClient({
         onMutate: async ({ action, value, ids }) => {
             await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all(tenantSlug) });
 
-            const listKey = queryKeys.tasks.list(tenantSlug, filters);
+            const listKey = queryKeys.tasks.list(tenantSlug, queryKeyFilters);
             const previousList = queryClient.getQueryData<TaskListItem[]>(listKey);
 
             if (previousList) {
@@ -300,7 +332,11 @@ export function TasksClient({
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={tasksFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="task" />
+            <FilterToolbar
+                filters={liveFilters}
+                searchId="task-search"
+                searchPlaceholder="Search tasks… (Enter)"
+            />
 
             {/* Bulk Actions Toolbar */}
             {appPermissions.tasks.edit && selected.size > 0 && (

@@ -511,9 +511,22 @@ describe('Filter module architecture', () => {
    * Internal modules (not re-exported from barrel, imported by other public modules).
    * These are implementation details and should NOT be added to the public API.
    */
-  const INTERNAL_MODULES = new Set(['filter-range-panel', 'filter-scroll']);
+  const INTERNAL_MODULES = new Set([
+    'filter-range-panel',
+    'filter-range-utils',
+    'filter-scroll',
+    'filter-select-utils',
+  ]);
 
-  it('all public .ts/.tsx files are referenced in barrel (internal modules excluded)', () => {
+  /**
+   * Reference modules — deliberately not re-exported from the barrel and not
+   * imported by any other module. They exist for docs/tests/playground use
+   * (`filter-examples.ts` ships representative patterns for page authors).
+   * If a reference module becomes load-bearing, move it out of this set.
+   */
+  const REFERENCE_MODULES = new Set(['filter-examples']);
+
+  it('all public .ts/.tsx files are referenced in barrel (internal + reference modules excluded)', () => {
     const barrel = fs.readFileSync(path.join(filterDir, 'index.ts'), 'utf-8');
     const files = fs.readdirSync(filterDir)
       .filter(f => (f.endsWith('.ts') || f.endsWith('.tsx')) && f !== 'index.ts');
@@ -521,16 +534,40 @@ describe('Filter module architecture', () => {
     for (const file of files) {
       const mod = file.replace(/\.(ts|tsx)$/, '');
       if (INTERNAL_MODULES.has(mod)) continue; // Internal: checked separately
+      if (REFERENCE_MODULES.has(mod)) continue; // Reference: intentionally excluded
       expect(barrel).toContain(mod);
     }
   });
 
-  it('internal modules are imported by at least one public module', () => {
-    for (const internal of INTERNAL_MODULES) {
-      const publicFiles = fs.readdirSync(filterDir)
-        .filter(f => (f.endsWith('.ts') || f.endsWith('.tsx')) && f !== 'index.ts' && !INTERNAL_MODULES.has(f.replace(/\.(ts|tsx)$/, '')));
+  it('reference modules are not imported by any public module (kept isolated)', () => {
+    const publicFiles = fs.readdirSync(filterDir)
+      .filter(f => (f.endsWith('.ts') || f.endsWith('.tsx')) && f !== 'index.ts')
+      .filter(f => {
+        const mod = f.replace(/\.(ts|tsx)$/, '');
+        return !REFERENCE_MODULES.has(mod);
+      });
 
-      const importedBy = publicFiles.filter(f => {
+    for (const ref of REFERENCE_MODULES) {
+      const importers = publicFiles.filter(f => {
+        const src = fs.readFileSync(path.join(filterDir, f), 'utf-8');
+        return src.includes(`./${ref}`);
+      });
+      // Zero importers — reference modules must stay isolated so production
+      // code never accidentally pulls in example / test data.
+      expect(importers).toEqual([]);
+    }
+  });
+
+  it('internal modules are imported by at least one other module (dead-code sentinel)', () => {
+    // Previously: "imported by a *public* module". That over-constrained
+    // internal → internal imports (e.g. filter-range-utils ← filter-range-panel)
+    // where both sides are internal but the util is still load-bearing.
+    for (const internal of INTERNAL_MODULES) {
+      const otherFiles = fs.readdirSync(filterDir)
+        .filter(f => (f.endsWith('.ts') || f.endsWith('.tsx')) && f !== 'index.ts')
+        .filter(f => f.replace(/\.(ts|tsx)$/, '') !== internal);
+
+      const importedBy = otherFiles.filter(f => {
         const src = fs.readFileSync(path.join(filterDir, f), 'utf-8');
         return src.includes(`./${internal}`);
       });

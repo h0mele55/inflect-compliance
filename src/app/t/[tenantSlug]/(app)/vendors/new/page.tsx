@@ -3,17 +3,33 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
-const CRIT_OPTIONS = [
-    { value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' },
-    { value: 'HIGH', label: 'High' }, { value: 'CRITICAL', label: 'Critical' },
-];
+// Epic 55 — vendor status is a two-option choice ("onboarding" vs
+// "active"). RadioGroup is the right primitive: both options are
+// visible at a glance, the choice is a user decision (not a dropdown
+// of many), and it reads as a pair of pills rather than a concealed
+// menu.
 const STATUS_OPTIONS = [
-    { value: 'ACTIVE', label: 'Active' }, { value: 'ONBOARDING', label: 'Onboarding' },
+    { value: 'ACTIVE', label: 'Active' },
+    { value: 'ONBOARDING', label: 'Onboarding' },
 ];
-const DATA_ACCESS_OPTIONS = [
-    { value: '', label: '— None —' }, { value: 'NONE', label: 'None' },
-    { value: 'LOW', label: 'Low' }, { value: 'MEDIUM', label: 'Medium' }, { value: 'HIGH', label: 'High' },
+
+// 4–5 option enums → Combobox (`hideSearch`) keeps the form compact
+// and visually consistent with the other pickers on the page.
+const CRIT_OPTIONS: ComboboxOption[] = [
+    { value: 'LOW', label: 'Low' },
+    { value: 'MEDIUM', label: 'Medium' },
+    { value: 'HIGH', label: 'High' },
+    { value: 'CRITICAL', label: 'Critical' },
+];
+const DATA_ACCESS_OPTIONS: ComboboxOption[] = [
+    { value: 'NONE', label: 'None' },
+    { value: 'LOW', label: 'Low' },
+    { value: 'MEDIUM', label: 'Medium' },
+    { value: 'HIGH', label: 'High' },
 ];
 
 export default function CreateVendorPage() {
@@ -110,21 +126,54 @@ export default function CreateVendorPage() {
                 <div className="grid grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1">Status</label>
-                        <select className="input w-full" value={form.status} onChange={e => update('status', e.target.value)} id="vendor-status-select">
-                            {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        <RadioGroup
+                            id="vendor-status-select"
+                            value={form.status}
+                            onValueChange={(v) => update('status', v)}
+                            className="flex gap-4 pt-1"
+                        >
+                            {STATUS_OPTIONS.map((o) => {
+                                const itemId = `vendor-status-${o.value.toLowerCase()}`;
+                                return (
+                                    <div key={o.value} className="flex items-center gap-2">
+                                        <RadioGroupItem value={o.value} id={itemId} />
+                                        <Label htmlFor={itemId} className="cursor-pointer">
+                                            {o.label}
+                                        </Label>
+                                    </div>
+                                );
+                            })}
+                        </RadioGroup>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1">Criticality</label>
-                        <select className="input w-full" value={form.criticality} onChange={e => update('criticality', e.target.value)} id="vendor-criticality-select">
-                            {CRIT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        <Combobox
+                            id="vendor-criticality-select"
+                            name="criticality"
+                            options={CRIT_OPTIONS}
+                            selected={CRIT_OPTIONS.find(o => o.value === form.criticality) ?? null}
+                            setSelected={(o) => update('criticality', o?.value ?? '')}
+                            placeholder="Select criticality…"
+                            hideSearch
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-full' }}
+                            caret
+                        />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-1">Data Access</label>
-                        <select className="input w-full" value={form.dataAccess} onChange={e => update('dataAccess', e.target.value)} id="vendor-data-access">
-                            {DATA_ACCESS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        <Combobox
+                            id="vendor-data-access"
+                            name="dataAccess"
+                            options={DATA_ACCESS_OPTIONS}
+                            selected={DATA_ACCESS_OPTIONS.find(o => o.value === form.dataAccess) ?? null}
+                            setSelected={(o) => update('dataAccess', o?.value ?? '')}
+                            placeholder="— None —"
+                            hideSearch
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-full' }}
+                            caret
+                        />
                     </div>
                 </div>
 

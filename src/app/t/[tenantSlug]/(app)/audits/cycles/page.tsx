@@ -4,11 +4,32 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { FieldGroup } from '@/components/ui/field-group';
 
 const FW_META: Record<string, { icon: AppIconName; label: string; color: string }> = {
     ISO27001: { icon: 'shield', label: 'ISO/IEC 27001:2022', color: 'from-indigo-500 to-purple-600' },
     NIS2: { icon: 'globe', label: 'NIS2 Directive', color: 'from-blue-500 to-cyan-600' },
 };
+
+// Epic 55 — framework picker options. Labels are intentionally verbose
+// (include the version / full regulation name) because the Combobox
+// search index benefits from the extra tokens ("ISO", "27001", "NIS2",
+// "EU 2022/2555" all become fuzzy-matchable).
+const FW_OPTIONS: ComboboxOption<{ version: string }>[] = [
+    {
+        value: 'ISO27001',
+        label: 'ISO/IEC 27001:2022',
+        meta: { version: '2022' },
+    },
+    {
+        value: 'NIS2',
+        label: 'NIS2 Directive (EU 2022/2555)',
+        meta: { version: 'EU_2022_2555' },
+    },
+];
 
 const STATUS_BADGE: Record<string, string> = {
     PLANNING: 'badge-neutral', IN_PROGRESS: 'badge-info', READY: 'badge-success', COMPLETE: 'badge-warning',
@@ -68,24 +89,45 @@ export default function AuditCyclesPage() {
             </div>
 
             {showForm && (
-                <form onSubmit={create} className="glass-card p-6 space-y-4 animate-fadeIn" id="cycle-form">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="input-label">Framework *</label>
-                            <select className="input w-full" value={form.frameworkKey}
-                                onChange={e => setForm(f => ({ ...f, frameworkKey: e.target.value }))} id="fw-select">
-                                <option value="ISO27001">ISO/IEC 27001:2022</option>
-                                <option value="NIS2">NIS2 Directive (EU 2022/2555)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="input-label">Cycle Name *</label>
-                            <input className="input w-full" required value={form.name}
-                                onChange={e => setForm(f => ({ ...f, name: e.target.value }))} id="cycle-name-input"
-                                placeholder="e.g. ISO27001 Recertification 2025" />
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
+                <form onSubmit={create} className="glass-card p-6 animate-fadeIn" id="cycle-form">
+                    <FieldGroup columns={2} gap="md">
+                        <FormField label="Framework" required>
+                            <Combobox<false, { version: string }>
+                                id="fw-select"
+                                name="frameworkKey"
+                                options={FW_OPTIONS}
+                                selected={
+                                    FW_OPTIONS.find(
+                                        (o) => o.value === form.frameworkKey,
+                                    ) ?? null
+                                }
+                                setSelected={(option) => {
+                                    if (!option) return;
+                                    setForm((f) => ({
+                                        ...f,
+                                        frameworkKey: option.value,
+                                    }));
+                                }}
+                                placeholder="Select framework…"
+                                searchPlaceholder="Search frameworks…"
+                                matchTriggerWidth
+                                buttonProps={{ className: 'w-full' }}
+                                caret
+                            />
+                        </FormField>
+                        <FormField label="Cycle name" required>
+                            <Input
+                                id="cycle-name-input"
+                                required
+                                value={form.name}
+                                onChange={(e) =>
+                                    setForm((f) => ({ ...f, name: e.target.value }))
+                                }
+                                placeholder="e.g. ISO27001 Recertification 2025"
+                            />
+                        </FormField>
+                    </FieldGroup>
+                    <div className="mt-4 flex gap-2">
                         <button type="submit" className="btn btn-primary" id="submit-cycle-btn">Create Cycle</button>
                         <button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary">Cancel</button>
                     </div>

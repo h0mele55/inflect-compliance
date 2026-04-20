@@ -1,0 +1,289 @@
+/**
+ * Epic 55 Prompt 6 — status/lifecycle/enum migration contract.
+ *
+ * Asserts the primitive-fit across the five migrated surfaces:
+ *   1. tasks/new                  → Combobox hideSearch × 3 (type/severity/priority)
+ *   2. controls/NewControlModal   → Combobox × 2 (category/frequency, freq hideSearch)
+ *   3. controls/ControlDetailSheet → Combobox × 2 (category/frequency, freq hideSearch)
+ *   4. risks/NewRiskModal         → Combobox × 1 (category)
+ *   5. vendors/new                → RadioGroup × 1 (status) + Combobox hideSearch × 2
+ *
+ * Primitive rules verified:
+ *   - ≤3 user-choice options with all-visible semantics  → RadioGroup.
+ *   - 4–7 enum options where search adds no value        → Combobox `hideSearch`.
+ *   - ≥8 options OR dynamic list                         → Combobox with search.
+ *
+ * Every migrated control preserves its legacy id for E2E parity and
+ * its `name` attribute for native `<form onSubmit>` serialisation.
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+const ROOT = path.resolve(__dirname, '../../');
+function read(rel: string): string {
+    return fs.readFileSync(path.join(ROOT, rel), 'utf-8');
+}
+
+const TASK_NEW_SRC = read('src/app/t/[tenantSlug]/(app)/tasks/new/page.tsx');
+const CONTROL_MODAL_SRC = read(
+    'src/app/t/[tenantSlug]/(app)/controls/NewControlModal.tsx',
+);
+const CONTROL_SHEET_SRC = read(
+    'src/app/t/[tenantSlug]/(app)/controls/ControlDetailSheet.tsx',
+);
+const RISK_MODAL_SRC = read(
+    'src/app/t/[tenantSlug]/(app)/risks/NewRiskModal.tsx',
+);
+const VENDORS_NEW_SRC = read(
+    'src/app/t/[tenantSlug]/(app)/vendors/new/page.tsx',
+);
+
+// ─── 1. tasks/new — type / severity / priority ────────────────────
+
+describe('tasks/new — type / severity / priority Combobox', () => {
+    it('imports Combobox', () => {
+        expect(TASK_NEW_SRC).toMatch(
+            /from ["']@\/components\/ui\/combobox["']/,
+        );
+    });
+
+    const PICKER_IDS = [
+        'task-type-select',
+        'task-severity-select',
+        'task-priority-select',
+    ];
+
+    it.each(PICKER_IDS)('no native <select id="%s">', (id) => {
+        expect(TASK_NEW_SRC).not.toMatch(
+            new RegExp(`<select[^>]*\\bid=["']${id}["']`),
+        );
+    });
+
+    it.each(PICKER_IDS)(
+        'Combobox preserves id="%s" for E2E parity',
+        (id) => {
+            expect(TASK_NEW_SRC).toMatch(
+                new RegExp(`<Combobox[\\s\\S]{0,500}id=["']${id}["']`),
+            );
+        },
+    );
+
+    it('uses hideSearch — these are ≤5-option enums with no search value', () => {
+        // All three pickers should have hideSearch; count at least 3
+        // occurrences of the hideSearch flag across the file.
+        const hits = TASK_NEW_SRC.match(/hideSearch/g) ?? [];
+        expect(hits.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('preserves legacy TYPE_OPTIONS / SEVERITY_OPTIONS / PRIORITY_OPTIONS constants (typed as ComboboxOption[])', () => {
+        expect(TASK_NEW_SRC).toMatch(
+            /TYPE_OPTIONS:\s*ComboboxOption\[\]/,
+        );
+        expect(TASK_NEW_SRC).toMatch(
+            /SEVERITY_OPTIONS:\s*ComboboxOption\[\]/,
+        );
+        expect(TASK_NEW_SRC).toMatch(
+            /PRIORITY_OPTIONS:\s*ComboboxOption\[\]/,
+        );
+    });
+});
+
+// ─── 2. NewControlModal — category + frequency ────────────────────
+
+describe('NewControlModal — category + frequency Comboboxes', () => {
+    it('imports Combobox', () => {
+        expect(CONTROL_MODAL_SRC).toMatch(
+            /from ["']@\/components\/ui\/combobox["']/,
+        );
+    });
+
+    it.each(['control-category-input', 'control-frequency-input'])(
+        'no native <select id="%s">',
+        (id) => {
+            expect(CONTROL_MODAL_SRC).not.toMatch(
+                new RegExp(`<select[^>]*\\bid=["']${id}["']`),
+            );
+        },
+    );
+
+    it.each(['control-category-input', 'control-frequency-input'])(
+        'Combobox preserves id="%s"',
+        (id) => {
+            expect(CONTROL_MODAL_SRC).toMatch(
+                new RegExp(`<Combobox[\\s\\S]{0,500}id=["']${id}["']`),
+            );
+        },
+    );
+
+    it('category Combobox uses search (10 options); frequency uses hideSearch (7)', () => {
+        // Category has `searchPlaceholder`; frequency has `hideSearch`.
+        expect(CONTROL_MODAL_SRC).toMatch(
+            /id=["']control-category-input["'][\s\S]{0,800}searchPlaceholder=["']Search categories/,
+        );
+        expect(CONTROL_MODAL_SRC).toMatch(
+            /id=["']control-frequency-input["'][\s\S]{0,800}hideSearch/,
+        );
+    });
+
+    it('uses forceDropdown inside the modal (no nested Vaul Drawer)', () => {
+        const hits = CONTROL_MODAL_SRC.match(/forceDropdown/g) ?? [];
+        expect(hits.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('CATEGORY_OPTIONS + FREQUENCY_OPTIONS are typed ComboboxOption[] (no stale string[] shape)', () => {
+        expect(CONTROL_MODAL_SRC).toMatch(
+            /FREQUENCY_OPTIONS:\s*ComboboxOption\[\]/,
+        );
+        expect(CONTROL_MODAL_SRC).toMatch(
+            /CATEGORY_OPTIONS:\s*ComboboxOption\[\]/,
+        );
+    });
+});
+
+// ─── 3. ControlDetailSheet — category + frequency ─────────────────
+
+describe('ControlDetailSheet — category + frequency Comboboxes', () => {
+    it('imports Combobox', () => {
+        expect(CONTROL_SHEET_SRC).toMatch(
+            /from ["']@\/components\/ui\/combobox["']/,
+        );
+    });
+
+    it.each(['sheet-category-input', 'sheet-frequency-input'])(
+        'no native <select id="%s">',
+        (id) => {
+            expect(CONTROL_SHEET_SRC).not.toMatch(
+                new RegExp(`<select[^>]*\\bid=["']${id}["']`),
+            );
+        },
+    );
+
+    it.each(['sheet-category-input', 'sheet-frequency-input'])(
+        'Combobox preserves id="%s"',
+        (id) => {
+            expect(CONTROL_SHEET_SRC).toMatch(
+                new RegExp(`<Combobox[\\s\\S]{0,500}id=["']${id}["']`),
+            );
+        },
+    );
+
+    it('both pickers wire disabled={!canWrite} so RBAC mirrors the rest of the sheet', () => {
+        const hits = CONTROL_SHEET_SRC.match(/disabled=\{!canWrite\}/g) ?? [];
+        expect(hits.length).toBeGreaterThanOrEqual(3); // fieldset + 2 pickers
+    });
+});
+
+// ─── 4. NewRiskModal — category ───────────────────────────────────
+
+describe('NewRiskModal — category Combobox', () => {
+    it('no native <select id="risk-category">', () => {
+        expect(RISK_MODAL_SRC).not.toMatch(
+            /<select[^>]*\bid=["']risk-category["']/,
+        );
+    });
+
+    it('Combobox preserves id="risk-category" + name="category"', () => {
+        expect(RISK_MODAL_SRC).toMatch(
+            /<Combobox[\s\S]{0,500}id=["']risk-category["']/,
+        );
+        expect(RISK_MODAL_SRC).toMatch(
+            /<Combobox[\s\S]{0,500}name=["']category["']/,
+        );
+    });
+
+    it('projects CATEGORIES into CATEGORY_OPTIONS typed as ComboboxOption[]', () => {
+        expect(RISK_MODAL_SRC).toMatch(
+            /CATEGORY_OPTIONS:\s*ComboboxOption\[\]\s*=\s*CATEGORIES\.map/,
+        );
+    });
+
+    it('keeps the existing CATEGORIES const as the single source of truth', () => {
+        expect(RISK_MODAL_SRC).toMatch(/const CATEGORIES\s*=\s*\[/);
+    });
+});
+
+// ─── 5. vendors/new — status RadioGroup + criticality/dataAccess Combobox ─
+
+describe('vendors/new — mixed primitives (RadioGroup + Combobox)', () => {
+    it('imports Combobox + RadioGroup + Label', () => {
+        expect(VENDORS_NEW_SRC).toMatch(
+            /from ["']@\/components\/ui\/combobox["']/,
+        );
+        expect(VENDORS_NEW_SRC).toMatch(
+            /from ["']@\/components\/ui\/radio-group["']/,
+        );
+        expect(VENDORS_NEW_SRC).toMatch(
+            /from ["']@\/components\/ui\/label["']/,
+        );
+    });
+
+    it('vendor status uses RadioGroup (2-option user choice, all-visible)', () => {
+        expect(VENDORS_NEW_SRC).toMatch(
+            /<RadioGroup[\s\S]{0,300}id=["']vendor-status-select["']/,
+        );
+        expect(VENDORS_NEW_SRC).toMatch(/<RadioGroupItem\b/);
+    });
+
+    it('no native <select> for any of the 3 enum pickers', () => {
+        for (const id of [
+            'vendor-status-select',
+            'vendor-criticality-select',
+            'vendor-data-access',
+        ]) {
+            expect(VENDORS_NEW_SRC).not.toMatch(
+                new RegExp(`<select[^>]*\\bid=["']${id}["']`),
+            );
+        }
+    });
+
+    it('criticality + dataAccess use Combobox hideSearch (4–5 option enums)', () => {
+        expect(VENDORS_NEW_SRC).toMatch(
+            /<Combobox[\s\S]{0,500}id=["']vendor-criticality-select["'][\s\S]{0,500}hideSearch/,
+        );
+        expect(VENDORS_NEW_SRC).toMatch(
+            /<Combobox[\s\S]{0,500}id=["']vendor-data-access["'][\s\S]{0,500}hideSearch/,
+        );
+    });
+
+    it('DATA_ACCESS_OPTIONS drops the phantom empty-value row (Combobox treats null via placeholder)', () => {
+        // Legacy had `{ value: '', label: '— None —' }` as an option.
+        // Combobox carries this via `placeholder="— None —"` instead.
+        expect(VENDORS_NEW_SRC).toMatch(
+            /DATA_ACCESS_OPTIONS:\s*ComboboxOption\[\]\s*=\s*\[\s*\{\s*value:\s*['"]NONE['"]/,
+        );
+        expect(VENDORS_NEW_SRC).toMatch(
+            /placeholder=["']— None —["']/,
+        );
+    });
+});
+
+// ─── 6. Cross-cutting drift sentinels ─────────────────────────────
+
+describe('Epic 55 Prompt 6 — drift sentinels', () => {
+    it('every migrated picker also carries a `name` attribute for form serialisation', () => {
+        for (const [src, ids] of [
+            [TASK_NEW_SRC, ['type', 'severity', 'priority']],
+            [CONTROL_MODAL_SRC, ['category', 'frequency']],
+            [CONTROL_SHEET_SRC, ['category', 'frequency']],
+            [RISK_MODAL_SRC, ['category']],
+            [VENDORS_NEW_SRC, ['criticality', 'dataAccess']],
+        ] as const) {
+            for (const name of ids) {
+                expect(src).toMatch(
+                    new RegExp(`name=["']${name}["']`),
+                );
+            }
+        }
+    });
+
+    it('RadioGroup is only used where semantically appropriate (vendor status, 2 options)', () => {
+        // Only vendors/new should use <RadioGroup> among the five
+        // migrated surfaces; the others should stay on <Combobox>.
+        expect(VENDORS_NEW_SRC).toMatch(/<RadioGroup\b/);
+        expect(TASK_NEW_SRC).not.toMatch(/<RadioGroup\b/);
+        expect(CONTROL_MODAL_SRC).not.toMatch(/<RadioGroup\b/);
+        expect(CONTROL_SHEET_SRC).not.toMatch(/<RadioGroup\b/);
+        expect(RISK_MODAL_SRC).not.toMatch(/<RadioGroup\b/);
+    });
+});

@@ -134,7 +134,7 @@ export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, 
                     getRowId={(r: any) => r.id}
                     emptyState="No risks in the register"
                     resourceName={(p) => p ? 'risks' : 'risk'}
-                    data-testid="risk-register-table"
+                    data-testid="risk-table"
                 />
             )}
         </>

@@ -13,10 +13,11 @@ test.describe('Issue Management', () => {
         tenantSlug = await loginAndGetTenant(page);
         await gotoAndVerify(page, `/t/${tenantSlug}/tasks`, 'h1');
         await expect(page.locator('#new-task-btn')).toBeVisible({ timeout: 10000 });
+        // `#task-search` is the FilterToolbar searchId on this page.
+        // Epic 53 consolidated status/type/severity into a single Filter
+        // popover — the old `#task-status-filter` / `#task-type-filter`
+        // / `#task-severity-filter` inputs no longer exist.
         await expect(page.locator('#task-search')).toBeVisible();
-        await expect(page.locator('#task-status-filter')).toBeVisible();
-        await expect(page.locator('#task-type-filter')).toBeVisible();
-        await expect(page.locator('#task-severity-filter')).toBeVisible();
     });
 
     test('create a new issue and see detail', async ({ page }) => {
@@ -72,23 +73,39 @@ test.describe('Issue Management', () => {
         await page.click(`text=E2E Issue ${uniqueId}`);
         await page.waitForSelector('#task-title', { timeout: 10000 });
 
-        // Verify assign controls are visible for admin
+        // Verify assign controls are visible for admin. Epic 55:
+        // #task-assignee-input is now a <UserCombobox> trigger button,
+        // not a text input. Interact via click + search + option click.
         await expect(page.locator('#task-assignee-input')).toBeVisible();
         await expect(page.locator('#assign-task-btn')).toBeVisible();
 
-        // Get current user's ID from session and try assigning
+        // Pull current user's email/name from session so we can pick
+        // ourselves out of the member picker fuzzy-search index.
         const session = await page.evaluate(async () => {
             const res = await fetch('/api/auth/session');
             return res.json();
         });
-        const userId = session?.user?.id;
-        if (userId) {
-            await page.fill('#task-assignee-input', userId);
-            await page.click('#assign-task-btn');
-            await page.waitForLoadState('networkidle');
-            // After assign, reload and confirm the input still has the value
-            await page.reload();
-            await page.waitForSelector('#task-assignee', { timeout: 10000 });
+        const email = session?.user?.email as string | undefined;
+        const name = (session?.user?.name as string | undefined) || email;
+        if (email && name) {
+            await page.click('#task-assignee-input');
+            const search = page.getByPlaceholder('Search members…');
+            await search.fill(name);
+            const option = page
+                .getByRole('option')
+                .filter({ hasText: email })
+                .first();
+            const visible = await option
+                .waitFor({ state: 'visible', timeout: 5000 })
+                .then(() => true)
+                .catch(() => false);
+            if (visible) {
+                await option.click();
+                await page.click('#assign-task-btn');
+                await page.waitForLoadState('networkidle');
+                await page.reload();
+                await page.waitForSelector('#task-assignee', { timeout: 10000 });
+            }
         }
     });
 

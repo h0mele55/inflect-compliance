@@ -1,144 +1,536 @@
 "use client";
 
+/**
+ * Epic 54 — canonical responsive Modal.
+ *
+ * The single source of truth for modal dialogs across Inflect. Page
+ * authors compose this primitive for every create/edit/confirm flow;
+ * do not build bespoke overlays with `fixed inset-0 bg-black/60`.
+ *
+ * Architecture:
+ *   - Radix Dialog on desktop (focus trap, `inert`, Escape, portal).
+ *   - Vaul Drawer on mobile (drag-to-dismiss, native feel).
+ *   - One controlled `showModal` / `setShowModal` pair opens either.
+ *   - Structured slots: `<Modal.Header>`, `<Modal.Body>`, `<Modal.Footer>`,
+ *     `<Modal.Actions>`, `<Modal.Close>`. The body scrolls independently
+ *     so long forms never trap the header/footer offscreen.
+ *
+ * Design-token alignment:
+ *   - Every surface / text / border class is a semantic token; the Epic 51
+ *     theme toggle flips the modal in lock-step with the rest of the app.
+ *
+ * Accessibility:
+ *   - Always ships a `Dialog.Title` — either the `<Modal.Header title=…>`
+ *     the consumer renders, or a visually-hidden fallback using the
+ *     `title` prop. Radix refuses to mount without a title, so the
+ *     fallback also prevents runtime warnings.
+ *   - `description` is wired to `aria-describedby`.
+ *   - Floating close button carries `aria-label="Close"` and focus-visible
+ *     ring via the shared `focus-visible:ring-ring` token.
+ *   - Escape, backdrop click, and drag-to-dismiss all route through the
+ *     same `closeModal` path so `preventDefaultClose` works for unsaved-
+ *     state guards regardless of surface.
+ */
+
 import { cn } from "@dub/utils";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import { cva, type VariantProps } from "class-variance-authority";
+import { AlertTriangle, Info, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { ComponentProps, Dispatch, SetStateAction } from "react";
+import {
+    ComponentProps,
+    Dispatch,
+    FormEventHandler,
+    ReactNode,
+    SetStateAction,
+    type HTMLAttributes,
+} from "react";
 import { Drawer } from "vaul";
 import { useMediaQuery } from "./hooks";
 
-export function Modal({
-  children,
-  className,
-  showModal,
-  setShowModal,
-  onClose,
-  desktopOnly,
-  preventDefaultClose,
-  drawerRootProps,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  showModal?: boolean;
-  setShowModal?: Dispatch<SetStateAction<boolean>>;
-  onClose?: () => void;
-  desktopOnly?: boolean;
-  preventDefaultClose?: boolean;
-  drawerRootProps?: ComponentProps<typeof Drawer.Root>;
-}) {
-  const router = useRouter();
+// ─── Size variants ──────────────────────────────────────────────────
 
-  const closeModal = ({ dragged }: { dragged?: boolean } = {}) => {
-    if (preventDefaultClose && !dragged) {
-      return;
-    }
-    // fire onClose event if provided
-    onClose && onClose();
+const modalContentVariants = cva(
+    [
+        // Base layout: centred, full-width on small screens, capped height
+        // with independent body scroll. Header/footer pinned via the slot
+        // components below.
+        "fixed inset-0 z-40 m-auto h-fit w-full",
+        "flex max-h-[min(85vh,680px)] flex-col",
+        "border border-border-subtle bg-bg-default text-content-emphasis",
+        "p-0 shadow-lg sm:rounded-2xl",
+        "scrollbar-hide animate-scale-in overflow-hidden",
+    ],
+    {
+        variants: {
+            size: {
+                // Confirm dialogs — tight, centred, quick to read.
+                xs: "max-w-sm",
+                // Small forms (1-3 fields).
+                sm: "max-w-md",
+                // Default CRUD forms.
+                md: "max-w-lg",
+                // Longer forms / side-by-side inputs.
+                lg: "max-w-2xl",
+                // Data-entry panels with lots of content.
+                xl: "max-w-4xl",
+                // Full-width on desktop (rare — use Sheet instead).
+                full: "max-w-[calc(100vw-2rem)]",
+            },
+        },
+        defaultVariants: {
+            size: "md",
+        },
+    },
+);
 
-    // if setShowModal is defined, use it to close modal
-    if (setShowModal) {
-      setShowModal(false);
-      // else, this is intercepting route @modal
-    } else {
-      router.back();
-    }
-  };
-  const { isMobile } = useMediaQuery();
+// ─── Responsive presentation helper (exported) ──────────────────────
 
-  if (isMobile && !desktopOnly) {
-    return (
-      <Drawer.Root
-        open={setShowModal ? showModal : true}
-        onOpenChange={(open) => {
-          if (!open) {
-            closeModal({ dragged: true });
-          }
-        }}
-        {...drawerRootProps}
-      >
-        <Drawer.Portal>
-          <Drawer.Overlay className="fixed inset-0 z-50 bg-neutral-100 bg-opacity-10 backdrop-blur" />
-          <Drawer.Content
-            onPointerDownOutside={(e) => {
-              // Prevent dismissal when clicking inside a toast
-              if (
-                e.target instanceof Element &&
-                e.target.closest("[data-sonner-toast]")
-              ) {
-                e.preventDefault();
-              }
-            }}
-            className={cn(
-              "fixed bottom-0 left-0 right-0 z-50 flex flex-col",
-              "rounded-t-[10px] border-t border-neutral-200 bg-white",
-              className,
-            )}
-          >
-            <div className="scrollbar-hide flex-1 overflow-y-auto rounded-t-[10px] bg-inherit">
-              <VisuallyHidden.Root>
-                <Drawer.Title>Modal</Drawer.Title>
-                <Drawer.Description>This is a modal</Drawer.Description>
-              </VisuallyHidden.Root>
-              <DrawerIsland />
-              {children}
-            </div>
-          </Drawer.Content>
-          <Drawer.Overlay />
-        </Drawer.Portal>
-      </Drawer.Root>
+export type ModalPresentation = "dialog" | "drawer";
+
+/**
+ * Resolve the presentation surface for a modal given the viewport and
+ * caller preferences. Exported so advanced consumers (sheets, custom
+ * overlays) can share the exact decision logic.
+ */
+export function resolveModalPresentation(opts: {
+    isMobile: boolean;
+    desktopOnly?: boolean;
+}): ModalPresentation {
+    if (opts.desktopOnly) return "dialog";
+    return opts.isMobile ? "drawer" : "dialog";
+}
+
+// ─── Props ──────────────────────────────────────────────────────────
+
+export interface ModalProps extends VariantProps<typeof modalContentVariants> {
+    children: ReactNode;
+    /** Additional class for the Dialog.Content / Drawer.Content surface. */
+    className?: string;
+    /** Controlled open state. Omit both to use the intercepting-route pattern. */
+    showModal?: boolean;
+    setShowModal?: Dispatch<SetStateAction<boolean>>;
+    /** Fires before the close happens (both surfaces). */
+    onClose?: () => void;
+    /** Force dialog even on mobile (rare — drops drag-to-dismiss). */
+    desktopOnly?: boolean;
+    /** Ignore backdrop / Escape closes unless the user drags on mobile. */
+    preventDefaultClose?: boolean;
+    drawerRootProps?: ComponentProps<typeof Drawer.Root>;
+    // ── A11y ──
+    /** Accessible name for the dialog. Required for screen readers. */
+    title?: string;
+    /** Longer description; becomes `aria-describedby` content. */
+    description?: string;
+    /** Render a floating close button on desktop. Default: true. */
+    showCloseButton?: boolean;
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+function ModalRoot({
+    children,
+    className,
+    size,
+    showModal,
+    setShowModal,
+    onClose,
+    desktopOnly,
+    preventDefaultClose,
+    drawerRootProps,
+    title,
+    description,
+    showCloseButton = true,
+}: ModalProps) {
+    const router = useRouter();
+    const { isMobile } = useMediaQuery();
+
+    const closeModal = ({ dragged }: { dragged?: boolean } = {}) => {
+        if (preventDefaultClose && !dragged) return;
+        onClose?.();
+        if (setShowModal) setShowModal(false);
+        else router.back();
+    };
+
+    const presentation = resolveModalPresentation({ isMobile, desktopOnly });
+
+    const fallbackDialogTitle = (
+        <VisuallyHidden.Root>
+            <Dialog.Title>{title ?? "Dialog"}</Dialog.Title>
+            {description ? (
+                <Dialog.Description>{description}</Dialog.Description>
+            ) : null}
+        </VisuallyHidden.Root>
     );
-  }
+    const fallbackDrawerTitle = (
+        <VisuallyHidden.Root>
+            <Drawer.Title>{title ?? "Dialog"}</Drawer.Title>
+            {description ? (
+                <Drawer.Description>{description}</Drawer.Description>
+            ) : null}
+        </VisuallyHidden.Root>
+    );
 
-  return (
-    <Dialog.Root
-      open={setShowModal ? showModal : true}
-      onOpenChange={(open) => {
-        if (!open) {
-          closeModal();
-        }
-      }}
-    >
-      <Dialog.Portal>
-        <Dialog.Overlay
-          // for detecting when there's an active opened modal
-          id="modal-backdrop"
-          className="animate-fade-in fixed inset-0 z-40 bg-neutral-100 bg-opacity-50 backdrop-blur-md"
-        />
-        <Dialog.Content
-          onOpenAutoFocus={(e) => e.preventDefault()}
-          onCloseAutoFocus={(e) => e.preventDefault()}
-          onPointerDownOutside={(e) => {
-            // Prevent dismissal when clicking inside a toast
-            if (
-              e.target instanceof Element &&
-              e.target.closest("[data-sonner-toast]")
-            ) {
-              e.preventDefault();
-            }
-          }}
-          className={cn(
-            "fixed inset-0 z-40 m-auto h-fit w-full max-w-md",
-            "border border-neutral-200 bg-white p-0 shadow-xl sm:rounded-2xl",
-            "scrollbar-hide animate-scale-in overflow-y-auto",
-            className,
-          )}
+    if (presentation === "drawer") {
+        return (
+            <Drawer.Root
+                open={setShowModal ? showModal : true}
+                onOpenChange={(open) => {
+                    if (!open) closeModal({ dragged: true });
+                }}
+                {...drawerRootProps}
+            >
+                <Drawer.Portal>
+                    <Drawer.Overlay
+                        data-modal-overlay
+                        className="fixed inset-0 z-50 bg-bg-overlay backdrop-blur"
+                    />
+                    <Drawer.Content
+                        onPointerDownOutside={(e) => {
+                            if (
+                                e.target instanceof Element &&
+                                e.target.closest("[data-sonner-toast]")
+                            ) {
+                                e.preventDefault();
+                            }
+                        }}
+                        className={cn(
+                            "fixed bottom-0 left-0 right-0 z-50 flex flex-col",
+                            "max-h-[92vh] rounded-t-[10px] border-t border-border-subtle bg-bg-default text-content-emphasis",
+                            className,
+                        )}
+                    >
+                        <DrawerHandle />
+                        {fallbackDrawerTitle}
+                        <div
+                            data-modal-body-wrapper
+                            className="flex flex-1 flex-col overflow-hidden rounded-t-[10px] bg-inherit"
+                        >
+                            {children}
+                        </div>
+                    </Drawer.Content>
+                </Drawer.Portal>
+            </Drawer.Root>
+        );
+    }
+
+    return (
+        <Dialog.Root
+            open={setShowModal ? showModal : true}
+            onOpenChange={(open) => {
+                if (!open) closeModal();
+            }}
         >
-          <VisuallyHidden.Root>
-            <Dialog.Title>Modal</Dialog.Title>
-            <Dialog.Description>This is a modal</Dialog.Description>
-          </VisuallyHidden.Root>
-          {children}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
+            <Dialog.Portal>
+                <Dialog.Overlay
+                    id="modal-backdrop"
+                    data-modal-overlay
+                    className="animate-fade-in fixed inset-0 z-40 bg-bg-overlay backdrop-blur-md"
+                />
+                <Dialog.Content
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                    onCloseAutoFocus={(e) => e.preventDefault()}
+                    onPointerDownOutside={(e) => {
+                        if (
+                            e.target instanceof Element &&
+                            e.target.closest("[data-sonner-toast]")
+                        ) {
+                            e.preventDefault();
+                        }
+                    }}
+                    className={cn(modalContentVariants({ size }), className)}
+                >
+                    {fallbackDialogTitle}
+                    {children}
+                    {showCloseButton && !preventDefaultClose ? (
+                        <Dialog.Close asChild>
+                            <button
+                                type="button"
+                                aria-label="Close"
+                                className="absolute right-3 top-3 rounded-md p-1.5 text-content-muted transition-colors hover:bg-bg-muted hover:text-content-emphasis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                data-modal-close
+                            >
+                                <X className="size-4" />
+                            </button>
+                        </Dialog.Close>
+                    ) : null}
+                </Dialog.Content>
+            </Dialog.Portal>
+        </Dialog.Root>
+    );
 }
 
-function DrawerIsland() {
-  return (
-    <div className="sticky top-0 z-20 flex items-center justify-center rounded-t-[10px] bg-inherit">
-      <div className="my-3 h-1 w-12 rounded-full bg-neutral-300" />
-    </div>
-  );
+// ─── Structured slots ───────────────────────────────────────────────
+
+function DrawerHandle() {
+    return (
+        <div className="sticky top-0 z-20 flex shrink-0 items-center justify-center rounded-t-[10px] bg-inherit">
+            <div className="my-3 h-1 w-12 rounded-full bg-border-emphasis" />
+        </div>
+    );
 }
+
+/**
+ * Pinned header. Rendering this automatically declares the Dialog.Title
+ * (so you don't need `title=` on <Modal>). Long body content scrolls
+ * underneath the header stays visible.
+ */
+function Header({
+    title,
+    description,
+    className,
+    children,
+    ...rest
+}: HTMLAttributes<HTMLDivElement> & {
+    title?: ReactNode;
+    description?: ReactNode;
+}) {
+    return (
+        <div
+            data-modal-header
+            className={cn(
+                "flex shrink-0 flex-col gap-1 border-b border-border-subtle px-5 py-4",
+                className,
+            )}
+            {...rest}
+        >
+            {title ? (
+                <Dialog.Title asChild>
+                    <h2 className="text-base font-semibold text-content-emphasis">
+                        {title}
+                    </h2>
+                </Dialog.Title>
+            ) : null}
+            {description ? (
+                <Dialog.Description asChild>
+                    <p className="text-sm text-content-muted">{description}</p>
+                </Dialog.Description>
+            ) : null}
+            {children}
+        </div>
+    );
+}
+
+/**
+ * Scrollable content area. The body takes the remaining height between
+ * pinned header and footer so long forms scroll inside the modal without
+ * the overlay itself scrolling.
+ */
+function Body({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
+    return (
+        <div
+            data-modal-body
+            className={cn(
+                "scrollbar-thin flex-1 overflow-y-auto px-5 py-4 text-sm text-content-default",
+                className,
+            )}
+            {...rest}
+        />
+    );
+}
+
+/**
+ * Pinned footer — typically holds `<Modal.Actions>` or bespoke buttons.
+ */
+function Footer({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
+    return (
+        <div
+            data-modal-footer
+            className={cn(
+                "flex shrink-0 items-center justify-end gap-2 border-t border-border-subtle px-5 py-3",
+                className,
+            )}
+            {...rest}
+        />
+    );
+}
+
+/**
+ * Conventional "Cancel | Save" action row. Wraps children in a footer so
+ * callers don't need to compose both.
+ */
+function Actions({
+    className,
+    children,
+    align = "right",
+    ...rest
+}: HTMLAttributes<HTMLDivElement> & { align?: "left" | "right" | "between" }) {
+    return (
+        <Footer
+            className={cn(
+                align === "left" && "justify-start",
+                align === "between" && "justify-between",
+                className,
+            )}
+            {...rest}
+        >
+            {children}
+        </Footer>
+    );
+}
+
+/**
+ * Convenience wrapper that renders a `<form>` inside the modal body so
+ * the body controls scroll while form submission flows through a single
+ * `onSubmit` handler. Pair with `<Modal.Actions>` for Cancel/Save.
+ */
+function Form({
+    children,
+    className,
+    onSubmit,
+    ...rest
+}: Omit<HTMLAttributes<HTMLFormElement>, "onSubmit"> & {
+    onSubmit?: FormEventHandler<HTMLFormElement>;
+}) {
+    return (
+        <form
+            noValidate
+            onSubmit={onSubmit}
+            data-modal-form
+            className={cn("flex flex-1 flex-col overflow-hidden", className)}
+            {...rest}
+        >
+            {children}
+        </form>
+    );
+}
+
+// ─── Confirm dialog sugar ───────────────────────────────────────────
+
+export type ConfirmTone = "danger" | "warning" | "info";
+
+export interface ConfirmModalProps {
+    showModal: boolean;
+    setShowModal: Dispatch<SetStateAction<boolean>>;
+    /** Dialog heading (required). */
+    title: string;
+    /** Body copy describing consequences. */
+    description?: ReactNode;
+    /** Tone drives icon + primary button color. Default: `"warning"`. */
+    tone?: ConfirmTone;
+    /** Primary action label. Default: "Confirm". */
+    confirmLabel?: string;
+    /** Secondary action label. Default: "Cancel". */
+    cancelLabel?: string;
+    /**
+     * Called when the user clicks the primary action. If it returns a
+     * Promise, the button shows a pending state until it settles and
+     * closes the modal on success.
+     */
+    onConfirm: () => void | Promise<unknown>;
+    /** Called when the user cancels or dismisses. Always fires on close. */
+    onCancel?: () => void;
+}
+
+const toneIcon: Record<ConfirmTone, JSX.Element> = {
+    danger: (
+        <AlertTriangle className="size-5 text-content-error" aria-hidden="true" />
+    ),
+    warning: (
+        <AlertTriangle className="size-5 text-content-warning" aria-hidden="true" />
+    ),
+    info: <Info className="size-5 text-content-info" aria-hidden="true" />,
+};
+
+const tonePrimaryClass: Record<ConfirmTone, string> = {
+    danger: "btn btn-danger",
+    warning: "btn btn-primary",
+    info: "btn btn-primary",
+};
+
+/**
+ * Prebuilt confirmation dialog. Use for destructive ops (delete, offboard,
+ * revoke), irreversible transitions (close audit cycle), or any action
+ * that needs a "are you sure?" gate.
+ */
+function Confirm({
+    showModal,
+    setShowModal,
+    title,
+    description,
+    tone = "warning",
+    confirmLabel = "Confirm",
+    cancelLabel = "Cancel",
+    onConfirm,
+    onCancel,
+}: ConfirmModalProps) {
+    const handleConfirm = async () => {
+        const result = onConfirm();
+        if (result instanceof Promise) {
+            try {
+                await result;
+            } catch {
+                return; // keep open so the caller can surface an error
+            }
+        }
+        setShowModal(false);
+    };
+
+    const handleCancel = () => {
+        onCancel?.();
+        setShowModal(false);
+    };
+
+    return (
+        <ModalRoot
+            showModal={showModal}
+            setShowModal={setShowModal}
+            size="xs"
+            title={title}
+            description={typeof description === "string" ? description : undefined}
+            onClose={onCancel}
+            showCloseButton={false}
+        >
+            <Header>
+                <div className="flex items-start gap-3">
+                    <span className="mt-0.5 shrink-0">{toneIcon[tone]}</span>
+                    <div className="flex min-w-0 flex-col gap-1">
+                        <Dialog.Title asChild>
+                            <h2 className="text-base font-semibold text-content-emphasis">
+                                {title}
+                            </h2>
+                        </Dialog.Title>
+                        {description ? (
+                            <Dialog.Description asChild>
+                                <p className="text-sm text-content-muted">
+                                    {description}
+                                </p>
+                            </Dialog.Description>
+                        ) : null}
+                    </div>
+                </div>
+            </Header>
+            <Actions>
+                <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    data-modal-cancel
+                    onClick={handleCancel}
+                >
+                    {cancelLabel}
+                </button>
+                <button
+                    type="button"
+                    className={cn(tonePrimaryClass[tone], "btn-sm")}
+                    data-modal-confirm
+                    onClick={handleConfirm}
+                >
+                    {confirmLabel}
+                </button>
+            </Actions>
+        </ModalRoot>
+    );
+}
+
+// ─── Composite export ───────────────────────────────────────────────
+
+export const Modal = Object.assign(ModalRoot, {
+    Header,
+    Body,
+    Footer,
+    Actions,
+    Form,
+    Confirm,
+    Close: Dialog.Close,
+});

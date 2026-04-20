@@ -56,18 +56,32 @@ function resolveDbUrl(): string {
  * Synchronous DB availability check.
  *
  * Attempts a Prisma `$connect()` + `$queryRaw` against the given URL.
- * Runs synchronously via execSync so it can gate `describe` / `describe.skip`
+ * Runs synchronously via spawnSync so it can gate `describe` / `describe.skip`
  * at module scope.
+ *
+ * Uses spawnSync (no shell) with the URL passed via environment variable to
+ * avoid shell-escaping issues with special characters like & in pgbouncer URLs.
  */
 function checkDbAvailable(url: string | undefined): boolean {
     if (!url) return false;
     try {
-        const { execSync } = require('child_process');
-        execSync(
-            `node -e "const{PrismaClient}=require('@prisma/client');const p=new PrismaClient({datasources:{db:{url:'${url.replace(/'/g, "\\\\'")}'}}});p.$connect().then(()=>p.$queryRaw\`SELECT 1\`).then(()=>{p.$disconnect();process.exit(0)}).catch(()=>{p.$disconnect().catch(()=>{});process.exit(1)})"`,
-            { timeout: 5000, stdio: 'ignore', cwd: ROOT },
-        );
-        return true;
+        const { spawnSync } = require('child_process');
+        const script = [
+            "const{PrismaClient}=require('@prisma/client');",
+            'const u=process.env.__DB_CHECK_URL;',
+            'const p=new PrismaClient({datasources:{db:{url:u}}});',
+            'p.$connect()',
+            '.then(()=>p.$queryRawUnsafe("SELECT 1"))',
+            '.then(()=>{p.$disconnect();process.exit(0)})',
+            '.catch(()=>{p.$disconnect().catch(()=>{});process.exit(1)})',
+        ].join('');
+        const result = spawnSync('node', ['-e', script], {
+            timeout: 5000,
+            stdio: 'ignore',
+            cwd: ROOT,
+            env: { ...process.env, __DB_CHECK_URL: url },
+        });
+        return result.status === 0;
     } catch {
         return false;
     }

@@ -2,23 +2,25 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { UserCombobox } from '@/components/ui/user-combobox';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 
-const TYPE_OPTIONS = [
+const TYPE_OPTIONS: ComboboxOption[] = [
     { value: 'TASK', label: 'Task' },
     { value: 'AUDIT_FINDING', label: 'Audit Finding' },
     { value: 'CONTROL_GAP', label: 'Control Gap' },
     { value: 'INCIDENT', label: 'Incident' },
     { value: 'IMPROVEMENT', label: 'Improvement' },
 ];
-const SEVERITY_OPTIONS = [
+const SEVERITY_OPTIONS: ComboboxOption[] = [
     { value: 'INFO', label: 'Info' },
     { value: 'LOW', label: 'Low' },
     { value: 'MEDIUM', label: 'Medium' },
     { value: 'HIGH', label: 'High' },
     { value: 'CRITICAL', label: 'Critical' },
 ];
-const PRIORITY_OPTIONS = [
+const PRIORITY_OPTIONS: ComboboxOption[] = [
     { value: 'P0', label: 'P0 — Critical' },
     { value: 'P1', label: 'P1 — High' },
     { value: 'P2', label: 'P2 — Medium' },
@@ -52,6 +54,7 @@ type PendingLink = { entityType: string; entityId: string };
 export default function NewTaskPage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
+    const { tenantSlug } = useTenantContext();
     const router = useRouter();
 
     const [form, setForm] = useState({
@@ -165,21 +168,48 @@ export default function NewTaskPage() {
                 <div className="grid grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm text-slate-300 mb-1">Type *</label>
-                        <select className="input w-full" value={form.type} onChange={e => update('type', e.target.value)} id="task-type-select">
-                            {TYPE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                        </select>
+                        <Combobox
+                            id="task-type-select"
+                            name="type"
+                            options={TYPE_OPTIONS}
+                            selected={TYPE_OPTIONS.find(o => o.value === form.type) ?? null}
+                            setSelected={(o) => update('type', o?.value ?? '')}
+                            placeholder="Select type…"
+                            hideSearch
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-full' }}
+                            caret
+                        />
                     </div>
                     <div>
                         <label className="block text-sm text-slate-300 mb-1">Severity</label>
-                        <select className="input w-full" value={form.severity} onChange={e => update('severity', e.target.value)} id="task-severity-select">
-                            {SEVERITY_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                        </select>
+                        <Combobox
+                            id="task-severity-select"
+                            name="severity"
+                            options={SEVERITY_OPTIONS}
+                            selected={SEVERITY_OPTIONS.find(o => o.value === form.severity) ?? null}
+                            setSelected={(o) => update('severity', o?.value ?? '')}
+                            placeholder="Select severity…"
+                            hideSearch
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-full' }}
+                            caret
+                        />
                     </div>
                     <div>
                         <label className="block text-sm text-slate-300 mb-1">Priority</label>
-                        <select className="input w-full" value={form.priority} onChange={e => update('priority', e.target.value)} id="task-priority-select">
-                            {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                        </select>
+                        <Combobox
+                            id="task-priority-select"
+                            name="priority"
+                            options={PRIORITY_OPTIONS}
+                            selected={PRIORITY_OPTIONS.find(o => o.value === form.priority) ?? null}
+                            setSelected={(o) => update('priority', o?.value ?? '')}
+                            placeholder="Select priority…"
+                            hideSearch
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-full' }}
+                            caret
+                        />
                     </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -188,8 +218,18 @@ export default function NewTaskPage() {
                         <input type="date" className="input w-full" value={form.dueAt} onChange={e => update('dueAt', e.target.value)} id="task-due-input" />
                     </div>
                     <div>
-                        <label className="block text-sm text-slate-300 mb-1">Assignee (User ID)</label>
-                        <input type="text" className="input w-full" placeholder="Paste user ID (optional)" value={form.assigneeUserId} onChange={e => update('assigneeUserId', e.target.value)} id="task-assignee-input" />
+                        <label className="block text-sm text-slate-300 mb-1">Assignee</label>
+                        <UserCombobox
+                            id="task-assignee-input"
+                            name="assigneeUserId"
+                            tenantSlug={tenantSlug}
+                            selectedId={form.assigneeUserId || null}
+                            onChange={(userId) =>
+                                update('assigneeUserId', userId ?? '')
+                            }
+                            placeholder="Unassigned"
+                            forceDropdown={false}
+                        />
                     </div>
                 </div>
 

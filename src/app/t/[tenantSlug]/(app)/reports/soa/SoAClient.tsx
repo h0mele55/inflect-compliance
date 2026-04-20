@@ -10,6 +10,7 @@ import {
 import type { SoAReportDTO, SoAEntryDTO } from '@/lib/dto/soa';
 import { PdfExportButton } from '@/components/PdfExportButton';
 import { RequirePermission } from '@/components/require-permission';
+import { Modal } from '@/components/ui/modal';
 
 // ─── Types ───
 
@@ -319,79 +320,142 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                 </table>
             </div>
 
-            {/* Map Control Modal */}
-            {mapModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setMapModal(null)}>
-                    <div className="bg-slate-800 border border-slate-600/50 rounded-xl p-6 w-full max-w-md shadow-2xl animate-fadeIn" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-sm font-semibold text-white mb-1">Map Control to {mapModal.requirementCode}</h3>
-                        <p className="text-xs text-slate-400 mb-4">Select a tenant control to map to this Annex A requirement.</p>
-
-                        <input
-                            type="text"
-                            className="input w-full mb-3"
-                            placeholder="Search controls…"
-                            value={mapControlSearch}
-                            onChange={e => setMapControlSearch(e.target.value)}
-                            autoFocus
-                        />
-
-                        <div className="max-h-60 overflow-y-auto space-y-1">
-                            {mapFilteredControls.map(c => (
-                                <button
-                                    key={c.id}
-                                    className="w-full text-left px-3 py-2 rounded-lg text-xs hover:bg-slate-700/60 transition-colors flex items-center justify-between"
-                                    onClick={() => handleMapControl(c.id)}
-                                    disabled={saving}
-                                >
-                                    <div>
-                                        <span className="font-mono text-brand-400">{c.code || '—'}</span>
-                                        <span className="ml-2 text-slate-200">{c.name}</span>
-                                    </div>
-                                    <span className={`badge ${c.status === 'IMPLEMENTED' ? 'badge-success' : 'badge-neutral'}`}>{c.status}</span>
-                                </button>
-                            ))}
-                            {mapFilteredControls.length === 0 && (
-                                <p className="text-xs text-slate-500 text-center py-4">No controls found</p>
-                            )}
-                        </div>
-
-                        <div className="flex justify-end mt-4">
-                            <button className="btn btn-ghost" onClick={() => setMapModal(null)}>Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Justification Modal */}
-            {justModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setJustModal(null)}>
-                    <div className="bg-slate-800 border border-slate-600/50 rounded-xl p-6 w-full max-w-md shadow-2xl animate-fadeIn" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-sm font-semibold text-white mb-1">Add Justification</h3>
-                        <p className="text-xs text-slate-400 mb-4">
-                            Justify why control <span className="font-mono text-brand-400">{justModal.controlCode}</span> is not applicable for requirement {justModal.requirementCode}.
-                        </p>
-
-                        <textarea
-                            className="input w-full min-h-[100px]"
-                            placeholder="e.g. Fully remote company — no physical premises to secure."
-                            value={justText}
-                            onChange={e => setJustText(e.target.value)}
-                            autoFocus
-                        />
-
-                        <div className="flex justify-end gap-2 mt-4">
-                            <button className="btn btn-ghost" onClick={() => setJustModal(null)}>Cancel</button>
+            {/* Map Control Modal — shared <Modal> (Epic 54) */}
+            <Modal
+                showModal={!!mapModal}
+                setShowModal={(v) => {
+                    const next = typeof v === 'function' ? v(!!mapModal) : v;
+                    if (!next && !saving) setMapModal(null);
+                }}
+                size="md"
+                title="Map control"
+                description={
+                    mapModal
+                        ? `Map a tenant control to requirement ${mapModal.requirementCode}.`
+                        : undefined
+                }
+                preventDefaultClose={saving}
+            >
+                <Modal.Header
+                    title={
+                        mapModal
+                            ? `Map control to ${mapModal.requirementCode}`
+                            : 'Map control'
+                    }
+                    description="Select a tenant control to map to this Annex A requirement."
+                />
+                <Modal.Body>
+                    <input
+                        type="text"
+                        className="input mb-3 w-full"
+                        placeholder="Search controls…"
+                        value={mapControlSearch}
+                        onChange={(e) => setMapControlSearch(e.target.value)}
+                        autoFocus
+                    />
+                    <div className="max-h-60 space-y-1 overflow-y-auto">
+                        {mapFilteredControls.map((c) => (
                             <button
-                                className="btn btn-primary"
-                                onClick={handleSaveJustification}
-                                disabled={saving || !justText.trim()}
+                                key={c.id}
+                                type="button"
+                                className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs transition-colors hover:bg-bg-muted"
+                                onClick={() => handleMapControl(c.id)}
+                                disabled={saving}
                             >
-                                {saving ? 'Saving…' : 'Save Justification'}
+                                <div>
+                                    <span className="font-mono text-brand-emphasis">
+                                        {c.code || '—'}
+                                    </span>
+                                    <span className="ml-2 text-content-emphasis">
+                                        {c.name}
+                                    </span>
+                                </div>
+                                <span
+                                    className={`badge ${c.status === 'IMPLEMENTED' ? 'badge-success' : 'badge-neutral'}`}
+                                >
+                                    {c.status}
+                                </span>
                             </button>
-                        </div>
+                        ))}
+                        {mapFilteredControls.length === 0 && (
+                            <p className="py-4 text-center text-xs text-content-muted">
+                                No controls found
+                            </p>
+                        )}
                     </div>
-                </div>
-            )}
+                </Modal.Body>
+                <Modal.Actions>
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setMapModal(null)}
+                        disabled={saving}
+                    >
+                        Cancel
+                    </button>
+                </Modal.Actions>
+            </Modal>
+
+            {/* Justification Modal — shared <Modal> (Epic 54) */}
+            <Modal
+                showModal={!!justModal}
+                setShowModal={(v) => {
+                    const next = typeof v === 'function' ? v(!!justModal) : v;
+                    if (!next && !saving) setJustModal(null);
+                }}
+                size="sm"
+                title="Add justification"
+                description={
+                    justModal
+                        ? `Justify why ${justModal.controlCode} is not applicable for ${justModal.requirementCode}.`
+                        : undefined
+                }
+                preventDefaultClose={saving}
+            >
+                <Modal.Header
+                    title="Add justification"
+                    description={
+                        justModal ? (
+                            <>
+                                Justify why control{' '}
+                                <span className="font-mono text-brand-emphasis">
+                                    {justModal.controlCode}
+                                </span>{' '}
+                                is not applicable for requirement{' '}
+                                {justModal.requirementCode}.
+                            </>
+                        ) : null
+                    }
+                />
+                <Modal.Body>
+                    <textarea
+                        className="input min-h-[100px] w-full"
+                        placeholder="e.g. Fully remote company — no physical premises to secure."
+                        value={justText}
+                        onChange={(e) => setJustText(e.target.value)}
+                        autoFocus
+                        disabled={saving}
+                    />
+                </Modal.Body>
+                <Modal.Actions>
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setJustModal(null)}
+                        disabled={saving}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleSaveJustification}
+                        disabled={saving || !justText.trim()}
+                    >
+                        {saving ? 'Saving…' : 'Save justification'}
+                    </button>
+                </Modal.Actions>
+            </Modal>
         </>
     );
 }

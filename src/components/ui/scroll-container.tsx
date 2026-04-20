@@ -23,9 +23,11 @@ export function ScrollContainer({
       >
         {children}
       </div>
-      {/* Bottom scroll fade */}
+      {/* Bottom scroll fade — tokenised so the gradient blends with the
+          parent surface regardless of theme. The legacy `from-white`
+          broke inside any dark Modal/Sheet body. */}
       <div
-        className="pointer-events-none absolute bottom-0 left-0 z-10 hidden h-16 w-full rounded-b-lg bg-gradient-to-t from-white to-transparent sm:block"
+        className="pointer-events-none absolute bottom-0 left-0 z-10 hidden h-16 w-full rounded-b-lg bg-gradient-to-t from-bg-default to-transparent sm:block"
         style={{ opacity: 1 - Math.pow(scrollProgress, 2) }}
       />
     </div>

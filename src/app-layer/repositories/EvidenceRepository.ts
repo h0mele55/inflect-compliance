@@ -6,6 +6,8 @@ import type { PaginatedResponse } from '@/lib/dto/pagination';
 
 export interface EvidenceListFilters {
     type?: string;
+    /** EvidenceStatus: DRAFT | SUBMITTED | APPROVED | REJECTED */
+    status?: string;
     controlId?: string;
     q?: string;
     archived?: boolean;
@@ -65,6 +67,9 @@ export class EvidenceRepository {
 
         if (filters?.type) {
             where.type = filters.type as Prisma.EnumEvidenceTypeFilter;
+        }
+        if (filters?.status) {
+            where.status = filters.status as Prisma.EnumEvidenceStatusFilter;
         }
         if (filters?.controlId) {
             where.controlId = filters.controlId;

@@ -10,7 +10,8 @@ type AcceptedFileFormats =
   | "csv"
   | "documents"
   | "programResourceImages"
-  | "programResourceFiles";
+  | "programResourceFiles"
+  | "evidence";
 
 const documentTypes = [
   "application/pdf", // .pdf
@@ -20,6 +21,18 @@ const documentTypes = [
   "application/vnd.ms-excel", // .xls
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
   "text/csv", // .csv
+];
+
+// Broad evidence preset — matches the legacy inline upload accept list:
+//   .pdf,.jpg,.jpeg,.png,.gif,.webp,.csv,.txt,.doc,.docx,.xlsx,.xls,.json,.zip
+const evidenceTypes = [
+  ...documentTypes,
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/json",
+  "application/zip",
 ];
 
 const acceptFileTypes: Record<
@@ -48,15 +61,26 @@ const acceptFileTypes: Record<
     types: [...documentTypes, "application/zip"],
     errorMessage: "File type not supported (document or zip files only)",
   },
+  evidence: {
+    types: evidenceTypes,
+    errorMessage:
+      "File type not supported — use PDF, Office, CSV, image, JSON, or ZIP",
+  },
 };
 
 const imageUploadVariants = cva(
-  "group relative isolate flex aspect-[1200/630] w-full flex-col items-center justify-center overflow-hidden bg-white transition-all hover:bg-neutral-50",
+  "group relative isolate flex w-full flex-col items-center justify-center overflow-hidden transition-all",
   {
     variants: {
       variant: {
-        default: "rounded-md border border-neutral-300 shadow-sm",
-        plain: "",
+        default:
+          "aspect-[1200/630] rounded-md border border-neutral-300 bg-white shadow-sm hover:bg-neutral-50",
+        plain: "aspect-[1200/630] bg-white hover:bg-neutral-50",
+        // Document-oriented dropzone for file-evidence / modal contexts.
+        // Uses semantic tokens so the same component works in Epic 54
+        // modals without importing the image-centric Dub palette.
+        document:
+          "min-h-[10rem] rounded-lg border border-dashed border-border-default bg-bg-subtle hover:bg-bg-muted hover:border-border-emphasis",
       },
     },
     defaultVariants: {
@@ -160,6 +184,10 @@ export function FileUpload({
 }: FileUploadProps) {
   const [dragActive, setDragActive] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  // The `document` variant paints on semantic tokens (dark-theme-safe);
+  // the original `default` / `plain` variants keep their opaque-white
+  // behaviour for the image-upload callers.
+  const isDoc = variant === "document";
 
   const onFileChange = async (
     e: React.ChangeEvent<HTMLInputElement> | DragEvent,
@@ -223,7 +251,12 @@ export function FileUpload({
       )}
     >
       {loading && (
-        <div className="absolute inset-0 z-[5] flex items-center justify-center rounded-[inherit] bg-white">
+        <div
+          className={cn(
+            "absolute inset-0 z-[5] flex items-center justify-center rounded-[inherit]",
+            isDoc ? "bg-bg-subtle" : "bg-white",
+          )}
+        >
           <LoadingCircle />
         </div>
       )}
@@ -253,17 +286,25 @@ export function FileUpload({
       />
       <div
         className={cn(
-          "absolute inset-0 z-[3] flex flex-col items-center justify-center rounded-[inherit] border-2 border-transparent bg-white transition-all",
-          disabled && "bg-neutral-50",
+          "absolute inset-0 z-[3] flex flex-col items-center justify-center rounded-[inherit] border-2 border-transparent transition-all",
+          isDoc ? "bg-[inherit]" : "bg-white",
+          disabled && (isDoc ? "bg-bg-muted" : "bg-neutral-50"),
           dragActive &&
             !disabled &&
-            "cursor-copy border-black bg-neutral-50 opacity-100",
+            (isDoc
+              ? "cursor-copy border-brand-emphasis bg-bg-muted opacity-100"
+              : "cursor-copy border-black bg-neutral-50 opacity-100"),
           imageSrc
             ? cn(
                 "opacity-0",
                 showHoverOverlay && !disabled && "group-hover:opacity-100",
               )
-            : cn(!disabled && "group-hover:bg-neutral-50"),
+            : cn(
+                !disabled &&
+                  (isDoc
+                    ? "group-hover:bg-[inherit]"
+                    : "group-hover:bg-neutral-50"),
+              ),
         )}
       >
         <Icon
@@ -271,18 +312,22 @@ export function FileUpload({
             "size-7 transition-all duration-75",
             !disabled
               ? cn(
-                  "text-neutral-500 group-hover:scale-110 group-active:scale-95",
+                  isDoc ? "text-content-muted" : "text-neutral-500",
+                  "group-hover:scale-110 group-active:scale-95",
                   dragActive ? "scale-110" : "scale-100",
                 )
-              : "text-neutral-400",
+              : isDoc
+                ? "text-content-subtle"
+                : "text-neutral-400",
             iconClassName,
           )}
         />
         {content !== null && (
           <div
             className={cn(
-              "mt-2 text-center text-sm text-neutral-500",
-              disabled && "text-neutral-400",
+              "mt-2 text-center text-sm",
+              isDoc ? "text-content-muted" : "text-neutral-500",
+              disabled && (isDoc ? "text-content-subtle" : "text-neutral-400"),
             )}
           >
             {content ?? (

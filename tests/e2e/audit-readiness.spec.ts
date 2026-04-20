@@ -56,8 +56,8 @@ test.describe('Audit Readiness', () => {
         const uid = Date.now().toString(36);
         const cycleName = `E2E ISO27001 Audit ${uid}`;
 
-        // Select ISO27001
-        await page.selectOption('#fw-select', 'ISO27001');
+        // ISO27001 is the default Combobox selection; no interaction
+        // needed (Epic 55 migrated #fw-select from <select> to <Combobox>).
         await page.fill('#cycle-name-input', cycleName);
         await page.click('#submit-cycle-btn');
 
@@ -171,7 +171,11 @@ test.describe('Audit Readiness', () => {
         const uid = Date.now().toString(36);
         const cycleName = `E2E NIS2 Audit ${uid}`;
 
-        await page.selectOption('#fw-select', 'NIS2');
+        // Open the framework Combobox and pick the NIS2 option.
+        await page.click('#fw-select');
+        await page
+            .getByRole('option', { name: /NIS2 Directive/ })
+            .click();
         await page.fill('#cycle-name-input', cycleName);
         await page.click('#submit-cycle-btn');
 

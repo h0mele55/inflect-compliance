@@ -8,8 +8,13 @@ export { useKeyboardShortcut } from "./use-keyboard-shortcut";
 export { useLocalStorage } from "./use-local-storage";
 export { useMediaQuery } from "./use-media-query";
 export { useOptimisticUpdate } from "./use-optimistic-update";
-export { usePagination } from "./use-pagination";
 export { useResizeObserver } from "./use-resize-observer";
-export { useRouterStuff } from "./use-router-stuff";
+export {
+    useResponsivePresentation,
+    resolvePresentation,
+    type ResponsivePresentation,
+    type UseResponsivePresentation,
+    type UseResponsivePresentationOptions,
+} from "./use-responsive-presentation";
 export { useScrollProgress } from "./use-scroll-progress";
 export { useScroll } from "./use-scroll";

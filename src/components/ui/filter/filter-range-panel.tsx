@@ -11,52 +11,14 @@ import {
   type Ref,
 } from "react";
 import { FilterScroll } from "./filter-scroll";
+import {
+  normalizeRangeBounds,
+  sanitizeNumericDraft,
+  storageToDraft,
+} from "./filter-range-utils";
 import { encodeRangeToken, parseRangeToken, type Filter } from "./types";
 
 type RangeBound = "min" | "max";
-
-function normalizeRangeBounds(
-  min?: number,
-  max?: number,
-): { min?: number; max?: number } {
-  if (min == null && max == null) {
-    return {};
-  }
-  if (min != null && max != null && min > max) {
-    return { min: max, max: min };
-  }
-  return { ...(min != null ? { min } : {}), ...(max != null ? { max } : {}) };
-}
-
-function storageToDraft(
-  storage: number | undefined,
-  displayScale: number,
-): string {
-  if (storage == null) {
-    return "";
-  }
-  if (displayScale === 1) {
-    return String(Math.trunc(storage));
-  }
-  const display = storage / displayScale;
-  return String(Number(display.toFixed(2)));
-}
-
-/** Keep only characters valid for the range field (selection APIs need `type="text"`, not `type="number"`). */
-function sanitizeNumericDraft(raw: string, displayScale: number): string {
-  if (raw === "") {
-    return "";
-  }
-  if (displayScale === 1) {
-    return raw.replace(/\D/g, "");
-  }
-  let s = raw.replace(/[^0-9.]/g, "");
-  const firstDot = s.indexOf(".");
-  if (firstDot !== -1) {
-    s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, "");
-  }
-  return s;
-}
 
 function FilterRangeHeader({
   label,
@@ -73,9 +35,9 @@ function FilterRangeHeader({
         <button
           type="button"
           className={cn(
-            "flex size-6 shrink-0 items-center justify-center rounded-md p-2 text-neutral-500",
+            "flex size-6 shrink-0 items-center justify-center rounded-md p-2 text-content-muted",
             "transition-[transform,color,background-color] duration-150 ease-out motion-reduce:transition-none",
-            "hover:bg-neutral-900/5",
+            "hover:bg-bg-muted hover:text-content-emphasis",
             "active:scale-[0.97] motion-reduce:active:scale-100",
           )}
           onClick={() => onBack()}
@@ -84,7 +46,7 @@ function FilterRangeHeader({
           <ChevronLeft className="size-3 shrink-0" />
         </button>
 
-        <span className="text-sm font-medium text-neutral-900">{label}</span>
+        <span className="text-sm font-medium text-content-emphasis">{label}</span>
       </div>
 
       {onClear && (
@@ -169,9 +131,9 @@ function RangeEndControl({
   return (
     <div
       className={cn(
-        "border-subtle flex h-10 min-w-0 flex-1 items-stretch overflow-hidden rounded-lg border bg-white",
+        "border-border-subtle flex h-10 min-w-0 flex-1 items-stretch overflow-hidden rounded-lg border bg-bg-default",
         "transition-[border-color,box-shadow] duration-150 ease-out motion-reduce:transition-none",
-        "focus-within:border-neutral-500 focus-within:ring-4 focus-within:ring-neutral-200",
+        "focus-within:border-border-emphasis focus-within:ring-4 focus-within:ring-ring",
       )}
     >
       <input
@@ -182,7 +144,7 @@ function RangeEndControl({
         aria-label={bound === "min" ? "Minimum value" : "Maximum value"}
         placeholder={unboundedLabel}
         id={`filter-range-input-${bound}`}
-        className="min-w-0 flex-1 border-0 bg-transparent px-3 py-1 text-sm text-neutral-900 outline-none placeholder:text-neutral-400 focus:ring-0"
+        className="min-w-0 flex-1 border-0 bg-transparent px-3 py-1 text-sm text-content-emphasis outline-none placeholder:text-content-subtle focus:ring-0"
         value={draft}
         onChange={(e) => {
           setDraft(sanitizeNumericDraft(e.target.value, displayScale));
@@ -383,7 +345,7 @@ function FilterRangeContent({
           />
         </div>
 
-        <span className="shrink-0 pb-2.5 text-xs text-neutral-500">to</span>
+        <span className="shrink-0 pb-2.5 text-xs text-content-muted">to</span>
 
         <div className="min-w-0 flex-1">
           <RangeEndControl

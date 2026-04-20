@@ -19,10 +19,16 @@ import { Popover } from "../popover";
 import { FilterRangePanel } from "./filter-range-panel";
 import { FilterScroll } from "./filter-scroll";
 import {
+  activeRangeTokenFor,
+  hasAppliedRange,
+  isOptionSelectedIn,
+  isSingleSelect,
+  resolveEmptyStateFor,
+} from "./filter-select-utils";
+import {
   ActiveFilterInput,
   Filter,
   FilterOption,
-  normalizeActiveFilter,
   parseRangeToken,
 } from "./types";
 
@@ -100,23 +106,14 @@ export function FilterSelect({
     ? filters.find(({ key }) => key === selectedFilterKey)
     : null;
 
-  const activeRangeTokenForSelected = useMemo(() => {
-    if (!selectedFilter || selectedFilter.type !== "range" || !activeFilters) {
-      return undefined;
-    }
-    const raw = activeFilters.find((f) => f.key === selectedFilter.key);
-    if (!raw) {
-      return undefined;
-    }
-    return normalizeActiveFilter(raw).values[0] as string | undefined;
-  }, [activeFilters, selectedFilter]);
+  const activeRangeTokenForSelected = useMemo(
+    () => activeRangeTokenFor(selectedFilter, activeFilters),
+    [activeFilters, selectedFilter],
+  );
 
   const rangeFilterHasAppliedValue = useMemo(() => {
-    if (!selectedFilter || selectedFilter.type !== "range") {
-      return false;
-    }
-    const { min, max } = parseRangeToken(activeRangeTokenForSelected);
-    return min != null || max != null;
+    if (!selectedFilter || selectedFilter.type !== "range") return false;
+    return hasAppliedRange(activeRangeTokenForSelected);
   }, [selectedFilter, activeRangeTokenForSelected]);
 
   const openFilter = useCallback(
@@ -138,42 +135,25 @@ export function FilterSelect({
   );
 
   const isOptionSelected = useCallback(
-    (value: FilterOption["value"]) => {
-      if (!selectedFilter || !activeFilters) return false;
-
-      const rawActiveFilter = activeFilters.find(
-        (filter) => filter.key === selectedFilterKey,
-      );
-      if (!rawActiveFilter) return false;
-
-      const normalizedFilter = normalizeActiveFilter(rawActiveFilter);
-      return normalizedFilter.values.includes(value);
-    },
-    [selectedFilter, activeFilters, selectedFilterKey],
+    (value: FilterOption["value"]) =>
+      selectedFilterKey
+        ? isOptionSelectedIn(activeFilters, selectedFilterKey, value)
+        : false,
+    [activeFilters, selectedFilterKey],
   );
 
   const selectOption = useCallback(
     (value: FilterOption["value"]) => {
-      if (selectedFilter) {
-        const isSingleSelect =
-          selectedFilter?.singleSelect ||
-          (!isAdvancedFilter && !selectedFilter?.multiple);
+      if (!selectedFilter) return;
+      const singleSelect = isSingleSelect(selectedFilter, { isAdvancedFilter });
+      const isSelected = isOptionSelected(value);
 
-        if (isSingleSelect) {
-          const isSelected = isOptionSelected(value);
-          isSelected
-            ? onRemove(selectedFilter.key, value)
-            : onSelect(selectedFilter.key, value);
-          setIsOpen(false);
-        } else {
-          const isSelected = isOptionSelected(value);
-          if (isSelected) {
-            onRemove(selectedFilter.key, value);
-          } else {
-            onSelect(selectedFilter.key, value);
-          }
-        }
+      if (isSelected) {
+        onRemove(selectedFilter.key, value);
+      } else {
+        onSelect(selectedFilter.key, value);
       }
+      if (singleSelect) setIsOpen(false);
     },
     [selectedFilter, isOptionSelected, onSelect, onRemove, isAdvancedFilter],
   );
@@ -264,7 +244,7 @@ export function FilterSelect({
                 !selectedFilter || selectedFilter.shouldFilter !== false
               }
             >
-              <div className="flex items-center overflow-hidden rounded-t-lg border-b border-neutral-200">
+              <div className="flex items-center overflow-hidden rounded-t-lg border-b border-border-default">
                 <CommandInput
                   placeholder={`${selectedFilter?.label || "Filter"}...`}
                   value={search}
@@ -295,7 +275,7 @@ export function FilterSelect({
                   }}
                 />
                 {!selectedFilter && (
-                  <kbd className="mr-2 hidden shrink-0 rounded border border-neutral-200 bg-neutral-100 px-2 py-0.5 text-xs font-light text-neutral-500 md:block">
+                  <kbd className="mr-2 hidden shrink-0 rounded border border-border-default bg-bg-muted px-2 py-0.5 text-xs font-light text-content-muted md:block">
                     F
                   </kbd>
                 )}
@@ -318,7 +298,7 @@ export function FilterSelect({
                               onSelect={() => openFilter(filter.key)}
                             />
                             {filter.separatorAfter && (
-                              <Command.Separator className="-mx-1 my-1 border-b border-neutral-200" />
+                              <Command.Separator className="-mx-1 my-1 border-b border-border-subtle" />
                             )}
                           </Fragment>
                         ))
@@ -328,9 +308,9 @@ export function FilterSelect({
                           (option) => !search || !option.hideDuringSearch,
                         )
                         ?.map((option) => {
-                          const isSingleSelect =
-                            selectedFilter?.singleSelect ||
-                            (!isAdvancedFilter && !selectedFilter?.multiple);
+                          const singleSelect = isSingleSelect(selectedFilter, {
+                            isAdvancedFilter,
+                          });
                           const isSelected = isOptionSelected(option.value);
 
                           return (
@@ -339,12 +319,12 @@ export function FilterSelect({
                               filter={selectedFilter}
                               option={option}
                               showCheckbox={
-                                !isSingleSelect &&
+                                !singleSelect &&
                                 (isAdvancedFilter || selectedFilter?.multiple)
                               }
                               isChecked={isSelected}
                               right={
-                                isSingleSelect ? (
+                                singleSelect ? (
                                   isSelected ? (
                                     <Check className="h-4 w-4" />
                                   ) : (
@@ -377,12 +357,7 @@ export function FilterSelect({
                       onSelect={() => selectOption(search)}
                       askAI={askAI}
                     >
-                      {emptyState
-                        ? isEmptyStateObject(emptyState)
-                          ? emptyState?.[selectedFilterKey ?? "default"] ??
-                            "No matching options"
-                          : emptyState
-                        : "No matching options"}
+                      {resolveEmptyStateFor(emptyState, selectedFilterKey)}
                     </CommandEmpty>
                   )}
                 </Command.List>
@@ -397,37 +372,27 @@ export function FilterSelect({
         className={cn(
           "group flex h-10 cursor-pointer appearance-none items-center gap-x-2 truncate rounded-lg border px-3 text-sm outline-none",
           "transition-[color,border-color,box-shadow] duration-150 ease-out motion-reduce:transition-none",
-          "border-neutral-200 bg-white text-neutral-900 placeholder-neutral-400",
-          "focus-visible:border-neutral-500 data-[state=open]:border-neutral-500 data-[state=open]:ring-4 data-[state=open]:ring-neutral-200",
+          "border-border-default bg-bg-default text-content-emphasis placeholder:text-content-subtle",
+          "focus-visible:border-border-emphasis data-[state=open]:border-border-emphasis data-[state=open]:ring-4 data-[state=open]:ring-ring",
           "active:scale-[0.98] motion-reduce:active:scale-100",
           className,
         )}
       >
         <ListFilter className="size-4 shrink-0" />
-        <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left text-neutral-900">
+        <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left text-content-emphasis">
           {children ?? "Filter"}
         </span>
         {activeFilters?.length ? (
-          <div className="flex size-4 shrink-0 items-center justify-center rounded-full bg-black text-[0.625rem] text-white">
+          <div className="flex size-4 shrink-0 items-center justify-center rounded-full bg-brand-emphasis text-[0.625rem] text-content-inverted">
             {activeFilters.length}
           </div>
         ) : (
           <ChevronDown
-            className={`size-4 shrink-0 text-neutral-400 transition-transform duration-100 ease-out group-data-[state=open]:rotate-180 motion-reduce:transition-none`}
+            className={`size-4 shrink-0 text-content-subtle transition-transform duration-100 ease-out group-data-[state=open]:rotate-180 motion-reduce:transition-none`}
           />
         )}
       </button>
     </Popover>
-  );
-}
-
-function isEmptyStateObject(
-  emptyState: ReactNode | Record<string, ReactNode>,
-): emptyState is Record<string, ReactNode> {
-  return (
-    typeof emptyState === "object" &&
-    emptyState !== null &&
-    !isValidElement(emptyState)
   );
 }
 
@@ -442,7 +407,7 @@ const CommandInput = (
     <Command.Input
       {...restProps}
       size={1}
-      className="grow border-0 py-3 pl-4 pr-2 outline-none placeholder:text-neutral-400 focus:ring-0 sm:text-sm"
+      className="grow border-0 py-3 pl-4 pr-2 outline-none placeholder:text-content-subtle focus:ring-0 sm:text-sm bg-transparent text-content-emphasis"
       onKeyDown={(e) => {
         props.onKeyDown?.(e);
 
@@ -487,7 +452,8 @@ function FilterButton({
         "flex cursor-pointer items-center gap-3 whitespace-nowrap rounded-md px-3 py-2 text-left text-sm",
         "transition-colors duration-100 ease-out motion-reduce:transition-none",
         "active:scale-[0.99] motion-reduce:active:scale-100",
-        "data-[selected=true]:bg-neutral-100",
+        "text-content-default",
+        "data-[selected=true]:bg-bg-muted data-[selected=true]:text-content-emphasis",
       )}
       value={label + option?.value}
       onSelect={onSelect}
@@ -501,18 +467,18 @@ function FilterButton({
           className={cn(
             "flex h-4 w-4 items-center justify-center rounded border",
             isChecked
-              ? "border-neutral-900 bg-neutral-900"
-              : "border-neutral-300",
+              ? "border-brand-emphasis bg-brand-emphasis"
+              : "border-border-default",
           )}
         >
-          {isChecked && <Check className="h-3 w-3 text-white" />}
+          {isChecked && <Check className="h-3 w-3 text-content-inverted" />}
         </div>
       )}
-      <span className="shrink-0 text-neutral-600">
+      <span className="shrink-0 text-content-muted">
         {isReactNode(Icon) ? Icon : <Icon className="h-4 w-4" />}
       </span>
       <span className="flex-1">{truncate(label, 48)}</span>
-      <div className="ml-1 flex shrink-0 justify-end text-neutral-500">
+      <div className="ml-1 flex shrink-0 justify-end text-content-muted">
         {right}
       </div>
     </Command.Item>
@@ -542,7 +508,7 @@ const CommandEmpty = ({
   ) {
     if (!search)
       return (
-        <Command.Empty className="p-2 text-center text-sm text-neutral-400">
+        <Command.Empty className="p-2 text-center text-sm text-content-muted">
           Start typing to search...
         </Command.Empty>
       );
@@ -562,17 +528,17 @@ const CommandEmpty = ({
   // Ask AI option should only be shown if no filter is selected and the user has typed something in the search input
   if (!selectedFilter && askAI && search) {
     return (
-      <Command.Empty className="flex min-w-[180px] items-center space-x-2 rounded-md bg-neutral-100 px-3 py-2">
+      <Command.Empty className="flex min-w-[180px] items-center space-x-2 rounded-md bg-bg-muted px-3 py-2">
         <Magic className="h-4 w-4" />
-        <p className="text-center text-sm text-neutral-600">
-          Ask AI <span className="text-black">"{search}"</span>
+        <p className="text-center text-sm text-content-default">
+          Ask AI <span className="text-content-emphasis">"{search}"</span>
         </p>
       </Command.Empty>
     );
   }
 
   return (
-    <Command.Empty className="p-2 text-center text-sm text-neutral-400">
+    <Command.Empty className="p-2 text-center text-sm text-content-muted">
       {children}
     </Command.Empty>
   );

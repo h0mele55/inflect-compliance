@@ -6,13 +6,20 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
-import { CompactFilterBar } from '@/components/filters/CompactFilterBar';
-import { vendorsFilterConfig } from '@/components/filters/configs';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@dub/utils';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { Package } from 'lucide-react';
+import {
+    FilterProvider,
+    useFilterContext,
+    useFilters,
+} from '@/components/ui/filter';
+import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { toApiSearchParams } from '@/lib/filters/url-sync';
+import { buildVendorFilters, VENDOR_FILTER_KEYS } from './filter-defs';
 
 const STATUS_VARIANT: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
     ACTIVE: 'success', ONBOARDING: 'info',
@@ -45,25 +52,48 @@ interface VendorsClientProps {
  * Client island for vendors — handles filter interactions and table navigation.
  * Data is pre-fetched server-side and passed via props.
  */
-export function VendorsClient({ initialVendors, initialFilters, tenantSlug, permissions }: VendorsClientProps) {
+export function VendorsClient(props: VendorsClientProps) {
+    const filterCtx = useFilterContext([], VENDOR_FILTER_KEYS, {
+        serverFilters: props.initialFilters,
+    });
+    return (
+        <FilterProvider value={filterCtx}>
+            <VendorsPageInner {...props} />
+        </FilterProvider>
+    );
+}
+
+function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissions }: VendorsClientProps) {
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const router = useRouter();
 
-    // URL-driven filter state
-    const { filters, setFilter, clearFilters, hasActiveFilters } = useUrlFilters(['q', 'status', 'criticality', 'reviewDue']);
+    const { state, search, hasActive } = useFilters();
 
-    const hasFilters = !!(filters.q || filters.status || filters.criticality || filters.reviewDue);
+    const fetchParams = useMemo(
+        () => toApiSearchParams(state, { search }),
+        [state, search],
+    );
+    const queryKeyFilters = useMemo(() => {
+        const obj: Record<string, string> = {};
+        for (const [k, v] of fetchParams) obj[k] = v;
+        return obj;
+    }, [fetchParams]);
+
     const serverHadFilters = initialFilters && Object.keys(initialFilters).length > 0;
-    const filtersMatchInitial = serverHadFilters
-        ? JSON.stringify(filters) === JSON.stringify(initialFilters)
-        : !hasFilters;
+    const filtersMatchInitial = useMemo(() => {
+        if (!serverHadFilters) return !hasActive;
+        const keys = new Set([...Object.keys(queryKeyFilters), ...Object.keys(initialFilters)]);
+        for (const k of keys) {
+            if ((queryKeyFilters[k] ?? '') !== (initialFilters[k] ?? '')) return false;
+        }
+        return true;
+    }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
 
     const vendorsQuery = useQuery({
-        queryKey: queryKeys.vendors.list(tenantSlug, filters),
+        queryKey: queryKeys.vendors.list(tenantSlug, queryKeyFilters),
         queryFn: async () => {
-            const params = new URLSearchParams(filters);
-            const qs = params.toString();
+            const qs = fetchParams.toString();
             const res = await fetch(apiUrl(`/vendors${qs ? `?${qs}` : ''}`));
             if (!res.ok) throw new Error('Failed to fetch vendors');
             return res.json();
@@ -72,6 +102,7 @@ export function VendorsClient({ initialVendors, initialFilters, tenantSlug, perm
     });
 
     const vendors = vendorsQuery.data ?? [];
+    const liveFilters = useMemo(() => buildVendorFilters(), []);
 
     const vendorColumns = useMemo(() => createColumns<any>([
         {
@@ -159,18 +190,31 @@ export function VendorsClient({ initialVendors, initialFilters, tenantSlug, perm
             </div>
 
             {/* Filters */}
-            <CompactFilterBar config={vendorsFilterConfig} filters={filters} setFilter={setFilter} clearFilters={clearFilters} hasActiveFilters={hasActiveFilters} idPrefix="vendor" />
+            <FilterToolbar
+                filters={liveFilters}
+                searchId="vendor-search"
+                searchPlaceholder="Search vendors… (Enter)"
+            />
 
             {/* Table */}
-            <DataTable
-                data={vendors}
-                columns={vendorColumns}
-                getRowId={(v: any) => v.id}
-                onRowClick={(row) => router.push(tenantHref(`/vendors/${row.original.id}`))}
-                emptyState={hasActiveFilters ? 'No vendors match your filters' : 'No vendors found. Add your first vendor to get started.'}
-                resourceName={(p) => p ? 'vendors' : 'vendor'}
-                data-testid="vendors-table"
-            />
+            <div className="border border-border-default rounded-lg overflow-hidden">
+                <DataTable
+                    data={vendors}
+                    columns={vendorColumns}
+                    getRowId={(v: any) => v.id}
+                    onRowClick={(row) => router.push(tenantHref(`/vendors/${row.original.id}`))}
+                    emptyState={
+                        <EmptyState
+                            icon={Package}
+                            title={hasActive ? 'No vendors match your filters' : 'No vendors found'}
+                            description={hasActive ? undefined : 'Add your first vendor to get started.'}
+                        />
+                    }
+                    resourceName={(p) => p ? 'vendors' : 'vendor'}
+                    data-testid="vendors-table"
+                    className="hover:bg-bg-muted"
+                />
+            </div>
         </>
     );
 }

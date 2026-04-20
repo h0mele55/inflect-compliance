@@ -17,7 +17,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     const nonce = (await headers()).get(CSP_NONCE_HEADER) ?? undefined;
 
     return (
-        <html lang={locale} suppressHydrationWarning>
+        // `data-theme="dark"` seeds the SSR markup so the first paint matches
+        // the baseline palette. ThemeProvider rehydrates from localStorage /
+        // prefers-color-scheme on the client and flips the attribute if needed.
+        <html lang={locale} data-theme="dark" suppressHydrationWarning>
             <body suppressHydrationWarning nonce={nonce}>
                 <Providers>
                     <NextIntlClientProvider messages={messages} locale={locale}>

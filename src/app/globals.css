@@ -5,60 +5,87 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import '../styles/tokens.css';
 
+/* ──────────────────────────────────────────────────────────────────
+ * Legacy Inflect color aliases.
+ *
+ * These `--bg-primary` / `--text-primary` / `--brand` names predate
+ * the Epic 51 semantic token system in `src/styles/tokens.css`. They
+ * now delegate to the canonical tokens so a single theme flip changes
+ * both surfaces. Do NOT extend this alias list — point new code at
+ * `--bg-*` / `--content-*` / `--border-*` / `--brand-*` directly.
+ * ────────────────────────────────────────────────────────────────── */
 :root {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-card: #1e293b;
-  --bg-hover: #334155;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --border-color: #334155;
-  --brand: #6366f1;
-  --brand-hover: #818cf8;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --critical: #dc2626;
+  --bg-primary:    var(--bg-page);
+  --bg-secondary:  var(--bg-default);
+  --bg-card:       var(--bg-default);
+  --bg-hover:      var(--bg-muted);
+  --text-primary:  var(--content-emphasis);
+  --text-secondary: var(--content-muted);
+  --border-color:  var(--border-default);
+  --brand:         var(--brand-default);
+  --brand-hover:   var(--brand-muted);
+  --success:       var(--content-success);
+  --warning:       var(--content-warning);
+  --danger:        var(--content-error);
+  --critical:      var(--content-error);
 }
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
+  background: var(--bg-page);
+  color: var(--content-emphasis);
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-primary); }
-::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--bg-page); }
+::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
 
-/* Glass card effect */
+/* Glass card effect — uses semantic glass tokens so light/dark theme toggle flips both. */
 .glass-card {
-  background: rgba(30, 41, 59, 0.8);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(51, 65, 85, 0.5);
-  border-radius: 12px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+}
+.glass-card {
+  @apply p-4 md:p-5;
 }
 
-/* Status badges */
+/* ──────────────────────────────────────────────────────────────────
+ * Status badges (legacy class layer).
+ *
+ * These `.badge-*` classes share tokens with `<StatusBadge>` from
+ * `src/components/ui/status-badge.tsx`. New code should prefer
+ * `<StatusBadge variant="…">` — the CVA variant carries a11y labels
+ * and icon slots out of the box. See `tests/unit/legacy-ui-ratchet.test.ts`
+ * for the migration ratchet that keeps usage from growing.
+ * ────────────────────────────────────────────────────────────────── */
 .badge {
   @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
-.badge-success { @apply bg-emerald-500/20 text-emerald-400; }
-.badge-warning { @apply bg-amber-500/20 text-amber-400; }
-.badge-danger { @apply bg-red-500/20 text-red-400; }
-.badge-info { @apply bg-blue-500/20 text-blue-400; }
-.badge-neutral { @apply bg-slate-500/20 text-slate-400; }
+.badge-success { background: var(--bg-success);   color: var(--content-success);   }
+.badge-warning { background: var(--bg-warning);   color: var(--content-warning);   }
+.badge-danger  { background: var(--bg-error);     color: var(--content-error);     }
+.badge-info    { background: var(--bg-info);      color: var(--content-info);      }
+.badge-neutral { background: var(--bg-subtle);    color: var(--content-muted);     }
 
-/* Buttons — pill style, matching filter pill spec */
-/*
+/* ──────────────────────────────────────────────────────────────────
+ * Buttons (legacy class layer).
+ *
+ * Token-driven pill buttons that mirror `buttonVariants` in
+ * `src/components/ui/button-variants.ts`. A light/dark theme swap
+ * flips both surfaces. New code should prefer the `<Button variant="…">`
+ * CVA component — it adds loading, keyboard-shortcut hints, and
+ * size-specific icon slots.
+ *
  * Button tokens:
  *   height:  ~34px (default), ~28px (xs), ~32px (sm), ~42px (lg)
  *   radius:  rounded-full (pill)
  *   font:    text-xs 12px (default), text-[11px] (xs), text-sm 14px (lg)
  *   icon:    14px default, 12px xs, 16px lg
  *   border:  always visible (transparent when not needed)
- */
+ * ────────────────────────────────────────────────────────────────── */
 .btn {
   @apply inline-flex items-center justify-center gap-1.5
     px-3.5 py-1.5 rounded-full
@@ -69,33 +96,67 @@ body {
     whitespace-nowrap;
 }
 .btn-primary {
-  @apply bg-brand-600 border-brand-600 hover:bg-brand-500 hover:border-brand-500
-    text-white shadow-sm shadow-brand-600/20;
+  background: var(--brand-emphasis);
+  border-color: var(--brand-emphasis);
+  color: var(--content-inverted);
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover {
+  background: var(--brand-default);
+  border-color: var(--brand-default);
 }
 .btn-secondary {
-  @apply bg-slate-800/60 border-slate-600/50 text-slate-200
-    hover:bg-slate-700/60 hover:border-slate-500/50;
+  background: var(--bg-default);
+  border-color: var(--border-subtle);
+  color: var(--content-emphasis);
+}
+.btn-secondary:hover {
+  background: var(--bg-muted);
+  border-color: var(--border-default);
 }
 .btn-danger {
-  @apply bg-red-600/80 border-red-600 hover:bg-red-500 text-white;
+  background: var(--bg-error);
+  border-color: var(--border-error);
+  color: var(--content-error);
+}
+.btn-danger:hover {
+  background: var(--bg-error);
+  color: var(--content-emphasis);
 }
 .btn-success {
-  @apply bg-emerald-600/80 border-emerald-600 hover:bg-emerald-500 text-white;
+  background: var(--bg-success);
+  border-color: var(--border-success);
+  color: var(--content-success);
+}
+.btn-success:hover {
+  background: var(--bg-success);
+  color: var(--content-emphasis);
 }
 .btn-ghost {
-  @apply border-transparent text-slate-300 hover:bg-slate-700/50;
+  @apply border-transparent;
+  color: var(--content-default);
+}
+.btn-ghost:hover {
+  background: var(--bg-muted);
+  color: var(--content-emphasis);
 }
 .btn-xs { @apply px-2.5 py-1 text-[11px] gap-1; }
 .btn-sm { @apply px-3 py-1.5 text-xs; }
 .btn-lg { @apply px-5 py-2.5 text-sm gap-2; }
 
-/* Inputs */
+/* Inputs — tokenised so forms track the active theme. */
 .input {
-  @apply w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-slate-200 
-    placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500
-    transition-all duration-200 text-sm;
+  @apply w-full rounded-lg px-3 py-2 text-sm transition-all duration-200
+    placeholder-content-subtle
+    focus:outline-none focus:ring-2 focus:ring-ring focus:border-border-emphasis;
+  background: var(--bg-default);
+  border: 1px solid var(--border-default);
+  color: var(--content-emphasis);
 }
-.input-label { @apply block text-sm font-medium text-slate-300 mb-1; }
+.input-label {
+  @apply block text-sm font-medium mb-1;
+  color: var(--content-default);
+}
 
 select.input { @apply appearance-none cursor-pointer; }
 textarea.input { @apply resize-y min-h-[80px]; }
@@ -105,9 +166,16 @@ textarea.input { @apply resize-y min-h-[80px]; }
  * See: src/components/ui/table/GUIDE.md
  * Do NOT extend these rules for new list pages. */
 .data-table { @apply w-full text-sm text-left; }
-.data-table th { @apply px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider bg-slate-800/50; }
-.data-table td { @apply px-4 py-3 border-t border-slate-700/50; }
-.data-table tr:hover td { @apply bg-slate-700/20; }
+.data-table th {
+  @apply px-4 py-3 text-xs font-semibold uppercase tracking-wider;
+  color: var(--content-muted);
+  background: var(--bg-subtle);
+}
+.data-table td {
+  @apply px-4 py-3 border-t;
+  border-color: var(--border-subtle);
+}
+.data-table tr:hover td { background: var(--bg-subtle); }
 
 /* Animations */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -117,11 +185,18 @@ textarea.input { @apply resize-y min-h-[80px]; }
 
 /* Sidebar nav */
 .nav-link {
-  @apply flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-slate-400
-    hover:text-slate-200 hover:bg-slate-700/50 transition-all duration-200 text-sm;
+  @apply flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg transition-all duration-200 text-sm;
+  color: var(--content-muted);
+}
+.nav-link:hover {
+  color: var(--content-emphasis);
+  background: var(--bg-muted);
 }
 .nav-link.active {
-  @apply text-white bg-brand-600/20 border-l-[3px] border-brand-500 font-medium;
+  @apply border-l-[3px] font-medium;
+  color: var(--content-emphasis);
+  background: var(--brand-subtle);
+  border-left-color: var(--brand-default);
 }
 .nav-link-label {
   @apply truncate;
@@ -132,42 +207,46 @@ textarea.input { @apply resize-y min-h-[80px]; }
   @apply flex flex-wrap items-center justify-between gap-3
     sticky top-0 z-20
     -mx-4 md:-mx-6 px-4 md:px-6
-    py-3 bg-slate-900/80 backdrop-blur-sm;
-}
-
-/* Responsive card padding */
-.glass-card {
-  @apply p-4 md:p-5;
+    py-3 backdrop-blur-sm;
+  background: color-mix(in srgb, var(--bg-page) 80%, transparent);
 }
 
 /* Focus-visible — accessible keyboard focus rings */
 .btn:focus-visible,
 .nav-link:focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--brand-default);
   outline-offset: 2px;
 }
 
 /* Icon color tokens */
 :root {
-  --icon-muted: #94a3b8;   /* slate-400 */
-  --icon-active: #f1f5f9;  /* slate-100 */
-  --icon-brand: #818cf8;   /* brand-hover / indigo-400 */
+  --icon-muted:  var(--content-muted);
+  --icon-active: var(--content-emphasis);
+  --icon-brand:  var(--brand-muted);
 }
 
 /* Icon-only button utility — enforces touch target + accessible focus */
 .icon-btn {
   @apply inline-flex items-center justify-center rounded-lg
     min-w-[36px] min-h-[36px]
-    text-slate-400 hover:text-slate-200 hover:bg-slate-700/50
     transition-colors duration-150
     disabled:opacity-40 disabled:pointer-events-none;
+  color: var(--content-muted);
+}
+.icon-btn:hover {
+  color: var(--content-emphasis);
+  background: var(--bg-muted);
 }
 .icon-btn:focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--brand-default);
   outline-offset: 2px;
 }
 .icon-btn-danger {
-  @apply text-red-400 hover:text-red-300 hover:bg-red-500/10;
+  color: var(--content-error);
+}
+.icon-btn-danger:hover {
+  color: var(--content-error);
+  background: var(--bg-error);
 }
 .icon-btn-sm {
   @apply min-w-[28px] min-h-[28px];
@@ -192,4 +271,3 @@ textarea.input { @apply resize-y min-h-[80px]; }
 @media screen {
   .soa-print-body { max-width: 1200px; margin: 0 auto; padding: 2rem; }
 }
-

@@ -18,17 +18,17 @@ async function safeFetch(url: string): Promise<Response | null> {
     }
 }
 
-/** Safely parse JSON from a response. Returns null if response is HTML or malformed. */
-async function safeJson(res: Response): Promise<Record<string, unknown> | null> {
+/** Safely parse JSON from a response. Returns undefined if response is HTML or malformed. */
+async function safeJson(res: Response): Promise<Record<string, unknown> | null | undefined> {
     try {
         const text = await res.text();
         if (text.startsWith('<') || text.startsWith('<!DOCTYPE')) {
             // Server returned an HTML error page (cold compilation, 500, etc.)
-            return null;
+            return undefined;
         }
         return JSON.parse(text);
     } catch {
-        return null;
+        return undefined;
     }
 }
 
@@ -37,6 +37,8 @@ describe('Auth Routes Integration', () => {
 
     beforeAll(async () => {
         // Ping the server until it successfully responds with JSON.
+        // The session endpoint returns `null` when no session is active,
+        // which is a valid JSON response indicating the server is ready.
         for (let i = 0; i < 10; i++) {
             try {
                 const warmup = await fetch(`${BASE_URL}/api/auth/session`, {
@@ -44,7 +46,7 @@ describe('Auth Routes Integration', () => {
                 });
                 if (warmup.ok) {
                     const json = await safeJson(warmup);
-                    if (json !== null) {
+                    if (json !== undefined) {
                         serverAvailable = true;
                         break;
                     }
@@ -60,6 +62,7 @@ describe('Auth Routes Integration', () => {
     }, 60000);
 
     // Helper: skip test if server not available
+    // 15s timeout accommodates dev server cold-compilation of API routes.
     const itLive = (name: string, fn: () => Promise<void>) => {
         it(name, async () => {
             if (!serverAvailable) {
@@ -67,7 +70,7 @@ describe('Auth Routes Integration', () => {
                 return;
             }
             await fn();
-        });
+        }, 15000);
     };
 
     describe('GET /api/auth/session', () => {
@@ -84,15 +87,15 @@ describe('Auth Routes Integration', () => {
             }
             expect(res.status).toBe(200);
             const data = await safeJson(res);
-            if (!data) return; // HTML response — skip assertion
-            expect(typeof data).toBe('object');
+            if (data === undefined) return; // HTML response — skip assertion
+            expect(data === null || typeof data === 'object').toBe(true);
         });
 
         itLive('does NOT expose access_token in session response', async () => {
             const res = await safeFetch(`${BASE_URL}/api/auth/session`);
             if (!res) return;
             const data = await safeJson(res);
-            if (!data) return;
+            if (data === undefined) return;
             expect(data?.access_token).toBeUndefined();
             expect(data?.accessToken).toBeUndefined();
         });
@@ -101,7 +104,7 @@ describe('Auth Routes Integration', () => {
             const res = await safeFetch(`${BASE_URL}/api/auth/session`);
             if (!res) return;
             const data = await safeJson(res);
-            if (!data) return;
+            if (data === undefined) return;
             expect(data?.refresh_token).toBeUndefined();
             expect(data?.refreshToken).toBeUndefined();
         });
@@ -113,7 +116,7 @@ describe('Auth Routes Integration', () => {
             if (!res) return;
             expect(res.status).toBe(200);
             const data = await safeJson(res);
-            if (!data) return;
+            if (data === undefined) return;
             expect(data.csrfToken).toBeDefined();
             expect(typeof data.csrfToken).toBe('string');
             expect((data.csrfToken as string).length).toBeGreaterThan(0);
@@ -123,12 +126,12 @@ describe('Auth Routes Integration', () => {
             const res1 = await safeFetch(`${BASE_URL}/api/auth/csrf`);
             if (!res1 || res1.status !== 200) return;
             const data1 = await safeJson(res1);
-            if (!data1) return;
+            if (data1 === undefined) return;
 
             const res2 = await safeFetch(`${BASE_URL}/api/auth/csrf`);
             if (!res2 || res2.status !== 200) return;
             const data2 = await safeJson(res2);
-            if (!data2) return;
+            if (data2 === undefined) return;
 
             expect(data1.csrfToken).toBeDefined();
             expect(data2.csrfToken).toBeDefined();
@@ -140,7 +143,7 @@ describe('Auth Routes Integration', () => {
             const res = await safeFetch(`${BASE_URL}/api/auth/providers`);
             if (!res) return;
             const data = await safeJson(res);
-            if (!data) {
+            if (data === undefined) {
                 console.warn('[skipped] providers endpoint returned non-JSON (server may be compiling)');
                 return;
             }
@@ -154,7 +157,7 @@ describe('Auth Routes Integration', () => {
             const res = await safeFetch(`${BASE_URL}/api/auth/providers`);
             if (!res) return;
             const data = await safeJson(res);
-            if (!data) return;
+            if (data === undefined) return;
             expect(data.credentials).toBeDefined();
         });
     });
@@ -164,7 +167,7 @@ describe('Auth Routes Integration', () => {
             const res = await safeFetch(`${BASE_URL}/api/auth/session`);
             if (!res) return;
             const data = await safeJson(res);
-            if (!data) return;
+            if (data === undefined) return;
             const jsonStr = JSON.stringify(data);
             expect(jsonStr).not.toContain('"access_token"');
             expect(jsonStr).not.toContain('"refresh_token"');

@@ -65,4 +65,9 @@ export const queryKeys = {
         list: (tenantSlug: string) =>
             ['findings', tenantSlug, 'list'] as const,
     },
+    members: {
+        all: (tenantSlug: string) => ['members', tenantSlug] as const,
+        list: (tenantSlug: string) =>
+            ['members', tenantSlug, 'list'] as const,
+    },
 } as const;

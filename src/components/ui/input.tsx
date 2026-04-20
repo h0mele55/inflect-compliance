@@ -1,91 +1,191 @@
+"use client";
+
+/**
+ * Epic 55 — shared <Input> primitive.
+ *
+ * Token-backed, CVA-sized, accessible text/number/password/etc. input
+ * that composes cleanly with <Label> and <FormField>. Keeps the legacy
+ * password-toggle + inline-error affordances from the Dub port but
+ * pivots every colour to the Epic 51 semantic token palette so the same
+ * component works in dark + light themes.
+ *
+ * API surface (props):
+ *   - Standard HTMLInputElement attrs (value, onChange, placeholder, …).
+ *   - `size`: "sm" | "md" | "lg" — CVA variant, default "md".
+ *   - `invalid`: boolean — toggles error styling and `aria-invalid`.
+ *   - `error`: string — renders a role="alert" hint below the input.
+ *     Supplying `error` implies `invalid`.
+ *   - `description`: string — renders a muted hint below the input.
+ *
+ * Accessibility:
+ *   - `aria-invalid` mirrors `invalid` / presence of `error`.
+ *   - `aria-describedby` auto-links to the error + description elements
+ *     when an `id` is supplied. Downstream `<FormField>` wraps both in
+ *     one id-linked package.
+ */
+
 import { cn } from "@dub/utils";
+import { cva, type VariantProps } from "class-variance-authority";
 import { AlertCircle } from "lucide-react";
-import React, { useCallback, useState } from "react";
+import * as React from "react";
 import { Eye, EyeSlash } from "./icons";
 
+// ─── CVA ────────────────────────────────────────────────────────────
+
+export const inputVariants = cva(
+    [
+        "w-full rounded-lg border text-sm transition-colors",
+        "bg-bg-default text-content-emphasis placeholder-content-subtle",
+        "border-border-default",
+        "hover:border-border-emphasis",
+        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-border-emphasis",
+        "disabled:cursor-not-allowed disabled:bg-bg-muted disabled:text-content-muted disabled:hover:border-border-default",
+        "read-only:bg-bg-muted read-only:text-content-muted read-only:hover:border-border-default",
+    ],
+    {
+        variants: {
+            size: {
+                sm: "h-8 px-2.5 text-xs",
+                md: "h-9 px-3",
+                lg: "h-10 px-3.5",
+            },
+            invalid: {
+                true: "border-border-error text-content-error placeholder-content-error/60 focus-visible:border-border-error focus-visible:ring-border-error",
+                false: "",
+            },
+        },
+        defaultVariants: { size: "md", invalid: false },
+    },
+);
+
+// ─── Props ──────────────────────────────────────────────────────────
+
+type CvaInputProps = VariantProps<typeof inputVariants>;
+
 export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {
-  error?: string;
+    extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">,
+        Omit<CvaInputProps, "invalid"> {
+    /** Show error styling + render an `role="alert"` hint below. */
+    error?: string;
+    /** Muted helper text rendered below the input. */
+    description?: string;
+    /** Force invalid styling (used when error is surfaced elsewhere). */
+    invalid?: boolean;
 }
 
+// ─── Component ──────────────────────────────────────────────────────
+
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
-    const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+    (
+        {
+            className,
+            type,
+            size,
+            invalid,
+            error,
+            description,
+            id,
+            "aria-describedby": ariaDescribedBy,
+            ...props
+        },
+        ref,
+    ) => {
+        const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
+        const isPassword = type === "password";
+        const effectiveType = isPassword && isPasswordVisible ? "text" : type;
 
-    const toggleIsPasswordVisible = useCallback(
-      () => setIsPasswordVisible(!isPasswordVisible),
-      [isPasswordVisible, setIsPasswordVisible],
-    );
+        const hasError = Boolean(error);
+        const effectiveInvalid = invalid || hasError;
 
-    return (
-      <div>
-        <div className="relative flex">
-          <input
-            type={isPasswordVisible ? "text" : type}
-            className={cn(
-              "w-full max-w-md rounded-md border border-neutral-300 text-neutral-900 placeholder-neutral-400 read-only:bg-neutral-100 read-only:text-neutral-500 focus:border-neutral-500 focus:outline-none focus:ring-neutral-500 sm:text-sm",
-              props.error &&
-                "border-red-500 focus:border-red-500 focus:ring-red-500",
-              className,
-            )}
-            ref={ref}
-            {...props}
-          />
+        // Chain aria-describedby so consumers who pass their own ids
+        // keep working; we append our own description/error ids when
+        // the input has an id of its own.
+        const errorId = id && hasError ? `${id}-error` : undefined;
+        const descId = id && description ? `${id}-description` : undefined;
+        const describedBy =
+            [ariaDescribedBy, descId, errorId].filter(Boolean).join(" ") ||
+            undefined;
 
-          <div className="group">
-            {props.error && (
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex flex-none items-center px-2.5">
-                <AlertCircle
-                  className={cn(
-                    "size-5 text-white",
-                    type === "password" &&
-                      "transition-opacity group-hover:opacity-0",
-                  )}
-                  fill="#ef4444"
-                />
-              </div>
-            )}
-            {type === "password" && (
-              <button
-                className={cn(
-                  "absolute inset-y-0 right-0 flex items-center px-3",
-                  props.error &&
-                    "opacity-0 transition-opacity group-hover:opacity-100",
+        return (
+            <div className="w-full">
+                <div className="relative flex">
+                    <input
+                        type={effectiveType}
+                        id={id}
+                        ref={ref}
+                        aria-invalid={effectiveInvalid || undefined}
+                        aria-describedby={describedBy}
+                        className={cn(
+                            inputVariants({ size, invalid: effectiveInvalid }),
+                            // Reserve room on the right for the error icon
+                            // and/or password toggle so the text doesn't
+                            // slide under them.
+                            (hasError || isPassword) && "pr-9",
+                            hasError && isPassword && "pr-14",
+                            className,
+                        )}
+                        {...props}
+                    />
+
+                    {hasError && (
+                        <div
+                            className={cn(
+                                "pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5",
+                                isPassword && "transition-opacity group-hover:opacity-0",
+                            )}
+                        >
+                            <AlertCircle
+                                className="size-5 text-content-error"
+                                aria-hidden="true"
+                            />
+                        </div>
+                    )}
+
+                    {isPassword && (
+                        <button
+                            type="button"
+                            onClick={() => setIsPasswordVisible((v) => !v)}
+                            className={cn(
+                                "absolute inset-y-0 right-0 flex items-center px-2.5 text-content-muted transition-colors hover:text-content-emphasis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                hasError &&
+                                    "opacity-0 transition-opacity group-hover:opacity-100",
+                            )}
+                            aria-label={
+                                isPasswordVisible ? "Hide password" : "Show password"
+                            }
+                            tabIndex={-1}
+                        >
+                            {isPasswordVisible ? (
+                                <Eye className="size-4" aria-hidden="true" />
+                            ) : (
+                                <EyeSlash className="size-4" aria-hidden="true" />
+                            )}
+                        </button>
+                    )}
+                </div>
+
+                {description && !hasError && (
+                    <p
+                        id={descId}
+                        className="mt-1.5 text-xs text-content-muted"
+                    >
+                        {description}
+                    </p>
                 )}
-                type="button"
-                onClick={() => toggleIsPasswordVisible()}
-                aria-label={
-                  isPasswordVisible ? "Hide password" : "Show Password"
-                }
-              >
-                {isPasswordVisible ? (
-                  <Eye
-                    className="size-4 flex-none text-neutral-500 transition hover:text-neutral-700"
-                    aria-hidden
-                  />
-                ) : (
-                  <EyeSlash
-                    className="size-4 flex-none text-neutral-500 transition hover:text-neutral-700"
-                    aria-hidden
-                  />
-                )}
-              </button>
-            )}
-          </div>
-        </div>
 
-        {props.error && (
-          <span
-            className="mt-2 block text-sm text-red-500"
-            role="alert"
-            aria-live="assertive"
-          >
-            {props.error}
-          </span>
-        )}
-      </div>
-    );
-  },
+                {hasError && (
+                    <p
+                        id={errorId}
+                        role="alert"
+                        aria-live="polite"
+                        className="mt-1.5 text-xs text-content-error"
+                    >
+                        {error}
+                    </p>
+                )}
+            </div>
+        );
+    },
 );
 
 Input.displayName = "Input";
