@@ -18,7 +18,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     // ADMIN-only
     if (ctx.role !== 'ADMIN') {
-        return NextResponse.json({ error: 'Forbidden: ADMIN role required' }, { status: 403 });
+        return NextResponse.json<any>({ error: 'Forbidden: ADMIN role required' }, { status: 403 });
     }
 
     // Parse optional query params
@@ -32,5 +32,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         maxBreaks: 20,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

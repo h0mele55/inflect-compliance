@@ -5,5 +5,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    return NextResponse.json(await getRiskTraceability(ctx, params.id));
+    return NextResponse.json<any>(await getRiskTraceability(ctx, params.id));
 });

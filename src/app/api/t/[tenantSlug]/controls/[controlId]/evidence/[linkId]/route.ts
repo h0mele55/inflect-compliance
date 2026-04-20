@@ -6,5 +6,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; controlId: string; linkId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     await unlinkEvidence(ctx, params.controlId, params.linkId);
-    return NextResponse.json({ success: true });
+    return NextResponse.json<any>({ success: true });
 });

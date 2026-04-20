@@ -53,5 +53,5 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
         return link;
     });
 
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json<any>(result, { status: 201 });
 });

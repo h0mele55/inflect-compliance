@@ -12,11 +12,11 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; runId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const evidence = await listRunEvidence(ctx, params.runId);
-    return NextResponse.json(evidence);
+    return NextResponse.json<any>(evidence);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(LinkTestEvidenceSchema, async (req, { params }: { params: { tenantSlug: string; runId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const link = await linkEvidenceToRun(ctx, params.runId, body);
-    return NextResponse.json(link, { status: 201 });
+    return NextResponse.json<any>(link, { status: 201 });
 }));

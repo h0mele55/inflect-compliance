@@ -6,5 +6,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const notifications = await listMyNotifications(ctx);
-    return NextResponse.json(notifications);
+    return NextResponse.json<any>(notifications);
 });

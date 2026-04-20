@@ -26,5 +26,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         });
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

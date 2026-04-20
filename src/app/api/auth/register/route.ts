@@ -15,11 +15,11 @@ export const POST = withApiErrorHandling(withValidatedBody(AuthActionSchema, asy
             return await handleLogin(body);
         }
 
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'Invalid action' }, { status: 400 });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         logger.error('Auth error', { component: 'auth', error: error instanceof Error ? error.message : String(error) });
-        return NextResponse.json({ error: error.message || 'Auth failed' }, { status: 500 });
+        return NextResponse.json<any>({ error: error.message || 'Auth failed' }, { status: 500 });
     }
 }));
 
@@ -27,13 +27,13 @@ export const POST = withApiErrorHandling(withValidatedBody(AuthActionSchema, asy
 async function handleRegister(body: any) {
     const { email, password, name, orgName } = body;
     if (!email || !password || !name || !orgName) {
-        return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Check if email already used
     const existing = await prisma.user.findFirst({ where: { email } });
     if (existing) {
-        return NextResponse.json({ error: 'Email already registered' }, { status: 409 });
+        return NextResponse.json<any>({ error: 'Email already registered' }, { status: 409 });
     }
 
     // Create tenant
@@ -68,7 +68,7 @@ async function handleRegister(body: any) {
         role: membership.role,
     });
 
-    const response = NextResponse.json({
+    const response = NextResponse.json<any>({
         user: { id: user.id, email: user.email, name: user.name, role: membership.role },
         tenant: { id: tenant.id, name: tenant.name },
     });
@@ -88,7 +88,7 @@ async function handleRegister(body: any) {
 async function handleLogin(body: any) {
     const { email, password } = body;
     if (!email || !password) {
-        return NextResponse.json({ error: 'Missing credentials' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'Missing credentials' }, { status: 400 });
     }
 
     const user = await prisma.user.findFirst({
@@ -104,7 +104,7 @@ async function handleLogin(body: any) {
     });
 
     if (!user || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
-        return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+        return NextResponse.json<any>({ error: 'Invalid credentials' }, { status: 401 });
     }
 
     // Resolve tenant and role from membership (sole authority)
@@ -117,7 +117,7 @@ async function handleLogin(body: any) {
         role: membership?.role ?? 'READER',
     });
 
-    const response = NextResponse.json({
+    const response = NextResponse.json<any>({
         user: { id: user.id, email: user.email, name: user.name, role: membership?.role ?? 'READER' },
         tenant: membership?.tenant ? { id: membership.tenant.id, name: membership.tenant.name } : null,
     });

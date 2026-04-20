@@ -8,11 +8,11 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; issueId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const bundles = await listBundles(ctx, params.issueId);
-    return NextResponse.json(bundles);
+    return NextResponse.json<any>(bundles);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateBundleSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; issueId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const bundle = await createBundle(ctx, params.issueId, body.name);
-    return NextResponse.json(bundle, { status: 201 });
+    return NextResponse.json<any>(bundle, { status: 201 });
 }));

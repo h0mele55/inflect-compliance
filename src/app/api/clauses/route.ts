@@ -6,5 +6,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest) => {
     const ctx = await getLegacyCtx(req);
     const clauses = await listClauses(ctx);
-    return NextResponse.json(clauses);
+    return NextResponse.json<any>(clauses);
 });

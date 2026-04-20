@@ -12,7 +12,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (action === 'export-json') {
         const data = await exportReadinessJson(ctx, params.cycleId);
-        return NextResponse.json(data);
+        return NextResponse.json<any>(data);
     }
 
     if (action === 'export-unmapped-csv') {
@@ -31,5 +31,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     // Default: compute readiness
     const result = await computeReadiness(ctx, params.cycleId);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

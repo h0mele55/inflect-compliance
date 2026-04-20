@@ -15,7 +15,7 @@
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-    return NextResponse.json(
+    return NextResponse.json<any>(
         {
             status: 'alive',
             timestamp: new Date().toISOString(),

@@ -18,7 +18,7 @@ export const POST = withApiErrorHandling(withValidatedBody(
         const ctx = await requireAdminCtx(params, req);
 
         if (!body.targetUserId) {
-            return NextResponse.json(
+            return NextResponse.json<any>(
                 { error: 'targetUserId is required' },
                 { status: 400 },
             );
@@ -26,7 +26,7 @@ export const POST = withApiErrorHandling(withValidatedBody(
 
         const result = await revokeUserSessions(ctx, body.targetUserId);
 
-        return NextResponse.json({
+        return NextResponse.json<any>({
             success: true,
             message: 'User sessions revoked.',
             userId: result.userId,

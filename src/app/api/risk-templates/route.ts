@@ -8,5 +8,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
  */
 export const GET = withApiErrorHandling(async () => {
     const templates = await RiskTemplateRepository.list();
-    return NextResponse.json(templates);
+    return NextResponse.json<any>(templates);
 });

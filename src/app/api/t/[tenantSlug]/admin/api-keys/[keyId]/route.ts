@@ -9,5 +9,5 @@ export const DELETE = withApiErrorHandling(async (
 ) => {
     const ctx = await requireAdminCtx(params, req);
     const result = await revokeApiKey(ctx, params.keyId);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

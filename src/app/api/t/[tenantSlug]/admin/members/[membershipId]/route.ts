@@ -34,8 +34,8 @@ export const PATCH = withApiErrorHandling(async (
     }
 
     if (!result) {
-        return NextResponse.json({ error: 'No changes specified' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'No changes specified' }, { status: 400 });
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

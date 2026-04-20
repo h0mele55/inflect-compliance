@@ -16,7 +16,7 @@ export const GET = withApiErrorHandling(async (
 ) => {
     const ctx = await requireAdminCtx(params, req);
     const keys = await listApiKeys(ctx);
-    return NextResponse.json(keys);
+    return NextResponse.json<any>(keys);
 });
 
 export const POST = withApiErrorHandling(async (
@@ -27,5 +27,5 @@ export const POST = withApiErrorHandling(async (
     const body = await req.json();
     const input = CreateApiKeySchema.parse(body);
     const result = await createApiKey(ctx, input);
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json<any>(result, { status: 201 });
 });

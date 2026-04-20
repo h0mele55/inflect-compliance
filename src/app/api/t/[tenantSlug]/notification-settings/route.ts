@@ -21,7 +21,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         ]);
     });
 
-    return NextResponse.json({ settings, stats });
+    return NextResponse.json<any>({ settings, stats });
 });
 
 /** PUT — update tenant notification settings (admin-only) */
@@ -39,5 +39,5 @@ export const PUT = withApiErrorHandling(async (req: NextRequest, { params }: { p
         }),
     );
 
-    return NextResponse.json(updated);
+    return NextResponse.json<any>(updated);
 });

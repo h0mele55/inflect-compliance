@@ -25,7 +25,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (query.includeDeleted === 'true') {
         const controls = await listControlsWithDeleted(ctx);
-        return NextResponse.json(controls);
+        return NextResponse.json<any>(controls);
     }
 
     const filters = {
@@ -43,16 +43,16 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
             cursor: query.cursor,
             filters,
         });
-        return NextResponse.json(result);
+        return NextResponse.json<any>(result);
     }
 
     // Backward compatibility: flat array
     const controls = await listControls(ctx, filters);
-    return NextResponse.json(controls);
+    return NextResponse.json<any>(controls);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateControlSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const control = await createControl(ctx, body);
-    return NextResponse.json(control, { status: 201 });
+    return NextResponse.json<any>(control, { status: 201 });
 }));

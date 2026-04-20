@@ -12,11 +12,11 @@ const LinkSchema = z.object({
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    return NextResponse.json(await listAssetControls(ctx, params.id));
+    return NextResponse.json<any>(await listAssetControls(ctx, params.id));
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const body = LinkSchema.parse(await req.json());
-    return NextResponse.json(await mapAssetToControl(ctx, params.id, body.controlId, body.coverageType, body.rationale), { status: 201 });
+    return NextResponse.json<any>(await mapAssetToControl(ctx, params.id, body.controlId, body.coverageType, body.rationale), { status: 201 });
 });

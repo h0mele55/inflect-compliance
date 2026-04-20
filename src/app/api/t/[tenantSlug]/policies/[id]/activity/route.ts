@@ -7,5 +7,5 @@ import { getPolicyActivity } from '@/app-layer/usecases/policy';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const events = await getPolicyActivity(ctx, params.id);
-    return NextResponse.json(events);
+    return NextResponse.json<any>(events);
 });

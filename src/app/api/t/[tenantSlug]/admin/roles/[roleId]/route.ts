@@ -19,7 +19,7 @@ export const PATCH = withApiErrorHandling(async (
     const body = await req.json();
     const input = UpdateRoleSchema.parse(body);
     const role = await updateCustomRole(ctx, params.roleId, input);
-    return NextResponse.json(role);
+    return NextResponse.json<any>(role);
 });
 
 export const DELETE = withApiErrorHandling(async (
@@ -28,5 +28,5 @@ export const DELETE = withApiErrorHandling(async (
 ) => {
     const ctx = await requireAdminCtx(params, req);
     const result = await deleteCustomRole(ctx, params.roleId);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

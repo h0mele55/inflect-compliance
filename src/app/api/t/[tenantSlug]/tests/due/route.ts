@@ -10,11 +10,11 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const queue = await getDueQueue(ctx);
-    return NextResponse.json(queue);
+    return NextResponse.json<any>(queue);
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const result = await runDuePlanning(ctx);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

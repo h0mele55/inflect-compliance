@@ -17,7 +17,7 @@ export const GET = withApiErrorHandling(async (
 ) => {
     const ctx = await requireAdminCtx(params, req);
     const roles = await listCustomRoles(ctx);
-    return NextResponse.json(roles);
+    return NextResponse.json<any>(roles);
 });
 
 export const POST = withApiErrorHandling(async (
@@ -28,5 +28,5 @@ export const POST = withApiErrorHandling(async (
     const body = await req.json();
     const input = CreateRoleSchema.parse(body);
     const role = await createCustomRole(ctx, input);
-    return NextResponse.json(role, { status: 201 });
+    return NextResponse.json<any>(role, { status: 201 });
 });

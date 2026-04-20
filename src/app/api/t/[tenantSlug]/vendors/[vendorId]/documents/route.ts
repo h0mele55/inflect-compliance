@@ -8,11 +8,11 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const docs = await listVendorDocuments(ctx, params.vendorId);
-    return NextResponse.json(docs);
+    return NextResponse.json<any>(docs);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateVendorDocumentSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const doc = await addVendorDocument(ctx, params.vendorId, body);
-    return NextResponse.json(doc, { status: 201 });
+    return NextResponse.json<any>(doc, { status: 201 });
 }));

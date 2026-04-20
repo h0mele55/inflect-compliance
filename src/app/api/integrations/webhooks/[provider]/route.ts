@@ -35,7 +35,7 @@ export async function POST(
     const { provider } = params;
 
     if (!provider || typeof provider !== 'string') {
-        return NextResponse.json({ error: 'Missing provider' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'Missing provider' }, { status: 400 });
     }
 
     try {
@@ -58,20 +58,20 @@ export async function POST(
         // Always return 200 for valid requests (prevent webhook retries on processing errors)
         // Only return 4xx for auth/validation failures
         if (result.status === 'auth_failed') {
-            return NextResponse.json(
+            return NextResponse.json<any>(
                 { error: 'Webhook authentication failed' },
                 { status: 401 }
             );
         }
 
         if (result.status === 'invalid_provider') {
-            return NextResponse.json(
+            return NextResponse.json<any>(
                 { error: 'Unknown integration provider' },
                 { status: 404 }
             );
         }
 
-        return NextResponse.json({
+        return NextResponse.json<any>({
             received: true,
             eventId: result.eventId,
             status: result.status,
@@ -83,7 +83,7 @@ export async function POST(
             provider,
             err: err instanceof Error ? err : new Error(String(err)),
         });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Internal server error' },
             { status: 500 }
         );

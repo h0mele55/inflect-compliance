@@ -66,6 +66,13 @@ import {
 import { Popover, PopoverProps } from "../popover";
 import { ScrollContainer } from "../scroll-container";
 import { Tooltip } from "../tooltip";
+import { COMBOBOX_DEFAULT_MESSAGES } from "./messages";
+
+export {
+    COMBOBOX_DEFAULT_MESSAGES,
+    getComboboxMessages,
+    type ComboboxMessages,
+} from "./messages";
 
 // ─── Option type ────────────────────────────────────────────────────
 
@@ -176,8 +183,8 @@ export function Combobox<
     loading = false,
     trigger,
     icon: IconProp,
-    placeholder = "Select…",
-    searchPlaceholder = "Search…",
+    placeholder = COMBOBOX_DEFAULT_MESSAGES.placeholder,
+    searchPlaceholder = COMBOBOX_DEFAULT_MESSAGES.searchPlaceholder,
     emptyState,
     createLabel,
     createIcon: CreateIcon = Plus,
@@ -333,7 +340,7 @@ export function Combobox<
             )}
             <div className="grow truncate">
                 {createLabel?.(search) ??
-                    `Create ${search ? `"${search}"` : "new option..."}`}
+                    COMBOBOX_DEFAULT_MESSAGES.createLabel(search)}
             </div>
         </Command.Item>
     );
@@ -352,10 +359,34 @@ export function Combobox<
     // same a11y + form props injected. For the default Button we pass
     // them directly; for a custom trigger we cloneElement and inject.
 
+    // Compute an accessible name for the trigger. We prefer the
+    // explicit `aria-label` already on `buttonProps`, then the
+    // collapsed-selection label (from selected options), and finally
+    // the placeholder. This guarantees axe's `button-name` rule is
+    // satisfied even when the Button's children render as a ReactNode
+    // tree that assistive tech doesn't flatten into text.
+    const selectedTriggerText =
+        selected.map((option) =>
+            typeof option.label === "string" ? option.label : option.value,
+        ).join(", ");
+    const triggerAriaLabel =
+        (buttonProps as { "aria-label"?: string } | undefined)?.[
+            "aria-label"
+        ] ??
+        (selectedTriggerText ||
+            (typeof placeholder === "string" ? placeholder : "Select"));
+
     const triggerA11yProps = {
         id,
         disabled,
+        // WAI-ARIA 1.2: a trigger that opens a listbox should carry
+        // `role="combobox"` alongside `aria-haspopup="listbox"`.
+        // Radix Popover.Trigger only emits `aria-expanded` /
+        // `aria-controls` — we supply the role explicitly so assistive
+        // tech announces "combobox, collapsed" / "combobox, expanded".
+        role: "combobox" as const,
         "aria-haspopup": "listbox" as const,
+        "aria-label": triggerAriaLabel,
         "aria-invalid": effectiveInvalid || undefined,
         "aria-describedby": ariaDescribedBy,
         "aria-required": required || ariaRequired || undefined,
@@ -547,7 +578,7 @@ export function Combobox<
                                             {shouldFilter ? (
                                                 <Empty className="text-content-subtle flex min-h-12 items-center justify-center text-sm">
                                                     {emptyState ??
-                                                        "No matches"}
+                                                        COMBOBOX_DEFAULT_MESSAGES.emptyState}
                                                 </Empty>
                                             ) : sortedOptions!.length === 0 ? (
                                                 <div
@@ -555,7 +586,7 @@ export function Combobox<
                                                     data-combobox-empty
                                                 >
                                                     {emptyState ??
-                                                        "No matches"}
+                                                        COMBOBOX_DEFAULT_MESSAGES.emptyState}
                                                 </div>
                                             ) : null}
                                         </>

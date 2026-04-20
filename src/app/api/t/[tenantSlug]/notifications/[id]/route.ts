@@ -8,5 +8,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const PUT = withApiErrorHandling(withValidatedBody(EmptyBodySchema, async (req, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const result = await markNotificationRead(ctx, params.id);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 }));

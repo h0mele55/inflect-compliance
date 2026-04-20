@@ -26,7 +26,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (query.includeDeleted === 'true') {
         const risks = await listRisksWithDeleted(ctx);
-        return NextResponse.json(risks);
+        return NextResponse.json<any>(risks);
     }
 
     const hasPagination = query.limit || query.cursor;
@@ -43,7 +43,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
                 q: query.q,
             },
         });
-        return NextResponse.json(result);
+        return NextResponse.json<any>(result);
     }
 
     // Backward compat: return flat array
@@ -55,12 +55,12 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         ownerUserId: query.ownerUserId,
         q: query.q,
     });
-    return NextResponse.json(risks);
+    return NextResponse.json<any>(risks);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateRiskSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const risk = await createRisk(ctx, body as any);
-    return NextResponse.json(risk, { status: 201 });
+    return NextResponse.json<any>(risk, { status: 201 });
 }));

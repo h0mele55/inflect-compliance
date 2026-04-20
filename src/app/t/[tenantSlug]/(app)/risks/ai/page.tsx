@@ -4,6 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { RequirePermission } from '@/components/require-permission';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+
+const SCALE_OPTIONS: ComboboxOption[] = [1,2,3,4,5].map(v => ({ value: String(v), label: String(v) }));
 
 // ─── Types ───
 
@@ -442,24 +445,26 @@ export default function AIRiskAssessmentPage() {
                                             {isEditing ? (
                                                 <div className="flex items-center gap-4">
                                                     <label className="text-xs text-slate-400">
-                                                        L: <select
-                                                            className="input text-xs w-16 inline-block ml-1"
-                                                            value={editForm.likelihoodSuggested}
-                                                            onChange={e => setEditForm(p => ({ ...p, likelihoodSuggested: +e.target.value }))}
+                                                        L: <Combobox
+                                                            hideSearch
                                                             id={`edit-likelihood-${idx}`}
-                                                        >
-                                                            {[1,2,3,4,5].map(v => <option key={v} value={v}>{v}</option>)}
-                                                        </select>
+                                                            selected={SCALE_OPTIONS.find(o => o.value === String(editForm.likelihoodSuggested)) ?? null}
+                                                            setSelected={(opt) => setEditForm(p => ({ ...p, likelihoodSuggested: +(opt?.value ?? p.likelihoodSuggested) }))}
+                                                            options={SCALE_OPTIONS}
+                                                            matchTriggerWidth
+                                                            buttonProps={{ className: 'text-xs w-16 inline-block ml-1' }}
+                                                        />
                                                     </label>
                                                     <label className="text-xs text-slate-400">
-                                                        I: <select
-                                                            className="input text-xs w-16 inline-block ml-1"
-                                                            value={editForm.impactSuggested}
-                                                            onChange={e => setEditForm(p => ({ ...p, impactSuggested: +e.target.value }))}
+                                                        I: <Combobox
+                                                            hideSearch
                                                             id={`edit-impact-${idx}`}
-                                                        >
-                                                            {[1,2,3,4,5].map(v => <option key={v} value={v}>{v}</option>)}
-                                                        </select>
+                                                            selected={SCALE_OPTIONS.find(o => o.value === String(editForm.impactSuggested)) ?? null}
+                                                            setSelected={(opt) => setEditForm(p => ({ ...p, impactSuggested: +(opt?.value ?? p.impactSuggested) }))}
+                                                            options={SCALE_OPTIONS}
+                                                            matchTriggerWidth
+                                                            buttonProps={{ className: 'text-xs w-16 inline-block ml-1' }}
+                                                        />
                                                     </label>
                                                 </div>
                                             ) : (

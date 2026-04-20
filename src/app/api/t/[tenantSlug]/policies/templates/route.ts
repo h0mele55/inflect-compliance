@@ -7,5 +7,5 @@ import * as policyUsecases from '@/app-layer/usecases/policy';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const templates = await policyUsecases.listPolicyTemplates(ctx);
-    return NextResponse.json(templates);
+    return NextResponse.json<any>(templates);
 });

@@ -9,5 +9,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(InstallTemplatesSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const results = await installControlsFromTemplate(ctx, body.templateIds);
-    return NextResponse.json(results, { status: 201 });
+    return NextResponse.json<any>(results, { status: 201 });
 }));

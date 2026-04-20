@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { ArrowLeft, Plus, Trash2, CheckCircle, XCircle, Loader2, Link2, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
+import { Combobox } from '@/components/ui/combobox';
 
 interface ConnectionDTO {
     id: string;
@@ -293,18 +294,15 @@ export default function AdminIntegrationsPage() {
                         {/* Provider select */}
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">Provider</label>
-                            <select
-                                value={formProvider}
-                                onChange={e => { setFormProvider(e.target.value); setFormConfig({}); setFormSecrets({}); }}
-                                className="input w-full"
+                            <Combobox
                                 id="integration-provider-select"
+                                selected={providers.map(p => ({ value: p.id, label: p.displayName })).find(o => o.value === formProvider) ?? null}
+                                setSelected={(opt) => { setFormProvider(opt?.value ?? ''); setFormConfig({}); setFormSecrets({}); }}
+                                options={providers.map(p => ({ value: p.id, label: p.displayName }))}
+                                placeholder="Select a provider..."
                                 disabled={!!editingId}
-                            >
-                                <option value="">Select a provider...</option>
-                                {providers.map(p => (
-                                    <option key={p.id} value={p.id}>{p.displayName}</option>
-                                ))}
-                            </select>
+                                matchTriggerWidth
+                            />
                             {selectedProvider && (
                                 <p className="text-xs text-slate-500 mt-1">{selectedProvider.description}</p>
                             )}

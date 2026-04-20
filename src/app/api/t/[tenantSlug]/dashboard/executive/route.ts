@@ -12,5 +12,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const payload = await getExecutiveDashboard(ctx);
-    return NextResponse.json(payload);
+    return NextResponse.json<any>(payload);
 });

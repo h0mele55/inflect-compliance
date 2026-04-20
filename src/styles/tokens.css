@@ -161,3 +161,30 @@
   --shadow:     0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.12);
 }
+
+/* ─────────────────────────────────────────────────────────────────
+ * Reduced-motion preference (WCAG 2.1 SC 2.3.3 — Animation from
+ * Interactions). Users who've set `prefers-reduced-motion: reduce`
+ * at the OS level should see only essential motion. We flatten our
+ * transition / animation durations to a near-zero value so every
+ * component built on top of `--duration-*` variables respects the
+ * preference without per-component opt-in. Tailwind-generated
+ * `transition-*` / `animate-*` utilities also short-circuit here.
+ * ───────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast:    1ms;
+    --duration-default: 1ms;
+    --duration-slow:    1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+

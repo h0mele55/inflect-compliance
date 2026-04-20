@@ -8,5 +8,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(LinkRiskControlSchema, async (req, { params }: { params: { id: string } }, body) => {
     const ctx = await getLegacyCtx(req);
     const result = await linkControlToRisk(ctx, params.id, body.controlId);
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json<any>(result, { status: 201 });
 }));

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTenantContext, useTenantHref } from '@/lib/tenant-context-provider';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import {
     Building2,
     Map,
@@ -433,17 +434,32 @@ function CompanyProfileStep({ data, onUpdate }: { data: StepData; onUpdate: (d: 
             </div>
             <div>
                 <label className="input-label">Industry</label>
-                <select className="input" value={data.industry || ''} onChange={(e) => onUpdate({ industry: e.target.value })}>
-                    <option value="">Select industry...</option>
-                    <option value="technology">Technology</option>
-                    <option value="finance">Finance & Banking</option>
-                    <option value="healthcare">Healthcare</option>
-                    <option value="manufacturing">Manufacturing</option>
-                    <option value="government">Government</option>
-                    <option value="energy">Energy & Utilities</option>
-                    <option value="retail">Retail & E-commerce</option>
-                    <option value="other">Other</option>
-                </select>
+                <Combobox
+                    hideSearch
+                    selected={[
+                        { value: 'technology', label: 'Technology' },
+                        { value: 'finance', label: 'Finance & Banking' },
+                        { value: 'healthcare', label: 'Healthcare' },
+                        { value: 'manufacturing', label: 'Manufacturing' },
+                        { value: 'government', label: 'Government' },
+                        { value: 'energy', label: 'Energy & Utilities' },
+                        { value: 'retail', label: 'Retail & E-commerce' },
+                        { value: 'other', label: 'Other' },
+                    ].find(o => o.value === (data.industry || '')) ?? null}
+                    setSelected={(opt) => onUpdate({ industry: opt?.value ?? '' })}
+                    options={[
+                        { value: 'technology', label: 'Technology' },
+                        { value: 'finance', label: 'Finance & Banking' },
+                        { value: 'healthcare', label: 'Healthcare' },
+                        { value: 'manufacturing', label: 'Manufacturing' },
+                        { value: 'government', label: 'Government' },
+                        { value: 'energy', label: 'Energy & Utilities' },
+                        { value: 'retail', label: 'Retail & E-commerce' },
+                        { value: 'other', label: 'Other' },
+                    ]}
+                    placeholder="Select industry..."
+                    matchTriggerWidth
+                />
             </div>
             <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -453,13 +469,24 @@ function CompanyProfileStep({ data, onUpdate }: { data: StepData; onUpdate: (d: 
                 </div>
                 <div>
                     <label className="input-label">Company Size</label>
-                    <select className="input" value={data.size || ''} onChange={(e) => onUpdate({ size: e.target.value })}>
-                        <option value="">Select...</option>
-                        <option value="1-50">1–50 employees</option>
-                        <option value="51-200">51–200 employees</option>
-                        <option value="201-1000">201–1,000 employees</option>
-                        <option value="1000+">1,000+ employees</option>
-                    </select>
+                    <Combobox
+                        hideSearch
+                        selected={[
+                            { value: '1-50', label: '1–50 employees' },
+                            { value: '51-200', label: '51–200 employees' },
+                            { value: '201-1000', label: '201–1,000 employees' },
+                            { value: '1000+', label: '1,000+ employees' },
+                        ].find(o => o.value === (data.size || '')) ?? null}
+                        setSelected={(opt) => onUpdate({ size: opt?.value ?? '' })}
+                        options={[
+                            { value: '1-50', label: '1–50 employees' },
+                            { value: '51-200', label: '51–200 employees' },
+                            { value: '201-1000', label: '201–1,000 employees' },
+                            { value: '1000+', label: '1,000+ employees' },
+                        ]}
+                        placeholder="Select..."
+                        matchTriggerWidth
+                    />
                 </div>
             </div>
         </div>

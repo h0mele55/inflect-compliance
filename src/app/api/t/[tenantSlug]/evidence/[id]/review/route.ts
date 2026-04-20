@@ -9,5 +9,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(EvidenceReviewSchema, async (req, { params }: { params: { tenantSlug: string; id: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const result = await reviewEvidence(ctx, params.id, body);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 }));

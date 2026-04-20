@@ -6,5 +6,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; frameworkKey: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const requirements = await listFrameworkRequirements(ctx, params.frameworkKey);
-    return NextResponse.json(requirements);
+    return NextResponse.json<any>(requirements);
 });

@@ -12,6 +12,7 @@ const PencilIcon = ({ size = 14 }: { size?: number }) => (
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { extractMutationError } from '@/lib/mutations';
 import { Modal } from '@/components/ui/modal';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 
@@ -45,10 +46,17 @@ const FREQ_LABELS: Record<string, string> = {
     MONTHLY: 'Monthly', QUARTERLY: 'Quarterly', ANNUALLY: 'Annually',
 };
 const FREQ_OPTIONS = ['', 'AD_HOC', 'DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY'];
+const FREQ_CB_OPTIONS: ComboboxOption[] = FREQ_OPTIONS.filter(Boolean).map(f => ({ value: f, label: FREQ_LABELS[f] || f }));
 const CATEGORY_OPTIONS = ['', 'ORGANIZATIONAL', 'PEOPLE', 'PHYSICAL', 'TECHNOLOGICAL'];
 const CATEGORY_LABELS: Record<string, string> = {
     ORGANIZATIONAL: 'Organizational', PEOPLE: 'People', PHYSICAL: 'Physical', TECHNOLOGICAL: 'Technological',
 };
+const CATEGORY_CB_OPTIONS: ComboboxOption[] = CATEGORY_OPTIONS.filter(Boolean).map(c => ({ value: c, label: CATEGORY_LABELS[c] || c }));
+const STATUS_CB_OPTIONS: ComboboxOption[] = Object.entries(STATUS_LABELS).map(([val, lbl]) => ({ value: val, label: lbl }));
+const EVIDENCE_SOURCE_OPTIONS: ComboboxOption[] = [
+    { value: 'MANUAL', label: 'Manual' },
+    { value: 'INTEGRATION', label: 'Integration' },
+];
 
 type Tab = 'overview' | 'tasks' | 'evidence' | 'mappings' | 'traceability' | 'activity' | 'tests';
 
@@ -530,17 +538,17 @@ export default function ControlDetailPage() {
                 </div>
                 {permissions.canWrite && (
                     <div className="flex gap-2">
-                        <select
-                            className="input w-40 text-sm"
-                            value={control.status}
-                            onChange={e => changeStatus(e.target.value)}
-                            disabled={changingStatus}
+                        <Combobox
+                            hideSearch
                             id="control-status-select"
-                        >
-                            {Object.entries(STATUS_LABELS).map(([val, lbl]) => (
-                                <option key={val} value={val}>{lbl}</option>
-                            ))}
-                        </select>
+                            selected={STATUS_CB_OPTIONS.find(o => o.value === control.status) ?? null}
+                            setSelected={(opt) => { if (opt) changeStatus(opt.value); }}
+                            options={STATUS_CB_OPTIONS}
+                            disabled={changingStatus}
+                            placeholder="Status"
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-40 text-sm' }}
+                        />
                         <button className="btn btn-secondary" onClick={() => { setAppChoice(control.applicability); setAppJustification(control.applicabilityJustification || ''); setShowApplicability(!showApplicability); }} id="toggle-applicability-btn">
                             Applicability
                         </button>
@@ -700,11 +708,15 @@ export default function ControlDetailPage() {
 
                         {editingAutomation && permissions.canWrite ? (
                             <div className="space-y-2">
-                                <select className="input w-full" value={autoEvidenceSource} onChange={e => setAutoEvidenceSource(e.target.value)} id="evidence-source-select">
-                                    <option value="">No source</option>
-                                    <option value="MANUAL">Manual</option>
-                                    <option value="INTEGRATION">Integration</option>
-                                </select>
+                                <Combobox
+                                    hideSearch
+                                    id="evidence-source-select"
+                                    selected={EVIDENCE_SOURCE_OPTIONS.find(o => o.value === autoEvidenceSource) ?? null}
+                                    setSelected={(opt) => setAutoEvidenceSource(opt?.value ?? '')}
+                                    options={EVIDENCE_SOURCE_OPTIONS}
+                                    placeholder="No source"
+                                    matchTriggerWidth
+                                />
                                 {autoEvidenceSource === 'INTEGRATION' && (
                                     <input type="text" className="input w-full" placeholder="Automation key (e.g. aws-cis-1.2)" value={autoKey} onChange={e => setAutoKey(e.target.value)} id="automation-key-input" />
                                 )}
@@ -819,37 +831,31 @@ export default function ControlDetailPage() {
                                     <label htmlFor="edit-category" className="mb-1 block text-sm text-content-default">
                                         Category
                                     </label>
-                                    <select
+                                    <Combobox
+                                        hideSearch
+                                        forceDropdown
                                         id="edit-category"
-                                        className="input w-full"
-                                        value={editForm.category}
-                                        onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
-                                        data-testid="edit-category-input"
-                                    >
-                                        {CATEGORY_OPTIONS.map((c) => (
-                                            <option key={c} value={c}>
-                                                {c ? CATEGORY_LABELS[c] || c : '— None —'}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        selected={CATEGORY_CB_OPTIONS.find(o => o.value === editForm.category) ?? null}
+                                        setSelected={(opt) => setEditForm((f) => ({ ...f, category: opt?.value ?? '' }))}
+                                        options={CATEGORY_CB_OPTIONS}
+                                        placeholder="— None —"
+                                        matchTriggerWidth
+                                    />
                                 </div>
                                 <div>
                                     <label htmlFor="edit-frequency" className="mb-1 block text-sm text-content-default">
                                         Frequency
                                     </label>
-                                    <select
+                                    <Combobox
+                                        hideSearch
+                                        forceDropdown
                                         id="edit-frequency"
-                                        className="input w-full"
-                                        value={editForm.frequency}
-                                        onChange={(e) => setEditForm((f) => ({ ...f, frequency: e.target.value }))}
-                                        data-testid="edit-frequency-select"
-                                    >
-                                        {FREQ_OPTIONS.map((f) => (
-                                            <option key={f} value={f}>
-                                                {f ? FREQ_LABELS[f] || f : '— None —'}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        selected={FREQ_CB_OPTIONS.find(o => o.value === editForm.frequency) ?? null}
+                                        setSelected={(opt) => setEditForm((f) => ({ ...f, frequency: opt?.value ?? '' }))}
+                                        options={FREQ_CB_OPTIONS}
+                                        placeholder="— None —"
+                                        matchTriggerWidth
+                                    />
                                 </div>
                             </div>
                             <div>
@@ -1088,20 +1094,24 @@ export default function ControlDetailPage() {
                     )}
                     {showMapForm && permissions.canWrite && (
                         <div className="glass-card p-4 space-y-3">
-                            <select className="input w-full" value={selectedFramework} onChange={e => setSelectedFramework(e.target.value)} id="framework-select">
-                                <option value="">Select Framework...</option>
-                                {frameworks.map((f: FrameworkDTO) => (
-                                    <option key={f.key || f.id} value={f.key || f.id}>{f.name}</option>
-                                ))}
-                            </select>
+                            <Combobox
+                                id="framework-select"
+                                selected={frameworks.map((f: FrameworkDTO) => ({ value: f.key ?? f.id ?? '', label: f.name })).find(o => o.value === selectedFramework) ?? null}
+                                setSelected={(opt) => setSelectedFramework(opt?.value ?? '')}
+                                options={frameworks.map((f: FrameworkDTO) => ({ value: f.key ?? f.id ?? '', label: f.name }))}
+                                placeholder="Select Framework..."
+                                matchTriggerWidth
+                            />
                             {requirements.length > 0 && (
                                 <>
-                                    <select className="input w-full" value={selectedReq} onChange={e => setSelectedReq(e.target.value)} id="requirement-select">
-                                        <option value="">Select Requirement...</option>
-                                        {requirements.map((r: RequirementDTO) => (
-                                            <option key={r.id} value={r.id}>{r.code ? `${r.code} — ` : ''}{r.title || r.description}</option>
-                                        ))}
-                                    </select>
+                                    <Combobox
+                                        id="requirement-select"
+                                        selected={requirements.map((r: RequirementDTO) => ({ value: r.id, label: `${r.code ? `${r.code} — ` : ''}${r.title || r.description}` })).find(o => o.value === selectedReq) ?? null}
+                                        setSelected={(opt) => setSelectedReq(opt?.value ?? '')}
+                                        options={requirements.map((r: RequirementDTO) => ({ value: r.id, label: `${r.code ? `${r.code} — ` : ''}${r.title || r.description}` }))}
+                                        placeholder="Select Requirement..."
+                                        matchTriggerWidth
+                                    />
                                     <button onClick={mapRequirement} disabled={!selectedReq || savingMap} className="btn btn-primary" id="submit-mapping-btn">
                                         {savingMap ? 'Mapping...' : 'Map'}
                                     </button>

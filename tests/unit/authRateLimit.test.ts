@@ -2,12 +2,21 @@ import { NextRequest } from 'next/server';
 import { checkAuthRateLimit } from '@/lib/rate-limit/authRateLimit';
 
 describe('Auth Rate Limit Module', () => {
+    let warnSpy: jest.SpyInstance;
+
     beforeEach(() => {
         // Force the environment to memory mode for testing
         process.env.RATE_LIMIT_ENABLED = '1';
         process.env.RATE_LIMIT_MODE = 'memory';
         // Ensure rate limiting is NOT skipped (AUTH_TEST_MODE bypasses rate limiting)
         delete process.env.AUTH_TEST_MODE;
+        // Several tests deliberately exceed the limit to verify blocking; silence
+        // the expected structured warn so it doesn't pollute test output.
+        warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        warnSpy.mockRestore();
     });
 
     function createMockRequest(path: string, ip: string = '127.0.0.1') {

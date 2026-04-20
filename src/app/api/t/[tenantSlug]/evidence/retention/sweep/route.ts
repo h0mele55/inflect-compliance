@@ -17,5 +17,5 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     const ctx = await getTenantCtx(params, req);
     const body = SweepSchema.parse(await req.json());
     const result = await runRetentionSweepUsecase(ctx, { dryRun: body.dryRun });
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

@@ -8,6 +8,7 @@ import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 
 const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
     loading: () => <div className="animate-pulse h-48" aria-busy="true" />,
@@ -86,7 +87,10 @@ export default function AssetDetailPage() {
     if (!asset) return null;
 
     const TYPES = ['INFORMATION', 'APPLICATION', 'SYSTEM', 'SERVICE', 'DATA_STORE', 'INFRASTRUCTURE', 'VENDOR', 'PROCESS', 'PEOPLE_PROCESS', 'OTHER'];
+    const TYPE_OPTIONS: ComboboxOption[] = TYPES.map(t => ({ value: t, label: t.replace(/_/g, ' ') }));
     const CRITICALITIES = ['LOW', 'MEDIUM', 'HIGH'];
+    const CRIT_OPTIONS: ComboboxOption[] = CRITICALITIES.map(c => ({ value: c, label: c }));
+    const STATUS_OPTIONS: ComboboxOption[] = [{ value: 'ACTIVE', label: 'Active' }, { value: 'RETIRED', label: 'Retired' }];
     const critColor = (c: string) => c === 'HIGH' ? 'badge-danger' : c === 'MEDIUM' ? 'badge-warning' : 'badge-success';
 
     return (
@@ -120,9 +124,9 @@ export default function AssetDetailPage() {
                     <>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="input-label">Name *</label><input className="input" value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} /></div>
-                            <div><label className="input-label">Type</label><select className="input" value={form.type} onChange={e => setForm((f: any) => ({ ...f, type: e.target.value }))}>{TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}</select></div>
-                            <div><label className="input-label">Criticality</label><select className="input" value={form.criticality} onChange={e => setForm((f: any) => ({ ...f, criticality: e.target.value || null }))}><option value="">—</option>{CRITICALITIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-                            <div><label className="input-label">Status</label><select className="input" value={form.status} onChange={e => setForm((f: any) => ({ ...f, status: e.target.value }))}><option value="ACTIVE">Active</option><option value="RETIRED">Retired</option></select></div>
+                            <div><label className="input-label">Type</label><Combobox hideSearch selected={TYPE_OPTIONS.find(o => o.value === form.type) ?? null} setSelected={(opt) => setForm((f: any) => ({ ...f, type: opt?.value ?? 'SYSTEM' }))} options={TYPE_OPTIONS} matchTriggerWidth /></div>
+                            <div><label className="input-label">Criticality</label><Combobox hideSearch selected={CRIT_OPTIONS.find(o => o.value === form.criticality) ?? null} setSelected={(opt) => setForm((f: any) => ({ ...f, criticality: opt?.value || null }))} options={CRIT_OPTIONS} placeholder="—" matchTriggerWidth /></div>
+                            <div><label className="input-label">Status</label><Combobox hideSearch selected={STATUS_OPTIONS.find(o => o.value === form.status) ?? null} setSelected={(opt) => setForm((f: any) => ({ ...f, status: opt?.value ?? 'ACTIVE' }))} options={STATUS_OPTIONS} matchTriggerWidth /></div>
                             <div><label className="input-label">Owner</label><input className="input" value={form.owner} onChange={e => setForm((f: any) => ({ ...f, owner: e.target.value }))} /></div>
                             <div><label className="input-label">External Ref</label><input className="input" value={form.externalRef} onChange={e => setForm((f: any) => ({ ...f, externalRef: e.target.value }))} /></div>
                             <div><label className="input-label">Classification</label><input className="input" value={form.classification} onChange={e => setForm((f: any) => ({ ...f, classification: e.target.value }))} /></div>

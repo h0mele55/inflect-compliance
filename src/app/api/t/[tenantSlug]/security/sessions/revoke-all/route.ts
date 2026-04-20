@@ -16,7 +16,7 @@ export const POST = withApiErrorHandling(async (
     const ctx = await requireAdminCtx(params, req);
     const result = await revokeAllTenantSessions(ctx);
 
-    return NextResponse.json({
+    return NextResponse.json<any>({
         success: true,
         message: `Sessions revoked for ${result.usersAffected} users.`,
         usersAffected: result.usersAffected,

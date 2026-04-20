@@ -53,16 +53,16 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
                 },
             });
         }
-        return NextResponse.json(data);
+        return NextResponse.json<any>(data);
     }
 
-    return NextResponse.json(await getAuditPack(ctx, params.packId));
+    return NextResponse.json<any>(await getAuditPack(ctx, params.packId));
 });
 
 export const PATCH = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; packId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const body = UpdatePackSchema.parse(await req.json());
-    return NextResponse.json(await updateAuditPack(ctx, params.packId, body));
+    return NextResponse.json<any>(await updateAuditPack(ctx, params.packId, body));
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; packId: string } }) => {
@@ -73,30 +73,30 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
 
     if (action === 'items') {
         const body = AddItemsSchema.parse(raw);
-        return NextResponse.json(await addAuditPackItems(ctx, params.packId, body.items), { status: 201 });
+        return NextResponse.json<any>(await addAuditPackItems(ctx, params.packId, body.items), { status: 201 });
     }
     if (action === 'freeze') {
-        return NextResponse.json(await freezeAuditPack(ctx, params.packId));
+        return NextResponse.json<any>(await freezeAuditPack(ctx, params.packId));
     }
     if (action === 'share') {
         // ─── Plan check: audit pack sharing requires PRO+ ───
         await requireFeature(ctx.tenantId, FEATURES.AUDIT_PACK_SHARING);
         const body = ShareSchema.parse(raw);
-        return NextResponse.json(await generateShareLink(ctx, params.packId, body.expiresAt), { status: 201 });
+        return NextResponse.json<any>(await generateShareLink(ctx, params.packId, body.expiresAt), { status: 201 });
     }
     if (action === 'revoke-share') {
         const body = RevokeShareSchema.parse(raw);
-        return NextResponse.json(await revokeShare(ctx, body.shareId));
+        return NextResponse.json<any>(await revokeShare(ctx, body.shareId));
     }
     if (action === 'clone') {
         const body = CloneSchema.parse(raw);
-        return NextResponse.json(await clonePackForRetest(ctx, params.packId, body.name), { status: 201 });
+        return NextResponse.json<any>(await clonePackForRetest(ctx, params.packId, body.name), { status: 201 });
     }
     if (action === 'store-export') {
         const { content, filename, mimeType } = raw;
         const result = await storeExportArtifact(ctx, params.packId, content, filename, mimeType || 'application/json');
-        return NextResponse.json(result, { status: 201 });
+        return NextResponse.json<any>(result, { status: 201 });
     }
 
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    return NextResponse.json<any>({ error: 'Unknown action' }, { status: 400 });
 });

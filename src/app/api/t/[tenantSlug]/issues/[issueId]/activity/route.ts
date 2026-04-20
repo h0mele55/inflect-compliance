@@ -7,5 +7,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; issueId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const activity = await getTaskActivity(ctx, params.issueId);
-    return NextResponse.json(activity);
+    return NextResponse.json<any>(activity);
 });

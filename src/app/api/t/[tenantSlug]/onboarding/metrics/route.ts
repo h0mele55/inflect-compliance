@@ -6,5 +6,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req, { params }: { params: Promise<{ tenantSlug: string }> }) => {
     const ctx = await getTenantCtx(await params, req);
     const metrics = await getOnboardingMetrics(ctx);
-    return NextResponse.json(metrics);
+    return NextResponse.json<any>(metrics);
 });

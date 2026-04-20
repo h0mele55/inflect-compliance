@@ -481,5 +481,18 @@
         "noAssetsAvailable": "No assets available yet.",
         "linkedControls": "Linked Controls",
         "noControlsAvailable": "No controls available. Add controls first from the Controls page."
+    },
+    "ui": {
+        "combobox": {
+            "searchPlaceholder": "Search…",
+            "placeholder": "Select…",
+            "emptyState": "No matches",
+            "createLabel": "Create \"{search}\"",
+            "createLabelEmpty": "Create new option…"
+        },
+        "form": {
+            "required": "Required",
+            "invalid": "Invalid"
+        }
     }
 }

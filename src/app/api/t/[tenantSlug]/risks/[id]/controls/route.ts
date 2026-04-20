@@ -13,5 +13,5 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     if (error) throw badRequest('Invalid Request Body', error);
 
     const rc = await linkControlToRisk(ctx, params.id, body.controlId);
-    return NextResponse.json(rc, { status: 201 });
+    return NextResponse.json<any>(rc, { status: 201 });
 });

@@ -6,5 +6,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest) => {
     const ctx = await getLegacyCtx(req);
     const data = await getReports(ctx);
-    return NextResponse.json(data);
+    return NextResponse.json<any>(data);
 });

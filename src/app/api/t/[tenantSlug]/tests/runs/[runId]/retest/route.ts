@@ -9,5 +9,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; runId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const run = await retestFromRun(ctx, params.runId);
-    return NextResponse.json(run, { status: 201 });
+    return NextResponse.json<any>(run, { status: 201 });
 });

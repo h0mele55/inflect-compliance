@@ -17,14 +17,14 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     const action = url.searchParams.get('action');
 
     if (action === 'default-pack-preview') {
-        return NextResponse.json(await previewDefaultPack(ctx, params.cycleId));
+        return NextResponse.json<any>(await previewDefaultPack(ctx, params.cycleId));
     }
 
-    return NextResponse.json(await getAuditCycle(ctx, params.cycleId));
+    return NextResponse.json<any>(await getAuditCycle(ctx, params.cycleId));
 });
 
 export const PATCH = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; cycleId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const body = UpdateCycleSchema.parse(await req.json());
-    return NextResponse.json(await updateAuditCycle(ctx, params.cycleId, body));
+    return NextResponse.json<any>(await updateAuditCycle(ctx, params.cycleId, body));
 });

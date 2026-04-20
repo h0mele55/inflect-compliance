@@ -18,16 +18,16 @@ export const POST = withApiErrorHandling(withValidatedBody(StepBodySchema, async
 
     if (body.action === 'save') {
         const state = await saveOnboardingStep(ctx, body.step as any, body.data ?? {});
-        return NextResponse.json(state);
+        return NextResponse.json<any>(state);
     }
 
     if (body.action === 'skip') {
         const state = await skipOnboardingStep(ctx, body.step as any);
-        return NextResponse.json(state);
+        return NextResponse.json<any>(state);
     }
 
     // action === 'complete'
     const state = await completeOnboardingStep(ctx, body.step as any);
-    return NextResponse.json(state);
+    return NextResponse.json<any>(state);
 }));
 

@@ -8,6 +8,7 @@ import { useTenantContext, useTenantApiUrl, useTenantHref } from '@/lib/tenant-c
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@dub/utils';
 
@@ -38,10 +39,18 @@ type Risk = {
     updatedAt: string;
 };
 
-const STATUS_OPTIONS = ['OPEN', 'MITIGATING', 'ACCEPTED', 'CLOSED'] as const;
+const STATUS_VALUES = ['OPEN', 'MITIGATING', 'ACCEPTED', 'CLOSED'] as const;
+const STATUS_OPTIONS: ComboboxOption[] = STATUS_VALUES.map(s => ({ value: s, label: s }));
 const CATEGORIES = [
     'Technical', 'Operational', 'Compliance', 'Strategic',
     'Financial', 'Reputational', 'Physical', 'Human Resources',
+];
+const CATEGORY_OPTIONS: ComboboxOption[] = CATEGORIES.map(c => ({ value: c, label: c }));
+const TREATMENT_OPTIONS: ComboboxOption[] = [
+    { value: 'TREAT', label: 'Treat' },
+    { value: 'TRANSFER', label: 'Transfer' },
+    { value: 'TOLERATE', label: 'Tolerate' },
+    { value: 'AVOID', label: 'Avoid' },
 ];
 
 const STATUS_VARIANT: Record<string, 'warning' | 'success' | 'info' | 'neutral'> = {
@@ -224,14 +233,16 @@ export default function RiskDetailPage() {
                 {canWrite && !editing && (
                     <div className="flex gap-2">
                         <Button variant="secondary" onClick={startEditing} id="edit-risk-btn">Edit</Button>
-                        <select
-                            className="input w-36 text-sm"
-                            value={risk.status}
-                            onChange={e => handleStatusChange(e.target.value)}
+                        <Combobox
+                            hideSearch
                             id="risk-status-select"
-                        >
-                            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                            selected={STATUS_OPTIONS.find(o => o.value === risk.status) ?? null}
+                            setSelected={(opt) => { if (opt) handleStatusChange(opt.value); }}
+                            options={STATUS_OPTIONS}
+                            placeholder="Status"
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-36 text-sm' }}
+                        />
                     </div>
                 )}
             </div>
@@ -256,10 +267,14 @@ export default function RiskDetailPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="input-label">Category</label>
-                                <select className="input" value={editForm.category ?? ''} onChange={set('category')}>
-                                    <option value="">— Select —</option>
-                                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
+                                <Combobox
+                                    hideSearch
+                                    selected={CATEGORY_OPTIONS.find(o => o.value === (editForm.category ?? '')) ?? null}
+                                    setSelected={(opt) => setEditForm(f => ({ ...f, category: opt?.value ?? '' }))}
+                                    options={CATEGORY_OPTIONS}
+                                    placeholder="— Select —"
+                                    matchTriggerWidth
+                                />
                             </div>
                             <div>
                                 <label className="input-label">Treatment Owner</label>
@@ -285,13 +300,14 @@ export default function RiskDetailPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="input-label">Treatment</label>
-                                <select className="input" value={editForm.treatment ?? ''} onChange={set('treatment')}>
-                                    <option value="">—</option>
-                                    <option value="TREAT">Treat</option>
-                                    <option value="TRANSFER">Transfer</option>
-                                    <option value="TOLERATE">Tolerate</option>
-                                    <option value="AVOID">Avoid</option>
-                                </select>
+                                <Combobox
+                                    hideSearch
+                                    selected={TREATMENT_OPTIONS.find(o => o.value === (editForm.treatment ?? '')) ?? null}
+                                    setSelected={(opt) => setEditForm(f => ({ ...f, treatment: opt?.value ?? '' }))}
+                                    options={TREATMENT_OPTIONS}
+                                    placeholder="—"
+                                    matchTriggerWidth
+                                />
                             </div>
                             <div>
                                 <label className="input-label">Next Review</label>

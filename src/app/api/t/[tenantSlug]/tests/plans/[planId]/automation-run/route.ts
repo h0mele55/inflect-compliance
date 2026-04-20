@@ -12,8 +12,8 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     const ctx = await getTenantCtx(params, req);
     const body = await req.json();
     if (!body.result || !['PASS', 'FAIL', 'INCONCLUSIVE'].includes(body.result)) {
-        return NextResponse.json({ error: 'result is required: PASS | FAIL | INCONCLUSIVE' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'result is required: PASS | FAIL | INCONCLUSIVE' }, { status: 400 });
     }
     const run = await createAutomatedTestRun(ctx, params.planId, body);
-    return NextResponse.json(run, { status: 201 });
+    return NextResponse.json<any>(run, { status: 201 });
 });

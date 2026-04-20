@@ -21,11 +21,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         due: (sp.get('due') as 'overdue' | 'next7d') ?? undefined,
         q: sp.get('q') ?? undefined,
     });
-    return NextResponse.json(tasks);
+    return NextResponse.json<any>(tasks);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateTaskSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const task = await createTask(ctx, body);
-    return NextResponse.json(task, { status: 201 });
+    return NextResponse.json<any>(task, { status: 201 });
 }));

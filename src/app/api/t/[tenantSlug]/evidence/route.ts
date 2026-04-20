@@ -26,7 +26,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (query.includeDeleted === 'true') {
         const evidence = await listEvidenceWithDeleted(ctx);
-        return NextResponse.json(evidence);
+        return NextResponse.json<any>(evidence);
     }
 
     const filters = {
@@ -45,17 +45,17 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
             cursor: query.cursor,
             filters,
         });
-        return NextResponse.json(result);
+        return NextResponse.json<any>(result);
     }
 
     // Backward compatibility: flat array
     const evidence = await listEvidence(ctx, filters);
-    return NextResponse.json(evidence);
+    return NextResponse.json<any>(evidence);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateEvidenceSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const evidence = await createEvidence(ctx, body as any);
-    return NextResponse.json(evidence, { status: 201 });
+    return NextResponse.json<any>(evidence, { status: 201 });
 }));

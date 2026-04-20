@@ -11,5 +11,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(CompleteTestRunSchema, async (req, { params }: { params: { tenantSlug: string; runId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const run = await completeTestRun(ctx, params.runId, body);
-    return NextResponse.json(run);
+    return NextResponse.json<any>(run);
 }));

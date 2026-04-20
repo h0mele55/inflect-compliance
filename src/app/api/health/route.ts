@@ -30,7 +30,7 @@ export async function GET() {
 
     const allOk = Object.values(checks).every(c => c.status === 'ok');
 
-    return NextResponse.json(
+    return NextResponse.json<any>(
         {
             status: allOk ? 'healthy' : 'degraded',
             timestamp: new Date().toISOString(),

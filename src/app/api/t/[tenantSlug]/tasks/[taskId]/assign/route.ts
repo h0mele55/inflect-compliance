@@ -8,5 +8,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(AssignTaskSchema, async (req, { params }: { params: { tenantSlug: string; taskId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const task = await assignTask(ctx, params.taskId, body.assigneeUserId);
-    return NextResponse.json(task);
+    return NextResponse.json<any>(task);
 }));

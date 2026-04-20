@@ -6,5 +6,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: Promise<{ tenantSlug: string }> }) => {
     const ctx = await getTenantCtx(await params, req);
     const state = await startOnboarding(ctx);
-    return NextResponse.json(state, { status: 200 });
+    return NextResponse.json<any>(state, { status: 200 });
 });

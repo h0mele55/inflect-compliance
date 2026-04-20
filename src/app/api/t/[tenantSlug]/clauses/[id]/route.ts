@@ -9,5 +9,5 @@ export const PUT = withApiErrorHandling(withValidatedBody(UpdateClauseProgressSc
     const ctx = await getTenantCtx(params, req);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const progress = await updateClauseProgress(ctx, params.id, body as any);
-    return NextResponse.json(progress);
+    return NextResponse.json<any>(progress);
 }));

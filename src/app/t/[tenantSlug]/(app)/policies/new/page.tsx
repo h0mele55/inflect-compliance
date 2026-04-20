@@ -3,6 +3,20 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+
+const POLICY_CATEGORIES: ComboboxOption[] = [
+    'Information Security',
+    'Access Control',
+    'HR',
+    'Physical',
+    'Compliance',
+    'Operations',
+    'Risk Management',
+    'Business Continuity',
+    'Supplier',
+    'Other',
+].map((c) => ({ value: c, label: c }));
 
 export default function NewPolicyPage() {
     const apiUrl = useTenantApiUrl();
@@ -158,12 +172,18 @@ export default function NewPolicyPage() {
                 </div>
                 <div>
                     <label className="input-label">Category</label>
-                    <select className="input w-full" value={category} onChange={e => setCategory(e.target.value)}>
-                        <option value="">Select category...</option>
-                        {['Information Security', 'Access Control', 'HR', 'Physical', 'Compliance', 'Operations', 'Risk Management', 'Business Continuity', 'Supplier', 'Other'].map(c => (
-                            <option key={c} value={c}>{c}</option>
-                        ))}
-                    </select>
+                    <Combobox
+                        id="policy-category-select"
+                        name="category"
+                        options={POLICY_CATEGORIES}
+                        selected={POLICY_CATEGORIES.find(o => o.value === category) ?? null}
+                        setSelected={(o) => setCategory(o?.value ?? '')}
+                        placeholder="Select category…"
+                        searchPlaceholder="Search categories…"
+                        matchTriggerWidth
+                        buttonProps={{ className: 'w-full' }}
+                        caret
+                    />
                 </div>
 
                 {/* Initial content for blank mode only */}

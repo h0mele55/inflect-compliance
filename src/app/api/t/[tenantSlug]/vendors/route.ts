@@ -35,7 +35,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
                 q: query.q,
             },
         });
-        return NextResponse.json(result);
+        return NextResponse.json<any>(result);
     }
 
     // Backward compat: return flat array
@@ -46,12 +46,12 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         reviewDue: query.reviewDue,
         q: query.q,
     });
-    return NextResponse.json(vendors);
+    return NextResponse.json<any>(vendors);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateVendorSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const vendor = await createVendor(ctx, body as any);
-    return NextResponse.json(vendor, { status: 201 });
+    return NextResponse.json<any>(vendor, { status: 201 });
 }));

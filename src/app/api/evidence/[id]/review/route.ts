@@ -8,5 +8,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(EvidenceReviewSchema, async (req, { params }: { params: { id: string } }, body) => {
     const ctx = await getLegacyCtx(req);
     const review = await reviewEvidence(ctx, params.id, body);
-    return NextResponse.json(review, { status: 201 });
+    return NextResponse.json<any>(review, { status: 201 });
 }));

@@ -5,6 +5,8 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { normaliseHref } from '@/lib/security/safe-url';
 
 const STATUS_BADGE: Record<string, string> = {
     ACTIVE: 'badge-success', ONBOARDING: 'badge-info', OFFBOARDING: 'badge-warning', OFFBOARDED: 'badge-neutral',
@@ -18,6 +20,17 @@ const DOC_TYPES = Object.keys(DOC_TYPE_LABELS);
 const ASSESSMENT_STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral', IN_REVIEW: 'badge-warning', APPROVED: 'badge-success', REJECTED: 'badge-danger',
 };
+const VENDOR_STATUS_OPTIONS: ComboboxOption[] = ['ACTIVE', 'ONBOARDING', 'OFFBOARDING', 'OFFBOARDED'].map(s => ({ value: s, label: s }));
+const VENDOR_CRIT_OPTIONS: ComboboxOption[] = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(c => ({ value: c, label: c }));
+const DOC_TYPE_CB_OPTIONS: ComboboxOption[] = DOC_TYPES.map(t => ({ value: t, label: DOC_TYPE_LABELS[t] || t }));
+const VENDOR_LINK_TYPE_OPTIONS: ComboboxOption[] = [
+    { value: 'ASSET', label: 'Asset' }, { value: 'RISK', label: 'Risk' },
+    { value: 'ISSUE', label: 'Issue' }, { value: 'CONTROL', label: 'Control' },
+];
+const VENDOR_LINK_RELATION_OPTIONS: ComboboxOption[] = [
+    { value: 'RELATED', label: 'Related' }, { value: 'USES', label: 'Uses' },
+    { value: 'MITIGATES', label: 'Mitigates' }, { value: 'STORES_DATA_FOR', label: 'Stores Data' },
+];
 
 type Tab = 'overview' | 'documents' | 'assessments' | 'links' | 'bundles' | 'subprocessors';
 
@@ -200,7 +213,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                     <div className="grid grid-cols-2 gap-4 text-sm">
                         <div><span className="text-slate-400">Legal Name:</span> <span className="ml-2">{vendor.legalName || '—'}</span></div>
                         <div><span className="text-slate-400">Domain:</span> <span className="ml-2">{vendor.domain || '—'}</span></div>
-                        <div><span className="text-slate-400">Website:</span> <span className="ml-2">{vendor.websiteUrl ? <a href={vendor.websiteUrl} target="_blank" className="text-blue-400 underline">{vendor.websiteUrl}</a> : '—'}</span></div>
+                        <div><span className="text-slate-400">Website:</span> <span className="ml-2">{normaliseHref(vendor.websiteUrl) ? <a href={normaliseHref(vendor.websiteUrl)!} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">{vendor.websiteUrl}</a> : '—'}</span></div>
                         <div><span className="text-slate-400">Country:</span> <span className="ml-2">{vendor.country || '—'}</span></div>
                         <div><span className="text-slate-400">Owner:</span> <span className="ml-2">{vendor.owner?.name || '—'}</span></div>
                         <div><span className="text-slate-400">Data Access:</span> <span className="ml-2">{vendor.dataAccess || '—'}</span></div>
@@ -214,8 +227,8 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                         <div className="border-t border-slate-700 pt-3 mt-3 space-y-2">
                             <h3 className="text-sm font-semibold text-slate-300">Enrichment Data</h3>
                             <div className="grid grid-cols-2 gap-3 text-sm">
-                                {vendor.privacyPolicyUrl && <div><span className="text-slate-400">Privacy Policy:</span> <a href={vendor.privacyPolicyUrl} target="_blank" className="text-blue-400 underline ml-1" id="enrichment-privacy">View ↗</a></div>}
-                                {vendor.securityPageUrl && <div><span className="text-slate-400">Security Page:</span> <a href={vendor.securityPageUrl} target="_blank" className="text-blue-400 underline ml-1" id="enrichment-security">View ↗</a></div>}
+                                {normaliseHref(vendor.privacyPolicyUrl) && <div><span className="text-slate-400">Privacy Policy:</span> <a href={normaliseHref(vendor.privacyPolicyUrl)!} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline ml-1" id="enrichment-privacy">View ↗</a></div>}
+                                {normaliseHref(vendor.securityPageUrl) && <div><span className="text-slate-400">Security Page:</span> <a href={normaliseHref(vendor.securityPageUrl)!} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline ml-1" id="enrichment-security">View ↗</a></div>}
                                 {vendor.certificationsJson && Array.isArray(vendor.certificationsJson) && (
                                     <div className="col-span-2"><span className="text-slate-400">Certifications:</span> {(vendor.certificationsJson as string[]).map((c: string) => <span key={c} className="badge badge-info ml-1">{c}</span>)}</div>
                                 )}
@@ -241,15 +254,11 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                         </div>
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">Status</label>
-                            <select className="input w-full" value={editForm.status} onChange={e => setEditForm((p: any) => ({ ...p, status: e.target.value }))}>
-                                {['ACTIVE', 'ONBOARDING', 'OFFBOARDING', 'OFFBOARDED'].map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
+                            <Combobox hideSearch selected={VENDOR_STATUS_OPTIONS.find(o => o.value === editForm.status) ?? null} setSelected={(opt) => setEditForm((p: any) => ({ ...p, status: opt?.value ?? p.status }))} options={VENDOR_STATUS_OPTIONS} matchTriggerWidth />
                         </div>
                         <div>
                             <label className="block text-sm text-slate-400 mb-1">Criticality</label>
-                            <select className="input w-full" value={editForm.criticality} onChange={e => setEditForm((p: any) => ({ ...p, criticality: e.target.value }))}>
-                                {['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
+                            <Combobox hideSearch selected={VENDOR_CRIT_OPTIONS.find(o => o.value === editForm.criticality) ?? null} setSelected={(opt) => setEditForm((p: any) => ({ ...p, criticality: opt?.value ?? p.criticality }))} options={VENDOR_CRIT_OPTIONS} matchTriggerWidth />
                         </div>
                     </div>
                     <div>
@@ -278,9 +287,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-sm text-slate-400 mb-1">Type</label>
-                                    <select className="input w-full" value={docForm.type} onChange={e => setDocForm(p => ({ ...p, type: e.target.value }))} id="doc-type-select">
-                                        {DOC_TYPES.map(t => <option key={t} value={t}>{DOC_TYPE_LABELS[t]}</option>)}
-                                    </select>
+                                    <Combobox hideSearch id="doc-type-select" selected={DOC_TYPE_CB_OPTIONS.find(o => o.value === docForm.type) ?? null} setSelected={(opt) => setDocForm(p => ({ ...p, type: opt?.value ?? p.type }))} options={DOC_TYPE_CB_OPTIONS} matchTriggerWidth />
                                 </div>
                                 <div>
                                     <label className="block text-sm text-slate-400 mb-1">Title</label>
@@ -318,7 +325,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                                         <td className="p-3">{d.validTo ? formatDate(d.validTo) : '—'}</td>
                                         <td className="p-3 text-slate-400">{d.uploadedBy?.name || '—'}</td>
                                         <td className="p-3">
-                                            {d.externalUrl && <a href={d.externalUrl} target="_blank" className="text-blue-400 underline text-xs">Open ↗</a>}
+                                            {normaliseHref(d.externalUrl) && <a href={normaliseHref(d.externalUrl)!} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline text-xs">Open ↗</a>}
                                         </td>
                                         {canWrite && <td className="p-3"><button className="text-red-400 text-xs hover:underline" onClick={() => removeDoc(d.id)}>Remove</button></td>}
                                     </tr>
@@ -341,10 +348,15 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                                 </button>
                             ) : (
                                 <div className="flex items-center gap-2">
-                                    <select className="input w-48" value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)} id="template-select">
-                                        <option value="">Select template…</option>
-                                        {templates.map(t => <option key={t.key} value={t.key}>{t.name} ({t._count?.questions || 0} Q)</option>)}
-                                    </select>
+                                    <Combobox
+                                        id="template-select"
+                                        selected={templates.map((t: any) => ({ value: t.key, label: `${t.name} (${t._count?.questions || 0} Q)` })).find((o: ComboboxOption) => o.value === selectedTemplate) ?? null}
+                                        setSelected={(opt) => setSelectedTemplate(opt?.value ?? '')}
+                                        options={templates.map((t: any) => ({ value: t.key, label: `${t.name} (${t._count?.questions || 0} Q)` }))}
+                                        placeholder="Select template…"
+                                        matchTriggerWidth
+                                        buttonProps={{ className: 'w-48' }}
+                                    />
                                     <button className="btn btn-primary" onClick={startAssessment} disabled={!selectedTemplate} id="confirm-start-assessment">Start</button>
                                     <button className="btn btn-secondary" onClick={() => setShowStartAssessment(false)}>Cancel</button>
                                 </div>
@@ -399,10 +411,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                         <div className="card p-4 flex items-end gap-3">
                             <div>
                                 <label className="block text-sm text-slate-400 mb-1">Type</label>
-                                <select className="input" value={linkForm.entityType} onChange={e => setLinkForm(p => ({ ...p, entityType: e.target.value }))} id="link-type">
-                                    <option value="ASSET">Asset</option><option value="RISK">Risk</option>
-                                    <option value="ISSUE">Issue</option><option value="CONTROL">Control</option>
-                                </select>
+                                <Combobox hideSearch id="link-type" selected={VENDOR_LINK_TYPE_OPTIONS.find(o => o.value === linkForm.entityType) ?? null} setSelected={(opt) => setLinkForm(p => ({ ...p, entityType: opt?.value ?? p.entityType }))} options={VENDOR_LINK_TYPE_OPTIONS} matchTriggerWidth />
                             </div>
                             <div>
                                 <label className="block text-sm text-slate-400 mb-1">Entity ID</label>
@@ -410,10 +419,7 @@ export default function VendorDetailPage({ params }: { params: { tenantSlug: str
                             </div>
                             <div>
                                 <label className="block text-sm text-slate-400 mb-1">Relation</label>
-                                <select className="input" value={linkForm.relation} onChange={e => setLinkForm(p => ({ ...p, relation: e.target.value }))} id="link-relation">
-                                    <option value="RELATED">Related</option><option value="USES">Uses</option>
-                                    <option value="MITIGATES">Mitigates</option><option value="STORES_DATA_FOR">Stores Data</option>
-                                </select>
+                                <Combobox hideSearch id="link-relation" selected={VENDOR_LINK_RELATION_OPTIONS.find(o => o.value === linkForm.relation) ?? null} setSelected={(opt) => setLinkForm(p => ({ ...p, relation: opt?.value ?? p.relation }))} options={VENDOR_LINK_RELATION_OPTIONS} matchTriggerWidth />
                             </div>
                             <button className="btn btn-primary" id="submit-link-btn" onClick={async () => {
                                 await fetch(apiUrl(`/vendors/${params.vendorId}/links`), {

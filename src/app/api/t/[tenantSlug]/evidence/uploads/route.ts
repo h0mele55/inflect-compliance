@@ -15,7 +15,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     const file = formData.get('file');
 
     if (!file || !(file instanceof File)) {
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Missing or invalid file in form data' },
             { status: 400 },
         );
@@ -31,5 +31,5 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     };
 
     const evidence = await uploadEvidenceFile(ctx, file, metadata);
-    return NextResponse.json(evidence, { status: 201 });
+    return NextResponse.json<any>(evidence, { status: 201 });
 });

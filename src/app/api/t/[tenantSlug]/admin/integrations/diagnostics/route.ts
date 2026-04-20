@@ -20,5 +20,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     const diagnostics = await getIntegrationDiagnostics(ctx);
 
-    return NextResponse.json(diagnostics);
+    return NextResponse.json<any>(diagnostics);
 });

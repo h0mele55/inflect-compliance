@@ -8,6 +8,7 @@ import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonLine, SkeletonCard } from '@/components/ui/skeleton';
 import { UserCombobox } from '@/components/ui/user-combobox';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -30,7 +31,10 @@ const TYPE_LABELS: Record<string, string> = {
     INCIDENT: 'Incident', IMPROVEMENT: 'Improvement', TASK: 'Task',
 };
 const ENTITY_TYPE_OPTIONS = ['CONTROL', 'RISK', 'ASSET', 'EVIDENCE', 'FRAMEWORK_REQUIREMENT'];
+const ENTITY_TYPE_CB_OPTIONS: ComboboxOption[] = ENTITY_TYPE_OPTIONS.map(t => ({ value: t, label: t }));
 const RELATION_OPTIONS = ['RELATES_TO', 'CAUSED_BY', 'MITIGATED_BY', 'EVIDENCE_FOR'];
+const RELATION_CB_OPTIONS: ComboboxOption[] = RELATION_OPTIONS.map(r => ({ value: r, label: r.replace(/_/g, ' ') }));
+const TASK_STATUS_CB_OPTIONS: ComboboxOption[] = Object.entries(STATUS_LABELS).map(([val, lbl]) => ({ value: val, label: lbl }));
 
 type Tab = 'overview' | 'links' | 'comments' | 'activity';
 
@@ -275,17 +279,17 @@ export default function TaskDetailPage() {
                 </div>
                 {permissions.canWrite && (
                     <div className="flex gap-2 items-center">
-                        <select
-                            className="input w-40 text-sm"
-                            value={task.status}
-                            onChange={e => changeStatus(e.target.value)}
-                            disabled={changingStatus}
+                        <Combobox
+                            hideSearch
                             id="task-status-select"
-                        >
-                            {Object.entries(STATUS_LABELS).map(([val, lbl]) => (
-                                <option key={val} value={val}>{lbl}</option>
-                            ))}
-                        </select>
+                            selected={TASK_STATUS_CB_OPTIONS.find(o => o.value === task.status) ?? null}
+                            setSelected={(opt) => { if (opt) changeStatus(opt.value); }}
+                            options={TASK_STATUS_CB_OPTIONS}
+                            disabled={changingStatus}
+                            placeholder="Status"
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-40 text-sm' }}
+                        />
                     </div>
                 )}
             </div>
@@ -424,13 +428,9 @@ export default function TaskDetailPage() {
                     {showLinkForm && permissions.canWrite && (
                         <form onSubmit={addLink} className="glass-card p-4 space-y-3">
                             <div className="grid grid-cols-3 gap-3">
-                                <select className="input" value={linkEntityType} onChange={e => setLinkEntityType(e.target.value)} id="link-entity-type">
-                                    {ENTITY_TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                                </select>
+                                <Combobox hideSearch id="link-entity-type" selected={ENTITY_TYPE_CB_OPTIONS.find(o => o.value === linkEntityType) ?? null} setSelected={(opt) => setLinkEntityType(opt?.value ?? linkEntityType)} options={ENTITY_TYPE_CB_OPTIONS} matchTriggerWidth />
                                 <input type="text" className="input" placeholder="Entity ID *" value={linkEntityId} onChange={e => setLinkEntityId(e.target.value)} required id="link-entity-id" />
-                                <select className="input" value={linkRelation} onChange={e => setLinkRelation(e.target.value)} id="link-relation">
-                                    {RELATION_OPTIONS.map(r => <option key={r} value={r}>{r.replace(/_/g, ' ')}</option>)}
-                                </select>
+                                <Combobox hideSearch id="link-relation" selected={RELATION_CB_OPTIONS.find(o => o.value === linkRelation) ?? null} setSelected={(opt) => setLinkRelation(opt?.value ?? linkRelation)} options={RELATION_CB_OPTIONS} matchTriggerWidth />
                             </div>
                             <button type="submit" disabled={savingLink} className="btn btn-primary" id="submit-link-btn">
                                 {savingLink ? 'Linking...' : 'Add Link'}

@@ -29,5 +29,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         due: query.due,
         q: query.q,
     });
-    return NextResponse.json(plans);
+    return NextResponse.json<any>(plans);
 });

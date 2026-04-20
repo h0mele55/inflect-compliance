@@ -24,7 +24,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (query.includeDeleted === 'true') {
         const assets = await listAssetsWithDeleted(ctx);
-        return NextResponse.json(assets);
+        return NextResponse.json<any>(assets);
     }
 
     const hasPagination = query.limit || query.cursor;
@@ -39,7 +39,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
                 q: query.q,
             },
         });
-        return NextResponse.json(result);
+        return NextResponse.json<any>(result);
     }
 
     // Backward compat: return flat array
@@ -49,11 +49,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         criticality: query.criticality,
         q: query.q,
     });
-    return NextResponse.json(assets);
+    return NextResponse.json<any>(assets);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateAssetSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const asset = await createAsset(ctx, body);
-    return NextResponse.json(asset, { status: 201 });
+    return NextResponse.json<any>(asset, { status: 201 });
 }));

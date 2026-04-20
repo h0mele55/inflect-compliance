@@ -10,6 +10,6 @@ export const POST = withApiErrorHandling(
     withValidatedBody(CreatePolicyVersionSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }, body) => {
         const ctx = await getTenantCtx(params, req);
         const version = await policyUsecases.createPolicyVersion(ctx, params.id, body);
-        return NextResponse.json(version, { status: 201 });
+        return NextResponse.json<any>(version, { status: 201 });
     })
 );

@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import Link from 'next/link';
+import { Combobox } from '@/components/ui/combobox';
 
 export default function TemplatesPage() {
     const apiUrl = useTenantApiUrl();
@@ -77,10 +78,16 @@ export default function TemplatesPage() {
                     type="text" className="input flex-1 min-w-[200px]" placeholder="Search templates..."
                     value={search} onChange={e => setSearch(e.target.value)} id="template-search"
                 />
-                <select className="input w-48" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} id="template-category-filter">
-                    <option value="">All Categories</option>
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <Combobox
+                    hideSearch
+                    id="template-category-filter"
+                    selected={categories.map(c => ({ value: c, label: c })).find(o => o.value === categoryFilter) ?? null}
+                    setSelected={(opt) => setCategoryFilter(opt?.value ?? '')}
+                    options={categories.map(c => ({ value: c, label: c }))}
+                    placeholder="All Categories"
+                    matchTriggerWidth
+                    buttonProps={{ className: 'w-48' }}
+                />
             </div>
 
             {/* Grid */}

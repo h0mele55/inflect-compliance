@@ -31,7 +31,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         ...p,
         configJson: maskSecrets(p.configJson as Record<string, unknown>),
     }));
-    return NextResponse.json(safe);
+    return NextResponse.json<any>(safe);
 });
 
 /**
@@ -42,7 +42,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     const body = await req.json();
     const parsed = UpsertSsoConfigInput.parse(body);
     const provider = await upsertTenantSsoConfig(ctx, parsed);
-    return NextResponse.json(provider, { status: body.id ? 200 : 201 });
+    return NextResponse.json<any>(provider, { status: body.id ? 200 : 201 });
 });
 
 /**
@@ -68,9 +68,9 @@ export const PATCH = withApiErrorHandling(async (req: NextRequest, { params }: {
             result = await setTenantSsoEnforced(ctx, id, false);
             break;
         default:
-            return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+            return NextResponse.json<any>({ error: 'Invalid action' }, { status: 400 });
     }
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });
 
 /**
@@ -81,7 +81,7 @@ export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: 
     const ctx = await requireAdminCtx(params, req);
     const { id } = await req.json() as { id: string };
     await deleteTenantSsoConfig(ctx, id);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json<any>({ ok: true });
 });
 
 // ─── Helpers ─────────────────────────────────────────────────────────

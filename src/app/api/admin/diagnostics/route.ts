@@ -25,7 +25,7 @@ export const GET = withApiErrorHandling(async (req) => {
 
     const uptimeSeconds = Math.round((Date.now() - startedAt.getTime()) / 1000);
 
-    return NextResponse.json({
+    return NextResponse.json<any>({
         service: {
             name: process.env.OTEL_SERVICE_NAME || 'inflect-compliance',
             version: process.env.npm_package_version || '0.0.0',

@@ -79,7 +79,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
                 pdfDoc = await generateGapAnalysisPdf(ctx, { watermark });
                 break;
             default:
-                return NextResponse.json({ error: 'Unknown report type' }, { status: 400 });
+                return NextResponse.json<any>({ error: 'Unknown report type' }, { status: 400 });
         }
     } catch (genErr) {
         logger.error('PDF generation failed', { component: 'report', reportType: body.type });
@@ -132,7 +132,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
             })
         ) as { id: string };
 
-        return NextResponse.json({
+        return NextResponse.json<any>({
             fileId: fileRecord.id,
             fileName,
             sizeBytes: writeResult.sizeBytes,

@@ -23,5 +23,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         includeTests: query.includeTests === 'true',
     });
 
-    return NextResponse.json(report);
+    return NextResponse.json<any>(report);
 });

@@ -12,8 +12,8 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     const ctx = await getTenantCtx(params, req);
     const body = await req.json();
     if (!body.auditPackId) {
-        return NextResponse.json({ error: 'auditPackId is required' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'auditPackId is required' }, { status: 400 });
     }
     const item = await snapshotTestRun(ctx, params.runId, body.auditPackId);
-    return NextResponse.json(item, { status: 201 });
+    return NextResponse.json<any>(item, { status: 201 });
 });

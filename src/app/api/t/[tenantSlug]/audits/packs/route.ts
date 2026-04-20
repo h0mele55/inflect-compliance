@@ -13,11 +13,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     const ctx = await getTenantCtx(params, req);
     const url = new URL(req.url);
     const cycleId = url.searchParams.get('cycleId') || undefined;
-    return NextResponse.json(await listAuditPacks(ctx, cycleId));
+    return NextResponse.json<any>(await listAuditPacks(ctx, cycleId));
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const body = CreatePackSchema.parse(await req.json());
-    return NextResponse.json(await createAuditPack(ctx, body.auditCycleId, body.name), { status: 201 });
+    return NextResponse.json<any>(await createAuditPack(ctx, body.auditCycleId, body.name), { status: 201 });
 });

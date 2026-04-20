@@ -12,5 +12,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     const ctx = await getTenantCtx(params, req);
     const days = parseInt(req.nextUrl.searchParams.get('days') ?? '90', 10);
     const payload = await getComplianceTrends(ctx, isNaN(days) ? 90 : days);
-    return NextResponse.json(payload);
+    return NextResponse.json<any>(payload);
 });

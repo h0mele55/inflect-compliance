@@ -88,10 +88,10 @@ export async function loginAndGetTenant(
         return form && Object.keys(form).some(k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber'));
     }, { timeout: 30000 });
 
-    // Retry loop: MissingCSRF can occur transiently when the dev server is
-    // compiling routes — the request body stream drains before NextAuth reads it.
-    // Retrying the full login flow resolves it once compilation finishes.
-    const LOGIN_ATTEMPTS = 3;
+    // Retry loop: covers dev-server JIT compilation races on the very first
+    // login attempt. With AUTH_URL aligned to the test port, CSRF no longer
+    // flakes, so two attempts is enough.
+    const LOGIN_ATTEMPTS = 2;
     for (let attempt = 1; attempt <= LOGIN_ATTEMPTS; attempt++) {
         if (attempt > 1) {
             await safeGoto(page, '/login', { timeout: 60_000 });
@@ -113,19 +113,14 @@ export async function loginAndGetTenant(
 
         if (navigated) break;
 
-        // Navigation may have completed just after the timeout — re-check URL.
         const url = page.url();
         if (/\/t\/[^/]+\/dashboard/.test(url)) break;
 
-        // Still on /login after submit? Retry — CSRF failures can manifest as
-        // visible "MissingCSRF" text, a URL error param, or a silent redirect back.
         if (attempt < LOGIN_ATTEMPTS && url.includes('/login')) {
-            console.warn(`[loginAndGetTenant] Login failed on attempt ${attempt} (URL: ${url}), retrying...`);
-            await page.waitForTimeout(3000);
+            await page.waitForTimeout(2000);
             continue;
         }
 
-        // Final attempt — fail with diagnostics
         console.error("LOGIN TIMEOUT! URL is:", url);
         console.error("PAGE CONTENT:", await page.content());
         throw new Error(`Login failed after ${attempt} attempts. URL: ${url}`);

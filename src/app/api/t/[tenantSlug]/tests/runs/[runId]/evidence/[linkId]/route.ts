@@ -9,5 +9,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; runId: string; linkId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     await unlinkEvidenceFromRun(ctx, params.linkId);
-    return NextResponse.json({ ok: true });
+    return NextResponse.json<any>({ ok: true });
 });

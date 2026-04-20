@@ -11,7 +11,7 @@ import { scimServiceProviderConfig } from '@/lib/scim/types';
 
 export async function GET(req: NextRequest) {
     const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
-    return NextResponse.json(scimServiceProviderConfig(baseUrl), {
+    return NextResponse.json<any>(scimServiceProviderConfig(baseUrl), {
         headers: { 'Content-Type': 'application/scim+json' },
     });
 }

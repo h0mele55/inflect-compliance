@@ -15,7 +15,7 @@ import { logger } from '@/lib/observability/logger';
 export async function POST(req: NextRequest) {
     // ── Gate 1: Environment check ──
     if (process.env.NODE_ENV === 'production') {
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Seed endpoint is disabled in production' },
             { status: 403 }
         );
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     // ── Gate 2: Token check ──
     const seedToken = process.env.STAGING_SEED_TOKEN;
     if (!seedToken) {
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'STAGING_SEED_TOKEN env var not set' },
             { status: 503 }
         );
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     const providedToken = req.headers.get('x-seed-token');
     if (providedToken !== seedToken) {
         logger.warn('Unauthorized staging seed attempt', { component: 'staging-seed' });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Invalid seed token' },
             { status: 401 }
         );
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
         logger.info('Staging seed completed', { component: 'staging-seed', ...counts });
 
-        return NextResponse.json({
+        return NextResponse.json<any>({
             success: true,
             message: 'Staging seed completed',
             counts,
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         });
     } catch (err) {
         logger.error('Staging seed failed', { component: 'staging-seed', error: err instanceof Error ? err.message : String(err) });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Seed failed', details: String(err) },
             { status: 500 }
         );

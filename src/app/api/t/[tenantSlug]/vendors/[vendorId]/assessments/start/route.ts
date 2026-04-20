@@ -8,5 +8,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(StartAssessmentSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const assessment = await startVendorAssessment(ctx, params.vendorId, body.templateKey);
-    return NextResponse.json(assessment, { status: 201 });
+    return NextResponse.json<any>(assessment, { status: 201 });
 }));

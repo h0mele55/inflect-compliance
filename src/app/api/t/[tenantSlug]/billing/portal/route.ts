@@ -25,5 +25,5 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
         `${appUrl}/t/${ctx.tenantSlug}/admin`,
     );
 
-    return NextResponse.json({ url });
+    return NextResponse.json<any>({ url });
 });

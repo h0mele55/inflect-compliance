@@ -8,5 +8,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(BulkAssignSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const result = await bulkAssign(ctx, body.taskIds, body.assigneeUserId);
-    return NextResponse.json({ updated: result.count });
+    return NextResponse.json<any>({ updated: result.count });
 }));

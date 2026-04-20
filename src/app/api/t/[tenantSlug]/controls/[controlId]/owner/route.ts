@@ -8,5 +8,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(SetControlOwnerSchema, async (req, { params }: { params: { tenantSlug: string; controlId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const control = await setControlOwner(ctx, params.controlId, body.ownerUserId);
-    return NextResponse.json(control);
+    return NextResponse.json<any>(control);
 }));

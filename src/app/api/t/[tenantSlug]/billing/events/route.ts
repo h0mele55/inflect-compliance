@@ -16,5 +16,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     const events = await listBillingEvents(ctx.tenantId, limit);
 
-    return NextResponse.json({ events });
+    return NextResponse.json<any>({ events });
 });

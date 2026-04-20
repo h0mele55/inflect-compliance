@@ -7,6 +7,7 @@ import {
     KeyRound, Plus, Trash2, XCircle, CheckCircle, Copy, Check,
     Clock, AlertTriangle, Eye, EyeOff,
 } from 'lucide-react';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 
 // ─── Types ───
 
@@ -51,6 +52,7 @@ const EXPIRY_OPTIONS = [
     { label: '180 days', value: '180' },
     { label: '1 year', value: '365' },
 ];
+const EXPIRY_CB_OPTIONS: ComboboxOption[] = EXPIRY_OPTIONS.filter(o => o.value).map(o => ({ value: o.value, label: o.label }));
 
 function formatDate(d: string | null): string {
     if (!d) return '—';
@@ -380,11 +382,16 @@ export default function ApiKeysPage() {
 
                     <div>
                         <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">Expiry</label>
-                        <select value={createExpiry} onChange={(e) => setCreateExpiry(e.target.value)} className="input w-full sm:w-48" id="key-expiry-select">
-                            {EXPIRY_OPTIONS.map(o => (
-                                <option key={o.value} value={o.value}>{o.label}</option>
-                            ))}
-                        </select>
+                        <Combobox
+                            hideSearch
+                            id="key-expiry-select"
+                            selected={EXPIRY_CB_OPTIONS.find(o => o.value === createExpiry) ?? null}
+                            setSelected={(opt) => setCreateExpiry(opt?.value ?? '')}
+                            options={EXPIRY_CB_OPTIONS}
+                            placeholder="No expiry"
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-full sm:w-48' }}
+                        />
                     </div>
 
                     <div>

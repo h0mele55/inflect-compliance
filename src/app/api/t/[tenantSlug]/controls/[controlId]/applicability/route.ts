@@ -8,5 +8,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const POST = withApiErrorHandling(withValidatedBody(SetControlApplicabilitySchema, async (req, { params }: { params: { tenantSlug: string; controlId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const control = await setControlApplicability(ctx, params.controlId, body.applicability, body.justification ?? null);
-    return NextResponse.json(control);
+    return NextResponse.json<any>(control);
 }));

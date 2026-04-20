@@ -17,7 +17,7 @@ export const GET = withApiErrorHandling(async (
 ) => {
     const ctx = await getTenantCtx(params, req);
     const settings = await getTenantSecuritySettings(ctx);
-    return NextResponse.json(settings);
+    return NextResponse.json<any>(settings);
 });
 
 /**
@@ -30,6 +30,6 @@ export const PUT = withApiErrorHandling(withValidatedBody(
     async (req: NextRequest, { params }: { params: { tenantSlug: string } }, body) => {
         const ctx = await requireAdminCtx(params, req);
         const result = await updateTenantMfaPolicy(ctx, body);
-        return NextResponse.json(result);
+        return NextResponse.json<any>(result);
     },
 ));

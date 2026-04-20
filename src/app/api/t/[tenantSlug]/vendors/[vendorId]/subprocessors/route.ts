@@ -13,20 +13,20 @@ const AddSubprocessorSchema = z.object({
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    return NextResponse.json(await listSubprocessors(ctx, params.vendorId));
+    return NextResponse.json<any>(await listSubprocessors(ctx, params.vendorId));
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const raw = await req.json();
     const body = AddSubprocessorSchema.parse(raw);
-    return NextResponse.json(await addSubprocessor(ctx, params.vendorId, body), { status: 201 });
+    return NextResponse.json<any>(await addSubprocessor(ctx, params.vendorId, body), { status: 201 });
 });
 
 export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const url = new URL(req.url);
     const relationId = url.searchParams.get('relationId');
-    if (!relationId) return NextResponse.json({ error: 'relationId required' }, { status: 400 });
-    return NextResponse.json(await removeSubprocessor(ctx, relationId));
+    if (!relationId) return NextResponse.json<any>({ error: 'relationId required' }, { status: 400 });
+    return NextResponse.json<any>(await removeSubprocessor(ctx, relationId));
 });

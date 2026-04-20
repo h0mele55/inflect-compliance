@@ -1,6 +1,7 @@
 'use client';
 
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
+import { Combobox } from '@/components/ui/combobox';
 
 export interface FilterSelectConfig {
     key: string;
@@ -62,20 +63,17 @@ export function FilterBar({
 
                 {/* Select dropdowns */}
                 {selects.map((s) => (
-                    <select
+                    <Combobox
                         key={s.key}
-                        className={`input ${s.width || 'w-40'}`}
-                        value={filters[s.key] || ''}
-                        onChange={(e) => setFilter(s.key, e.target.value)}
+                        hideSearch
                         id={`filter-${s.key}`}
-                    >
-                        <option value="">{s.label}</option>
-                        {s.options.map((o) => (
-                            <option key={o.value} value={o.value}>
-                                {o.label}
-                            </option>
-                        ))}
-                    </select>
+                        selected={s.options.find(o => o.value === (filters[s.key] || '')) ? { value: filters[s.key] || '', label: s.options.find(o => o.value === filters[s.key])?.label || '' } : null}
+                        setSelected={(opt) => setFilter(s.key, opt?.value ?? '')}
+                        options={s.options.map(o => ({ value: o.value, label: o.label }))}
+                        placeholder={s.label}
+                        matchTriggerWidth
+                        buttonProps={{ className: s.width || 'w-40' }}
+                    />
                 ))}
 
                 {/* Toggle buttons */}

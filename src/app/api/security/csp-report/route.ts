@@ -108,7 +108,7 @@ export async function GET(): Promise<NextResponse> {
     // NOTE: This route is protected by the middleware auth guard.
     // Only authenticated users can access /api/* routes.
     const summary = getViolationSummary(50);
-    return NextResponse.json(summary);
+    return NextResponse.json<any>(summary);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────

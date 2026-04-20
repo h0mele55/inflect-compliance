@@ -117,6 +117,10 @@ export function resetRateLimit(key: string): void {
  */
 export function clearAllRateLimits(): void {
     store.clear();
+    if (cleanupTimer) {
+        clearInterval(cleanupTimer);
+        cleanupTimer = null;
+    }
 }
 
 // ─── Preset Configurations ──────────────────────────────────────────

@@ -7,5 +7,5 @@ import * as policyUsecases from '@/app-layer/usecases/policy';
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const result = await policyUsecases.archivePolicy(ctx, params.id);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

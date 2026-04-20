@@ -34,7 +34,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     // Build webhook endpoint URL for display
     const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 
-    return NextResponse.json({
+    return NextResponse.json<any>({
         connections: connections.map((c: Record<string, unknown>) => ({
             ...c,
             hasSecret: true, // secrets exist but are masked
@@ -64,15 +64,15 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
 
     // Validate required fields
     if (!body.provider || typeof body.provider !== 'string') {
-        return NextResponse.json({ error: 'provider is required' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'provider is required' }, { status: 400 });
     }
     if (!body.name || typeof body.name !== 'string') {
-        return NextResponse.json({ error: 'name is required' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'name is required' }, { status: 400 });
     }
 
     // Validate provider exists in registry
     if (!registry.getProvider(body.provider)) {
-        return NextResponse.json({
+        return NextResponse.json<any>({
             error: `Unknown provider: ${body.provider}`,
             availableProviders: registry.listProviderIds(),
         }, { status: 400 });
@@ -88,7 +88,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     });
 
     // Return connection WITHOUT secrets
-    return NextResponse.json({
+    return NextResponse.json<any>({
         id: connection.id,
         provider: connection.provider,
         name: connection.name,
@@ -115,12 +115,12 @@ export const PUT = withApiErrorHandling(async (req: NextRequest, { params }: { p
     };
 
     if (!body.provider) {
-        return NextResponse.json({ error: 'provider is required' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'provider is required' }, { status: 400 });
     }
 
     const providerImpl = registry.getProvider(body.provider);
     if (!providerImpl) {
-        return NextResponse.json({ error: `Unknown provider: ${body.provider}` }, { status: 400 });
+        return NextResponse.json<any>({ error: `Unknown provider: ${body.provider}` }, { status: 400 });
     }
 
     // Validate connection
@@ -134,7 +134,7 @@ export const PUT = withApiErrorHandling(async (req: NextRequest, { params }: { p
         await updateConnectionTestStatus(ctx, body.connectionId, result.valid ? 'ok' : 'error');
     }
 
-    return NextResponse.json({
+    return NextResponse.json<any>({
         valid: result.valid,
         error: result.error,
         testedAt: new Date().toISOString(),
@@ -149,10 +149,10 @@ export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: 
 
     const { connectionId } = await req.json() as { connectionId: string };
     if (!connectionId) {
-        return NextResponse.json({ error: 'connectionId required' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'connectionId required' }, { status: 400 });
     }
 
     await removeIntegrationConnection(ctx, connectionId);
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json<any>({ ok: true });
 });

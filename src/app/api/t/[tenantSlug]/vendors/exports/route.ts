@@ -72,5 +72,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json<any>(data);
 });

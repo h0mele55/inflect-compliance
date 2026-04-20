@@ -9,5 +9,5 @@ export const GET = withApiErrorHandling(async (
 ) => {
     const ctx = await getTenantCtx(params, req);
     const session = await getSession(ctx, params.sessionId);
-    return NextResponse.json(session);
+    return NextResponse.json<any>(session);
 });

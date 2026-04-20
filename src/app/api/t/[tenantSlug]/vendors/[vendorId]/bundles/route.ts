@@ -9,12 +9,12 @@ const CreateBundleSchema = z.object({ name: z.string().min(1), description: z.st
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    return NextResponse.json(await listEvidenceBundles(ctx, params.vendorId));
+    return NextResponse.json<any>(await listEvidenceBundles(ctx, params.vendorId));
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const raw = await req.json();
     const body = CreateBundleSchema.parse(raw);
-    return NextResponse.json(await createEvidenceBundle(ctx, params.vendorId, body), { status: 201 });
+    return NextResponse.json<any>(await createEvidenceBundle(ctx, params.vendorId, body), { status: 201 });
 });

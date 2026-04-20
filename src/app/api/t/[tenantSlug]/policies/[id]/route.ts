@@ -9,7 +9,7 @@ import * as policyUsecases from '@/app-layer/usecases/policy';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const policy = await policyUsecases.getPolicy(ctx, params.id);
-    return NextResponse.json(policy);
+    return NextResponse.json<any>(policy);
 });
 
 // PATCH /api/t/[tenantSlug]/policies/[id] — update metadata
@@ -17,6 +17,6 @@ export const PATCH = withApiErrorHandling(
     withValidatedBody(UpdatePolicyMetadataSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }, body) => {
         const ctx = await getTenantCtx(params, req);
         const policy = await policyUsecases.updatePolicyMetadata(ctx, params.id, body);
-        return NextResponse.json(policy);
+        return NextResponse.json<any>(policy);
     })
 );

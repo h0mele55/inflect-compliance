@@ -8,6 +8,7 @@ import {
     ChevronDown, ChevronUp, Users,
 } from 'lucide-react';
 import type { Role } from '@prisma/client';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 
 // ─── Types ───
 
@@ -60,6 +61,7 @@ const ROLE_COLORS: Record<string, string> = {
     AUDITOR: 'badge-warning',
     READER: 'badge-neutral',
 };
+const BASE_ROLE_OPTIONS: ComboboxOption[] = BASE_ROLES.map(r => ({ value: r, label: r }));
 
 // ─── Permission Grid Component ───
 
@@ -200,16 +202,14 @@ function RoleForm({
                     <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
                         Base Role (fallback)
                     </label>
-                    <select
-                        value={baseRole}
-                        onChange={(e) => handleBaseRoleChange(e.target.value as Role)}
-                        className="input w-full"
+                    <Combobox
+                        hideSearch
                         id="role-base-select"
-                    >
-                        {BASE_ROLES.map((r) => (
-                            <option key={r} value={r}>{r}</option>
-                        ))}
-                    </select>
+                        selected={BASE_ROLE_OPTIONS.find(o => o.value === baseRole) ?? null}
+                        setSelected={(opt) => { if (opt) handleBaseRoleChange(opt.value as Role); }}
+                        options={BASE_ROLE_OPTIONS}
+                        matchTriggerWidth
+                    />
                     <p className="text-[10px] text-slate-500 mt-1">
                         Used for coarse authorization when custom permissions don&apos;t apply.
                     </p>

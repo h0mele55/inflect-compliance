@@ -27,9 +27,14 @@ export default defineConfig({
         },
     ],
     webServer: {
+        // AUTH_URL / NEXTAUTH_URL must match the actual test port. NextAuth's
+        // reqWithEnvURL() rewrites the request origin to AUTH_URL for every
+        // /api/auth/* request — any mismatch causes login redirects to land on
+        // the wrong host and surfaces as spurious MissingCSRF / stuck-login
+        // failures in Playwright.
         command: isCI
-            ? `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 PORT=${port} npx next start -p ${port}`
-            : `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 npx next dev -p ${port}`,
+            ? `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 AUTH_URL=http://localhost:${port} NEXTAUTH_URL=http://localhost:${port} PORT=${port} npx next start -p ${port}`
+            : `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 AUTH_URL=http://localhost:${port} NEXTAUTH_URL=http://localhost:${port} npx next dev -p ${port}`,
         port,
         reuseExistingServer: !isCI,
         timeout: 120_000,

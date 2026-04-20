@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
+import { Combobox } from '@/components/ui/combobox';
 
 const CRIT_BADGE: Record<string, string> = { LOW: 'badge-neutral', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
 const STATUS_BADGE: Record<string, string> = {
@@ -125,11 +126,16 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
         if (q.answerType === 'SINGLE_SELECT' && q.optionsJson) {
             const options = Array.isArray(q.optionsJson) ? q.optionsJson : [];
             return (
-                <select className="input w-full max-w-xs" value={value || ''} disabled={disabled}
-                    onChange={e => setAnswers(p => ({ ...p, [q.id]: e.target.value }))}>
-                    <option value="">— Select —</option>
-                    {options.map((o: string) => <option key={o} value={o}>{o}</option>)}
-                </select>
+                <Combobox
+                    hideSearch
+                    selected={options.map((o: string) => ({ value: o, label: o })).find((opt: { value: string }) => opt.value === value) ?? null}
+                    setSelected={(opt) => setAnswers(p => ({ ...p, [q.id]: opt?.value ?? '' }))}
+                    options={options.map((o: string) => ({ value: o, label: o }))}
+                    placeholder="— Select —"
+                    disabled={disabled}
+                    matchTriggerWidth
+                    buttonProps={{ className: 'w-full max-w-xs' }}
+                />
             );
         }
 

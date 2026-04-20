@@ -20,6 +20,10 @@ beforeEach(() => {
     clearAllRateLimits();
 });
 
+afterAll(() => {
+    clearAllRateLimits();
+});
+
 describe('Rate Limiter', () => {
     it('allows requests within the limit', () => {
         const key = 'test:user-1';

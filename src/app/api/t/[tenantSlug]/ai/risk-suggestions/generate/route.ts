@@ -13,5 +13,5 @@ export const POST = withApiErrorHandling(withValidatedBody(RiskAssessmentInputSc
     const ctx = await getTenantCtx(params, req);
     const input = { frameworks: body.frameworks ?? [], assetIds: body.assetIds ?? [], context: body.context };
     const result = await generateRiskSuggestions(ctx, input);
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json<any>(result, { status: 201 });
 }));

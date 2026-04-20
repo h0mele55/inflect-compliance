@@ -10,5 +10,5 @@ import { listExpiredEvidence } from '@/app-layer/usecases/evidence-retention';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const result = await listExpiredEvidence(ctx);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

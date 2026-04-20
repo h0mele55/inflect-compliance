@@ -22,14 +22,14 @@ export const POST = withApiErrorHandling(async (
     // Get current session
     const session = await auth();
     if (!session?.user?.id) {
-        return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        return NextResponse.json<any>({ error: 'Not authenticated' }, { status: 401 });
     }
 
     const userId = session.user.id;
     const tenantId = session.user.tenantId;
 
     if (!tenantId) {
-        return NextResponse.json({ error: 'No tenant context' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'No tenant context' }, { status: 400 });
     }
 
     // ── Rate Limit Check ────────────────────────────────────────────
@@ -38,7 +38,7 @@ export const POST = withApiErrorHandling(async (
 
     if (!rateCheck.allowed) {
         const retrySeconds = Math.ceil(rateCheck.retryAfterMs / 1000);
-        return NextResponse.json(
+        return NextResponse.json<any>(
             {
                 success: false,
                 error: `Too many verification attempts. Please try again in ${retrySeconds} seconds.`,
@@ -53,12 +53,12 @@ export const POST = withApiErrorHandling(async (
     try {
         body = await req.json();
     } catch {
-        return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'Invalid request' }, { status: 400 });
     }
 
     const parsed = VerifyMfaInput.safeParse(body);
     if (!parsed.success) {
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Invalid code format' },
             { status: 400 },
         );
@@ -68,7 +68,7 @@ export const POST = withApiErrorHandling(async (
     const result = await verifyMfaChallenge(userId, tenantId, parsed.data.code, rateCheck.remaining);
 
     if (!result.success) {
-        return NextResponse.json({
+        return NextResponse.json<any>({
             success: false,
             error: result.message,
             remaining: result.remaining,
@@ -78,7 +78,7 @@ export const POST = withApiErrorHandling(async (
     // Reset rate limit on success
     resetRateLimit(rateLimitKey);
 
-    const response = NextResponse.json({
+    const response = NextResponse.json<any>({
         success: true,
         message: result.message,
     });

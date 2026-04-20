@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { statusBadgeVariants } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { cn } from '@dub/utils';
 
 // ─── Types ───
@@ -57,6 +58,7 @@ const ROLE_VARIANT: Record<string, 'error' | 'info' | 'warning' | 'neutral'> = {
     AUDITOR: 'warning',
     READER: 'neutral',
 };
+const ROLE_CB_OPTIONS: ComboboxOption[] = ROLES.map(r => ({ value: r, label: r }));
 const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error' | 'neutral'> = {
     ACTIVE: 'success',
     INVITED: 'warning',
@@ -322,16 +324,14 @@ export default function MembersAdminPage() {
                             <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">
                                 Role
                             </label>
-                            <select
+                            <Combobox
+                                hideSearch
                                 id="invite-role-select"
-                                value={inviteRole}
-                                onChange={(e) => setInviteRole(e.target.value)}
-                                className="input w-full"
-                            >
-                                {ROLES.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
+                                selected={ROLE_CB_OPTIONS.find(o => o.value === inviteRole) ?? null}
+                                setSelected={(opt) => setInviteRole(opt?.value ?? 'READER')}
+                                options={ROLE_CB_OPTIONS}
+                                matchTriggerWidth
+                            />
                         </div>
                         <Button
                             variant="primary"
@@ -394,16 +394,15 @@ export default function MembersAdminPage() {
                                     {editingRoleId === m.id ? (
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-1">
-                                                <select
-                                                    value={pendingRole}
-                                                    onChange={(e) => setPendingRole(e.target.value)}
-                                                    className="input text-xs py-1 px-2 w-full sm:w-28"
+                                                <Combobox
+                                                    hideSearch
                                                     id={`role-select-${m.id}`}
-                                                >
-                                                    {ROLES.map((r) => (
-                                                        <option key={r} value={r}>{r}</option>
-                                                    ))}
-                                                </select>
+                                                    selected={ROLE_CB_OPTIONS.find(o => o.value === pendingRole) ?? null}
+                                                    setSelected={(opt) => setPendingRole(opt?.value ?? pendingRole)}
+                                                    options={ROLE_CB_OPTIONS}
+                                                    matchTriggerWidth
+                                                    buttonProps={{ className: 'text-xs py-1 px-2 w-full sm:w-28' }}
+                                                />
                                                 <Button
                                                     variant="primary"
                                                     size="xs"
@@ -422,17 +421,16 @@ export default function MembersAdminPage() {
                                                 />
                                             </div>
                                             {customRoles.length > 0 && (
-                                                <select
-                                                    value={pendingCustomRoleId ?? ''}
-                                                    onChange={(e) => setPendingCustomRoleId(e.target.value || null)}
-                                                    className="input text-xs py-1 px-2 w-full sm:w-48"
+                                                <Combobox
+                                                    hideSearch
                                                     id={`custom-role-select-${m.id}`}
-                                                >
-                                                    <option value="">No custom role (use base role)</option>
-                                                    {customRoles.map((cr) => (
-                                                        <option key={cr.id} value={cr.id}>{cr.name}</option>
-                                                    ))}
-                                                </select>
+                                                    selected={customRoles.map(cr => ({ value: cr.id, label: cr.name })).find(o => o.value === (pendingCustomRoleId ?? '')) ?? null}
+                                                    setSelected={(opt) => setPendingCustomRoleId(opt?.value || null)}
+                                                    options={customRoles.map(cr => ({ value: cr.id, label: cr.name }))}
+                                                    placeholder="No custom role (use base role)"
+                                                    matchTriggerWidth
+                                                    buttonProps={{ className: 'text-xs py-1 px-2 w-full sm:w-48' }}
+                                                />
                                             )}
                                         </div>
                                     ) : (

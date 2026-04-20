@@ -36,7 +36,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     // Also return the SCIM endpoint base URL for admin visibility
     const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 
-    return NextResponse.json({
+    return NextResponse.json<any>({
         tokens,
         scimEndpoint: `${baseUrl}/api/scim/v2`,
         isEnabled: tokens.some(t => !t.revokedAt),
@@ -67,7 +67,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     });
 
     // Return the plaintext token ONCE — it cannot be retrieved again
-    return NextResponse.json({
+    return NextResponse.json<any>({
         ...token,
         plaintext,
         warning: 'Copy this token now. It will not be shown again.',
@@ -82,7 +82,7 @@ export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: 
 
     const { tokenId } = await req.json() as { tokenId: string };
     if (!tokenId) {
-        return NextResponse.json({ error: 'tokenId required' }, { status: 400 });
+        return NextResponse.json<any>({ error: 'tokenId required' }, { status: 400 });
     }
 
     // Verify token belongs to this tenant
@@ -91,7 +91,7 @@ export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: 
     });
 
     if (!existing) {
-        return NextResponse.json({ error: 'Token not found' }, { status: 404 });
+        return NextResponse.json<any>({ error: 'Token not found' }, { status: 404 });
     }
 
     await prisma.tenantScimToken.update({
@@ -99,5 +99,5 @@ export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: 
         data: { revokedAt: new Date() },
     });
 
-    return NextResponse.json({ ok: true, revokedAt: new Date().toISOString() });
+    return NextResponse.json<any>({ ok: true, revokedAt: new Date().toISOString() });
 });

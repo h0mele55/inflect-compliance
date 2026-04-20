@@ -1,0 +1,17 @@
+{
+    "extends": "../../tsconfig.json",
+    "compilerOptions": {
+        "jsx": "react-jsx",
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "target": "ES2020",
+        "noEmit": false,
+        "isolatedModules": false,
+        "incremental": false,
+        "types": ["jest", "node", "jest-axe", "@testing-library/jest-dom"]
+    },
+    "include": [
+        "./**/*",
+        "../../src/**/*"
+    ]
+}

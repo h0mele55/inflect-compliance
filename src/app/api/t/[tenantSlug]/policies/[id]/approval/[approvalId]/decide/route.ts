@@ -10,6 +10,6 @@ export const POST = withApiErrorHandling(
     withValidatedBody(DecideApprovalSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string; approvalId: string } }, body) => {
         const ctx = await getTenantCtx(params, req);
         const result = await policyUsecases.decidePolicyApproval(ctx, params.approvalId, body);
-        return NextResponse.json(result);
+        return NextResponse.json<any>(result);
     })
 );

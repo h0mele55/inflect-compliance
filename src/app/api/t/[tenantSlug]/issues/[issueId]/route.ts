@@ -11,11 +11,11 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; issueId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const task = await getTask(ctx, params.issueId);
-    return NextResponse.json(task);
+    return NextResponse.json<any>(task);
 });
 
 export const PATCH = withApiErrorHandling(withValidatedBody(UpdateTaskSchema, async (req, { params }: { params: { tenantSlug: string; issueId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const task = await updateTask(ctx, params.issueId, body);
-    return NextResponse.json(task);
+    return NextResponse.json<any>(task);
 }));

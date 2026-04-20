@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
     // ── Validate params ──
     if (!tenantSlug || !providerId) {
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Missing required parameters: tenant and provider' },
             { status: 400 }
         );
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!tenant) {
-        return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+        return NextResponse.json<any>({ error: 'Tenant not found' }, { status: 404 });
     }
 
     // ── Load provider config ──
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!provider) {
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'SAML provider not found or not enabled' },
             { status: 404 }
         );
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
             requestId, tenantSlug: tenantSlug || '', providerType: 'SAML',
             providerId: provider.id, stage: 'config_load',
         });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'SSO configuration error' },
             { status: 500 }
         );
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
         ssoLog('error', 'SAML config missing ssoUrl or entityId', {
             tenantSlug: tenantSlug || '', providerType: 'SAML', providerId: provider.id, stage: 'config_load',
         });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'SAML configuration incomplete — ssoUrl and entityId required' },
             { status: 500 }
         );
@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
             meta: { error: (err as Error).message },
         });
 
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Failed to initiate SAML authentication' },
             { status: 500 }
         );

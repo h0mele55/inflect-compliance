@@ -32,6 +32,7 @@ import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { queryKeys } from '@/lib/queryKeys';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
 const FREQUENCY_OPTIONS: ComboboxOption[] = [
     { value: 'AD_HOC', label: 'Ad Hoc' },
@@ -111,11 +112,18 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
     const canSubmit = form.name.trim().length > 0 && !saving &&
         (applicability === 'APPLICABLE' || justification.trim().length > 0);
 
+    const telemetry = useFormTelemetry('NewControlModal');
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!canSubmit) return;
         setSaving(true);
         setError('');
+        telemetry.trackSubmit({
+            applicability,
+            hasCategory: Boolean(form.category),
+            hasFrequency: Boolean(form.frequency),
+        });
         try {
             const body = {
                 name: form.name.trim(),
@@ -158,11 +166,13 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                 queryKey: queryKeys.controls.all(tenantSlug),
             });
 
+            telemetry.trackSuccess({ controlId: control.id });
             close();
             // Preserve the legacy post-create UX: deep-link to the new
             // control so users can start editing immediately.
             router.push(tenantHref(`/controls/${control.id}`));
         } catch (err) {
+            telemetry.trackError(err);
             setError(err instanceof Error ? err.message : 'Failed to create control');
             setSaving(false);
         }

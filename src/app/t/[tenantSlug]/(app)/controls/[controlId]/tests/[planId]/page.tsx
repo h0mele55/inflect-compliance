@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 
 interface TestPlanDetail {
     id: string;
@@ -40,6 +41,9 @@ const RESULT_BADGE: Record<string, string> = {
 const RUN_STATUS_BADGE: Record<string, string> = {
     PLANNED: 'badge-neutral', RUNNING: 'badge-info', COMPLETED: 'badge-success',
 };
+const FREQ_CB_OPTIONS: ComboboxOption[] = Object.entries(FREQ_LABELS).map(([v, l]) => ({ value: v, label: l }));
+const METHOD_OPTIONS: ComboboxOption[] = [{ value: 'MANUAL', label: 'Manual' }, { value: 'AUTOMATED', label: 'Automated' }];
+const PLAN_STATUS_OPTIONS: ComboboxOption[] = [{ value: 'ACTIVE', label: 'Active' }, { value: 'PAUSED', label: 'Paused' }];
 
 export default function TestPlanDetailPage() {
     const params = useParams();
@@ -184,23 +188,15 @@ export default function TestPlanDetailPage() {
                     <div className="grid grid-cols-3 gap-3">
                         <div>
                             <label className="text-xs text-slate-400 block mb-1">Frequency</label>
-                            <select className="input w-full" value={editFreq} onChange={e => setEditFreq(e.target.value)}>
-                                {Object.entries(FREQ_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                            </select>
+                            <Combobox hideSearch selected={FREQ_CB_OPTIONS.find(o => o.value === editFreq) ?? null} setSelected={(opt) => setEditFreq(opt?.value ?? editFreq)} options={FREQ_CB_OPTIONS} matchTriggerWidth />
                         </div>
                         <div>
                             <label className="text-xs text-slate-400 block mb-1">Method</label>
-                            <select className="input w-full" value={editMethod} onChange={e => setEditMethod(e.target.value)}>
-                                <option value="MANUAL">Manual</option>
-                                <option value="AUTOMATED">Automated</option>
-                            </select>
+                            <Combobox hideSearch selected={METHOD_OPTIONS.find(o => o.value === editMethod) ?? null} setSelected={(opt) => setEditMethod(opt?.value ?? editMethod)} options={METHOD_OPTIONS} matchTriggerWidth />
                         </div>
                         <div>
                             <label className="text-xs text-slate-400 block mb-1">Status</label>
-                            <select className="input w-full" value={editStatus} onChange={e => setEditStatus(e.target.value)} id="edit-plan-status">
-                                <option value="ACTIVE">Active</option>
-                                <option value="PAUSED">Paused</option>
-                            </select>
+                            <Combobox hideSearch id="edit-plan-status" selected={PLAN_STATUS_OPTIONS.find(o => o.value === editStatus) ?? null} setSelected={(opt) => setEditStatus(opt?.value ?? editStatus)} options={PLAN_STATUS_OPTIONS} matchTriggerWidth />
                         </div>
                     </div>
                     <button className="btn btn-primary btn-sm" onClick={savePlan} disabled={saving} id="save-plan-changes-btn">

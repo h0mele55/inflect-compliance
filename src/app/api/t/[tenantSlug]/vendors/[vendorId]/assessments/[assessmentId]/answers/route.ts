@@ -9,5 +9,5 @@ export const POST = withApiErrorHandling(withValidatedBody(SaveAssessmentAnswers
     const ctx = await getTenantCtx(params, req);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await saveAssessmentAnswers(ctx, params.assessmentId, body.answers as any);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 }));

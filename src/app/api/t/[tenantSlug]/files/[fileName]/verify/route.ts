@@ -8,5 +8,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     const url = new URL(req.url);
     const expectedHash = url.searchParams.get('hash') || undefined;
     const result = await verifyFileIntegrity(ctx, params.fileName, expectedHash);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

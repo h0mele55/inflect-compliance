@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 
 const STATUS_COLORS: Record<string, string> = {
     NOT_STARTED: 'badge-neutral', IN_PROGRESS: 'badge-info', READY: 'badge-success', NEEDS_REVIEW: 'badge-warning',
@@ -37,6 +38,18 @@ export function ClausesBrowser({ clauses: initialClauses, tenantSlug }: ClausesB
         return map[status] || status;
     };
 
+    // Status options must rebuild when the i18n bundle changes so the
+    // labels follow the active locale without a page reload.
+    const statusOptions = useMemo<ComboboxOption[]>(
+        () => [
+            { value: 'NOT_STARTED', label: t('notStarted') },
+            { value: 'IN_PROGRESS', label: t('inProgress') },
+            { value: 'READY', label: t('ready') },
+            { value: 'NEEDS_REVIEW', label: t('needsReview') },
+        ],
+        [t],
+    );
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-1 space-y-2">
@@ -57,12 +70,22 @@ export function ClausesBrowser({ clauses: initialClauses, tenantSlug }: ClausesB
                     <div className="glass-card p-6 animate-slideIn">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
                             <h2 className="text-lg font-bold">{t('clause')} {selected.number}: {selected.title}</h2>
-                            <select className="input w-full sm:w-40" value={selected.status} onChange={e => updateStatus(selected.id, e.target.value)}>
-                                <option value="NOT_STARTED">{t('notStarted')}</option>
-                                <option value="IN_PROGRESS">{t('inProgress')}</option>
-                                <option value="READY">{t('ready')}</option>
-                                <option value="NEEDS_REVIEW">{t('needsReview')}</option>
-                            </select>
+                            <div className="w-full sm:w-48">
+                                <Combobox
+                                    id="clause-status-select"
+                                    name="status"
+                                    options={statusOptions}
+                                    selected={statusOptions.find(o => o.value === selected.status) ?? null}
+                                    setSelected={(o) => {
+                                        if (o) updateStatus(selected.id, o.value);
+                                    }}
+                                    placeholder={t('notStarted')}
+                                    hideSearch
+                                    matchTriggerWidth
+                                    buttonProps={{ className: 'w-full' }}
+                                    caret
+                                />
+                            </div>
                         </div>
                         <p className="text-sm text-slate-300 mb-4">{selected.description}</p>
                         <div className="mb-4">

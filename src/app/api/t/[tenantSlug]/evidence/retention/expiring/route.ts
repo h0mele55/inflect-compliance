@@ -11,5 +11,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     const ctx = await getTenantCtx(params, req);
     const days = parseInt(req.nextUrl.searchParams.get('days') || '30', 10);
     const result = await listExpiringEvidence(ctx, isNaN(days) ? 30 : days);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

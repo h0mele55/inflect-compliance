@@ -8,17 +8,17 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { id: string } }) => {
     const ctx = await getLegacyCtx(req);
     const asset = await getAsset(ctx, params.id);
-    return NextResponse.json(asset);
+    return NextResponse.json<any>(asset);
 });
 
 export const PUT = withApiErrorHandling(withValidatedBody(UpdateAssetSchema, async (req, { params }: { params: { id: string } }, body) => {
     const ctx = await getLegacyCtx(req);
     const asset = await updateAsset(ctx, params.id, body);
-    return NextResponse.json({ success: true, asset });
+    return NextResponse.json<any>({ success: true, asset });
 }));
 
 export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { id: string } }) => {
     const ctx = await getLegacyCtx(req);
     await deleteAsset(ctx, params.id);
-    return NextResponse.json({ success: true });
+    return NextResponse.json<any>({ success: true });
 });

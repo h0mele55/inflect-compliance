@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 
 const SEV_BADGE: Record<string, string> = { LOW: 'badge-info', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
 const STATUS_BADGE: Record<string, string> = { OPEN: 'badge-danger', IN_PROGRESS: 'badge-info', READY_FOR_VERIFICATION: 'badge-warning', CLOSED: 'badge-success' };
@@ -191,8 +192,55 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
                 <form onSubmit={createFinding} className="glass-card p-6 space-y-4 animate-fadeIn">
                     <div className="grid grid-cols-2 gap-4">
                         <div><label className="input-label">{t.findingTitle} *</label><input className="input" required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
-                        <div><label className="input-label">{t.severity}</label><select className="input" value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))}><option value="LOW">{t.low}</option><option value="MEDIUM">{t.medium}</option><option value="HIGH">{t.high}</option><option value="CRITICAL">{t.critical}</option></select></div>
-                        <div><label className="input-label">{t.type}</label><select className="input" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}><option value="NONCONFORMITY">{t.nonconformity}</option><option value="OBSERVATION">{t.observation}</option><option value="OPPORTUNITY">{t.opportunity}</option></select></div>
+                        <div>
+                            <label className="input-label">{t.severity}</label>
+                            {(() => {
+                                const options: ComboboxOption[] = [
+                                    { value: 'LOW', label: t.low },
+                                    { value: 'MEDIUM', label: t.medium },
+                                    { value: 'HIGH', label: t.high },
+                                    { value: 'CRITICAL', label: t.critical },
+                                ];
+                                return (
+                                    <Combobox
+                                        id="finding-severity-select"
+                                        name="severity"
+                                        options={options}
+                                        selected={options.find(o => o.value === form.severity) ?? null}
+                                        setSelected={(o) => setForm(f => ({ ...f, severity: o?.value ?? 'MEDIUM' }))}
+                                        placeholder={t.severity}
+                                        hideSearch
+                                        matchTriggerWidth
+                                        buttonProps={{ className: 'w-full' }}
+                                        caret
+                                    />
+                                );
+                            })()}
+                        </div>
+                        <div>
+                            <label className="input-label">{t.type}</label>
+                            {(() => {
+                                const options: ComboboxOption[] = [
+                                    { value: 'NONCONFORMITY', label: t.nonconformity },
+                                    { value: 'OBSERVATION', label: t.observation },
+                                    { value: 'OPPORTUNITY', label: t.opportunity },
+                                ];
+                                return (
+                                    <Combobox
+                                        id="finding-type-select"
+                                        name="type"
+                                        options={options}
+                                        selected={options.find(o => o.value === form.type) ?? null}
+                                        setSelected={(o) => setForm(f => ({ ...f, type: o?.value ?? 'OBSERVATION' }))}
+                                        placeholder={t.type}
+                                        hideSearch
+                                        matchTriggerWidth
+                                        buttonProps={{ className: 'w-full' }}
+                                        caret
+                                    />
+                                );
+                            })()}
+                        </div>
                         <div><label className="input-label">{t.owner}</label><input className="input" value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} /></div>
                         <div className="col-span-2"><label className="input-label">{t.description} *</label><textarea className="input" required value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
                         <div><label className="input-label">{t.dueDate}</label><input type="date" className="input" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} /></div>

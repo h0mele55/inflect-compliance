@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
+import { Combobox } from '@/components/ui/combobox';
 
 interface TraceabilityPanelProps {
     apiBase: string;            // e.g. /api/t/acme-corp
@@ -233,11 +234,14 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
                     </div>
                     {showAddRisk && canWrite && (
                         <div className="glass-card p-3 mb-3 space-y-2">
-                            <select className="input w-full text-sm" value={addId} onChange={e => setAddId(e.target.value)} id="risk-select">
-                                <option value="">Select risk...</option>
-                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                {availableRisks.map((r: any) => <option key={r.id} value={r.id}>{r.title} ({r.status})</option>)}
-                            </select>
+                            <Combobox
+                                id="risk-select"
+                                selected={availableRisks.map((r: any) => ({ value: r.id, label: `${r.title} (${r.status})` })).find((o: { value: string }) => o.value === addId) ?? null}
+                                setSelected={(opt) => setAddId(opt?.value ?? '')}
+                                options={availableRisks.map((r: any) => ({ value: r.id, label: `${r.title} (${r.status})` }))}
+                                placeholder="Select risk..."
+                                matchTriggerWidth
+                            />
                             <input type="text" className="input w-full text-sm" placeholder="Rationale (optional)" value={addRationale} onChange={e => setAddRationale(e.target.value)} />
                             <button className="btn btn-primary text-xs" disabled={!addId || linkMutation.isPending} onClick={() => handleLink('risk')} id="confirm-risk-link">
                                 {linkMutation.isPending ? 'Linking...' : 'Link'}
@@ -284,11 +288,14 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
                     </div>
                     {showAddControl && canWrite && (
                         <div className="glass-card p-3 mb-3 space-y-2">
-                            <select className="input w-full text-sm" value={addId} onChange={e => setAddId(e.target.value)} id="control-select">
-                                <option value="">Select control...</option>
-                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                {availableControls.map((c: any) => <option key={c.id} value={c.id}>{c.code ? `${c.code} — ` : ''}{c.name} ({c.status})</option>)}
-                            </select>
+                            <Combobox
+                                id="control-select"
+                                selected={availableControls.map((c: any) => ({ value: c.id, label: `${c.code ? `${c.code} — ` : ''}${c.name} (${c.status})` })).find((o: { value: string }) => o.value === addId) ?? null}
+                                setSelected={(opt) => setAddId(opt?.value ?? '')}
+                                options={availableControls.map((c: any) => ({ value: c.id, label: `${c.code ? `${c.code} — ` : ''}${c.name} (${c.status})` }))}
+                                placeholder="Select control..."
+                                matchTriggerWidth
+                            />
                             <input type="text" className="input w-full text-sm" placeholder="Rationale (optional)" value={addRationale} onChange={e => setAddRationale(e.target.value)} />
                             <button className="btn btn-primary text-xs" disabled={!addId || linkMutation.isPending} onClick={() => handleLink('control')} id="confirm-control-link">
                                 {linkMutation.isPending ? 'Linking...' : 'Link'}
@@ -335,11 +342,14 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
                     </div>
                     {showAddAsset && canWrite && (
                         <div className="glass-card p-3 mb-3 space-y-2">
-                            <select className="input w-full text-sm" value={addId} onChange={e => setAddId(e.target.value)} id="asset-select">
-                                <option value="">Select asset...</option>
-                                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                                {availableAssets.map((a: any) => <option key={a.id} value={a.id}>{a.name} ({a.type})</option>)}
-                            </select>
+                            <Combobox
+                                id="asset-select"
+                                selected={availableAssets.map((a: any) => ({ value: a.id, label: `${a.name} (${a.type})` })).find((o: { value: string }) => o.value === addId) ?? null}
+                                setSelected={(opt) => setAddId(opt?.value ?? '')}
+                                options={availableAssets.map((a: any) => ({ value: a.id, label: `${a.name} (${a.type})` }))}
+                                placeholder="Select asset..."
+                                matchTriggerWidth
+                            />
                             <input type="text" className="input w-full text-sm" placeholder="Rationale (optional)" value={addRationale} onChange={e => setAddRationale(e.target.value)} />
                             <button className="btn btn-primary text-xs" disabled={!addId || linkMutation.isPending} onClick={() => handleLink('asset')} id="confirm-asset-link">
                                 {linkMutation.isPending ? 'Linking...' : 'Link'}

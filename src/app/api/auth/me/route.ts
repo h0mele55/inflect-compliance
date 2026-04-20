@@ -6,7 +6,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async () => {
     const session = await auth();
     if (!session?.user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        return NextResponse.json<any>({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
@@ -29,7 +29,7 @@ export const GET = withApiErrorHandling(async () => {
 
     const membership = user?.tenantMemberships[0];
 
-    return NextResponse.json({
+    return NextResponse.json<any>({
         user: {
             id: user?.id,
             email: user?.email,

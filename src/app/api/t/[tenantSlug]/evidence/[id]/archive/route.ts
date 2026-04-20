@@ -13,5 +13,5 @@ export const POST = withApiErrorHandling(async (
 ) => {
     const ctx = await getTenantCtx(params, req);
     const result = await archiveEvidence(ctx, params.id);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

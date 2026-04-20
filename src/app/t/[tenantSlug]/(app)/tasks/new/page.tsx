@@ -27,7 +27,7 @@ const PRIORITY_OPTIONS: ComboboxOption[] = [
     { value: 'P3', label: 'P3 — Low' },
 ];
 
-const LINK_ENTITY_OPTIONS = [
+const LINK_ENTITY_OPTIONS: ComboboxOption[] = [
     { value: 'CONTROL', label: 'Control' },
     { value: 'FRAMEWORK_REQUIREMENT', label: 'Framework Requirement' },
     { value: 'ASSET', label: 'Asset' },
@@ -35,15 +35,13 @@ const LINK_ENTITY_OPTIONS = [
     { value: 'EVIDENCE', label: 'Evidence' },
 ];
 
-const FINDING_OPTIONS = [
-    { value: '', label: '— Select source —' },
+const FINDING_OPTIONS: ComboboxOption[] = [
     { value: 'INTERNAL', label: 'Internal' },
     { value: 'EXTERNAL_AUDITOR', label: 'External Auditor' },
     { value: 'PEN_TEST', label: 'Pen Test' },
     { value: 'INCIDENT', label: 'Incident' },
 ];
-const GAP_TYPE_OPTIONS = [
-    { value: '', label: '— Select type —' },
+const GAP_TYPE_OPTIONS: ComboboxOption[] = [
     { value: 'DESIGN', label: 'Design' },
     { value: 'OPERATING_EFFECTIVENESS', label: 'Operating Effectiveness' },
     { value: 'DOCUMENTATION', label: 'Documentation' },
@@ -246,16 +244,34 @@ export default function NewTaskPage() {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm text-slate-300 mb-1">Finding Source</label>
-                                <select className="input w-full" value={form.findingSource} onChange={e => update('findingSource', e.target.value)} id="finding-source-select">
-                                    {FINDING_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-                                </select>
+                                <Combobox
+                                    id="finding-source-select"
+                                    name="findingSource"
+                                    options={FINDING_OPTIONS}
+                                    selected={FINDING_OPTIONS.find(o => o.value === form.findingSource) ?? null}
+                                    setSelected={(o) => update('findingSource', o?.value ?? '')}
+                                    placeholder="— Select source —"
+                                    hideSearch
+                                    matchTriggerWidth
+                                    buttonProps={{ className: 'w-full' }}
+                                    caret
+                                />
                             </div>
                             {form.type === 'CONTROL_GAP' && (
                                 <div>
                                     <label className="block text-sm text-slate-300 mb-1">Control Gap Type</label>
-                                    <select className="input w-full" value={form.controlGapType} onChange={e => update('controlGapType', e.target.value)} id="gap-type-select">
-                                        {GAP_TYPE_OPTIONS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-                                    </select>
+                                    <Combobox
+                                        id="gap-type-select"
+                                        name="controlGapType"
+                                        options={GAP_TYPE_OPTIONS}
+                                        selected={GAP_TYPE_OPTIONS.find(o => o.value === form.controlGapType) ?? null}
+                                        setSelected={(o) => update('controlGapType', o?.value ?? '')}
+                                        placeholder="— Select type —"
+                                        hideSearch
+                                        matchTriggerWidth
+                                        buttonProps={{ className: 'w-full' }}
+                                        caret
+                                    />
                                 </div>
                             )}
                         </div>
@@ -273,9 +289,18 @@ export default function NewTaskPage() {
                     <div className="flex gap-2 items-end">
                         <div className="flex-1">
                             <label className="block text-xs text-slate-400 mb-1">Entity Type</label>
-                            <select className="input w-full text-sm" value={linkEntityType} onChange={e => setLinkEntityType(e.target.value)} id="link-entity-type">
-                                {LINK_ENTITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            </select>
+                            <Combobox
+                                id="link-entity-type"
+                                name="linkEntityType"
+                                options={LINK_ENTITY_OPTIONS}
+                                selected={LINK_ENTITY_OPTIONS.find(o => o.value === linkEntityType) ?? null}
+                                setSelected={(o) => setLinkEntityType(o?.value ?? 'CONTROL')}
+                                placeholder="Select entity…"
+                                hideSearch
+                                matchTriggerWidth
+                                buttonProps={{ className: 'w-full' }}
+                                caret
+                            />
                         </div>
                         <div className="flex-1">
                             <label className="block text-xs text-slate-400 mb-1">Entity ID</label>

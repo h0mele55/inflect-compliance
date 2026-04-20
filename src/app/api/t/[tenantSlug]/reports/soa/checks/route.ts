@@ -16,5 +16,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     });
 
     const result = runSoAChecks(report.entries);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

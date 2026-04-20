@@ -8,11 +8,11 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest) => {
     const ctx = await getLegacyCtx(req);
     const audits = await listAudits(ctx);
-    return NextResponse.json(audits);
+    return NextResponse.json<any>(audits);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateAuditSchema, async (req, _ctx, body) => {
     const ctx = await getLegacyCtx(req);
     const audit = await createAudit(ctx, body);
-    return NextResponse.json(audit, { status: 201 });
+    return NextResponse.json<any>(audit, { status: 201 });
 }));

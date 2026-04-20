@@ -10,6 +10,6 @@ export const POST = withApiErrorHandling(
     withValidatedBody(PublishPolicySchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }, body) => {
         const ctx = await getTenantCtx(params, req);
         const policy = await policyUsecases.publishPolicy(ctx, params.id, body.versionId);
-        return NextResponse.json(policy);
+        return NextResponse.json<any>(policy);
     })
 );

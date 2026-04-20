@@ -16,6 +16,7 @@ import {
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildTaskFilters, TASK_FILTER_KEYS } from './filter-defs';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -34,6 +35,12 @@ const TYPE_LABELS: Record<string, string> = {
     INCIDENT: 'Incident', IMPROVEMENT: 'Improvement', TASK: 'Task',
 };
 const STATUS_OPTIONS = ['OPEN', 'TRIAGED', 'IN_PROGRESS', 'BLOCKED', 'RESOLVED', 'CLOSED', 'CANCELED'];
+const STATUS_CB_OPTIONS: ComboboxOption[] = STATUS_OPTIONS.map(s => ({ value: s, label: STATUS_LABELS[s] || s }));
+const BULK_ACTION_OPTIONS: ComboboxOption[] = [
+    { value: 'assign', label: 'Assign' },
+    { value: 'status', label: 'Change Status' },
+    { value: 'due', label: 'Set Due Date' },
+];
 
 // SLA windows (hours)
 const SLA_RESOLVE: Record<string, number> = { CRITICAL: 24, HIGH: 72, MEDIUM: 168, LOW: 720 };
@@ -342,20 +349,30 @@ function TasksPageInner({
             {appPermissions.tasks.edit && selected.size > 0 && (
                 <div className="glass-card p-3 flex items-center gap-3 border border-brand-500/30" id="bulk-toolbar">
                     <span className="text-sm text-brand-400 font-medium">{selected.size} selected</span>
-                    <select className="input w-full sm:w-40 text-sm" value={bulkAction} onChange={e => { setBulkAction(e.target.value); setBulkValue(''); }} id="bulk-action-select">
-                        <option value="">Choose action...</option>
-                        <option value="assign">Assign</option>
-                        <option value="status">Change Status</option>
-                        <option value="due">Set Due Date</option>
-                    </select>
+                    <Combobox
+                        hideSearch
+                        id="bulk-action-select"
+                        selected={BULK_ACTION_OPTIONS.find(o => o.value === bulkAction) ?? null}
+                        setSelected={(opt) => { setBulkAction(opt?.value ?? ''); setBulkValue(''); }}
+                        options={BULK_ACTION_OPTIONS}
+                        placeholder="Choose action..."
+                        matchTriggerWidth
+                        buttonProps={{ className: 'w-full sm:w-40 text-sm' }}
+                    />
                     {bulkAction === 'assign' && (
                         <input className="input w-full sm:w-48 text-sm" placeholder="User ID (blank = unassign)" value={bulkValue} onChange={e => setBulkValue(e.target.value)} id="bulk-value-input" />
                     )}
                     {bulkAction === 'status' && (
-                        <select className="input w-full sm:w-40 text-sm" value={bulkValue} onChange={e => setBulkValue(e.target.value)} id="bulk-value-input">
-                            <option value="">Select status...</option>
-                            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-                        </select>
+                        <Combobox
+                            hideSearch
+                            id="bulk-value-input"
+                            selected={STATUS_CB_OPTIONS.find(o => o.value === bulkValue) ?? null}
+                            setSelected={(opt) => setBulkValue(opt?.value ?? '')}
+                            options={STATUS_CB_OPTIONS}
+                            placeholder="Select status..."
+                            matchTriggerWidth
+                            buttonProps={{ className: 'w-full sm:w-40 text-sm' }}
+                        />
                     )}
                     {bulkAction === 'due' && (
                         <input type="date" className="input w-full sm:w-40 text-sm" value={bulkValue} onChange={e => setBulkValue(e.target.value)} id="bulk-value-input" />

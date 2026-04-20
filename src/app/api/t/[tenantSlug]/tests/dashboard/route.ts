@@ -12,5 +12,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     const period = parseInt(url.searchParams.get('period') || '30', 10);
     const validPeriod = [30, 90, 180, 365].includes(period) ? period : 30;
     const metrics = await getTestDashboardMetrics(ctx, validPeriod);
-    return NextResponse.json(metrics);
+    return NextResponse.json<any>(metrics);
 });

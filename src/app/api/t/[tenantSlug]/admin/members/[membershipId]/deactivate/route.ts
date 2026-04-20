@@ -11,5 +11,5 @@ export const POST = withApiErrorHandling(async (
     const result = await deactivateTenantMember(ctx, {
         membershipId: params.membershipId,
     });
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

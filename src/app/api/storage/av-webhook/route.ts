@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
             const signature = req.headers.get('x-av-signature') || '';
             if (!signature || !verifySignature(rawBody, signature, secret)) {
                 logger.warn('AV webhook: invalid signature', { component: 'av-webhook' });
-                return NextResponse.json(
+                return NextResponse.json<any>(
                     { error: 'Invalid webhook signature' },
                     { status: 401 }
                 );
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
             // No secret configured — check for development bypass
             if (process.env.NODE_ENV === 'production') {
                 logger.error('AV webhook: AV_WEBHOOK_SECRET not configured in production', { component: 'av-webhook' });
-                return NextResponse.json(
+                return NextResponse.json<any>(
                     { error: 'Webhook authentication not configured' },
                     { status: 500 }
                 );
@@ -95,18 +95,18 @@ export async function POST(req: NextRequest) {
         try {
             payload = JSON.parse(rawBody);
         } catch {
-            return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+            return NextResponse.json<any>({ error: 'Invalid JSON payload' }, { status: 400 });
         }
 
         if (!payload.status || !VALID_STATUSES.includes(payload.status)) {
-            return NextResponse.json(
+            return NextResponse.json<any>(
                 { error: `Invalid status: must be one of ${VALID_STATUSES.join(', ')}` },
                 { status: 400 }
             );
         }
 
         if (!payload.fileId && !payload.pathKey) {
-            return NextResponse.json(
+            return NextResponse.json<any>(
                 { error: 'Either fileId or pathKey is required' },
                 { status: 400 }
             );
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
                 fileId: payload.fileId,
                 pathKey: payload.pathKey,
             });
-            return NextResponse.json({ error: 'File not found' }, { status: 404 });
+            return NextResponse.json<any>({ error: 'File not found' }, { status: 404 });
         }
 
         // ─── Map status ───
@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        return NextResponse.json({
+        return NextResponse.json<any>({
             success: true,
             fileId: fileRecord.id,
             scanStatus,
@@ -213,7 +213,7 @@ export async function POST(req: NextRequest) {
             component: 'av-webhook',
             err: err instanceof Error ? err : new Error(String(err)),
         });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Internal server error' },
             { status: 500 }
         );

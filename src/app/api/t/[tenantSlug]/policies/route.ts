@@ -25,7 +25,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
   if (query.includeDeleted === 'true') {
     const policies = await policyUsecases.listPoliciesWithDeleted(ctx);
-    return NextResponse.json(policies);
+    return NextResponse.json<any>(policies);
   }
 
   const hasPagination = query.limit || query.cursor;
@@ -40,7 +40,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         q: query.q,
       },
     });
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
   }
 
   // Backward compat: return flat array
@@ -50,7 +50,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     language: query.language,
     q: query.q,
   });
-  return NextResponse.json(policies);
+  return NextResponse.json<any>(policies);
 });
 
 // POST /api/t/[tenantSlug]/policies — create (blank or from template)
@@ -79,6 +79,6 @@ export const POST = withApiErrorHandling(
       });
     }
 
-    return NextResponse.json(policy, { status: 201 });
+    return NextResponse.json<any>(policy, { status: 201 });
   })
 );

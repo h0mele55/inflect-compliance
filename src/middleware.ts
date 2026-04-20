@@ -169,12 +169,12 @@ export default async function middleware(req: any, ctx: any): Promise<NextRespon
         }
     }
 
-    // ── Auth API routes bypass: let the route handler process these directly.
-    // The auth() middleware wrapper calls reqWithEnvURL() which constructs a new
-    // Request, consuming the original body stream. The downstream route handler
-    // then receives an empty body and cannot read the CSRF token, causing
-    // MissingCSRF errors. These routes are public and self-authenticating, so
-    // skipping the session-checking wrapper is safe. ──
+    // ── Auth API routes bypass ──
+    // /api/auth/* routes are public and self-authenticating (they manage their
+    // own session/CSRF handling). They also get invoked twice through NextAuth's
+    // `reqWithEnvURL()` if the session wrapper runs here — once in this
+    // middleware and once in the downstream route handler — which can disturb
+    // the request body stream. Skip the session-checking wrapper entirely.
     let authRes: Response | undefined;
     if (pathname.startsWith('/api/auth/')) {
         authRes = NextResponse.next();
@@ -190,11 +190,9 @@ export default async function middleware(req: any, ctx: any): Promise<NextRespon
     // its <script> tags with the matching nonce.
     //
     // For /api/auth/ routes we must NOT pass { request: { headers } } because
-    // Next.js internally re-creates the Request to apply header overrides,
-    // which can consume the body stream. The downstream NextAuth route handler
-    // then calls reqWithEnvURL(req) → new NextRequest(url, req) on an already-
-    // drained body, losing the CSRF token and triggering MissingCSRF.
-    // API routes don't need the x-csp-nonce request header anyway.
+    // Next.js re-creates the Request to apply header overrides, which can
+    // interfere with the NextAuth body-parsing path. API routes don't need the
+    // x-csp-nonce request header anyway.
     const isAuthApi = pathname.startsWith('/api/auth/');
     const isPassThrough = !authRes
         || (authRes.status === 200 && !authRes.headers.get('location'));

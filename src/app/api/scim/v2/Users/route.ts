@@ -22,14 +22,14 @@ export async function GET(req: NextRequest) {
 
         const { resources, total } = await scimListUsers(ctx, baseUrl, { startIndex, count, filter });
 
-        return NextResponse.json(scimListResponse(resources, total, startIndex), {
+        return NextResponse.json<any>(scimListResponse(resources, total, startIndex), {
             headers: { 'Content-Type': 'application/scim+json' },
         });
     } catch (e) {
         if (e instanceof ScimAuthError) {
-            return NextResponse.json(scimError(e.status, e.message, e.scimType), { status: e.status });
+            return NextResponse.json<any>(scimError(e.status, e.message, e.scimType), { status: e.status });
         }
-        return NextResponse.json(scimError(500, 'Internal server error'), { status: 500 });
+        return NextResponse.json<any>(scimError(500, 'Internal server error'), { status: 500 });
     }
 }
 
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         const body = await req.json() as ScimCreateUserInput;
 
         if (!body.userName) {
-            return NextResponse.json(
+            return NextResponse.json<any>(
                 scimError(400, 'userName is required', 'invalidValue'),
                 { status: 400 }
             );
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
         const { user, created } = await scimCreateUser(ctx, body, baseUrl);
 
-        return NextResponse.json(user, {
+        return NextResponse.json<any>(user, {
             status: created ? 201 : 200,
             headers: {
                 'Content-Type': 'application/scim+json',
@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
         });
     } catch (e) {
         if (e instanceof ScimAuthError) {
-            return NextResponse.json(scimError(e.status, e.message, e.scimType), { status: e.status });
+            return NextResponse.json<any>(scimError(e.status, e.message, e.scimType), { status: e.status });
         }
-        return NextResponse.json(scimError(500, 'Internal server error'), { status: 500 });
+        return NextResponse.json<any>(scimError(500, 'Internal server error'), { status: 500 });
     }
 }

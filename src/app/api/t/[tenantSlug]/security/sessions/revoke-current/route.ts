@@ -16,7 +16,7 @@ export const POST = withApiErrorHandling(async (
     const ctx = await getTenantCtx(params, req);
     const result = await revokeCurrentSession(ctx);
 
-    return NextResponse.json({
+    return NextResponse.json<any>({
         success: true,
         message: 'All your sessions have been revoked. You will need to sign in again.',
         userId: result.userId,

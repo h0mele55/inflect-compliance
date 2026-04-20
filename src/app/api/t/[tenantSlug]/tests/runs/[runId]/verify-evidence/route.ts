@@ -10,5 +10,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; runId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const result = await verifyRunEvidence(ctx, params.runId);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });

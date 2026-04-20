@@ -20,11 +20,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (view === 'invites') {
         const invites = await listPendingInvites(ctx);
-        return NextResponse.json(invites);
+        return NextResponse.json<any>(invites);
     }
 
     const members = await listTenantMembers(ctx);
-    return NextResponse.json(members);
+    return NextResponse.json<any>(members);
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
@@ -32,5 +32,5 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     const body = await req.json();
     const input = InviteMemberSchema.parse(body);
     const result = await inviteTenantMember(ctx, input);
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json<any>(result, { status: 201 });
 });

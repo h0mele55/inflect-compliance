@@ -64,10 +64,16 @@ export function Form({
 
       <div className="flex flex-col items-start justify-between gap-4 rounded-b-xl border-t border-neutral-200 bg-neutral-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 sm:py-3">
         {typeof helpText === "string" ? (
+          // Epic 55 hardening: the legacy port used
+          // `dangerouslySetInnerHTML` here, which is an XSS hazard if
+          // a caller routes user-controlled content through `helpText`.
+          // Now rendered as plain text; callers who want rich
+          // formatting should pass a ReactNode (handled below).
           <p
             className="prose-sm prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-neutral-700 text-neutral-500 transition-colors"
-            dangerouslySetInnerHTML={{ __html: helpText || "" }}
-          />
+          >
+            {helpText}
+          </p>
         ) : (
           helpText
         )}

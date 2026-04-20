@@ -14,11 +14,11 @@ const CreateCycleSchema = z.object({
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    return NextResponse.json(await listAuditCycles(ctx));
+    return NextResponse.json<any>(await listAuditCycles(ctx));
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const body = CreateCycleSchema.parse(await req.json());
-    return NextResponse.json(await createAuditCycle(ctx, body), { status: 201 });
+    return NextResponse.json<any>(await createAuditCycle(ctx, body), { status: 201 });
 });

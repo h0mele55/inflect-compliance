@@ -10,5 +10,5 @@ import { getEvidenceMetrics } from '@/app-layer/usecases/evidence';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const metrics = await getEvidenceMetrics(ctx);
-    return NextResponse.json(metrics);
+    return NextResponse.json<any>(metrics);
 });

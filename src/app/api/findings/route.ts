@@ -8,12 +8,12 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest) => {
     const ctx = await getLegacyCtx(req);
     const findings = await listFindings(ctx);
-    return NextResponse.json(findings);
+    return NextResponse.json<any>(findings);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateFindingSchema, async (req, _ctx, body) => {
     const ctx = await getLegacyCtx(req);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const finding = await createFinding(ctx, body as any);
-    return NextResponse.json(finding, { status: 201 });
+    return NextResponse.json<any>(finding, { status: 201 });
 }));

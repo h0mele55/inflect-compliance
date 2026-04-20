@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         ssoLog('warn', 'Missing required parameters', {
             requestId, stage: 'start', providerType: 'OIDC',
         });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Missing required parameters: tenant and provider' },
             { status: 400 }
         );
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
     if (!tenant) {
         ssoLog('warn', 'Tenant not found', { ...logCtx, stage: 'start' });
-        return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+        return NextResponse.json<any>({ error: 'Tenant not found' }, { status: 404 });
     }
 
     // ── Load provider config ──
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 
     if (!provider) {
         ssoLog('warn', 'Provider not found or disabled', { ...logCtx, stage: 'config_load' });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'OIDC provider not found or not enabled' },
             { status: 404 }
         );
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
             ...logCtx, stage: 'config_load',
             meta: { validationError: configResult.error.message },
         });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'SSO configuration error' },
             { status: 500 }
         );
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
             ...logCtx, stage: 'discovery',
             meta: { error: (err as Error).message },
         });
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'Failed to contact identity provider' },
             { status: 502 }
         );

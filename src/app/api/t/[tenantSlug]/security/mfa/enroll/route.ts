@@ -16,7 +16,7 @@ export const GET = withApiErrorHandling(async (
     const ctx = await getTenantCtx(params, req);
     const status = await getUserMfaStatus(ctx);
 
-    return NextResponse.json(status);
+    return NextResponse.json<any>(status);
 });
 
 /**
@@ -42,11 +42,11 @@ export const DELETE = withApiErrorHandling(async (
     const result = await removeMfaEnrollment(ctx, targetUserId);
 
     if (!result.removed) {
-        return NextResponse.json(
+        return NextResponse.json<any>(
             { error: 'No MFA enrollment found to remove.' },
             { status: 404 },
         );
     }
 
-    return NextResponse.json({ success: true, message: 'MFA enrollment removed.' });
+    return NextResponse.json<any>({ success: true, message: 'MFA enrollment removed.' });
 });

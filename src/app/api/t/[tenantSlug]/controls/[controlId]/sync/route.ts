@@ -22,7 +22,7 @@ export const POST = withApiErrorHandling(async (
         triggeredBy: 'manual',
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 });
 
 /**
@@ -50,7 +50,7 @@ export const GET = withApiErrorHandling(async (
     });
 
     if (!control?.automationKey) {
-        return NextResponse.json({ syncStatus: null, provider: null });
+        return NextResponse.json<any>({ syncStatus: null, provider: null });
     }
 
     const [provider] = control.automationKey.split('.');
@@ -63,7 +63,7 @@ export const GET = withApiErrorHandling(async (
         params.controlId,
     );
 
-    return NextResponse.json({
+    return NextResponse.json<any>({
         syncStatus: mapping?.syncStatus ?? null,
         lastSyncedAt: mapping?.lastSyncedAt ?? null,
         lastSyncDirection: mapping?.lastSyncDirection ?? null,

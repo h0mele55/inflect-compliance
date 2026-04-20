@@ -9,11 +9,11 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; issueId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const comments = await listTaskComments(ctx, params.issueId);
-    return NextResponse.json(comments);
+    return NextResponse.json<any>(comments);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(AddTaskCommentSchema, async (req, { params }: { params: { tenantSlug: string; issueId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const comment = await addTaskComment(ctx, params.issueId, body.body);
-    return NextResponse.json(comment, { status: 201 });
+    return NextResponse.json<any>(comment, { status: 201 });
 }));

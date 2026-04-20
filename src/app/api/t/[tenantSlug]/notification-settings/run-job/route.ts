@@ -7,7 +7,7 @@ import { runDailyEvidenceExpiryNotifications } from '@/app-layer/jobs/dailyEvide
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     if (ctx.role !== 'ADMIN') {
-        return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
+        return NextResponse.json<any>({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
     }
 
     const body = await req.json();
@@ -15,13 +15,13 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
 
     if (jobType === 'processOutbox') {
         const stats = await processOutbox({ limit: 100 });
-        return NextResponse.json({ success: true, stats, message: 'Outbox processed successfully (Global)' });
+        return NextResponse.json<any>({ success: true, stats, message: 'Outbox processed successfully (Global)' });
     }
 
     if (jobType === 'dailySweep') {
         const stats = await runDailyEvidenceExpiryNotifications({ tenantId: ctx.tenantId });
-        return NextResponse.json({ success: true, stats, message: 'Daily sweep executed successfully' });
+        return NextResponse.json<any>({ success: true, stats, message: 'Daily sweep executed successfully' });
     }
 
-    return NextResponse.json({ error: 'Invalid job type' }, { status: 400 });
+    return NextResponse.json<any>({ error: 'Invalid job type' }, { status: 400 });
 });

@@ -5,6 +5,13 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Paperclip } from 'lucide-react';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+
+const EV_KIND_OPTIONS: ComboboxOption[] = [
+    { value: 'FILE_UPLOAD', label: 'Upload File' },
+    { value: 'LINK', label: 'URL / Link' },
+    { value: 'EVIDENCE', label: 'Existing Evidence Record' },
+];
 
 interface EvidenceLink {
     id: string;
@@ -336,11 +343,14 @@ export default function TestRunPage() {
                     <div className="space-y-3 mb-4 p-3 rounded bg-slate-800/50 animate-fadeIn">
                         <div>
                             <label className="text-xs text-slate-400 block mb-1">Evidence Type</label>
-                            <select className="input w-full" value={evKind} onChange={e => setEvKind(e.target.value as 'LINK' | 'EVIDENCE' | 'FILE_UPLOAD')} id="evidence-kind-select">
-                                <option value="FILE_UPLOAD">Upload File</option>
-                                <option value="LINK">URL / Link</option>
-                                <option value="EVIDENCE">Existing Evidence Record</option>
-                            </select>
+                            <Combobox
+                                hideSearch
+                                id="evidence-kind-select"
+                                selected={EV_KIND_OPTIONS.find(o => o.value === evKind) ?? null}
+                                setSelected={(opt) => setEvKind((opt?.value ?? 'FILE_UPLOAD') as 'LINK' | 'EVIDENCE' | 'FILE_UPLOAD')}
+                                options={EV_KIND_OPTIONS}
+                                matchTriggerWidth
+                            />
                         </div>
                         {evKind === 'FILE_UPLOAD' && (
                             <>

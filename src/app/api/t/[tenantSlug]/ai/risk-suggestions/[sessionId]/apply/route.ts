@@ -12,5 +12,5 @@ export const POST = withApiErrorHandling(withValidatedBody(ApplySessionSchema, a
 ) => {
     const ctx = await getTenantCtx(params, req);
     const result = await applySession(ctx, params.sessionId, body);
-    return NextResponse.json(result);
+    return NextResponse.json<any>(result);
 }));
