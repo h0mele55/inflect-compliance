@@ -4,6 +4,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 
+function extractErrorMessage(value: unknown, fallback: string): string {
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object' && 'message' in value) {
+        const nested = (value as { message?: unknown }).message;
+        if (typeof nested === 'string') return nested;
+    }
+    return fallback;
+}
+
 function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -34,8 +43,8 @@ function LoginForm() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'register', email, password, name, orgName }),
                 });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Registration failed');
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(extractErrorMessage(data?.error, 'Registration failed'));
                 // After registration, sign in with credentials
             }
 
@@ -48,7 +57,8 @@ function LoginForm() {
             });
 
             if (result?.error) {
-                throw new Error(result.error === 'CredentialsSignin' ? 'Invalid credentials' : result.error);
+                const raw = extractErrorMessage(result.error, 'Login failed');
+                throw new Error(raw === 'CredentialsSignin' ? 'Invalid credentials' : raw);
             }
 
             // Force a native hard redirect. 
