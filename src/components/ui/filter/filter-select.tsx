@@ -375,6 +375,15 @@ export function FilterSelect({
         </AnimatedSizeContainer>
       }
     >
+      {/*
+        Epic 57 — the filter trigger carries a visible `F` keyboard
+        hint as an inline `<kbd>` chip. A Radix Tooltip wrapper would
+        fight Popover's `asChild` trigger ref (both want to attach to
+        the same button), so the inline chip is both simpler and more
+        durable. Hidden below `md` to preserve the compact mobile
+        toolbar layout, and suppressed when filters are active so the
+        badge has room.
+      */}
       <button
         type="button"
         className={cn(
@@ -385,6 +394,8 @@ export function FilterSelect({
           "active:scale-[0.98] motion-reduce:active:scale-100",
           className,
         )}
+        data-filter-trigger
+        aria-keyshortcuts="F"
       >
         <ListFilter className="size-4 shrink-0" />
         <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left text-content-emphasis">
@@ -395,9 +406,24 @@ export function FilterSelect({
             {activeFilters.length}
           </div>
         ) : (
-          <ChevronDown
-            className={`size-4 shrink-0 text-content-subtle transition-transform duration-100 ease-out group-data-[state=open]:rotate-180 motion-reduce:transition-none`}
-          />
+          <>
+            <kbd
+              className={cn(
+                "hidden shrink-0 items-center rounded border",
+                "border-border-subtle bg-bg-muted px-1.5 py-0.5",
+                "text-[10px] font-medium text-content-muted",
+                "md:inline-flex",
+                "group-data-[state=open]:hidden",
+              )}
+              aria-hidden="true"
+              data-filter-shortcut-hint
+            >
+              F
+            </kbd>
+            <ChevronDown
+              className={`size-4 shrink-0 text-content-subtle transition-transform duration-100 ease-out group-data-[state=open]:rotate-180 motion-reduce:transition-none`}
+            />
+          </>
         )}
       </button>
     </Popover>

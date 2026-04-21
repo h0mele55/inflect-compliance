@@ -30,8 +30,18 @@ import * as Dialog from '@radix-ui/react-dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { cn } from '@dub/utils';
 import { Command } from 'cmdk';
-import { Search } from 'lucide-react';
-import type { ReactNode } from 'react';
+import {
+    FileText,
+    Files,
+    Layers,
+    Paperclip,
+    Search,
+    ShieldCheck,
+    Triangle,
+    type LucideIcon,
+} from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import {
     useRegisteredShortcuts,
@@ -39,6 +49,17 @@ import {
 } from '@/lib/hooks/use-keyboard-shortcut';
 
 import { useCommandPalette } from './command-palette-provider';
+import {
+    tenantSlugFromPathname,
+    useEntitySearch,
+    type EntityKind,
+    type EntitySearchResult,
+} from './use-entity-search';
+import {
+    filterPaletteCommands,
+    usePaletteCommands,
+    type PaletteCommand,
+} from './use-palette-commands';
 
 // ─── Key rendering helpers ─────────────────────────────────────────────
 
@@ -103,15 +124,89 @@ function renderShortcut(raw: string): ReactNode {
  * Renders nothing until the provider says `isOpen`. Mounting as a
  * portal keeps the palette isolated from layout and always on top.
  */
+const ENTITY_META: Record<
+    EntityKind,
+    { heading: string; icon: LucideIcon }
+> = {
+    control: { heading: 'Controls', icon: ShieldCheck },
+    risk: { heading: 'Risks', icon: Triangle },
+    policy: { heading: 'Policies', icon: FileText },
+    evidence: { heading: 'Evidence', icon: Paperclip },
+    framework: { heading: 'Frameworks', icon: Layers },
+};
+
+const ENTITY_ORDER: EntityKind[] = [
+    'control',
+    'risk',
+    'policy',
+    'evidence',
+    'framework',
+];
+
+function groupByKind(
+    results: EntitySearchResult[],
+): Map<EntityKind, EntitySearchResult[]> {
+    const grouped = new Map<EntityKind, EntitySearchResult[]>();
+    for (const r of results) {
+        const bucket = grouped.get(r.kind) ?? [];
+        bucket.push(r);
+        grouped.set(r.kind, bucket);
+    }
+    return grouped;
+}
+
 export function CommandPalette() {
     const { isOpen, close } = useCommandPalette();
     const shortcuts = useRegisteredShortcuts();
+    const router = useRouter();
+    const pathname = usePathname();
+    const tenantSlug = tenantSlugFromPathname(pathname);
+
+    const [query, setQuery] = useState('');
+    const { loading, results, disabled: searchDisabled } = useEntitySearch(
+        query,
+        tenantSlug,
+    );
+    const grouped = groupByKind(results);
+    const hasEntityResults = results.length > 0;
+
+    // Navigation + action commands. When the user has started typing,
+    // we fold the shortcut group away so the narrower, intent-driven
+    // Navigation / Actions / entity-search stack owns the surface.
+    const allCommands = usePaletteCommands(tenantSlug);
+    const filteredCommands = filterPaletteCommands(allCommands, query);
+    const navCommands = filteredCommands.filter((c) => c.group === 'Navigation');
+    const actionCommands = filteredCommands.filter((c) => c.group === 'Actions');
+
+    const showShortcuts = query.trim().length === 0;
 
     // The palette's own `mod+k` binding shouldn't clutter the list —
     // it's the invocation affordance, not a first-class command.
     const listedShortcuts = shortcuts.filter(
         (s) => s.description && s.description !== 'Open command palette',
     );
+
+    const handleSelect = (href: string) => {
+        close();
+        // Reset the query so the next open starts fresh.
+        setQuery('');
+        router.push(href);
+    };
+
+    const handleAction = (perform: () => void) => {
+        close();
+        setQuery('');
+        // Let the close animation kick before running the action so
+        // a sign-out redirect doesn't race the portal teardown.
+        queueMicrotask(() => perform());
+    };
+
+    // Reset the query when the palette closes so the next open starts
+    // clean. Covers the backdrop-click and Escape paths that don't go
+    // through `handleSelect`.
+    useEffect(() => {
+        if (!isOpen) setQuery('');
+    }, [isOpen]);
 
     return (
         <Dialog.Root open={isOpen} onOpenChange={(next) => !next && close()}>
@@ -154,9 +249,13 @@ export function CommandPalette() {
 
                     <Command
                         loop
+                        // Backend filters for controls/risks/policies/
+                        // evidence; client-side filtering happens in
+                        // `useEntitySearch` for frameworks. cmdk's own
+                        // fuzzy filter would double-filter away good
+                        // matches, so disable it.
+                        shouldFilter={false}
                         className="flex flex-col"
-                        // cmdk handles the roving tabindex between items;
-                        // we just hand it the list of selectable elements.
                         label="Command palette"
                     >
                         <div
@@ -171,7 +270,13 @@ export function CommandPalette() {
                             />
                             <Command.Input
                                 autoFocus
-                                placeholder="Type a command or search…"
+                                value={query}
+                                onValueChange={setQuery}
+                                placeholder={
+                                    searchDisabled
+                                        ? 'Sign in to search controls, risks, policies…'
+                                        : 'Search controls, risks, policies, evidence, frameworks…'
+                                }
                                 className={cn(
                                     'flex-1 bg-transparent text-sm',
                                     'text-content-emphasis placeholder:text-content-subtle',
@@ -196,35 +301,195 @@ export function CommandPalette() {
                                 'max-h-[min(60vh,420px)] overflow-y-auto',
                                 'p-2',
                             )}
+                            data-testid="command-palette-list"
                         >
                             <Command.Empty
                                 className={cn(
                                     'py-10 text-center text-sm text-content-muted',
                                 )}
                             >
-                                No results found.
+                                {loading
+                                    ? 'Searching…'
+                                    : searchDisabled
+                                      ? 'Entity search is available after sign-in.'
+                                      : 'No results found.'}
                             </Command.Empty>
 
-                            {listedShortcuts.length > 0 && (
+                            {navCommands.length > 0 && (
+                                <CommandGroup
+                                    heading="Navigation"
+                                    items={navCommands}
+                                    testIdPrefix="nav"
+                                    onNavigate={handleSelect}
+                                    onAction={handleAction}
+                                />
+                            )}
+
+                            {actionCommands.length > 0 && (
+                                <CommandGroup
+                                    heading="Actions"
+                                    items={actionCommands}
+                                    testIdPrefix="action"
+                                    onNavigate={handleSelect}
+                                    onAction={handleAction}
+                                />
+                            )}
+
+                            {hasEntityResults &&
+                                ENTITY_ORDER.map((kind) => {
+                                    const items = grouped.get(kind);
+                                    if (!items || items.length === 0) return null;
+                                    const meta = ENTITY_META[kind];
+                                    return (
+                                        <EntityGroup
+                                            key={kind}
+                                            heading={meta.heading}
+                                            Icon={meta.icon}
+                                            items={items}
+                                            onSelect={handleSelect}
+                                        />
+                                    );
+                                })}
+
+                            {/*
+                             * Keyboard-shortcut discoverability: show
+                             * only when the user hasn't started typing
+                             * — keeps the search surface uncluttered.
+                             */}
+                            {showShortcuts && listedShortcuts.length > 0 && (
                                 <ShortcutGroup
                                     heading="Keyboard shortcuts"
                                     items={listedShortcuts}
                                 />
                             )}
-
-                            {/*
-                             * Future prompts add Command.Group blocks here:
-                             *   <Command.Group heading="Navigation">…</Command.Group>
-                             *   <Command.Group heading="Actions">…</Command.Group>
-                             *   <Command.Group heading="Controls">…</Command.Group>  (entity search)
-                             * Keep the structure flat; cmdk scores across
-                             * all items regardless of group.
-                             */}
                         </Command.List>
                     </Command>
                 </Dialog.Content>
             </Dialog.Portal>
         </Dialog.Root>
+    );
+}
+
+function CommandGroup({
+    heading,
+    items,
+    testIdPrefix,
+    onNavigate,
+    onAction,
+}: {
+    heading: string;
+    items: PaletteCommand[];
+    testIdPrefix: string;
+    onNavigate: (href: string) => void;
+    onAction: (perform: () => void) => void;
+}) {
+    return (
+        <Command.Group
+            heading={heading}
+            className={cn(
+                '[&_[cmdk-group-heading]]:px-2',
+                '[&_[cmdk-group-heading]]:py-1.5',
+                '[&_[cmdk-group-heading]]:text-xs',
+                '[&_[cmdk-group-heading]]:font-medium',
+                '[&_[cmdk-group-heading]]:uppercase',
+                '[&_[cmdk-group-heading]]:tracking-wider',
+                '[&_[cmdk-group-heading]]:text-content-subtle',
+            )}
+        >
+            {items.map((c) => {
+                const Icon = c.icon;
+                return (
+                    <Command.Item
+                        key={c.id}
+                        value={c.id}
+                        onSelect={() => {
+                            if (c.href) onNavigate(c.href);
+                            else if (c.perform) onAction(c.perform);
+                        }}
+                        className={cn(
+                            'flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm',
+                            'text-content-default',
+                            'data-[selected=true]:bg-bg-muted data-[selected=true]:text-content-emphasis',
+                        )}
+                        data-testid={`command-palette-${testIdPrefix}-${c.id}`}
+                        data-href={c.href}
+                    >
+                        <Icon
+                            aria-hidden="true"
+                            className="size-4 shrink-0 text-content-muted"
+                        />
+                        <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                    </Command.Item>
+                );
+            })}
+        </Command.Group>
+    );
+}
+
+function EntityGroup({
+    heading,
+    Icon,
+    items,
+    onSelect,
+}: {
+    heading: string;
+    Icon: LucideIcon;
+    items: EntitySearchResult[];
+    onSelect: (href: string) => void;
+}) {
+    return (
+        <Command.Group
+            heading={heading}
+            className={cn(
+                '[&_[cmdk-group-heading]]:px-2',
+                '[&_[cmdk-group-heading]]:py-1.5',
+                '[&_[cmdk-group-heading]]:text-xs',
+                '[&_[cmdk-group-heading]]:font-medium',
+                '[&_[cmdk-group-heading]]:uppercase',
+                '[&_[cmdk-group-heading]]:tracking-wider',
+                '[&_[cmdk-group-heading]]:text-content-subtle',
+            )}
+        >
+            {items.map((r) => (
+                <Command.Item
+                    key={`${r.kind}:${r.id}`}
+                    // The value must be unique per item; include kind to
+                    // avoid collisions across groups. cmdk's selection
+                    // machinery uses this to drive keyboard navigation.
+                    value={`${r.kind}:${r.id}:${r.primary}`}
+                    onSelect={() => onSelect(r.href)}
+                    className={cn(
+                        'flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 text-sm',
+                        'text-content-default',
+                        'data-[selected=true]:bg-bg-muted data-[selected=true]:text-content-emphasis',
+                    )}
+                    data-testid={`command-palette-result-${r.kind}`}
+                    data-href={r.href}
+                >
+                    <Icon
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-content-muted"
+                    />
+                    <span className="min-w-0 flex-1 truncate">{r.primary}</span>
+                    {r.secondary && (
+                        <span className="shrink-0 text-xs text-content-muted">
+                            {r.secondary}
+                        </span>
+                    )}
+                    {r.badge && (
+                        <span
+                            className={cn(
+                                'shrink-0 rounded border border-border-subtle bg-bg-muted',
+                                'px-1.5 py-0.5 text-[10px] font-medium uppercase',
+                                'tracking-wider text-content-muted',
+                            )}
+                        >
+                            {r.badge}
+                        </span>
+                    )}
+                </Command.Item>
+            ))}
+        </Command.Group>
     );
 }
 

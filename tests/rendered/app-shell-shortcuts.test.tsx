@@ -26,6 +26,26 @@ jest.mock('sonner', () => ({
     }),
 }));
 
+// The real <Providers> now mounts <CommandPalette />, which reads
+// next/navigation. Stub it so the palette's `usePathname()` /
+// `useRouter()` calls don't throw in jsdom.
+jest.mock('next/navigation', () => ({
+    usePathname: () => '/',
+    useRouter: () => ({
+        push: jest.fn(),
+        replace: jest.fn(),
+        back: jest.fn(),
+        forward: jest.fn(),
+        refresh: jest.fn(),
+        prefetch: jest.fn(),
+    }),
+}));
+
+jest.mock('next-auth/react', () => ({
+    signOut: jest.fn(),
+    signIn: jest.fn(),
+}));
+
 // Import AFTER jest.mock so the mock wins.
 // eslint-disable-next-line import/first
 import { Providers } from '@/app/providers';

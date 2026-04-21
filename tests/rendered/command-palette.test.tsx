@@ -22,14 +22,50 @@
 import React from 'react';
 import { render, fireEvent, act } from '@testing-library/react';
 
+// The palette reads `usePathname()` (to derive the tenant slug) and
+// `useRouter()` (to navigate on select). jsdom has no App Router
+// context, so stub both — tests can override `usePathname` per block
+// via the shared mock object below.
+const navigationMock = {
+    pathname: '/',
+    push: jest.fn(),
+};
+jest.mock('next/navigation', () => ({
+    usePathname: () => navigationMock.pathname,
+    useRouter: () => ({
+        push: (href: string) => navigationMock.push(href),
+        replace: jest.fn(),
+        back: jest.fn(),
+        forward: jest.fn(),
+        refresh: jest.fn(),
+        prefetch: jest.fn(),
+    }),
+}));
+
+// next-auth/react is pulled in transitively by the palette's
+// Sign-out action. It ships as ESM and isn't in the jsdom transform
+// allowlist — stub it so the module graph loads.
+jest.mock('next-auth/react', () => ({
+    signOut: jest.fn(),
+    signIn: jest.fn(),
+}));
+
+// eslint-disable-next-line import/first
 import { KeyboardShortcutProvider, useKeyboardShortcut } from '@/lib/hooks/use-keyboard-shortcut';
+// eslint-disable-next-line import/first
 import { __setIsMacForTests } from '@/lib/hooks/keyboard-shortcut-internals';
 
+// eslint-disable-next-line import/first
 import {
     CommandPalette,
     CommandPaletteProvider,
     useCommandPalette,
 } from '@/components/command-palette';
+
+beforeEach(() => {
+    navigationMock.pathname = '/';
+    navigationMock.push.mockReset();
+});
 
 function Shell({ children }: { children?: React.ReactNode }) {
     return (
