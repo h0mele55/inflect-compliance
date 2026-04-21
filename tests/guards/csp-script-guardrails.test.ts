@@ -194,11 +194,14 @@ describe('CSP Script Guardrails', () => {
 });
 
 describe('CSP Production Header', () => {
-    it('production CSP does not contain unsafe-inline', () => {
+    it('production script-src does not contain unsafe-inline', () => {
+        // style-src intentionally allows 'unsafe-inline' (see
+        // csp-style-guardrails.test.ts). script-src must never.
         const { buildCspHeader, generateNonce } = require('../../src/lib/security/csp');
         const nonce = generateNonce();
         const csp: string = buildCspHeader(nonce, false); // production
-        expect(csp).not.toContain("'unsafe-inline'");
+        const scriptSrc = csp.split(';').find((d: string) => d.trim().startsWith('script-src'))!;
+        expect(scriptSrc).not.toContain("'unsafe-inline'");
     });
 
     it('production CSP does not contain unsafe-eval', () => {

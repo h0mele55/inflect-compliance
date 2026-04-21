@@ -1,9 +1,10 @@
 import { getTranslations } from 'next-intl/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { listAuditLogs } from '@/app-layer/usecases/auditLog';
-import { Shield, CreditCard, KeyRound, ShieldCheck, ShieldPlus, Users, CloudCog, Plug } from 'lucide-react';
+import { Shield, CreditCard, KeyRound, ShieldCheck, ShieldPlus, Users, CloudCog, Plug, Palette } from 'lucide-react';
 import Link from 'next/link';
 import { AdminClient } from './AdminClient';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,14 @@ export default async function AdminPage({
 
     return (
         <div className="space-y-6 animate-fadeIn">
-            <h1 className="text-2xl font-bold">{t('title')}</h1>
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold">{t('title')}</h1>
+                <div className="flex items-center gap-3 glass-card px-4 py-2" id="admin-theme-section">
+                    <Palette className="w-4 h-4 text-content-muted" />
+                    <span className="text-sm text-content-muted">Theme</span>
+                    <ThemeToggle id="admin-theme-toggle" />
+                </div>
+            </div>
 
             {/* Navigation links — server-rendered, no JS needed */}
             <div className="flex gap-2 flex-wrap">

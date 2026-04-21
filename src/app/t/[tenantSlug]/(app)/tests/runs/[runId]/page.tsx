@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Paperclip } from 'lucide-react';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const EV_KIND_OPTIONS: ComboboxOption[] = [
     { value: 'FILE_UPLOAD', label: 'Upload File' },
@@ -185,9 +186,9 @@ export default function TestRunPage() {
         }
     };
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse"><div className="h-6 w-full sm:w-48 bg-slate-700 rounded mx-auto" /></div>;
+    if (loading) return <div className="p-12 text-center text-content-subtle animate-pulse"><div className="h-6 w-full sm:w-48 bg-bg-elevated rounded mx-auto" /></div>;
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
-    if (!run) return <div className="p-12 text-center text-slate-500">Run not found.</div>;
+    if (!run) return <div className="p-12 text-center text-content-subtle">Run not found.</div>;
 
     const isCompleted = run.status === 'COMPLETED';
 
@@ -197,9 +198,9 @@ export default function TestRunPage() {
     return (
         <div className="space-y-6 animate-fadeIn">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-xs text-slate-400">
+            <div className="flex items-center gap-2 text-xs text-content-muted">
                 {run.testPlan && (
-                    <Link href={tenantHref(`/controls/${run.testPlan.controlId}/tests/${run.testPlanId}`)} className="hover:text-white transition">
+                    <Link href={tenantHref(`/controls/${run.testPlan.controlId}/tests/${run.testPlanId}`)} className="hover:text-content-emphasis transition">
                         ← {run.testPlan.name}
                     </Link>
                 )}
@@ -221,7 +222,7 @@ export default function TestRunPage() {
                             </span>
                         )}
                         {run.executedAt && (
-                            <span className="text-xs text-slate-400">Executed: {formatDate(run.executedAt)}</span>
+                            <span className="text-xs text-content-muted">Executed: {formatDate(run.executedAt)}</span>
                         )}
                     </div>
                 </div>
@@ -230,16 +231,16 @@ export default function TestRunPage() {
             {/* Complete Form — only if not completed */}
             {!isCompleted && permissions.canWrite && (
                 <div className="glass-card p-5 space-y-4 border-l-4 border-brand-500">
-                    <h3 className="text-sm font-semibold text-white">Complete This Test Run</h3>
+                    <h3 className="text-sm font-semibold text-content-emphasis">Complete This Test Run</h3>
 
                     <div>
-                        <label className="text-xs text-slate-400 block mb-1">Result *</label>
+                        <label className="text-xs text-content-muted block mb-1">Result *</label>
                         <div className="flex gap-3">
                             {(['PASS', 'FAIL', 'INCONCLUSIVE'] as const).map(r => (
                                 <button
                                     key={r}
                                     className={`btn btn-sm ${result === r
-                                        ? r === 'PASS' ? 'bg-green-600 text-white' : r === 'FAIL' ? 'bg-red-600 text-white' : 'bg-yellow-600 text-white'
+                                        ? r === 'PASS' ? 'bg-green-600 text-content-emphasis' : r === 'FAIL' ? 'bg-red-600 text-content-emphasis' : 'bg-yellow-600 text-content-emphasis'
                                         : 'btn-ghost'
                                     }`}
                                     onClick={() => setResult(r)}
@@ -252,7 +253,7 @@ export default function TestRunPage() {
                     </div>
 
                     <div>
-                        <label className="text-xs text-slate-400 block mb-1">Notes</label>
+                        <label className="text-xs text-content-muted block mb-1">Notes</label>
                         <textarea
                             className="input w-full h-20"
                             value={notes}
@@ -264,7 +265,7 @@ export default function TestRunPage() {
 
                     {result === 'FAIL' && (
                         <div className="animate-fadeIn">
-                            <label className="text-xs text-slate-400 block mb-1">Finding Summary (for auto-created task)</label>
+                            <label className="text-xs text-content-muted block mb-1">Finding Summary (for auto-created task)</label>
                             <textarea
                                 className="input w-full h-16"
                                 value={findingSummary}
@@ -291,8 +292,8 @@ export default function TestRunPage() {
                 <div className="glass-card p-4 space-y-2">
                     {run.notes && (
                         <div>
-                            <span className="text-xs text-slate-400">Notes:</span>
-                            <p className="text-sm text-slate-300 whitespace-pre-wrap mt-1">{run.notes}</p>
+                            <span className="text-xs text-content-muted">Notes:</span>
+                            <p className="text-sm text-content-default whitespace-pre-wrap mt-1">{run.notes}</p>
                         </div>
                     )}
                     {run.findingSummary && (
@@ -302,14 +303,14 @@ export default function TestRunPage() {
                         </div>
                     )}
                     {run.executedBy && (
-                        <div className="text-xs text-slate-500 mt-2">
+                        <div className="text-xs text-content-subtle mt-2">
                             Executed by {run.executedBy.name || run.executedBy.email} at {formatDate(run.executedAt)}
                         </div>
                     )}
 
                     {/* Retest button for FAIL/INCONCLUSIVE */}
                     {permissions.canWrite && (run.result === 'FAIL' || run.result === 'INCONCLUSIVE') && (
-                        <div className="mt-3 pt-3 border-t border-slate-700/50">
+                        <div className="mt-3 pt-3 border-t border-border-default/50">
                             <button
                                 onClick={handleRetest}
                                 disabled={retesting}
@@ -318,7 +319,7 @@ export default function TestRunPage() {
                             >
                                 {retesting ? 'Creating...' : 'Retest'}
                             </button>
-                            <span className="text-xs text-slate-500 ml-2">Create a new run for this test plan</span>
+                            <span className="text-xs text-content-subtle ml-2">Create a new run for this test plan</span>
                         </div>
                     )}
                 </div>
@@ -327,7 +328,7 @@ export default function TestRunPage() {
             {/* Evidence Section */}
             <div className="glass-card p-4">
                 <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-slate-300">Evidence ({run.evidence?.length ?? 0})</h3>
+                    <h3 className="text-sm font-semibold text-content-default">Evidence ({run.evidence?.length ?? 0})</h3>
                     {permissions.canWrite && (
                         <button
                             className="btn btn-secondary btn-xs"
@@ -340,9 +341,9 @@ export default function TestRunPage() {
                 </div>
 
                 {showEvForm && (
-                    <div className="space-y-3 mb-4 p-3 rounded bg-slate-800/50 animate-fadeIn">
+                    <div className="space-y-3 mb-4 p-3 rounded bg-bg-default/50 animate-fadeIn">
                         <div>
-                            <label className="text-xs text-slate-400 block mb-1">Evidence Type</label>
+                            <label className="text-xs text-content-muted block mb-1">Evidence Type</label>
                             <Combobox
                                 hideSearch
                                 id="evidence-kind-select"
@@ -355,8 +356,8 @@ export default function TestRunPage() {
                         {evKind === 'FILE_UPLOAD' && (
                             <>
                                 <div>
-                                    <label className="text-xs text-slate-400 block mb-1">File</label>
-                                    <label className="flex flex-col items-center justify-center w-full p-4 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-brand-500/50 transition-colors bg-slate-900/30">
+                                    <label className="text-xs text-content-muted block mb-1">File</label>
+                                    <label className="flex flex-col items-center justify-center w-full p-4 border-2 border-dashed border-border-emphasis rounded-lg cursor-pointer hover:border-brand-500/50 transition-colors bg-bg-page/30">
                                         <input
                                             type="file"
                                             className="hidden"
@@ -368,39 +369,39 @@ export default function TestRunPage() {
                                             id="evidence-file-input"
                                         />
                                         {evFile ? (
-                                            <div className="text-sm text-white flex items-center gap-2">
+                                            <div className="text-sm text-content-emphasis flex items-center gap-2">
                                                 <Paperclip className="w-4 h-4 text-brand-400" aria-hidden="true" />
                                                 <span>{evFile.name}</span>
-                                                <span className="text-xs text-slate-500">({(evFile.size / 1024).toFixed(1)} KB)</span>
+                                                <span className="text-xs text-content-subtle">({(evFile.size / 1024).toFixed(1)} KB)</span>
                                             </div>
                                         ) : (
                                             <div className="text-center">
-                                                <p className="text-sm text-slate-400">Click to select a file</p>
-                                                <p className="text-xs text-slate-600 mt-1">PDF, images, documents, logs, etc.</p>
+                                                <p className="text-sm text-content-muted">Click to select a file</p>
+                                                <p className="text-xs text-content-subtle mt-1">PDF, images, documents, logs, etc.</p>
                                             </div>
                                         )}
                                     </label>
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-400 block mb-1">Title</label>
+                                    <label className="text-xs text-content-muted block mb-1">Title</label>
                                     <input className="input w-full" value={evFileTitle} onChange={e => setEvFileTitle(e.target.value)} placeholder="Evidence title..." id="evidence-file-title-input" />
                                 </div>
                             </>
                         )}
                         {evKind === 'LINK' && (
                             <div>
-                                <label className="text-xs text-slate-400 block mb-1">URL</label>
+                                <label className="text-xs text-content-muted block mb-1">URL</label>
                                 <input className="input w-full" value={evUrl} onChange={e => setEvUrl(e.target.value)} placeholder="https://..." id="evidence-url-input" />
                             </div>
                         )}
                         {evKind === 'EVIDENCE' && (
                             <div>
-                                <label className="text-xs text-slate-400 block mb-1">Evidence ID</label>
+                                <label className="text-xs text-content-muted block mb-1">Evidence ID</label>
                                 <input className="input w-full" value={evEvidenceId} onChange={e => setEvEvidenceId(e.target.value)} placeholder="Evidence record ID" id="evidence-id-input" />
                             </div>
                         )}
                         <div>
-                            <label className="text-xs text-slate-400 block mb-1">Note</label>
+                            <label className="text-xs text-content-muted block mb-1">Note</label>
                             <input className="input w-full" value={evNote} onChange={e => setEvNote(e.target.value)} placeholder="Optional note..." id="evidence-note-input" />
                         </div>
                         <button
@@ -415,16 +416,16 @@ export default function TestRunPage() {
                 )}
 
                 {run.evidence.length === 0 ? (
-                    <p className="text-sm text-slate-500">No evidence linked yet.</p>
+                    <p className="text-sm text-content-subtle">No evidence linked yet.</p>
                 ) : (
-                    <div className="divide-y divide-slate-700/50">
+                    <div className="divide-y divide-border-default/50">
                         {run.evidence.map(ev => (
                             <div key={ev.id} className="flex items-center justify-between py-2 group">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                         <span className="badge badge-xs badge-neutral">{ev.kind}</span>
                                         {ev.evidence && (
-                                            <span className="text-sm text-slate-300">{ev.evidence.title}</span>
+                                            <span className="text-sm text-content-default">{ev.evidence.title}</span>
                                         )}
                                         {ev.url && (
                                             <a href={ev.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-400 hover:underline truncate">
@@ -432,19 +433,22 @@ export default function TestRunPage() {
                                             </a>
                                         )}
                                     </div>
-                                    {ev.note && <p className="text-xs text-slate-500 mt-0.5">{ev.note}</p>}
-                                    <p className="text-xs text-slate-600 mt-0.5">
+                                    {ev.note && <p className="text-xs text-content-subtle mt-0.5">{ev.note}</p>}
+                                    <p className="text-xs text-content-subtle mt-0.5">
                                         {ev.createdBy?.name || ev.createdBy?.email} • {formatDate(ev.createdAt)}
                                     </p>
                                 </div>
                                 {permissions.canWrite && (
-                                    <button
-                                        className="btn btn-ghost btn-xs text-red-400 opacity-0 group-hover:opacity-100 transition"
-                                        onClick={() => unlinkEvidence(ev.id)}
-                                        disabled={unlinkingId === ev.id}
-                                    >
-                                        {unlinkingId === ev.id ? '...' : <span aria-label="Unlink evidence">×</span>}
-                                    </button>
+                                    <Tooltip content="Unlink evidence from this test">
+                                        <button
+                                            className="btn btn-ghost btn-xs text-red-400 opacity-0 group-hover:opacity-100 transition"
+                                            onClick={() => unlinkEvidence(ev.id)}
+                                            disabled={unlinkingId === ev.id}
+                                            aria-label="Unlink evidence"
+                                        >
+                                            {unlinkingId === ev.id ? '...' : <span aria-hidden="true">×</span>}
+                                        </button>
+                                    </Tooltip>
                                 )}
                             </div>
                         ))}
@@ -453,7 +457,7 @@ export default function TestRunPage() {
             </div>
 
             {/* Meta */}
-            <div className="text-xs text-slate-600">
+            <div className="text-xs text-content-subtle">
                 Created {formatDate(run.createdAt)} by {run.createdBy?.name || run.createdBy?.email || 'Unknown'}
             </div>
         </div>

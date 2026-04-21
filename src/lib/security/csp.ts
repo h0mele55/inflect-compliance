@@ -20,10 +20,16 @@
  *   - script-src: NO unsafe-inline in any environment
  *     Uses 'strict-dynamic' + nonce for all scripts. Next.js propagates the nonce
  *     to its own script tags automatically.
- *   - style-src: NO unsafe-inline in production/staging
- *     In development only, 'unsafe-inline' is required because Next.js HMR/Fast
- *     Refresh injects style tags that do not carry the nonce. This is a known
- *     Next.js limitation (https://github.com/vercel/next.js/issues/39706).
+ *   - style-src: 'unsafe-inline' is allowed, nonce is NOT present.
+ *     Per CSP Level 3, a nonce on style-src causes 'unsafe-inline' to be
+ *     ignored — including for `style=""` attributes, which nonces never
+ *     match. The app uses many dynamic SSR inline styles (progress bars,
+ *     colour-coded badges), so we omit the nonce from style-src and let
+ *     'unsafe-inline' cover both `<style>` tags and style attributes.
+ *     <style> tags are kept out of the codebase by the guardrail at
+ *     tests/guards/csp-style-guardrails.test.ts. CSS injection has far
+ *     lower blast radius than JS injection, and script-src stays strict
+ *     (nonce + strict-dynamic).
  *   - script-src dev: 'unsafe-eval' required for Next.js HMR/Fast Refresh eval().
  */
 
@@ -132,13 +138,16 @@ export function buildCspHeader(nonce: string, isDev = false): string {
         ],
         'style-src': [
             "'self'",
-            // In dev, Next.js HMR injects style tags without nonces.
-            // Per the CSP spec, the unsafe-inline token is IGNORED when a
-            // nonce is present, so we omit the nonce in dev to let the
-            // inline-style fallback take effect. In production, the nonce
-            // provides strict control.
-            // https://github.com/vercel/next.js/issues/39706
-            ...(isDev ? ["'unsafe-inline'"] : [`'nonce-${nonce}'`]),
+            // Per CSP L3, once a nonce or hash appears in style-src,
+            // 'unsafe-inline' is *ignored* — including for `style=""`
+            // attributes, which nonces never match. The app uses many
+            // SSR-emitted inline styles (progress-bar widths, status
+            // colours) so we drop the nonce from style-src and rely on
+            // 'unsafe-inline' alone. The guardrail at
+            // tests/guards/csp-style-guardrails.test.ts keeps <style>
+            // tags and CSS-in-JS out of the codebase, and script-src
+            // remains strict (nonce + strict-dynamic).
+            "'unsafe-inline'",
             // Google Fonts stylesheet
             'https://fonts.googleapis.com',
         ],

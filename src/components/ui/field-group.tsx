@@ -30,6 +30,7 @@
 import { cn } from "@dub/utils";
 import * as React from "react";
 import { FormDescription } from "./form-description";
+import { InfoTooltip } from "./tooltip";
 
 export interface FieldGroupProps
     extends Omit<React.HTMLAttributes<HTMLElement>, "title"> {
@@ -37,6 +38,12 @@ export interface FieldGroupProps
     title?: React.ReactNode;
     /** Optional muted description below the title. */
     description?: React.ReactNode;
+    /**
+     * Optional contextual help surfaced via an info icon next to the
+     * section heading. Use for non-obvious section semantics (e.g.,
+     * "Retention — files are soft-deleted on this date").
+     */
+    hint?: React.ReactNode;
     /**
      * Controls the grid layout. Defaults to a single-column vertical
      * stack (the common case for CRUD modals).
@@ -65,6 +72,7 @@ const FieldGroup = React.forwardRef<HTMLElement, FieldGroupProps>(
         {
             title,
             description,
+            hint,
             columns = 1,
             gap = "md",
             titleAs = "h3",
@@ -90,12 +98,25 @@ const FieldGroup = React.forwardRef<HTMLElement, FieldGroupProps>(
             >
                 {hasTitle && (
                     <header className="mb-3">
-                        <Heading
-                            id={headingId}
-                            className="text-sm font-semibold text-content-emphasis"
-                        >
-                            {title}
-                        </Heading>
+                        <div className="flex items-center gap-1.5">
+                            <Heading
+                                id={headingId}
+                                className="text-sm font-semibold text-content-emphasis"
+                            >
+                                {title}
+                            </Heading>
+                            {hint && (
+                                <InfoTooltip
+                                    content={hint}
+                                    aria-label={
+                                        typeof title === "string"
+                                            ? `More info about ${title}`
+                                            : "More information"
+                                    }
+                                    iconClassName="h-3.5 w-3.5"
+                                />
+                            )}
+                        </div>
                         {description && (
                             <FormDescription className="mt-0.5">
                                 {description}

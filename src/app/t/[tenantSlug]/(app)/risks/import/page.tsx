@@ -1,8 +1,9 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 type ParsedRow = {
     title: string;
@@ -113,7 +114,7 @@ export default function RiskImportPage() {
         return (
             <div className="space-y-6 animate-fadeIn">
                 <div className="glass-card p-8 text-center">
-                    <p className="text-slate-400">{t('noImportPermission')}</p>
+                    <p className="text-content-muted">{t('noImportPermission')}</p>
                     <Link href={href('/risks')} className="btn btn-secondary mt-4">{t('backToRisks')}</Link>
                 </div>
             </div>
@@ -123,18 +124,18 @@ export default function RiskImportPage() {
     return (
         <div className="space-y-6 animate-fadeIn max-w-4xl">
             <div className="flex items-center gap-3">
-                <Link href={href('/risks')} className="text-slate-400 hover:text-white transition">←</Link>
+                <Link href={href('/risks')} className="text-content-muted hover:text-content-emphasis transition">←</Link>
                 <div>
                     <h1 className="text-2xl font-bold">{t('importTitle')}</h1>
-                    <p className="text-slate-400 text-sm">{tenant.tenantName}</p>
+                    <p className="text-content-muted text-sm">{tenant.tenantName}</p>
                 </div>
             </div>
 
             {/* Format info */}
-            <div className="glass-card p-4 border-slate-600/50">
+            <div className="glass-card p-4 border-border-emphasis/50">
                 <h3 className="text-sm font-semibold mb-2">{t('csvFormat')}</h3>
-                <p className="text-xs text-slate-400">{t('csvDesc')}</p>
-                <pre className="mt-2 text-xs text-slate-500 bg-slate-900/50 p-2 rounded overflow-x-auto">
+                <p className="text-xs text-content-muted">{t('csvDesc')}</p>
+                <pre className="mt-2 text-xs text-content-subtle bg-bg-page/50 p-2 rounded overflow-x-auto">
                     title,description,category,likelihood,impact,owner{'\n'}
                     Unauthorized access,Risk of unauthorized data access,Technical,4,5,CISO
                 </pre>
@@ -153,37 +154,37 @@ export default function RiskImportPage() {
             {/* Preview */}
             {rows.length > 0 && !result && (
                 <div className="glass-card overflow-hidden">
-                    <div className="p-3 border-b border-slate-700/50 flex justify-between items-center">
+                    <div className="p-3 border-b border-border-default/50 flex justify-between items-center">
                         <span className="text-sm font-medium">{t('risksToImport', { count: rows.length })}</span>
                         <button onClick={doImport} disabled={importing} className="btn btn-primary btn-sm" id="import-btn">
                             {importing ? t('importing', { count: rows.length }) : t('confirmImport', { count: rows.length })}
                         </button>
                     </div>
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>{t('colTitle')}</th>
-                                <th>{t('colCategory')}</th>
-                                <th>{t('colLxI')}</th>
-                                <th>{t('colOwner')}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows.slice(0, 20).map((row, i) => (
-                                <tr key={i}>
-                                    <td className="text-xs text-slate-500">{i + 1}</td>
-                                    <td className="text-sm">{row.title}</td>
-                                    <td className="text-xs text-slate-400">{row.category || '—'}</td>
-                                    <td className="text-xs">{row.likelihood ?? 3}×{row.impact ?? 3}</td>
-                                    <td className="text-xs text-slate-400">{row.owner || '—'}</td>
-                                </tr>
-                            ))}
-                            {rows.length > 20 && (
-                                <tr><td colSpan={5} className="text-center text-xs text-slate-500">+{rows.length - 20} more…</td></tr>
-                            )}
-                        </tbody>
-                    </table>
+                    {(() => {
+                        const previewCols = createColumns<ParsedRow & { _idx: number }>([
+                            { id: 'num', header: '#', accessorKey: '_idx', cell: ({ getValue }: any) => <span className="text-xs text-content-subtle">{getValue()}</span> },
+                            { accessorKey: 'title', header: t('colTitle'), cell: ({ getValue }: any) => <span className="text-sm">{getValue()}</span> },
+                            { id: 'category', header: t('colCategory'), accessorKey: 'category', cell: ({ getValue }: any) => <span className="text-xs text-content-muted">{getValue() || '—'}</span> },
+                            { id: 'lxi', header: t('colLxI'), accessorFn: (r: any) => `${r.likelihood ?? 3}×${r.impact ?? 3}`, cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span> },
+                            { id: 'owner', header: t('colOwner'), accessorKey: 'owner', cell: ({ getValue }: any) => <span className="text-xs text-content-muted">{getValue() || '—'}</span> },
+                        ]);
+                        const previewData = rows.slice(0, 20).map((r, i) => ({ ...r, _idx: i + 1 }));
+                        return (
+                            <>
+                                <DataTable
+                                    data={previewData}
+                                    columns={previewCols}
+                                    getRowId={(r) => String(r._idx)}
+                                    emptyState="No rows to preview"
+                                    resourceName={(p) => p ? 'rows' : 'row'}
+                                    data-testid="risk-import-preview"
+                                />
+                                {rows.length > 20 && (
+                                    <p className="text-center text-xs text-content-subtle py-2">+{rows.length - 20} more…</p>
+                                )}
+                            </>
+                        );
+                    })()}
                 </div>
             )}
 

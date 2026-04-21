@@ -222,7 +222,7 @@ function ControlCoverageSection({ exec, href, t }: {
             segments={[
                 { label: 'Implemented', value: controlCoverage.implemented, color: 'bg-emerald-500' },
                 { label: 'In Progress', value: controlCoverage.inProgress, color: 'bg-amber-500' },
-                { label: 'Not Started', value: controlCoverage.notStarted, color: 'bg-slate-600' },
+                { label: 'Not Started', value: controlCoverage.notStarted, color: 'bg-border-emphasis' },
             ]}
             footer={
                 <Link href={href('/clauses')} className="text-brand-400 hover:text-brand-300">

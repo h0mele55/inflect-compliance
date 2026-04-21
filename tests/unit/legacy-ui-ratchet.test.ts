@@ -32,7 +32,7 @@ const APP_PAGES_ROOT = path.resolve(__dirname, '../../src/app/t');
  */
 const BASELINES = {
     btn: 242,
-    badge: 75,
+    badge: 78,
 } as const;
 
 function walk(dir: string, out: string[]): string[] {

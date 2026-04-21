@@ -232,3 +232,78 @@ describe('Migration progress', () => {
         }
     });
 });
+
+// ─── Ad-hoc <table> ratchet (Epic 52 finishing guide) ───────────────
+//
+// The MIGRATED_PAGES list above only knows about `*Client.tsx` files.
+// The Epic 52 finishing guide also targets detail pages and admin
+// routes that aren't named `*Client.tsx` — `admin/api-keys/page.tsx`,
+// `admin/roles/page.tsx`, `controls/[controlId]/page.tsx`, etc. This
+// ratchet caps the total count of `<table>` occurrences across the
+// whole tenant surface so those pages can only migrate in one
+// direction.
+
+const RATCHET_ALLOWLIST = new Set<string>([
+    // Print-only views — the static PDF generator uses plain <table>
+    // so it can render identically across browsers / serverless print
+    // pipelines. DataTable's interactive chrome is the wrong fit.
+    'reports/soa/print/SoAPrintView.tsx',
+]);
+
+// Baseline recorded at Epic 52 finishing-guide close-out. Counts
+// `<table>` occurrences (a page with 3 sub-tables contributes 3 to
+// the total). Lower only.
+//
+// Remaining hotspots (occurrences per file, post-api-keys migration):
+//   3  controls/[controlId]/page.tsx    evidence + mappings + activity
+//   3  vendors/[vendorId]/page.tsx      docs + assessments + links
+//   2  admin/members/page.tsx           members + pending invites
+//   2  admin/rbac/page.tsx              permission matrix + roles
+//   2  admin/roles/page.tsx             role list + permission grid
+//   1  reports/soa/SoAClient.tsx        cross-cutting SoA grid (also
+//                                       in EXCLUDED_PAGES because of
+//                                       expandable-row UX)
+//   1  tasks/[taskId]/page.tsx          activity log table
+const RAW_TABLE_BASELINE = 14;
+const RAW_TABLE_RE = /<table\b/g;
+
+function countAdHocTables(): { total: number; byFile: Record<string, number> } {
+    const byFile: Record<string, number> = {};
+    let total = 0;
+    const files = findFilesRecursive(CLIENT_DIR, (name) => /\.tsx$/.test(name));
+    for (const full of files) {
+        const rel = path.relative(CLIENT_DIR, full);
+        if (RATCHET_ALLOWLIST.has(rel)) continue;
+        const src = fs.readFileSync(full, 'utf-8');
+        const matches = src.match(RAW_TABLE_RE);
+        if (matches && matches.length > 0) {
+            byFile[rel] = matches.length;
+            total += matches.length;
+        }
+    }
+    return { total, byFile };
+}
+
+describe('Ad-hoc <table> ratchet', () => {
+    it(`<table> occurrences under (app) excluding print views ≤ ${RAW_TABLE_BASELINE}`, () => {
+        const { total, byFile } = countAdHocTables();
+        if (total > RAW_TABLE_BASELINE) {
+            const listed = Object.entries(byFile)
+                .sort(([, a], [, b]) => b - a)
+                .map(([f, n]) => `  ${n}\t${f}`)
+                .join('\n');
+            throw new Error(
+                `Epic 52 ratchet: ad-hoc <table> count grew from baseline ${RAW_TABLE_BASELINE} to ${total}.\n` +
+                    `Migrate the new page to <DataTable> (see src/components/ui/table/GUIDE.md) or, for print-only views, add it to RATCHET_ALLOWLIST in this test.\n` +
+                    `Current hits:\n${listed}`,
+            );
+        }
+        expect(total).toBeLessThanOrEqual(RAW_TABLE_BASELINE);
+    });
+
+    it('every allowlist entry points at a real file', () => {
+        for (const rel of RATCHET_ALLOWLIST) {
+            expect(fs.existsSync(path.join(CLIENT_DIR, rel))).toBe(true);
+        }
+    });
+});

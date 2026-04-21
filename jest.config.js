@@ -49,14 +49,14 @@ const jsdomProject = {
         '^@/env$': '<rootDir>/tests/mocks/env.ts',
         '^@/(.*)$': '<rootDir>/src/$1',
         '^@dub/utils$': '<rootDir>/tests/rendered/dub-utils-mock.ts',
-        // The shared `<Tooltip>` primitive transitively pulls in
-        // `<RichTextArea>` → `@tiptap/*` which is ESM-only and resists
-        // transformation inside Jest. Render tests don't exercise
-        // tooltip content, so we intercept the import at the
-        // `components/ui/tooltip` boundary and substitute a no-op
-        // pass-through. Matches both `"../tooltip"` (relative) and
-        // `"@/components/ui/tooltip"` (aliased) imports.
-        '^(.*\\.\\.?)?/?components/ui/tooltip(\\.tsx)?$': '<rootDir>/tests/rendered/tooltip-mock.tsx',
+        // Pass-through stub for render tests that transitively touch the
+        // Tooltip primitive through Button / Switch / StatusBadge (all of
+        // which import it via `./tooltip`). Radix Tooltip requires a
+        // TooltipProvider in the tree and emits portalised content — the
+        // stub keeps those tests decoupled from that lifecycle. The
+        // dedicated tooltip test at `tests/rendered/tooltip.test.tsx`
+        // imports via `@/components/ui/tooltip` which is resolved by the
+        // generic `@/` mapper above and bypasses this stub.
         '^\\.\\./tooltip$': '<rootDir>/tests/rendered/tooltip-mock.tsx',
         '^\\./tooltip$': '<rootDir>/tests/rendered/tooltip-mock.tsx',
         // Same problem with react-markdown directly.

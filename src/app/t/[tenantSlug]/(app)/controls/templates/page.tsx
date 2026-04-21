@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { AppIcon } from '@/components/icons/AppIcon';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 export default function ControlTemplatesPage() {
     const apiUrl = useTenantApiUrl();
@@ -87,7 +88,7 @@ export default function ControlTemplatesPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold" id="templates-heading"><AppIcon name="templates" className="inline-block mr-2 align-text-bottom" /> Control Templates</h1>
-                    <p className="text-slate-400 text-sm">Select templates to install as controls in your register</p>
+                    <p className="text-content-muted text-sm">Select templates to install as controls in your register</p>
                 </div>
                 <Link href={tenantHref('/controls')} className="btn btn-secondary">
                     ← Back to Controls
@@ -130,59 +131,47 @@ export default function ControlTemplatesPage() {
             {/* Template list */}
             <div className="glass-card overflow-hidden">
                 {loading ? (
-                    <div className="p-12 text-center text-slate-500 animate-pulse">Loading templates...</div>
+                    <div className="p-12 text-center text-content-subtle animate-pulse">Loading templates...</div>
                 ) : filtered.length === 0 ? (
-                    <div className="p-12 text-center text-slate-500">
+                    <div className="p-12 text-center text-content-subtle">
                         <p className="text-lg mb-2">No templates found</p>
                         <p className="text-sm">Templates are seeded by your admin.</p>
                     </div>
                 ) : (
-                    <table className="data-table" id="templates-table">
-                        <thead>
-                            <tr>
-                                <th className="w-10">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedIds.size === filtered.length && filtered.length > 0}
-                                        onChange={toggleAll}
-                                        className="rounded"
-                                    />
-                                </th>
-                                <th>Code</th>
-                                <th>Name</th>
-                                <th>Category</th>
-                                <th>Framework</th>
-                                <th>Description</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map(t => (
-                                <tr key={t.id} className="cursor-pointer hover:bg-slate-700/30 transition" onClick={() => toggle(t.id)}>
-                                    <td>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.has(t.id)}
-                                            onChange={() => toggle(t.id)}
-                                            className="rounded"
-                                        />
-                                    </td>
-                                    <td className="text-xs text-slate-400 font-mono">{t.code || '—'}</td>
-                                    <td className="font-medium text-white">{t.name}</td>
-                                    <td>
-                                        {t.category && (
-                                            <span className="badge badge-info text-xs">{t.category}</span>
-                                        )}
-                                    </td>
-                                    <td>
-                                        {t.frameworkTag && (
-                                            <span className="badge badge-neutral text-xs">{t.frameworkTag}</span>
-                                        )}
-                                    </td>
-                                    <td className="text-xs text-slate-500 truncate max-w-xs">{t.description || '—'}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    (() => {
+                        const templateCols = createColumns<any>([
+                            {
+                                id: 'select', header: () => (
+                                    <input type="checkbox" checked={selectedIds.size === filtered.length && filtered.length > 0} onChange={toggleAll} className="rounded" />
+                                ),
+                                cell: ({ row }: any) => (
+                                    <input type="checkbox" checked={selectedIds.has(row.original.id)} onChange={() => toggle(row.original.id)} className="rounded" />
+                                ),
+                            },
+                            { accessorKey: 'code', header: 'Code', cell: ({ getValue }: any) => <span className="text-xs text-content-muted font-mono">{getValue() || '—'}</span> },
+                            { accessorKey: 'name', header: 'Name', cell: ({ getValue }: any) => <span className="font-medium text-content-emphasis">{getValue()}</span> },
+                            {
+                                accessorKey: 'category', header: 'Category',
+                                cell: ({ getValue }: any) => getValue() ? <span className="badge badge-info text-xs">{getValue()}</span> : null,
+                            },
+                            {
+                                accessorKey: 'frameworkTag', header: 'Framework',
+                                cell: ({ getValue }: any) => getValue() ? <span className="badge badge-neutral text-xs">{getValue()}</span> : null,
+                            },
+                            { accessorKey: 'description', header: 'Description', cell: ({ getValue }: any) => <span className="text-xs text-content-subtle truncate max-w-xs">{getValue() || '—'}</span> },
+                        ]);
+                        return (
+                            <DataTable
+                                data={filtered}
+                                columns={templateCols}
+                                getRowId={(t: any) => t.id}
+                                onRowClick={(row) => toggle(row.original.id)}
+                                emptyState={<div className="text-center"><p className="text-lg mb-2">No templates found</p><p className="text-sm">Templates are seeded by your admin.</p></div>}
+                                resourceName={(p) => p ? 'templates' : 'template'}
+                                data-testid="templates-table"
+                            />
+                        );
+                    })()
                 )}
             </div>
         </div>

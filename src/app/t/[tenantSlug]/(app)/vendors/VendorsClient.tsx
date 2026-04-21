@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
+import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 import { buildVendorFilters, VENDOR_FILTER_KEYS } from './filter-defs';
 
 const STATUS_VARIANT: Record<string, 'success' | 'info' | 'warning' | 'neutral'> = {
@@ -34,9 +35,9 @@ function fmtDate(d: string | null) {
     return formatDate(d);
 }
 
-function isOverdue(d: string | null) {
-    if (!d) return false;
-    return new Date(d) < new Date();
+function isOverdue(d: string | null, now: Date | null) {
+    if (!d || !now) return false;
+    return new Date(d) < now;
 }
 
 interface VendorsClientProps {
@@ -67,6 +68,8 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const router = useRouter();
+    // Null until hydrated — keeps Overdue/Due badges stable across SSR.
+    const hydratedNow = useHydratedNow();
 
     const { state, search, hasActive } = useFilters();
 
@@ -148,7 +151,7 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
             cell: ({ row }: any) => (
                 <span>
                     {fmtDate(row.original.nextReviewAt)}
-                    {isOverdue(row.original.nextReviewAt) && <span className="ml-1 text-xs text-content-error font-semibold">Overdue</span>}
+                    {isOverdue(row.original.nextReviewAt, hydratedNow) && <span className="ml-1 text-xs text-content-error font-semibold">Overdue</span>}
                 </span>
             ),
         },
@@ -158,7 +161,7 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
             cell: ({ row }: any) => (
                 <span>
                     {fmtDate(row.original.contractRenewalAt)}
-                    {isOverdue(row.original.contractRenewalAt) && <span className="ml-1 text-xs text-content-warning font-semibold">Due</span>}
+                    {isOverdue(row.original.contractRenewalAt, hydratedNow) && <span className="ml-1 text-xs text-content-warning font-semibold">Due</span>}
                 </span>
             ),
         },
@@ -168,7 +171,7 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
             accessorFn: (v: any) => v.owner?.name || '—',
             cell: ({ getValue }: any) => <span className="text-content-muted">{getValue()}</span>,
         },
-    ]), [tenantHref]);
+    ]), [tenantHref, hydratedNow]);
 
     return (
         <>

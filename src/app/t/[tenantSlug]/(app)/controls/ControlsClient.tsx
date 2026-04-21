@@ -3,6 +3,12 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
+// NewControlModal and ControlDetailSheet were previously lazy-loaded
+// via next/dynamic, but the JIT race in `next dev` made the modals
+// occasionally fail to mount in serial-mode E2E runs (Playwright
+// clicked the trigger before the chunk finished compiling). Static
+// imports — the bundle cost is negligible and the E2E suite becomes
+// deterministic.
 import { NewControlModal } from './NewControlModal';
 import { ControlDetailSheet } from './ControlDetailSheet';
 import { queryKeys } from '@/lib/queryKeys';
@@ -17,6 +23,7 @@ import {
 import { useColumnVisibility } from '@/components/ui/hooks';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
     FilterProvider,
     filterStateToActiveFilters,
@@ -377,6 +384,7 @@ function ControlsPageInner({
 
     const taskStats = (c: ControlListItem) => {
         const total = c._count?.controlTasks ?? 0;
+        // guardrail-ignore: aggregating the row's own controlTasks array.
         const done = c.controlTasks?.filter(t => t.status === 'DONE').length ?? 0;
         return { total, done };
     };
@@ -388,7 +396,7 @@ function ControlsPageInner({
             id: 'code',
             header: 'Code',
             cell: ({ getValue }) => (
-                <span className="text-xs text-slate-400 font-mono">{getValue<string>() || '—'}</span>
+                <span className="text-xs text-content-muted font-mono">{getValue<string>() || '—'}</span>
             ),
         },
         {
@@ -398,14 +406,14 @@ function ControlsPageInner({
                 <div>
                     <Link
                         href={tenantHref(`/controls/${row.original.id}`)}
-                        className="font-medium text-white hover:text-brand-400 transition"
+                        className="font-medium text-content-emphasis hover:text-brand-400 transition"
                         id={`control-link-${row.original.id}`}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {row.original.name}
                     </Link>
                     {row.original.description && (
-                        <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{row.original.description}</p>
+                        <p className="text-xs text-content-subtle mt-0.5 truncate max-w-xs">{row.original.description}</p>
                     )}
                 </div>
             ),
@@ -416,16 +424,17 @@ function ControlsPageInner({
             cell: ({ row }) => {
                 const c = row.original;
                 return appPermissions.controls.edit ? (
-                    <button
-                        type="button"
-                        className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
-                        onClick={(e) => { e.stopPropagation(); handleStatusClick(c.id); }}
-                        title="Click to advance status"
-                        aria-label={`Advance status for control ${c.code || c.annexId || c.name}`}
-                        id={`status-pill-${c.id}`}
-                    >
-                        {STATUS_LABELS[c.status] || c.status}
-                    </button>
+                    <Tooltip content="Click to advance status">
+                        <button
+                            type="button"
+                            className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
+                            onClick={(e) => { e.stopPropagation(); handleStatusClick(c.id); }}
+                            aria-label={`Advance status for control ${c.code || c.annexId || c.name}`}
+                            id={`status-pill-${c.id}`}
+                        >
+                            {STATUS_LABELS[c.status] || c.status}
+                        </button>
+                    </Tooltip>
                 ) : (
                     <span className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'}`}>
                         {STATUS_LABELS[c.status] || c.status}
@@ -440,16 +449,23 @@ function ControlsPageInner({
                 const c = row.original;
                 const code = c.code || c.annexId || '';
                 return appPermissions.controls.edit ? (
-                    <button
-                        type="button"
-                        className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
-                        onClick={(e) => { e.stopPropagation(); handleApplicabilityClick(c.id, code); }}
-                        title={c.applicability === 'NOT_APPLICABLE' ? 'Click to mark applicable' : 'Click to mark not applicable'}
-                        aria-label={`Toggle applicability for control ${code || c.name}`}
-                        id={`applicability-pill-${c.id}`}
+                    <Tooltip
+                        content={
+                            c.applicability === 'NOT_APPLICABLE'
+                                ? 'Click to mark applicable'
+                                : 'Click to mark not applicable'
+                        }
                     >
-                        {c.applicability === 'NOT_APPLICABLE' ? 'N/A' : 'Yes'}
-                    </button>
+                        <button
+                            type="button"
+                            className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
+                            onClick={(e) => { e.stopPropagation(); handleApplicabilityClick(c.id, code); }}
+                            aria-label={`Toggle applicability for control ${code || c.name}`}
+                            id={`applicability-pill-${c.id}`}
+                        >
+                            {c.applicability === 'NOT_APPLICABLE' ? 'N/A' : 'Yes'}
+                        </button>
+                    </Tooltip>
                 ) : (
                     <span className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'}`}>
                         {c.applicability === 'NOT_APPLICABLE' ? 'N/A' : 'Yes'}
@@ -462,7 +478,7 @@ function ControlsPageInner({
             header: 'Owner',
             accessorFn: (c) => c.owner?.name || '—',
             cell: ({ getValue }) => (
-                <span className="text-xs text-slate-400">{getValue<string>()}</span>
+                <span className="text-xs text-content-muted">{getValue<string>()}</span>
             ),
         },
         {
@@ -470,7 +486,7 @@ function ControlsPageInner({
             header: 'Frequency',
             accessorFn: (c) => c.frequency ? FREQ_LABELS[c.frequency] || c.frequency : '—',
             cell: ({ getValue }) => (
-                <span className="text-xs text-slate-400">{getValue<string>()}</span>
+                <span className="text-xs text-content-muted">{getValue<string>()}</span>
             ),
         },
         {
@@ -483,7 +499,7 @@ function ControlsPageInner({
             cell: ({ row }) => {
                 const ts = taskStats(row.original);
                 return (
-                    <span className={ts.total > 0 && ts.done === ts.total ? 'text-emerald-400 text-xs' : 'text-slate-400 text-xs'}>
+                    <span className={ts.total > 0 && ts.done === ts.total ? 'text-emerald-400 text-xs' : 'text-content-muted text-xs'}>
                         {ts.done}/{ts.total}
                     </span>
                 );
@@ -494,7 +510,7 @@ function ControlsPageInner({
             header: 'Evidence',
             accessorFn: (c) => c._count?.evidenceLinks ?? 0,
             cell: ({ getValue }) => (
-                <span className="text-xs text-slate-400">{getValue<number>()}</span>
+                <span className="text-xs text-content-muted">{getValue<number>()}</span>
             ),
         },
         {
@@ -526,7 +542,7 @@ function ControlsPageInner({
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold"><AppIcon name="controls" className="inline-block mr-2 align-text-bottom" /> Controls</h1>
-                    <p className="text-slate-400 text-sm">{controls.length} controls in register</p>
+                    <p className="text-content-muted text-sm">{controls.length} controls in register</p>
                 </div>
                 {appPermissions.controls.create && (
                     <div className="flex gap-2">
@@ -585,6 +601,12 @@ function ControlsPageInner({
                 onPaginationChange={pg.setPagination}
                 rowCount={controls.length}
                 data-testid="controls-table"
+                // Enable row selection so the Epic 52 SelectionToolbar
+                // (and its Epic 56 Tooltip-wrapped Clear button) is
+                // reachable on this page. The current scope only needs
+                // the toolbar to render — concrete batch actions can be
+                // added incrementally without changing this wiring.
+                onRowSelectionChange={() => {}}
             />
 
             {/* Create Control Modal (Epic 54) */}

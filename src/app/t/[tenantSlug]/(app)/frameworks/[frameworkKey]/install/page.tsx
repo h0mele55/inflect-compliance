@@ -81,20 +81,20 @@ export default function InstallWizardPage() {
         }
     };
 
-    if (loading) return <div className="p-8 animate-pulse text-slate-400">Loading install wizard...</div>;
+    if (loading) return <div className="p-8 animate-pulse text-content-muted">Loading install wizard...</div>;
     if (!framework) return <div className="p-8 text-red-400">Framework not found</div>;
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
             {/* Header */}
             <div>
-                <Link href={tenantHref(`/frameworks/${frameworkKey}`)} className="text-slate-400 hover:text-white transition-colors text-sm">
+                <Link href={tenantHref(`/frameworks/${frameworkKey}`)} className="text-content-muted hover:text-content-emphasis transition-colors text-sm">
                     ← Back to {framework.name}
                 </Link>
-                <h1 className="text-2xl font-bold text-white mt-2" id="install-wizard-heading">
+                <h1 className="text-2xl font-bold text-content-emphasis mt-2" id="install-wizard-heading">
                     Install {framework.name} Pack
                 </h1>
-                <p className="text-sm text-slate-400 mt-1">
+                <p className="text-sm text-content-muted mt-1">
                     This will create controls, tasks, and requirement mappings for your tenant.
                 </p>
             </div>
@@ -103,14 +103,14 @@ export default function InstallWizardPage() {
             <div className="flex items-center gap-2 text-xs">
                 {['Select Pack', 'Preview', 'Install'].map((s, i) => (
                     <div key={s} className="flex items-center gap-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 && step === 'select' ? 'bg-brand-600 text-white' :
-                                i === 1 && step === 'preview' ? 'bg-brand-600 text-white' :
-                                    i === 2 && step === 'done' ? 'bg-emerald-600 text-white' :
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${i === 0 && step === 'select' ? 'bg-brand-600 text-content-emphasis' :
+                                i === 1 && step === 'preview' ? 'bg-brand-600 text-content-emphasis' :
+                                    i === 2 && step === 'done' ? 'bg-emerald-600 text-content-emphasis' :
                                         step === 'done' || (step === 'preview' && i === 0) ? 'bg-emerald-600/30 text-emerald-400' :
-                                            'bg-slate-700 text-slate-500'
+                                            'bg-bg-elevated text-content-subtle'
                             }`}>{i + 1}</div>
-                        <span className="text-slate-400">{s}</span>
-                        {i < 2 && <span className="text-slate-600">→</span>}
+                        <span className="text-content-muted">{s}</span>
+                        {i < 2 && <span className="text-content-subtle">→</span>}
                     </div>
                 ))}
             </div>
@@ -118,13 +118,13 @@ export default function InstallWizardPage() {
             {/* Step 1: Select Pack */}
             {step === 'select' && (
                 <div className="glass-card space-y-4">
-                    <h2 className="text-lg font-semibold text-white">Select a Pack</h2>
+                    <h2 className="text-lg font-semibold text-content-emphasis">Select a Pack</h2>
                     {packs.length === 0 ? (
-                        <p className="text-slate-500">No packs available for this framework.</p>
+                        <p className="text-content-subtle">No packs available for this framework.</p>
                     ) : (
                         <div className="space-y-2">
                             {packs.map(p => (
-                                <label key={p.key} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedPack === p.key ? 'border-brand-500 bg-brand-500/10' : 'border-slate-700 hover:border-slate-600'
+                                <label key={p.key} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedPack === p.key ? 'border-brand-500 bg-brand-500/10' : 'border-border-default hover:border-border-emphasis'
                                     }`}>
                                     <input
                                         type="radio"
@@ -135,8 +135,8 @@ export default function InstallWizardPage() {
                                         className="accent-brand-500"
                                     />
                                     <div>
-                                        <div className="text-sm font-medium text-white">{p.name}</div>
-                                        <div className="text-xs text-slate-500">{p._count?.templateLinks || 0} templates • v{p.version || 'latest'}</div>
+                                        <div className="text-sm font-medium text-content-emphasis">{p.name}</div>
+                                        <div className="text-xs text-content-subtle">{p._count?.templateLinks || 0} templates • v{p.version || 'latest'}</div>
                                     </div>
                                 </label>
                             ))}
@@ -149,29 +149,29 @@ export default function InstallWizardPage() {
             {step === 'preview' && preview && (
                 <div className="space-y-4">
                     <div className="glass-card">
-                        <h2 className="text-lg font-semibold text-white mb-4">Install Preview</h2>
+                        <h2 className="text-lg font-semibold text-content-emphasis mb-4">Install Preview</h2>
                         <div className="grid grid-cols-3 gap-4 mb-4">
-                            <div className="text-center p-3 rounded-lg bg-slate-800/50">
+                            <div className="text-center p-3 rounded-lg bg-bg-default/50">
                                 <div className="text-2xl font-bold text-brand-400" id="preview-new-controls">{preview.newControls}</div>
-                                <div className="text-xs text-slate-400">New Controls</div>
+                                <div className="text-xs text-content-muted">New Controls</div>
                             </div>
-                            <div className="text-center p-3 rounded-lg bg-slate-800/50">
+                            <div className="text-center p-3 rounded-lg bg-bg-default/50">
                                 <div className="text-2xl font-bold text-amber-400">{preview.existingControls}</div>
-                                <div className="text-xs text-slate-400">Already Exist</div>
+                                <div className="text-xs text-content-muted">Already Exist</div>
                             </div>
-                            <div className="text-center p-3 rounded-lg bg-slate-800/50">
-                                <div className="text-2xl font-bold text-slate-300">{preview.totalTemplates}</div>
-                                <div className="text-xs text-slate-400">Total Templates</div>
+                            <div className="text-center p-3 rounded-lg bg-bg-default/50">
+                                <div className="text-2xl font-bold text-content-default">{preview.totalTemplates}</div>
+                                <div className="text-xs text-content-muted">Total Templates</div>
                             </div>
                         </div>
 
                         {/* Template list */}
-                        <div className="max-h-64 overflow-y-auto space-y-1 border-t border-slate-700/50 pt-3">
+                        <div className="max-h-64 overflow-y-auto space-y-1 border-t border-border-default/50 pt-3">
                             {preview.templates?.map((t: any) => (
                                 <div key={t.code} className="flex items-center gap-3 px-3 py-1.5 rounded-md text-sm">
                                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.alreadyInstalled ? 'bg-emerald-500' : 'bg-brand-500'}`} />
-                                    <code className="text-xs text-slate-500 font-mono w-24 flex-shrink-0">{t.code}</code>
-                                    <span className="text-slate-300 flex-1">{t.title}</span>
+                                    <code className="text-xs text-content-subtle font-mono w-24 flex-shrink-0">{t.code}</code>
+                                    <span className="text-content-default flex-1">{t.title}</span>
                                     {t.alreadyInstalled && <span className="text-xs text-emerald-500">exists</span>}
                                     {!t.alreadyInstalled && <span className="text-xs text-brand-400">{t.tasks} tasks</span>}
                                 </div>
@@ -211,19 +211,19 @@ export default function InstallWizardPage() {
             {step === 'done' && result && (
                 <div className="glass-card text-center space-y-4" id="install-result">
                     <div className="text-4xl"></div>
-                    <h2 className="text-xl font-bold text-white">Pack Installed Successfully!</h2>
+                    <h2 className="text-xl font-bold text-content-emphasis">Pack Installed Successfully!</h2>
                     <div className="grid grid-cols-3 gap-4">
                         <div className="p-3 rounded-lg bg-emerald-500/10">
                             <div className="text-2xl font-bold text-emerald-400" id="result-controls">{result.controlsCreated}</div>
-                            <div className="text-xs text-slate-400">Controls Created</div>
+                            <div className="text-xs text-content-muted">Controls Created</div>
                         </div>
                         <div className="p-3 rounded-lg bg-brand-500/10">
                             <div className="text-2xl font-bold text-brand-400" id="result-tasks">{result.tasksCreated}</div>
-                            <div className="text-xs text-slate-400">Tasks Created</div>
+                            <div className="text-xs text-content-muted">Tasks Created</div>
                         </div>
                         <div className="p-3 rounded-lg bg-purple-500/10">
                             <div className="text-2xl font-bold text-purple-400" id="result-mappings">{result.mappingsCreated}</div>
-                            <div className="text-xs text-slate-400">Mappings Created</div>
+                            <div className="text-xs text-content-muted">Mappings Created</div>
                         </div>
                     </div>
                     <div className="flex gap-3 justify-center">

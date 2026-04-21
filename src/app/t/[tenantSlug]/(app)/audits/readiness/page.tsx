@@ -79,16 +79,16 @@ export default function ReadinessOverviewPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-bold" id="readiness-heading">Audit Readiness</h1>
-                    <p className="text-slate-400 text-sm">Framework readiness scores across all audit cycles</p>
+                    <p className="text-content-muted text-sm">Framework readiness scores across all audit cycles</p>
                 </div>
                 <Link href={`/t/${tenantSlug}/audits/cycles`} className="btn btn-secondary">View Cycles →</Link>
             </div>
 
             {cycles.length === 0 ? (
                 <div className="glass-card p-12 text-center">
-                    <div className="text-4xl mb-4"><BarChart3 className="w-10 h-10 text-slate-400 mx-auto" /></div>
+                    <div className="text-4xl mb-4"><BarChart3 className="w-10 h-10 text-content-muted mx-auto" /></div>
                     <h3 className="text-lg font-semibold mb-2">No audit cycles yet</h3>
-                    <p className="text-slate-400 text-sm mb-4">Create an audit cycle to see readiness scores</p>
+                    <p className="text-content-muted text-sm mb-4">Create an audit cycle to see readiness scores</p>
                     <Link href={`/t/${tenantSlug}/audits/cycles`} className="btn btn-primary">+ New Audit Cycle</Link>
                 </div>
             ) : (
@@ -99,23 +99,23 @@ export default function ReadinessOverviewPage() {
                         const sc = scores[c.id];
                         return (
                             <Link key={c.id} href={`/t/${tenantSlug}/audits/cycles/${c.id}/readiness`}
-                                className="glass-card p-6 hover:bg-slate-700/30 transition group" id={`readiness-card-${c.id}`}>
+                                className="glass-card p-6 hover:bg-bg-elevated/30 transition group" id={`readiness-card-${c.id}`}>
                                 <div className="flex items-start gap-6">
                                     <div className="flex-shrink-0">
                                         {sc ? <ScoreRing score={sc.score} /> : (
-                                            <div className="w-24 h-24 rounded-full bg-slate-700/50 animate-pulse flex items-center justify-center text-slate-500">–</div>
+                                            <div className="w-24 h-24 rounded-full bg-bg-elevated/50 animate-pulse flex items-center justify-center text-content-subtle">–</div>
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className={`w-8 h-8 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-sm`}><FwIcon className="w-4 h-4 text-white" aria-hidden="true" /></span>
+                                            <span className={`w-8 h-8 rounded-lg bg-gradient-to-br ${meta.color} flex items-center justify-center text-sm`}><FwIcon className="w-4 h-4 text-content-emphasis" aria-hidden="true" /></span>
                                             <h3 className="font-semibold text-sm truncate">{c.name}</h3>
                                         </div>
-                                        <p className="text-xs text-slate-400">{meta.label}</p>
+                                        <p className="text-xs text-content-muted">{meta.label}</p>
                                         {sc && (
                                             <div className="mt-3 space-y-1">
                                                 {sc.recommendations?.slice(0, 2).map((r: string, i: number) => (
-                                                    <p key={i} className="text-xs text-slate-500 truncate">→ {r}</p>
+                                                    <p key={i} className="text-xs text-content-subtle truncate">→ {r}</p>
                                                 ))}
                                             </div>
                                         )}

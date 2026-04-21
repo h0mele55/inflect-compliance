@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { VALID_SCOPES } from '@/lib/auth/api-key-auth';
 import {
@@ -8,6 +8,10 @@ import {
     Clock, AlertTriangle, Eye, EyeOff,
 } from 'lucide-react';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { InfoTooltip, Tooltip } from '@/components/ui/tooltip';
+import { useCopyToClipboard } from '@/components/ui/hooks';
+import { DataTable, createColumns } from '@/components/ui/table';
+import { toast } from 'sonner';
 
 // ─── Types ───
 
@@ -104,12 +108,17 @@ function ScopePicker({
                     className={`text-xs px-3 py-1.5 rounded-md transition font-medium ${
                         isFullAccess
                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                            : 'bg-slate-700/50 text-slate-400 border border-slate-600/50 hover:border-slate-500'
+                            : 'bg-bg-elevated/50 text-content-muted border border-border-emphasis/50 hover:border-border-emphasis'
                     }`}
                     id="scope-full-access"
                 >
                     Full Access (*)
                 </button>
+                <InfoTooltip
+                    aria-label="About the Full Access scope"
+                    iconClassName="h-3.5 w-3.5"
+                    content="Gives this key read + write on every resource — evidence, controls, admin settings. Prefer narrow scopes for automation."
+                />
                 {isFullAccess && (
                     <span className="text-[10px] text-amber-400/80 flex items-center gap-1">
                         <AlertTriangle className="w-3 h-3" />
@@ -121,8 +130,8 @@ function ScopePicker({
             {!isFullAccess && (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                     {Object.entries(SCOPE_GROUPS).map(([, group]) => (
-                        <div key={group.label} className="bg-slate-800/40 rounded-lg p-2 space-y-1">
-                            <div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+                        <div key={group.label} className="bg-bg-default/40 rounded-lg p-2 space-y-1">
+                            <div className="text-[10px] text-content-subtle uppercase tracking-wider font-medium">
                                 {group.label}
                             </div>
                             {group.scopes.map((scope) => {
@@ -137,7 +146,7 @@ function ScopePicker({
                                             w-full text-left text-[11px] px-2 py-1 rounded transition
                                             ${isSelected
                                                 ? 'bg-brand-500/20 text-brand-300 border border-brand-500/40'
-                                                : 'bg-slate-700/30 text-slate-400 border border-transparent hover:border-slate-600'
+                                                : 'bg-bg-elevated/30 text-content-muted border border-transparent hover:border-border-emphasis'
                                             }
                                         `}
                                         id={`scope-${scope.replace(':', '-')}`}
@@ -157,14 +166,17 @@ function ScopePicker({
 
 // ─── Copy-Once Key Display ───
 
-function KeyDisplay({ plaintext }: { plaintext: string }) {
-    const [copied, setCopied] = useState(false);
+export function KeyDisplay({ plaintext }: { plaintext: string }) {
     const [visible, setVisible] = useState(false);
+    const { copy, copied } = useCopyToClipboard({ timeout: 2500 });
 
     const handleCopy = async () => {
-        await navigator.clipboard.writeText(plaintext);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 3000);
+        const ok = await copy(plaintext);
+        if (ok) {
+            toast.success('API key copied — paste it into your tool now.');
+        } else {
+            toast.error('Copy failed — select the key and copy manually.');
+        }
     };
 
     return (
@@ -174,17 +186,19 @@ function KeyDisplay({ plaintext }: { plaintext: string }) {
                 Copy this key now — it will never be shown again!
             </div>
             <div className="flex items-center gap-2">
-                <code className="flex-1 bg-slate-900 px-3 py-2 rounded text-sm font-mono text-emerald-300 select-all break-all">
+                <code className="flex-1 bg-bg-page px-3 py-2 rounded text-sm font-mono text-emerald-300 select-all break-all">
                     {visible ? plaintext : plaintext.slice(0, 13) + '•'.repeat(40)}
                 </code>
-                <button
-                    onClick={() => setVisible(!visible)}
-                    className="btn btn-secondary text-xs py-2 px-2"
-                    title={visible ? 'Hide' : 'Show'}
-                    id="key-toggle-visibility"
-                >
-                    {visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
+                <Tooltip content={visible ? 'Hide key' : 'Show key'}>
+                    <button
+                        onClick={() => setVisible(!visible)}
+                        className="btn btn-secondary text-xs py-2 px-2"
+                        aria-label={visible ? 'Hide key' : 'Show key'}
+                        id="key-toggle-visibility"
+                    >
+                        {visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                </Tooltip>
                 <button
                     onClick={handleCopy}
                     className="btn btn-primary text-xs py-2 px-3"
@@ -299,6 +313,138 @@ export default function ApiKeysPage() {
     const activeKeys = keys.filter(k => !k.revokedAt && !isExpired(k.expiresAt));
     const inactiveKeys = keys.filter(k => k.revokedAt || isExpired(k.expiresAt));
 
+    // ─── Epic 52 — DataTable columns ───
+    const activeKeyColumns = useMemo(
+        () =>
+            createColumns<ApiKeyRecord>([
+                {
+                    accessorKey: 'name',
+                    header: 'Name',
+                    cell: ({ row }) => (
+                        <span className="text-sm font-medium text-content-emphasis">{row.original.name}</span>
+                    ),
+                },
+                {
+                    accessorKey: 'keyPrefix',
+                    header: 'Key',
+                    cell: ({ row }) => (
+                        <code className="text-xs text-content-muted font-mono">{row.original.keyPrefix}...</code>
+                    ),
+                },
+                {
+                    accessorKey: 'scopes',
+                    header: 'Scopes',
+                    cell: ({ row }) => {
+                        const scopes = row.original.scopes as string[];
+                        return (
+                            <div className="flex flex-wrap gap-1">
+                                {scopes.slice(0, 3).map((s) => (
+                                    <span key={s} className="badge badge-info text-[10px]">{s}</span>
+                                ))}
+                                {scopes.length > 3 && (
+                                    <span className="badge badge-neutral text-[10px]">+{scopes.length - 3}</span>
+                                )}
+                            </div>
+                        );
+                    },
+                },
+                {
+                    accessorKey: 'expiresAt',
+                    header: 'Expires',
+                    cell: ({ row }) =>
+                        row.original.expiresAt ? (
+                            <span className="flex items-center gap-1 text-xs text-content-muted">
+                                <Clock className="w-3 h-3" />
+                                {formatDate(row.original.expiresAt)}
+                            </span>
+                        ) : (
+                            <span className="text-xs text-content-subtle">Never</span>
+                        ),
+                },
+                {
+                    accessorKey: 'lastUsedAt',
+                    header: 'Last Used',
+                    cell: ({ row }) => (
+                        <span className="text-xs text-content-muted">{formatDate(row.original.lastUsedAt)}</span>
+                    ),
+                },
+                {
+                    accessorKey: 'createdAt',
+                    header: 'Created',
+                    cell: ({ row }) => (
+                        <span className="text-xs text-content-subtle">
+                            {formatDate(row.original.createdAt)}
+                            <br />
+                            <span className="text-content-subtle">
+                                by {row.original.createdBy?.name || row.original.createdBy?.email || '—'}
+                            </span>
+                        </span>
+                    ),
+                },
+                {
+                    id: 'actions',
+                    header: () => <span className="sr-only">Actions</span>,
+                    cell: ({ row }) => (
+                        <div className="text-right">
+                            <Tooltip content="Revoke key">
+                                <button
+                                    onClick={() => handleRevoke(row.original)}
+                                    className="btn btn-secondary text-xs py-1 px-2 text-red-400 hover:bg-red-500/10"
+                                    aria-label="Revoke key"
+                                    id={`revoke-key-${row.original.id}`}
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
+                            </Tooltip>
+                        </div>
+                    ),
+                },
+            ]),
+        // handleRevoke identity is stable within this component — but we
+        // include it so an eslint-exhaustive-deps warning doesn't slip in
+        // if someone refactors it into a useCallback later.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [],
+    );
+
+    const inactiveKeyColumns = useMemo(
+        () =>
+            createColumns<ApiKeyRecord>([
+                {
+                    accessorKey: 'name',
+                    header: 'Name',
+                    cell: ({ row }) => (
+                        <span className="text-sm text-content-muted line-through">{row.original.name}</span>
+                    ),
+                },
+                {
+                    accessorKey: 'keyPrefix',
+                    header: 'Key',
+                    cell: ({ row }) => (
+                        <code className="text-xs text-content-subtle font-mono">{row.original.keyPrefix}...</code>
+                    ),
+                },
+                {
+                    id: 'status',
+                    header: 'Status',
+                    cell: ({ row }) =>
+                        row.original.revokedAt ? (
+                            <span className="badge badge-danger text-[10px]">Revoked</span>
+                        ) : (
+                            <span className="badge badge-warning text-[10px]">Expired</span>
+                        ),
+                },
+                {
+                    accessorKey: 'createdAt',
+                    header: 'Created',
+                    cell: ({ row }) => (
+                        <span className="text-xs text-content-subtle">{formatDate(row.original.createdAt)}</span>
+                    ),
+                },
+            ]),
+        [],
+    );
+
     if (loading) {
         return (
             <div className="space-y-6 animate-fadeIn">
@@ -307,8 +453,8 @@ export default function ApiKeysPage() {
                     API Keys
                 </h1>
                 <div className="glass-card p-8 space-y-4">
-                    <div className="h-4 bg-slate-700/50 rounded w-1/3 animate-pulse" />
-                    <div className="h-4 bg-slate-700/50 rounded w-2/3 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/50 rounded w-1/3 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/50 rounded w-2/3 animate-pulse" />
                 </div>
             </div>
         );
@@ -323,7 +469,7 @@ export default function ApiKeysPage() {
                         <KeyRound className="w-6 h-6 text-brand-400" />
                         API Keys
                     </h1>
-                    <p className="text-sm text-slate-400 mt-1">
+                    <p className="text-sm text-content-muted mt-1">
                         Manage machine-to-machine API keys for programmatic access.
                         Keys are scoped to specific resources and actions.
                     </p>
@@ -369,10 +515,10 @@ export default function ApiKeysPage() {
             {/* Create Form */}
             {showCreate && (
                 <div className="glass-card p-6 border border-brand-500/30 space-y-4" id="create-key-form">
-                    <h3 className="text-sm font-semibold text-white">Create API Key</h3>
+                    <h3 className="text-sm font-semibold text-content-emphasis">Create API Key</h3>
 
                     <div>
-                        <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">Name *</label>
+                        <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">Name *</label>
                         <input
                             type="text" value={createName} onChange={(e) => setCreateName(e.target.value)}
                             placeholder="e.g. CI/CD Pipeline, Monitoring Agent"
@@ -381,7 +527,14 @@ export default function ApiKeysPage() {
                     </div>
 
                     <div>
-                        <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">Expiry</label>
+                        <div className="mb-1 flex items-center gap-1.5">
+                            <label className="text-xs text-content-muted uppercase tracking-wider">Expiry</label>
+                            <InfoTooltip
+                                aria-label="About key expiry"
+                                iconClassName="h-3.5 w-3.5"
+                                content="Keys with no expiry stay valid until someone manually revokes them. Set a deadline for any automation or third-party integration."
+                            />
+                        </div>
                         <Combobox
                             hideSearch
                             id="key-expiry-select"
@@ -395,7 +548,7 @@ export default function ApiKeysPage() {
                     </div>
 
                     <div>
-                        <label className="text-xs text-slate-400 uppercase tracking-wider mb-2 block">Scopes *</label>
+                        <label className="text-xs text-content-muted uppercase tracking-wider mb-2 block">Scopes *</label>
                         <ScopePicker selected={createScopes} onChange={setCreateScopes} />
                     </div>
 
@@ -414,102 +567,33 @@ export default function ApiKeysPage() {
 
             {/* Active Keys */}
             <div className="glass-card overflow-hidden" id="active-keys-card">
-                <div className="px-4 py-3 border-b border-slate-700/50">
-                    <h3 className="text-sm font-semibold text-white">Active Keys ({activeKeys.length})</h3>
+                <div className="px-4 py-3 border-b border-border-default/50">
+                    <h3 className="text-sm font-semibold text-content-emphasis">Active Keys ({activeKeys.length})</h3>
                 </div>
-                <table className="data-table" id="active-keys-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Key</th>
-                            <th>Scopes</th>
-                            <th>Expires</th>
-                            <th>Last Used</th>
-                            <th>Created</th>
-                            <th className="text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {activeKeys.map((k) => (
-                            <tr key={k.id} data-key-id={k.id}>
-                                <td className="text-sm font-medium text-white">{k.name}</td>
-                                <td><code className="text-xs text-slate-400 font-mono">{k.keyPrefix}...</code></td>
-                                <td>
-                                    <div className="flex flex-wrap gap-1">
-                                        {(k.scopes as string[]).slice(0, 3).map((s) => (
-                                            <span key={s} className="badge badge-info text-[10px]">{s}</span>
-                                        ))}
-                                        {(k.scopes as string[]).length > 3 && (
-                                            <span className="badge badge-neutral text-[10px]">+{(k.scopes as string[]).length - 3}</span>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="text-xs text-slate-400">
-                                    {k.expiresAt ? (
-                                        <span className="flex items-center gap-1">
-                                            <Clock className="w-3 h-3" />
-                                            {formatDate(k.expiresAt)}
-                                        </span>
-                                    ) : (
-                                        <span className="text-slate-500">Never</span>
-                                    )}
-                                </td>
-                                <td className="text-xs text-slate-400">{formatDate(k.lastUsedAt)}</td>
-                                <td className="text-xs text-slate-500">
-                                    {formatDate(k.createdAt)}
-                                    <br />
-                                    <span className="text-slate-600">by {k.createdBy?.name || k.createdBy?.email || '—'}</span>
-                                </td>
-                                <td className="text-right">
-                                    <button
-                                        onClick={() => handleRevoke(k)}
-                                        className="btn btn-secondary text-xs py-1 px-2 text-red-400 hover:bg-red-500/10"
-                                        title="Revoke" id={`revoke-key-${k.id}`}
-                                    >
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                        {activeKeys.length === 0 && (
-                            <tr><td colSpan={7} className="text-center text-slate-500 py-8">No active API keys.</td></tr>
-                        )}
-                    </tbody>
-                </table>
+                <DataTable
+                    data={activeKeys}
+                    columns={activeKeyColumns}
+                    getRowId={(k) => k.id}
+                    emptyState="No active API keys."
+                    resourceName={(p) => (p ? 'API keys' : 'API key')}
+                    data-testid="active-keys-table"
+                />
             </div>
 
             {/* Inactive/Revoked Keys */}
             {inactiveKeys.length > 0 && (
                 <div className="glass-card overflow-hidden opacity-60" id="inactive-keys-card">
-                    <div className="px-4 py-3 border-b border-slate-700/50">
-                        <h3 className="text-sm font-semibold text-slate-400">Revoked / Expired ({inactiveKeys.length})</h3>
+                    <div className="px-4 py-3 border-b border-border-default/50">
+                        <h3 className="text-sm font-semibold text-content-muted">Revoked / Expired ({inactiveKeys.length})</h3>
                     </div>
-                    <table className="data-table" id="inactive-keys-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Key</th>
-                                <th>Status</th>
-                                <th>Created</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {inactiveKeys.map((k) => (
-                                <tr key={k.id} className="opacity-60">
-                                    <td className="text-sm text-slate-400 line-through">{k.name}</td>
-                                    <td><code className="text-xs text-slate-500 font-mono">{k.keyPrefix}...</code></td>
-                                    <td>
-                                        {k.revokedAt ? (
-                                            <span className="badge badge-danger text-[10px]">Revoked</span>
-                                        ) : (
-                                            <span className="badge badge-warning text-[10px]">Expired</span>
-                                        )}
-                                    </td>
-                                    <td className="text-xs text-slate-500">{formatDate(k.createdAt)}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <DataTable
+                        data={inactiveKeys}
+                        columns={inactiveKeyColumns}
+                        getRowId={(k) => k.id}
+                        emptyState="No revoked or expired keys."
+                        resourceName={(p) => (p ? 'revoked keys' : 'revoked key')}
+                        data-testid="inactive-keys-table"
+                    />
                 </div>
             )}
         </div>

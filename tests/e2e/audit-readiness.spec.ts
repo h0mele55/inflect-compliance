@@ -105,39 +105,43 @@ test.describe('Audit Readiness', () => {
     });
 
     test('freeze the pack', async () => {
+        // The pack was just created by the previous serial test, so the
+        // freeze button must be present — surface the failure loudly if
+        // it's not.
         const freezeBtn = page.locator('#freeze-pack-btn');
-        if (!await freezeBtn.isVisible().catch(() => false)) { test.skip(); return; }
+        await expect(freezeBtn).toBeVisible({ timeout: 30_000 });
 
         // Click freeze and wait for the POST API response (large packs take time to snapshot)
         const [response] = await Promise.all([
-            page.waitForResponse(resp => resp.url().includes('action=freeze') && resp.request().method() === 'POST', { timeout: 60000 }),
+            page.waitForResponse(resp => resp.url().includes('action=freeze') && resp.request().method() === 'POST', { timeout: 60_000 }),
             freezeBtn.click(),
         ]);
         expect(response.status()).toBe(200);
 
         // Wait for the UI to reload pack data and reflect FROZEN status
-        await expect(page.locator('#pack-status')).toContainText('FROZEN', { timeout: 15000 });
+        await expect(page.locator('#pack-status')).toContainText('FROZEN', { timeout: 30_000 });
     });
 
     test('generate share link', async () => {
         const shareBtn = page.locator('#share-pack-btn');
-        if (!await shareBtn.isVisible().catch(() => false)) { test.skip(); return; }
+        await expect(shareBtn).toBeVisible({ timeout: 30_000 });
         await shareBtn.click();
 
-        await page.waitForSelector('#share-link-card', { timeout: 10000 });
+        await expect(page.locator('#share-link-card')).toBeVisible({ timeout: 15_000 });
         const linkEl = page.locator('#share-link-url');
         await expect(linkEl).toBeVisible();
 
         const linkText = await linkEl.textContent();
         expect(linkText).toContain('/audit/shared/');
 
-        // Extract token
+        // Extract token — must be present so the next test can fetch it.
         const match = linkText?.match(/\/audit\/shared\/([a-f0-9]+)/);
-        if (match) shareToken = match[1];
+        expect(match).not.toBeNull();
+        shareToken = match![1];
     });
 
     test('auditor can view shared pack', async () => {
-        if (!shareToken) { test.skip(); return; }
+        expect(shareToken).toBeTruthy();
 
         // Shared pack page may need cold-compilation (client component + API route)
         for (let attempt = 0; attempt < 3; attempt++) {

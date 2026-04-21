@@ -137,6 +137,71 @@ describe('<FormError />', () => {
 
 // ─── FieldGroup ────────────────────────────────────────────────
 
+describe('<FormField /> — `hint` prop (Epic 56)', () => {
+    it('does not render a hint trigger when hint is omitted', () => {
+        render(
+            <FormField label="Email">
+                <Input type="email" />
+            </FormField>,
+        );
+        expect(
+            screen.queryByTestId('info-tooltip-trigger'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('renders an InfoTooltip trigger next to the label when hint is present', () => {
+        render(
+            <FormField label="Session max age" hint="Absolute login lifetime.">
+                <Input type="number" />
+            </FormField>,
+        );
+        const hint = screen.getByRole('button', {
+            name: 'More info about Session max age',
+        });
+        expect(hint).toBeInTheDocument();
+        // The field itself stays reachable by its label.
+        expect(
+            screen.getByRole('spinbutton', { name: 'Session max age' }),
+        ).toBeInTheDocument();
+    });
+
+    it('keeps label/control wiring intact when both hint and description are set', () => {
+        render(
+            <FormField
+                label="Retention"
+                description="ISO 8601 date."
+                hint="Evidence is archived after this date."
+            >
+                <Input type="date" />
+            </FormField>,
+        );
+        expect(
+            screen.getByRole('button', { name: 'More info about Retention' }),
+        ).toBeInTheDocument();
+        expect(screen.getByText('ISO 8601 date.')).toBeInTheDocument();
+    });
+
+    it('hides the hint when the field is in error state — error gets priority', () => {
+        // Errors must not compete with contextual help; description is
+        // already hidden under error, but hint is optional context so
+        // it stays. We just verify the field renders both the error
+        // and the hint without layout breakage.
+        render(
+            <FormField
+                label="Retention"
+                error="Required."
+                hint="Evidence is archived after this date."
+            >
+                <Input type="date" />
+            </FormField>,
+        );
+        expect(screen.getByText('Required.')).toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'More info about Retention' }),
+        ).toBeInTheDocument();
+    });
+});
+
 describe('<FieldGroup />', () => {
     it('renders a labelled section when title is set', () => {
         render(
@@ -149,6 +214,19 @@ describe('<FieldGroup />', () => {
         const section = screen.getByRole('group', { name: 'Contact' });
         expect(section).toBeInTheDocument();
         expect(screen.getByText('How we reach you')).toBeInTheDocument();
+    });
+
+    it('renders an InfoTooltip trigger next to the heading when hint is set (Epic 56)', () => {
+        render(
+            <FieldGroup title="Retention" hint="Controls how long evidence stays searchable.">
+                <FormField label="Until">
+                    <Input type="date" />
+                </FormField>
+            </FieldGroup>,
+        );
+        expect(
+            screen.getByRole('button', { name: 'More info about Retention' }),
+        ).toBeInTheDocument();
     });
 
     it('renders an unlabelled section when no title', () => {

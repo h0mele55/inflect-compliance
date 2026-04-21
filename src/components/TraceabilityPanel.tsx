@@ -4,6 +4,7 @@ import { AppIcon } from '@/components/icons/AppIcon';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { Combobox } from '@/components/ui/combobox';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface TraceabilityPanelProps {
     apiBase: string;            // e.g. /api/t/acme-corp
@@ -22,7 +23,14 @@ const RISK_STATUS_BADGE: Record<string, string> = {
 const traceabilityKey = (tenantSlug: string, entityType: string, entityId: string) =>
     ['traceability', tenantSlug, entityType, entityId] as const;
 
-export default function TraceabilityPanel({ apiBase, entityType, entityId, canWrite, tenantHref, tenantSlug: tenantSlugProp }: TraceabilityPanelProps) {
+export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, entityId, canWrite, tenantHref, tenantSlug: tenantSlugProp }: TraceabilityPanelProps) {
+    // Callers pass `apiUrl('')` which yields `/api/t/<slug>/` with a
+    // trailing slash. Concatenating `${apiBase}/risks/…` then produces a
+    // `//` path which Next.js middleware redirects (308) to the canonical
+    // URL — the redirected request drops fetch credentials, and the
+    // server-side log shows no traceability call. Strip the trailing
+    // slash once so every nested URL is well-formed.
+    const apiBase = apiBaseRaw.replace(/\/+$/, '');
     // Extract tenantSlug from apiBase if not provided (e.g. /api/t/acme-corp → acme-corp)
     const tenantSlug = tenantSlugProp || apiBase.split('/t/')[1]?.split('/')[0] || '';
     const queryClient = useQueryClient();
@@ -265,7 +273,11 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
                                                 <td className="text-sm text-white font-medium">{r?.score ?? '—'}</td>
                                                 <td className="text-xs text-slate-400">{l.rationale || '—'}</td>
                                                 {canWrite && (
-                                                    <td><button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('risk', r?.id)} disabled={unlinkMutation.isPending} id={`unlink-risk-${r?.id}`} aria-label="Unlink risk">×</button></td>
+                                                    <td>
+                                                        <Tooltip content="Unlink risk">
+                                                            <button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('risk', r?.id)} disabled={unlinkMutation.isPending} id={`unlink-risk-${r?.id}`} aria-label="Unlink risk">×</button>
+                                                        </Tooltip>
+                                                    </td>
                                                 )}
                                             </tr>
                                         );
@@ -319,7 +331,11 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
                                                 <td><span className="badge badge-info text-xs">{c?.status || '—'}</span></td>
                                                 <td className="text-xs text-slate-400">{l.rationale || '—'}</td>
                                                 {canWrite && (
-                                                    <td><button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('control', c?.id)} disabled={unlinkMutation.isPending} id={`unlink-control-${c?.id}`} aria-label="Unlink control">×</button></td>
+                                                    <td>
+                                                        <Tooltip content="Unlink control">
+                                                            <button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('control', c?.id)} disabled={unlinkMutation.isPending} id={`unlink-control-${c?.id}`} aria-label="Unlink control">×</button>
+                                                        </Tooltip>
+                                                    </td>
                                                 )}
                                             </tr>
                                         );
@@ -373,7 +389,11 @@ export default function TraceabilityPanel({ apiBase, entityType, entityId, canWr
                                                 <td className="text-xs">{a?.criticality ? <span className={`badge ${a.criticality === 'HIGH' ? 'badge-danger' : a.criticality === 'MEDIUM' ? 'badge-warning' : 'badge-neutral'}`}>{a.criticality}</span> : '—'}</td>
                                                 <td className="text-xs text-slate-400">{l.rationale || '—'}</td>
                                                 {canWrite && (
-                                                    <td><button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('asset', a?.id)} disabled={unlinkMutation.isPending} id={`unlink-asset-${a?.id}`} aria-label="Unlink asset">×</button></td>
+                                                    <td>
+                                                        <Tooltip content="Unlink asset">
+                                                            <button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('asset', a?.id)} disabled={unlinkMutation.isPending} id={`unlink-asset-${a?.id}`} aria-label="Unlink asset">×</button>
+                                                        </Tooltip>
+                                                    </td>
                                                 )}
                                             </tr>
                                         );

@@ -12,6 +12,7 @@ import {
   TextItalic,
   TextStrike,
 } from "../icons";
+import { Tooltip } from "../tooltip";
 import { useRichTextContext } from "./rich-text-provider";
 
 export function RichTextToolbar({
@@ -197,23 +198,25 @@ export const RichTextToolbarButton = forwardRef<
     }: RichTextToolbarButtonProps,
     ref,
   ) => {
-    return (
+    const button = (
       <button
         ref={ref}
         type="button"
         onClick={onClick}
         disabled={disabled}
+        aria-label={label}
         className={cn(
           "flex size-8 items-center justify-center rounded-md transition-colors duration-150 disabled:opacity-50",
           isActive
             ? "bg-neutral-200"
             : "hover:bg-neutral-50 active:bg-neutral-100",
         )}
-        title={label}
       >
         <Icon className="size-4 shrink-0 text-neutral-700" />
         {label && <span className="sr-only">{label}</span>}
       </button>
     );
+    if (!label) return button;
+    return <Tooltip content={label}>{button}</Tooltip>;
   },
 );

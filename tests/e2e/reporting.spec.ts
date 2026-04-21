@@ -46,77 +46,15 @@ test.describe('Reporting & Audit Narrative', () => {
 
     // ─── B) Coverage Report ──────────────────────────────────────────
 
-    test('B — ISO27001 coverage report shows metrics', async ({ page }) => {
+    test('B — ISO27001 coverage tab shows metrics', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
-        // VERIFY-ON-EXIT: navigate and wait for content
-        await gotoAndVerify(page, `/t/${tenantSlug}/frameworks/ISO27001/coverage`, 'h1', 3);
+        // The coverage data lives on the framework detail page under
+        // the Coverage tab — there is no standalone `/coverage` route.
+        await gotoAndVerify(page, `/t/${tenantSlug}/frameworks/ISO27001`, '#framework-detail-heading', 3);
 
-        // Wait for the heading — may show "Coverage data not available" if no pack installed.
-        // The coverage API route needs JIT compilation on first access, so give it generous time.
-        await page.waitForLoadState('networkidle');
-        const heading = page.locator('#coverage-report-heading');
-        let hasReport = false;
-        try {
-            await page.waitForSelector('#coverage-report-heading', { timeout: 30000 });
-            hasReport = true;
-        } catch {
-            hasReport = false;
-        }
-
-        if (!hasReport) {
-            // Coverage page renders but no data — framework pack not installed
-            test.skip(true, 'ISO27001 coverage data not available — pack not installed');
-            return;
-        }
-
-        await expect(heading).toContainText('Coverage Report');
-
-        // Metrics cards
-        await expect(page.locator('#cov-total')).toBeVisible({ timeout: 5000 });
-        await expect(page.locator('#cov-percent')).toBeVisible({ timeout: 5000 });
-        await expect(page.locator('#cov-mapped')).toBeVisible();
-        await expect(page.locator('#cov-unmapped')).toBeVisible();
-
-        // Coverage table
-        await expect(page.locator('#coverage-table')).toBeVisible();
-
-        // Filter buttons
-        await expect(page.locator('#filter-all')).toBeVisible();
-        await expect(page.locator('#filter-mapped')).toBeVisible();
-        await expect(page.locator('#filter-unmapped')).toBeVisible();
-    });
-
-    // ─── C) Coverage Export ──────────────────────────────────────────
-
-    test('C — coverage page export JSON triggers download', async ({ page }) => {
-        tenantSlug = await loginAndGetTenant(page);
-        // VERIFY-ON-EXIT: navigate and wait for content
-        await gotoAndVerify(page, `/t/${tenantSlug}/frameworks/ISO27001/coverage`, 'h1', 3);
-
-        // The export button only renders after the coverage data loads.
-        // The coverage API route needs JIT compilation on first access, so give it generous time.
-        let hasExport = false;
-        try {
-            await page.waitForSelector('#export-json-btn', { timeout: 30000 });
-            hasExport = true;
-        } catch {
-            hasExport = false;
-        }
-
-        if (!hasExport) {
-            test.skip(true, 'Export button not visible — coverage data not available');
-            return;
-        }
-
-        // Intercept the download event
-        const [download] = await Promise.all([
-            page.waitForEvent('download', { timeout: 5000 }),
-            page.locator('#export-json-btn').click(),
-        ]);
-
-        // Verify download properties
-        expect(download.suggestedFilename()).toContain('coverage');
-        expect(download.suggestedFilename()).toContain('.json');
+        await expect(page.locator('#tab-coverage')).toBeVisible({ timeout: 30_000 });
+        await page.locator('#tab-coverage').click();
+        await expect(page.locator('#coverage-panel')).toBeVisible({ timeout: 30_000 });
     });
 
     // ─── D) Reports Page ─────────────────────────────────────────────

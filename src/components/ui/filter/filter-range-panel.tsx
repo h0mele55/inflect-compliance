@@ -2,6 +2,7 @@
 
 import { cn } from "@dub/utils";
 import { ChevronLeft } from "lucide-react";
+import { Tooltip } from "../tooltip";
 import {
   useCallback,
   useEffect,
@@ -32,19 +33,21 @@ function FilterRangeHeader({
   return (
     <div className="flex items-center justify-between px-2 pt-2">
       <div className="flex items-center gap-1">
-        <button
-          type="button"
-          className={cn(
-            "flex size-6 shrink-0 items-center justify-center rounded-md p-2 text-content-muted",
-            "transition-[transform,color,background-color] duration-150 ease-out motion-reduce:transition-none",
-            "hover:bg-bg-muted hover:text-content-emphasis",
-            "active:scale-[0.97] motion-reduce:active:scale-100",
-          )}
-          onClick={() => onBack()}
-          aria-label="Back"
-        >
-          <ChevronLeft className="size-3 shrink-0" />
-        </button>
+        <Tooltip content="Back to filter list">
+          <button
+            type="button"
+            className={cn(
+              "flex size-6 shrink-0 items-center justify-center rounded-md p-2 text-content-muted",
+              "transition-[transform,color,background-color] duration-150 ease-out motion-reduce:transition-none",
+              "hover:bg-bg-muted hover:text-content-emphasis",
+              "active:scale-[0.97] motion-reduce:active:scale-100",
+            )}
+            onClick={() => onBack()}
+            aria-label="Back to filter list"
+          >
+            <ChevronLeft className="size-3 shrink-0" />
+          </button>
+        </Tooltip>
 
         <span className="text-sm font-medium text-content-emphasis">{label}</span>
       </div>

@@ -8,6 +8,7 @@ import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
+import { CopyText } from '@/components/ui/copy-text';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 
 const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
@@ -82,7 +83,7 @@ export default function AssetDetailPage() {
         }
     };
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading asset…</div>;
+    if (loading) return <div className="p-12 text-center text-content-subtle animate-pulse">Loading asset…</div>;
     if (error && !asset) return <div className="glass-card p-8 text-center text-red-400">{error}<div className="mt-4"><Link href={tenantHref('/assets')} className="btn btn-secondary">← Back</Link></div></div>;
     if (!asset) return null;
 
@@ -98,7 +99,7 @@ export default function AssetDetailPage() {
             {/* Header */}
             <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                    <Link href={tenantHref('/assets')} className="text-slate-400 hover:text-white transition text-lg">←</Link>
+                    <Link href={tenantHref('/assets')} className="text-content-muted hover:text-content-emphasis transition text-lg">←</Link>
                     <div>
                         <h1 className="text-2xl font-bold" id="asset-title-heading">{asset.name}</h1>
                         <div className="flex items-center gap-2 mt-1">
@@ -139,21 +140,35 @@ export default function AssetDetailPage() {
                     </>
                 ) : (
                     <>
-                        {asset.classification && <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Classification</h3><p className="text-sm">{asset.classification}</p></div>}
+                        {asset.classification && <div><h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Classification</h3><p className="text-sm">{asset.classification}</p></div>}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Owner</h3><p className="text-sm">{asset.owner || '—'}</p></div>
-                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Location</h3><p className="text-sm">{asset.location || '—'}</p></div>
-                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">External Ref</h3><p className="text-sm">{asset.externalRef || '—'}</p></div>
-                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Data Residency</h3><p className="text-sm">{asset.dataResidency || '—'}</p></div>
+                            <div><h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Owner</h3><p className="text-sm">{asset.owner || '—'}</p></div>
+                            <div><h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Location</h3><p className="text-sm">{asset.location || '—'}</p></div>
+                            <div>
+                                <h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">External Ref</h3>
+                                {asset.externalRef ? (
+                                    <CopyText
+                                        value={asset.externalRef}
+                                        label={`Copy external reference ${asset.externalRef}`}
+                                        successMessage="External reference copied"
+                                        className="text-sm text-content-default"
+                                    >
+                                        {asset.externalRef}
+                                    </CopyText>
+                                ) : (
+                                    <p className="text-sm">—</p>
+                                )}
+                            </div>
+                            <div><h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Data Residency</h3><p className="text-sm">{asset.dataResidency || '—'}</p></div>
                         </div>
                         <div className="grid grid-cols-3 gap-4">
-                            <div className="glass-card p-4 text-center"><p className="text-xs text-slate-400 uppercase">Confidentiality</p><p className="text-2xl font-bold mt-1">{asset.confidentiality ?? '—'}</p></div>
-                            <div className="glass-card p-4 text-center"><p className="text-xs text-slate-400 uppercase">Integrity</p><p className="text-2xl font-bold mt-1">{asset.integrity ?? '—'}</p></div>
-                            <div className="glass-card p-4 text-center"><p className="text-xs text-slate-400 uppercase">Availability</p><p className="text-2xl font-bold mt-1">{asset.availability ?? '—'}</p></div>
+                            <div className="glass-card p-4 text-center"><p className="text-xs text-content-muted uppercase">Confidentiality</p><p className="text-2xl font-bold mt-1">{asset.confidentiality ?? '—'}</p></div>
+                            <div className="glass-card p-4 text-center"><p className="text-xs text-content-muted uppercase">Integrity</p><p className="text-2xl font-bold mt-1">{asset.integrity ?? '—'}</p></div>
+                            <div className="glass-card p-4 text-center"><p className="text-xs text-content-muted uppercase">Availability</p><p className="text-2xl font-bold mt-1">{asset.availability ?? '—'}</p></div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 border-t border-slate-700/50 pt-4">
-                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Created</h3><p className="text-sm text-slate-400">{formatDate(asset.createdAt)}</p></div>
-                            <div><h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Updated</h3><p className="text-sm text-slate-400">{formatDate(asset.updatedAt)}</p></div>
+                        <div className="grid grid-cols-2 gap-4 border-t border-border-default/50 pt-4">
+                            <div><h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Created</h3><p className="text-sm text-content-muted">{formatDate(asset.createdAt)}</p></div>
+                            <div><h3 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-1">Updated</h3><p className="text-sm text-content-muted">{formatDate(asset.updatedAt)}</p></div>
                         </div>
                     </>
                 )}
@@ -161,7 +176,7 @@ export default function AssetDetailPage() {
 
             {/* Linked Tasks */}
             <div className="glass-card p-6" id="linked-tasks-section">
-                <h2 className="text-lg font-semibold text-white mb-4 inline-flex items-center gap-2"><AppIcon name="tasks" size={18} /> Linked Tasks</h2>
+                <h2 className="text-lg font-semibold text-content-emphasis mb-4 inline-flex items-center gap-2"><AppIcon name="tasks" size={18} /> Linked Tasks</h2>
                 <LinkedTasksPanel
                     apiBase={apiUrl('')}
                     entityType="ASSET"
@@ -172,7 +187,7 @@ export default function AssetDetailPage() {
 
             {/* Traceability */}
             <div className="glass-card p-6">
-                <h2 className="text-lg font-semibold text-white mb-4 inline-flex items-center gap-2"><AppIcon name="link" size={18} /> Traceability</h2>
+                <h2 className="text-lg font-semibold text-content-emphasis mb-4 inline-flex items-center gap-2"><AppIcon name="link" size={18} /> Traceability</h2>
                 <TraceabilityPanel
                     apiBase={apiUrl('')}
                     entityType="asset"

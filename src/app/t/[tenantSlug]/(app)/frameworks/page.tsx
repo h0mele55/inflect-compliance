@@ -49,8 +49,8 @@ export default async function FrameworksPage({
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white" id="frameworks-heading">Compliance Frameworks</h1>
-                    <p className="text-sm text-slate-400 mt-1">Browse standards, install control packs, and track requirement coverage</p>
+                    <h1 className="text-2xl font-bold text-content-emphasis" id="frameworks-heading">Compliance Frameworks</h1>
+                    <p className="text-sm text-content-muted mt-1">Browse standards, install control packs, and track requirement coverage</p>
                 </div>
             </div>
 
@@ -71,12 +71,12 @@ export default async function FrameworksPage({
                             <div className="flex items-start justify-between pt-2">
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <FwIcon className="w-6 h-6 text-white" aria-hidden="true" />
-                                        <h2 className="text-lg font-semibold text-white group-hover:text-brand-300 transition-colors">{fw.name}</h2>
+                                        <FwIcon className="w-6 h-6 text-content-emphasis" aria-hidden="true" />
+                                        <h2 className="text-lg font-semibold text-content-emphasis group-hover:text-brand-300 transition-colors">{fw.name}</h2>
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
                                         {fw.version && <span className="badge badge-primary text-xs">v{fw.version}</span>}
-                                        {fw.kind && <span className="text-xs text-slate-500">{fw.kind.replace('_', ' ')}</span>}
+                                        {fw.kind && <span className="text-xs text-content-subtle">{fw.kind.replace('_', ' ')}</span>}
                                     </div>
                                 </div>
                                 {isInstalled ? (
@@ -86,10 +86,10 @@ export default async function FrameworksPage({
                                 )}
                             </div>
 
-                            <p className="text-sm text-slate-400 mt-3 line-clamp-2">{fw.description}</p>
+                            <p className="text-sm text-content-muted mt-3 line-clamp-2">{fw.description}</p>
 
                             {/* Stats */}
-                            <div className="flex items-center gap-4 mt-4 text-xs text-slate-500">
+                            <div className="flex items-center gap-4 mt-4 text-xs text-content-subtle">
                                 <span>{fw._count?.requirements || 0} requirements</span>
                                 <span>{fw._count?.packs || 0} pack{(fw._count?.packs || 0) !== 1 ? 's' : ''}</span>
                             </div>
@@ -98,19 +98,19 @@ export default async function FrameworksPage({
                             {cov && (
                                 <div className="mt-3" id={`fw-coverage-${fw.key}`}>
                                     <div className="flex items-center justify-between text-xs mb-1">
-                                        <span className="text-slate-400">Coverage</span>
-                                        <span className={coveragePercent === 100 ? 'text-emerald-400' : coveragePercent > 0 ? 'text-brand-400' : 'text-slate-500'}>
+                                        <span className="text-content-muted">Coverage</span>
+                                        <span className={coveragePercent === 100 ? 'text-emerald-400' : coveragePercent > 0 ? 'text-brand-400' : 'text-content-subtle'}>
                                             {coveragePercent}%
                                         </span>
                                     </div>
-                                    <div className="w-full h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
+                                    <div className="w-full h-1.5 rounded-full bg-bg-elevated/50 overflow-hidden">
                                         <div
-                                            className={`h-full rounded-full transition-all duration-500 ${coveragePercent === 100 ? 'bg-emerald-500' : coveragePercent > 0 ? 'bg-brand-500' : 'bg-slate-600'
+                                            className={`h-full rounded-full transition-all duration-500 ${coveragePercent === 100 ? 'bg-emerald-500' : coveragePercent > 0 ? 'bg-brand-500' : 'bg-border-emphasis'
                                                 }`}
                                             style={{ width: `${coveragePercent}%` }}
                                         />
                                     </div>
-                                    <div className="flex items-center gap-2 text-xs mt-1 text-slate-500">
+                                    <div className="flex items-center gap-2 text-xs mt-1 text-content-subtle">
                                         <span>{cov.mapped}/{cov.total} mapped</span>
                                     </div>
                                 </div>
@@ -134,7 +134,7 @@ export default async function FrameworksPage({
 
             {frameworks.length === 0 && (
                 <div className="glass-card text-center py-12">
-                    <p className="text-slate-500">No frameworks available. Run the seed to populate.</p>
+                    <p className="text-content-subtle">No frameworks available. Run the seed to populate.</p>
                 </div>
             )}
         </div>

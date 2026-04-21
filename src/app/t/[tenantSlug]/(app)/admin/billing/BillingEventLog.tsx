@@ -1,7 +1,8 @@
 'use client';
 import { formatDateTime } from '@/lib/format-date';
-
+import { useMemo } from 'react';
 import { Activity, CreditCard, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 /**
  * Renders a list of recent billing events with icons and human-readable labels.
@@ -25,52 +26,56 @@ interface BillingEvent {
 }
 
 export function BillingEventLog({ events }: { events: BillingEvent[] }) {
-    if (events.length === 0) {
-        return (
-            <div className="glass-card p-6 text-center">
-                <p className="text-sm text-slate-500">No billing events yet.</p>
-            </div>
-        );
-    }
+    const columns = useMemo(() => createColumns<BillingEvent>([
+        {
+            id: 'event',
+            header: 'Event',
+            accessorKey: 'type',
+            cell: ({ row }) => {
+                const config = EVENT_CONFIG[row.original.type] || {
+                    label: row.original.type,
+                    icon: Activity,
+                    color: 'text-content-muted',
+                };
+                const Icon = config.icon;
+                return (
+                    <div className="flex items-center gap-2">
+                        <Icon className={`w-4 h-4 ${config.color}`} />
+                        <span className="text-sm text-content-emphasis">{config.label}</span>
+                    </div>
+                );
+            },
+        },
+        {
+            id: 'time',
+            header: 'Time',
+            accessorKey: 'createdAt',
+            cell: ({ getValue }) => (
+                <span className="text-xs text-content-muted whitespace-nowrap">
+                    {formatDateTime(getValue() as string)}
+                </span>
+            ),
+        },
+        {
+            id: 'stripeId',
+            header: 'Stripe ID',
+            accessorKey: 'stripeEventId',
+            cell: ({ getValue }) => (
+                <span className="text-xs text-content-subtle font-mono">
+                    {(getValue() as string).slice(0, 20)}…
+                </span>
+            ),
+        },
+    ]), []);
 
     return (
-        <div className="glass-card overflow-hidden">
-            <table className="data-table">
-                <thead>
-                    <tr>
-                        <th>Event</th>
-                        <th>Time</th>
-                        <th>Stripe ID</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {events.map(event => {
-                        const config = EVENT_CONFIG[event.type] || {
-                            label: event.type,
-                            icon: Activity,
-                            color: 'text-slate-400',
-                        };
-                        const Icon = config.icon;
-
-                        return (
-                            <tr key={event.id}>
-                                <td>
-                                    <div className="flex items-center gap-2">
-                                        <Icon className={`w-4 h-4 ${config.color}`} />
-                                        <span className="text-sm text-white">{config.label}</span>
-                                    </div>
-                                </td>
-                                <td className="text-xs text-slate-400 whitespace-nowrap">
-                                    {formatDateTime(event.createdAt)}
-                                </td>
-                                <td className="text-xs text-slate-500 font-mono">
-                                    {event.stripeEventId.slice(0, 20)}…
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+        <DataTable
+            data={events}
+            columns={columns}
+            getRowId={(e) => e.id}
+            emptyState="No billing events yet."
+            resourceName={(p) => p ? 'events' : 'event'}
+            data-testid="billing-event-log"
+        />
     );
 }

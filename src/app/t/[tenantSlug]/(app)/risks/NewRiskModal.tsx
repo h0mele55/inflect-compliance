@@ -41,7 +41,12 @@ import {
 import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
+import { FormError } from '@/components/ui/form-error';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { InfoTooltip } from '@/components/ui/tooltip';
 import { queryKeys } from '@/lib/queryKeys';
+import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -241,11 +246,19 @@ export function NewRiskModal({
 
     const canSubmit = form.title.trim().length > 0 && !submitting;
 
+    const telemetry = useFormTelemetry('NewRiskModal');
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!canSubmit) return;
         setSubmitting(true);
         setError('');
+        telemetry.trackSubmit({
+            hasTemplate: Boolean(selectedTemplate),
+            likelihood: form.likelihood,
+            impact: form.impact,
+            controlLinkCount: selectedControlIds.size,
+        });
         try {
             const payload: Record<string, unknown> = {
                 title: form.title.trim(),
@@ -295,8 +308,10 @@ export function NewRiskModal({
             queryClient.invalidateQueries({
                 queryKey: queryKeys.risks.all(tenantSlug),
             });
+            telemetry.trackSuccess({ riskId: risk.id });
             close();
         } catch (err) {
+            telemetry.trackError(err);
             setError(
                 err instanceof Error ? err.message : 'Failed to create risk',
             );
@@ -369,36 +384,25 @@ export function NewRiskModal({
                         )}
 
                         {/* Title */}
-                        <div>
-                            <label
-                                className="mb-1 block text-sm text-content-default"
-                                htmlFor="risk-title"
-                            >
-                                Title{' '}
-                                <span className="text-content-error">*</span>
-                            </label>
-                            <input
+                        <FormField label="Title" required>
+                            <Input
                                 id="risk-title"
                                 ref={titleRef}
                                 type="text"
-                                className="input w-full"
                                 placeholder="e.g. Unauthorized access to PII"
                                 value={form.title}
                                 onChange={(e) => update('title', e.target.value)}
                                 required
                                 autoComplete="off"
                             />
-                        </div>
+                        </FormField>
+                        {form.title.length > 0 && !form.title.trim() && (
+                            <FormError>Title cannot be empty.</FormError>
+                        )}
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             {/* Category */}
-                            <div>
-                                <label
-                                    className="mb-1 block text-sm text-content-default"
-                                    htmlFor="risk-category"
-                                >
-                                    Category
-                                </label>
+                            <FormField label="Category">
                                 <Combobox
                                     id="risk-category"
                                     name="category"
@@ -418,20 +422,13 @@ export function NewRiskModal({
                                     buttonProps={{ className: 'w-full' }}
                                     caret
                                 />
-                            </div>
+                            </FormField>
 
                             {/* Owner */}
-                            <div>
-                                <label
-                                    className="mb-1 block text-sm text-content-default"
-                                    htmlFor="risk-owner"
-                                >
-                                    Treatment owner
-                                </label>
-                                <input
+                            <FormField label="Treatment owner">
+                                <Input
                                     id="risk-owner"
                                     type="text"
-                                    className="input w-full"
                                     placeholder="Name or team"
                                     value={form.treatmentOwner}
                                     onChange={(e) =>
@@ -442,20 +439,13 @@ export function NewRiskModal({
                                     }
                                     autoComplete="off"
                                 />
-                            </div>
+                            </FormField>
                         </div>
 
                         {/* Description */}
-                        <div>
-                            <label
-                                className="mb-1 block text-sm text-content-default"
-                                htmlFor="risk-description"
-                            >
-                                Description
-                            </label>
-                            <textarea
+                        <FormField label="Description">
+                            <Textarea
                                 id="risk-description"
-                                className="input w-full"
                                 rows={3}
                                 placeholder="What's the risk scenario?"
                                 value={form.description}
@@ -463,21 +453,28 @@ export function NewRiskModal({
                                     update('description', e.target.value)
                                 }
                             />
-                        </div>
+                        </FormField>
 
                         {/* Scoring */}
                         <div className="rounded-lg border border-border-subtle bg-bg-subtle p-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
                                 <div>
-                                    <label
-                                        className="mb-1 block text-sm text-content-default"
-                                        htmlFor="risk-likelihood"
-                                    >
-                                        Likelihood ·{' '}
-                                        <span className="font-semibold text-content-emphasis">
-                                            {form.likelihood}
-                                        </span>
-                                    </label>
+                                    <div className="mb-1 flex items-center gap-1.5">
+                                        <label
+                                            className="text-sm text-content-default"
+                                            htmlFor="risk-likelihood"
+                                        >
+                                            Likelihood ·{' '}
+                                            <span className="font-semibold text-content-emphasis">
+                                                {form.likelihood}
+                                            </span>
+                                        </label>
+                                        <InfoTooltip
+                                            aria-label="About likelihood"
+                                            iconClassName="h-3.5 w-3.5"
+                                            content="Inherent probability of this scenario in the next 12 months, ignoring current controls. 1 = rare, 5 = almost certain."
+                                        />
+                                    </div>
                                     <input
                                         id="risk-likelihood"
                                         type="range"
@@ -494,15 +491,22 @@ export function NewRiskModal({
                                     />
                                 </div>
                                 <div>
-                                    <label
-                                        className="mb-1 block text-sm text-content-default"
-                                        htmlFor="risk-impact"
-                                    >
-                                        Impact ·{' '}
-                                        <span className="font-semibold text-content-emphasis">
-                                            {form.impact}
-                                        </span>
-                                    </label>
+                                    <div className="mb-1 flex items-center gap-1.5">
+                                        <label
+                                            className="text-sm text-content-default"
+                                            htmlFor="risk-impact"
+                                        >
+                                            Impact ·{' '}
+                                            <span className="font-semibold text-content-emphasis">
+                                                {form.impact}
+                                            </span>
+                                        </label>
+                                        <InfoTooltip
+                                            aria-label="About impact"
+                                            iconClassName="h-3.5 w-3.5"
+                                            content="Severity to the organisation if the risk materialises. 1 = minor / isolated, 5 = catastrophic / regulatory."
+                                        />
+                                    </div>
                                     <input
                                         id="risk-impact"
                                         type="range"
@@ -534,23 +538,17 @@ export function NewRiskModal({
                         </div>
 
                         {/* Review date */}
-                        <div>
-                            <label
-                                className="mb-1 block text-sm text-content-default"
-                                htmlFor="risk-review-date"
-                            >
-                                Next review
-                            </label>
-                            <input
+                        <FormField label="Next review">
+                            <Input
                                 id="risk-review-date"
                                 type="date"
-                                className="input w-full sm:max-w-xs"
+                                className="sm:max-w-xs"
                                 value={form.nextReviewAt}
                                 onChange={(e) =>
                                     update('nextReviewAt', e.target.value)
                                 }
                             />
-                        </div>
+                        </FormField>
 
                         {/* Linked controls (optional, collapsible feel) */}
                         <details className="rounded-lg border border-border-subtle bg-bg-subtle">

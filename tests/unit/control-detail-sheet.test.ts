@@ -142,7 +142,10 @@ describe('ControlDetailSheet — UX invariants', () => {
 
 describe('ControlsClient — Sheet entry points', () => {
     it('imports ControlDetailSheet', () => {
-        expect(CLIENT_SRC).toMatch(/from ['"]\.\/ControlDetailSheet['"]/);
+        // Accept both static and dynamic imports (lazy-loading via next/dynamic)
+        const hasImport = /from ['"]\.\/ControlDetailSheet['"]/.test(CLIENT_SRC) ||
+            /import\(['"]\.\/ControlDetailSheet['"]\)/.test(CLIENT_SRC);
+        expect(hasImport).toBe(true);
     });
 
     it('owns sheetControlId state (null = closed)', () => {

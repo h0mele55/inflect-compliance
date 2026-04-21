@@ -201,33 +201,19 @@ test.describe('Core Certification Flow', () => {
         // Click "+ Link Control"
         await page.click('#add-control-link-btn');
 
-        // Wait for the control dropdown to populate — the TraceabilityPanel
-        // fetches controls asynchronously via useEffect after the form renders.
-        // We must wait for actual option elements beyond the placeholder.
-        const controlDropdown = page.locator('#traceability-panel select').first();
-        await controlDropdown.waitFor({ state: 'visible', timeout: 5000 });
-
-        // Poll until dropdown has real options (> 1 means more than just "Select control...")
-        await expect(async () => {
-            const optCount = await controlDropdown.locator('option').count();
-            expect(optCount).toBeGreaterThan(1);
-        }).toPass({ timeout: 15000 });
-
-        // Now iterate dropdown options to find our control
-        const optCount = await controlDropdown.locator('option').count();
-        let linked = false;
-        for (let i = 0; i < optCount; i++) {
-            const text = await controlDropdown.locator('option').nth(i).textContent();
-            if (text && (text.includes(CONTROL_CODE) || text.includes(CONTROL_NAME))) {
-                const value = await controlDropdown.locator('option').nth(i).getAttribute('value');
-                if (value) {
-                    await controlDropdown.selectOption(value);
-                    linked = true;
-                    break;
-                }
-            }
-        }
-        expect(linked).toBe(true);
+        // Epic 55 migrated TraceabilityPanel's control picker from a
+        // native <select> to a searchable <Combobox> (#control-select).
+        // Open the popover, type the unique control code, then click the
+        // matching option.
+        const controlTrigger = page.locator('#control-select').first();
+        await controlTrigger.waitFor({ state: 'visible', timeout: 30_000 });
+        await controlTrigger.click();
+        await page.getByPlaceholder('Search…').fill(CONTROL_CODE);
+        await page
+            .getByRole('option')
+            .filter({ hasText: CONTROL_CODE })
+            .first()
+            .click();
 
         // Click "Link" button
         await page.click('#confirm-control-link');

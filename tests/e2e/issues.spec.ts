@@ -1,5 +1,10 @@
 import { test, expect, Page } from '@playwright/test';
-import { loginAndGetTenant, safeGoto, gotoAndVerify } from './e2e-utils';
+import {
+    loginAndGetTenant,
+    safeGoto,
+    gotoAndVerify,
+    selectComboboxOption,
+} from './e2e-utils';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
@@ -26,12 +31,14 @@ test.describe('Issue Management', () => {
 
         await page.fill('#task-title-input', `E2E Issue ${uniqueId}`);
         await page.fill('#task-description-input', 'Test issue from e2e');
-        await page.selectOption('#task-type-select', 'INCIDENT');
-        await page.selectOption('#task-severity-select', 'HIGH');
-        await page.selectOption('#task-priority-select', 'P1');
+        // Epic 55: native <select>s migrated to <Combobox>; pick by
+        // visible label rather than enum value.
+        await selectComboboxOption(page, 'task-type-select', 'Incident');
+        await selectComboboxOption(page, 'task-severity-select', 'High');
+        await selectComboboxOption(page, 'task-priority-select', /^P1\b/);
 
         // INCIDENT requires asset or control link
-        await page.selectOption('#link-entity-type', 'ASSET');
+        await selectComboboxOption(page, 'link-entity-type', 'Asset');
         await page.fill('#link-entity-id', 'test-asset-id');
         await page.click('#add-link-btn');
         await page.waitForSelector('#pending-links-list', { timeout: 3000 });
@@ -54,8 +61,9 @@ test.describe('Issue Management', () => {
 
         // Wait for permissions to hydrate and status select to appear
         await page.waitForSelector('#task-status-select', { timeout: 10000 });
-        // Change status to TRIAGED — this triggers an async POST then re-fetch
-        await page.selectOption('#task-status-select', 'TRIAGED');
+        // Change status to TRIAGED — Epic 55 migrated this select to a
+        // <Combobox>; pick by visible label "Triaged".
+        await selectComboboxOption(page, 'task-status-select', 'Triaged');
 
         // Wait for the React component to reflect the change (POST + fetchTask completes)
         await expect(page.locator('#task-status')).toContainText('Triaged', { timeout: 15000 });
@@ -120,10 +128,11 @@ test.describe('Issue Management', () => {
         await page.click('#tab-links');
         await page.waitForLoadState('networkidle');
 
-        // Add a link
+        // Add a link — the task-detail picker uses raw enum values
+        // (CONTROL/RISK/ASSET/…) as the visible labels.
         await page.click('#add-link-btn');
         await page.waitForSelector('#link-entity-type', { timeout: 5000 });
-        await page.selectOption('#link-entity-type', 'CONTROL');
+        await selectComboboxOption(page, 'link-entity-type', 'CONTROL');
         await page.fill('#link-entity-id', 'test-control-id');
         await page.click('#submit-link-btn');
         await page.waitForLoadState('networkidle');

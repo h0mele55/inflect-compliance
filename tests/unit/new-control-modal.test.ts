@@ -146,7 +146,10 @@ describe('/controls/new — redirect compat shim', () => {
 
 describe('ControlsClient — create trigger + auto-open', () => {
     it('imports NewControlModal', () => {
-        expect(CLIENT_SRC).toMatch(/from ['"]\.\/NewControlModal['"]/);
+        // Accept both static and dynamic imports (lazy-loading via next/dynamic)
+        const hasImport = /from ['"]\.\/NewControlModal['"]/.test(CLIENT_SRC) ||
+            /import\(['"]\.\/NewControlModal['"]\)/.test(CLIENT_SRC);
+        expect(hasImport).toBe(true);
     });
 
     it('turned the #new-control-btn <Link> into a <button> that opens the modal', () => {

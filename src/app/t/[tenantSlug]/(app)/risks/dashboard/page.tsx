@@ -62,7 +62,7 @@ export default function RiskDashboardPage() {
     });
 
     if (loading) {
-        return <div className="glass-card p-12 text-center animate-pulse text-slate-500">{t('loading')}</div>;
+        return <div className="glass-card p-12 text-center animate-pulse text-content-subtle">{t('loading')}</div>;
     }
 
     return (
@@ -70,7 +70,7 @@ export default function RiskDashboardPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">{t('dashboardTitle')}</h1>
-                    <p className="text-slate-400 text-sm">{tenant.tenantName} — {t('riskCount', { count: total })}</p>
+                    <p className="text-content-muted text-sm">{tenant.tenantName} — {t('riskCount', { count: total })}</p>
                 </div>
                 <Link href={href('/risks')} className="btn btn-secondary" id="back-to-register">
                     {t('riskRegister')}
@@ -80,19 +80,19 @@ export default function RiskDashboardPage() {
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t('totalRisks')}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wider">{t('totalRisks')}</p>
                     <p className="text-3xl font-bold mt-2">{total}</p>
                 </div>
                 <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t('avgScore')}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wider">{t('avgScore')}</p>
                     <p className="text-3xl font-bold mt-2 text-amber-400">{avgScore}</p>
                 </div>
                 <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t('openRisks')}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wider">{t('openRisks')}</p>
                     <p className="text-3xl font-bold mt-2 text-emerald-400">{openCount}</p>
                 </div>
                 <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t('overdueReviews')}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wider">{t('overdueReviews')}</p>
                     <p className="text-3xl font-bold mt-2 text-red-400">{overdueRisks.length}</p>
                 </div>
             </div>
@@ -102,16 +102,16 @@ export default function RiskDashboardPage() {
                 <div className="glass-card p-5">
                     <h2 className="font-semibold mb-4">{t('statusBreakdown')}</h2>
                     {total === 0 ? (
-                        <p className="text-slate-500 text-sm">{t('noRisksYet')}</p>
+                        <p className="text-content-subtle text-sm">{t('noRisksYet')}</p>
                     ) : (
                         <div className="space-y-3">
                             {Object.entries(statusCounts).sort(([, a], [, b]) => b - a).map(([status, count]) => (
                                 <div key={status}>
                                     <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-slate-300">{status}</span>
-                                        <span className="text-slate-400">{count} ({Math.round(count / total * 100)}%)</span>
+                                        <span className="text-content-default">{status}</span>
+                                        <span className="text-content-muted">{count} ({Math.round(count / total * 100)}%)</span>
                                     </div>
-                                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-2 bg-bg-default rounded-full overflow-hidden">
                                         <div
                                             className="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-500 transition-all"
                                             style={{ width: `${(count / total) * 100}%` }}
@@ -129,11 +129,11 @@ export default function RiskDashboardPage() {
                     <div className="grid grid-cols-[auto_repeat(5,1fr)] gap-1 text-xs">
                         <div></div>
                         {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="text-center text-slate-500 font-medium pb-1">{i}</div>
+                            <div key={i} className="text-center text-content-subtle font-medium pb-1">{i}</div>
                         ))}
                         {[5, 4, 3, 2, 1].map(l => (
                             <>
-                                <div key={`l-${l}`} className="flex items-center text-slate-500 font-medium pr-2">{l}</div>
+                                <div key={`l-${l}`} className="flex items-center text-content-subtle font-medium pr-2">{l}</div>
                                 {[1, 2, 3, 4, 5].map(i => {
                                     const count = heatmapCounts[`${l}-${i}`] || 0;
                                     const s = l * i;
@@ -149,8 +149,8 @@ export default function RiskDashboardPage() {
                                 })}
                             </>
                         ))}
-                        <div className="text-slate-600 text-[10px] mt-1">L↑</div>
-                        <div className="col-span-5 text-center text-slate-600 text-[10px] mt-1">Impact →</div>
+                        <div className="text-content-subtle text-[10px] mt-1">L↑</div>
+                        <div className="col-span-5 text-center text-content-subtle text-[10px] mt-1">Impact →</div>
                     </div>
                 </div>
             </div>
@@ -164,7 +164,7 @@ export default function RiskDashboardPage() {
                             const daysOverdue = Math.floor((now.getTime() - new Date(r.nextReviewAt!).getTime()) / 86400000);
                             return (
                                 <Link key={r.id} href={href(`/risks/${r.id}`)} className="flex justify-between items-center p-2 rounded hover:bg-red-900/20 transition">
-                                    <span className="text-sm text-white">{r.title}</span>
+                                    <span className="text-sm text-content-emphasis">{r.title}</span>
                                     <span className="text-xs text-red-400">{t('daysOverdue', { days: daysOverdue })} · {r.treatmentOwner || t('noOwner')}</span>
                                 </Link>
                             );

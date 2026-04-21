@@ -218,7 +218,7 @@ export default function AIRiskAssessmentPage() {
         switch (c) {
             case 'high': return <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 ring-1 ring-emerald-500/30">● High confidence</span>;
             case 'medium': return <span className="text-xs px-2 py-0.5 rounded bg-amber-900/40 text-amber-300 ring-1 ring-amber-500/30">● Medium confidence</span>;
-            case 'low': return <span className="text-xs px-2 py-0.5 rounded bg-slate-700/40 text-slate-400 ring-1 ring-slate-500/30">● Low confidence</span>;
+            case 'low': return <span className="text-xs px-2 py-0.5 rounded bg-bg-elevated/40 text-content-muted ring-1 ring-slate-500/30">● Low confidence</span>;
             default: return null;
         }
     };
@@ -238,10 +238,10 @@ export default function AIRiskAssessmentPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <div className="flex items-center gap-3">
-                        <Link href={tenantHref('/risks')} className="text-slate-400 hover:text-white transition text-lg">←</Link>
+                        <Link href={tenantHref('/risks')} className="text-content-muted hover:text-content-emphasis transition text-lg">←</Link>
                         <div>
                             <h1 className="text-2xl font-bold" id="ai-risk-title">AI-Assisted Risk Assessment</h1>
-                            <p className="text-slate-400 text-sm">Generate and review AI-suggested risks for your organization</p>
+                            <p className="text-content-muted text-sm">Generate and review AI-suggested risks for your organization</p>
                         </div>
                     </div>
                 </div>
@@ -253,7 +253,7 @@ export default function AIRiskAssessmentPage() {
             {error && (
                 <div className="glass-card p-4 border-red-500/50 text-red-400 text-sm" id="ai-error">
                     {error}
-                    <button onClick={() => setError('')} className="ml-4 text-red-300 hover:text-white">x</button>
+                    <button onClick={() => setError('')} className="ml-4 text-red-300 hover:text-content-emphasis">x</button>
                 </div>
             )}
 
@@ -273,8 +273,8 @@ export default function AIRiskAssessmentPage() {
                                     onClick={() => toggleFramework(fw)}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                                         frameworks.includes(fw)
-                                            ? 'bg-blue-600 text-white ring-2 ring-blue-400/50'
-                                            : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600/50'
+                                            ? 'bg-blue-600 text-content-emphasis ring-2 ring-blue-400/50'
+                                            : 'bg-bg-elevated/50 text-content-default hover:bg-bg-muted/50'
                                     }`}
                                 >
                                     {fw}
@@ -295,17 +295,17 @@ export default function AIRiskAssessmentPage() {
                         </button>
                         {assetsLoaded && (
                             <div className="mt-2 max-h-48 overflow-y-auto space-y-1" id="ai-asset-list">
-                                {assets.length === 0 && <p className="text-sm text-slate-500">No assets found. Suggestions will be general.</p>}
+                                {assets.length === 0 && <p className="text-sm text-content-subtle">No assets found. Suggestions will be general.</p>}
                                 {assets.map(a => (
-                                    <label key={a.id} className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-700/30 cursor-pointer text-sm">
+                                    <label key={a.id} className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-bg-elevated/30 cursor-pointer text-sm">
                                         <input
                                             type="checkbox"
                                             checked={selectedAssetIds.includes(a.id)}
                                             onChange={() => toggleAsset(a.id)}
                                             className="rounded"
                                         />
-                                        <span className="text-white">{a.name}</span>
-                                        <span className="text-xs text-slate-400">{a.type.replace(/_/g, ' ')}</span>
+                                        <span className="text-content-emphasis">{a.name}</span>
+                                        <span className="text-xs text-content-muted">{a.type.replace(/_/g, ' ')}</span>
                                         {a.criticality && <span className={`badge text-xs ${a.criticality === 'HIGH' ? 'badge-danger' : a.criticality === 'MEDIUM' ? 'badge-warning' : 'badge-success'}`}>{a.criticality}</span>}
                                     </label>
                                 ))}
@@ -324,7 +324,7 @@ export default function AIRiskAssessmentPage() {
                             onChange={e => setContext(e.target.value)}
                             maxLength={2000}
                         />
-                        <p className="text-xs text-slate-500 mt-1">{context.length}/2000 characters</p>
+                        <p className="text-xs text-content-subtle mt-1">{context.length}/2000 characters</p>
                     </div>
 
                     {/* Generate Button */}
@@ -344,9 +344,9 @@ export default function AIRiskAssessmentPage() {
             {phase === 'generating' && (
                 <div className="glass-card p-12 text-center" id="ai-generating">
                     <div className="animate-pulse text-4xl mb-4">...</div>
-                    <h2 className="text-lg font-semibold text-white">Analyzing your environment…</h2>
-                    <p className="text-slate-400 text-sm mt-2">The AI is generating risk suggestions based on your assets, frameworks, and context.</p>
-                    <p className="text-slate-500 text-xs mt-4">This may take a few seconds</p>
+                    <h2 className="text-lg font-semibold text-content-emphasis">Analyzing your environment…</h2>
+                    <p className="text-content-muted text-sm mt-2">The AI is generating risk suggestions based on your assets, frameworks, and context.</p>
+                    <p className="text-content-subtle text-xs mt-4">This may take a few seconds</p>
                 </div>
             )}
 
@@ -356,15 +356,15 @@ export default function AIRiskAssessmentPage() {
                     {/* Summary bar */}
                     <div className="glass-card p-4 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <span className="text-sm text-slate-400">
-                                {session.items.length} suggestions • Provider: <strong className="text-slate-300">{session.provider}</strong>
+                            <span className="text-sm text-content-muted">
+                                {session.items.length} suggestions • Provider: <strong className="text-content-default">{session.provider}</strong>
                             </span>
                             {session.isFallback ? (
                                 <span className="text-xs px-2 py-1 rounded bg-amber-900/30 text-amber-300 ring-1 ring-amber-500/20" id="fallback-notice">
                                     [Fallback] Baseline suggestions (AI unavailable)
                                 </span>
                             ) : (
-                                <span className="text-xs text-slate-500">
+                                <span className="text-xs text-content-subtle">
                                     AI-generated -- review before applying
                                 </span>
                             )}
@@ -379,7 +379,7 @@ export default function AIRiskAssessmentPage() {
                     <div className="flex gap-3 text-sm">
                         <span className="text-emerald-400" id="accepted-count">[+] {acceptedCount} accepted</span>
                         <span className="text-red-400" id="rejected-count">[-] {rejectedCount} rejected</span>
-                        <span className="text-slate-400" id="pending-count">○ {pendingCount} pending</span>
+                        <span className="text-content-muted" id="pending-count">○ {pendingCount} pending</span>
                     </div>
 
                     {/* Suggestion cards */}
@@ -404,7 +404,7 @@ export default function AIRiskAssessmentPage() {
                                     <div className="flex-1 space-y-3">
                                         {/* Header */}
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-xs text-slate-500 font-mono">#{idx + 1}</span>
+                                            <span className="text-xs text-content-subtle font-mono">#{idx + 1}</span>
                                             {isEditing ? (
                                                 <input
                                                     className="input flex-1 text-sm font-semibold"
@@ -413,7 +413,7 @@ export default function AIRiskAssessmentPage() {
                                                     id={`edit-title-${idx}`}
                                                 />
                                             ) : (
-                                                <h3 className="text-sm font-semibold text-white">{item.title}</h3>
+                                                <h3 className="text-sm font-semibold text-content-emphasis">{item.title}</h3>
                                             )}
                                             {item.category && <span className="badge badge-info text-xs">{item.category}</span>}
                                             {confidenceBadge(item.confidence)}
@@ -429,14 +429,14 @@ export default function AIRiskAssessmentPage() {
                                                 id={`edit-desc-${idx}`}
                                             />
                                         ) : (
-                                            <p className="text-sm text-slate-300">{item.description}</p>
+                                            <p className="text-sm text-content-default">{item.description}</p>
                                         )}
 
                                         {/* Threat / Vulnerability */}
                                         {(item.threat || item.vulnerability) && !isEditing && (
                                             <div className="grid grid-cols-2 gap-4 text-xs">
-                                                {item.threat && <div><span className="text-slate-500 uppercase font-semibold">Threat</span><p className="text-slate-400 mt-0.5">{item.threat}</p></div>}
-                                                {item.vulnerability && <div><span className="text-slate-500 uppercase font-semibold">Vulnerability</span><p className="text-slate-400 mt-0.5">{item.vulnerability}</p></div>}
+                                                {item.threat && <div><span className="text-content-subtle uppercase font-semibold">Threat</span><p className="text-content-muted mt-0.5">{item.threat}</p></div>}
+                                                {item.vulnerability && <div><span className="text-content-subtle uppercase font-semibold">Vulnerability</span><p className="text-content-muted mt-0.5">{item.vulnerability}</p></div>}
                                             </div>
                                         )}
 
@@ -444,7 +444,7 @@ export default function AIRiskAssessmentPage() {
                                         <div className="flex items-center gap-4 text-sm">
                                             {isEditing ? (
                                                 <div className="flex items-center gap-4">
-                                                    <label className="text-xs text-slate-400">
+                                                    <label className="text-xs text-content-muted">
                                                         L: <Combobox
                                                             hideSearch
                                                             id={`edit-likelihood-${idx}`}
@@ -455,7 +455,7 @@ export default function AIRiskAssessmentPage() {
                                                             buttonProps={{ className: 'text-xs w-16 inline-block ml-1' }}
                                                         />
                                                     </label>
-                                                    <label className="text-xs text-slate-400">
+                                                    <label className="text-xs text-content-muted">
                                                         I: <Combobox
                                                             hideSearch
                                                             id={`edit-impact-${idx}`}
@@ -469,8 +469,8 @@ export default function AIRiskAssessmentPage() {
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <span className="text-slate-400">L: <strong className="text-white">{item.likelihoodSuggested ?? '—'}</strong></span>
-                                                    <span className="text-slate-400">I: <strong className="text-white">{item.impactSuggested ?? '—'}</strong></span>
+                                                    <span className="text-content-muted">L: <strong className="text-content-emphasis">{item.likelihoodSuggested ?? '—'}</strong></span>
+                                                    <span className="text-content-muted">I: <strong className="text-content-emphasis">{item.impactSuggested ?? '—'}</strong></span>
                                                     {item.likelihoodSuggested && item.impactSuggested && riskBadge(item.likelihoodSuggested, item.impactSuggested)}
                                                 </>
                                             )}
@@ -478,32 +478,32 @@ export default function AIRiskAssessmentPage() {
 
                                         {/* Rationale & Explainability */}
                                         {!isEditing && (item.rationale || sr) && (
-                                            <div className="bg-slate-800/50 rounded-lg p-3 text-xs text-slate-400 space-y-2">
+                                            <div className="bg-bg-default/50 rounded-lg p-3 text-xs text-content-muted space-y-2">
                                                 {item.rationale && (
                                                     <div>
-                                                        <span className="text-slate-500 uppercase font-semibold block mb-1">Rationale</span>
+                                                        <span className="text-content-subtle uppercase font-semibold block mb-1">Rationale</span>
                                                         {item.rationale}
                                                     </div>
                                                 )}
                                                 {sr && sr.whyThisRisk && (
                                                     <div>
-                                                        <span className="text-slate-500 uppercase font-semibold block mb-1">Why This Risk</span>
-                                                        <p className="text-slate-300">{sr.whyThisRisk}</p>
+                                                        <span className="text-content-subtle uppercase font-semibold block mb-1">Why This Risk</span>
+                                                        <p className="text-content-default">{sr.whyThisRisk}</p>
                                                     </div>
                                                 )}
                                                 {sr && sr.affectedAssetCharacteristics.length > 0 && (
                                                     <div>
-                                                        <span className="text-slate-500 uppercase font-semibold block mb-1">Affected Asset Characteristics</span>
+                                                        <span className="text-content-subtle uppercase font-semibold block mb-1">Affected Asset Characteristics</span>
                                                         <div className="flex flex-wrap gap-1">
                                                             {sr.affectedAssetCharacteristics.map((c, ci) => (
-                                                                <span key={ci} className="px-2 py-0.5 rounded bg-slate-700/60 text-slate-300">{c}</span>
+                                                                <span key={ci} className="px-2 py-0.5 rounded bg-bg-elevated/60 text-content-default">{c}</span>
                                                             ))}
                                                         </div>
                                                     </div>
                                                 )}
                                                 {sr && sr.suggestedControlThemes.length > 0 && (
                                                     <div>
-                                                        <span className="text-slate-500 uppercase font-semibold block mb-1">Control Themes</span>
+                                                        <span className="text-content-subtle uppercase font-semibold block mb-1">Control Themes</span>
                                                         <div className="flex flex-wrap gap-1">
                                                             {sr.suggestedControlThemes.map((t, ti) => (
                                                                 <span key={ti} className="px-2 py-0.5 rounded bg-indigo-900/40 text-indigo-300 ring-1 ring-indigo-500/20">{t}</span>
@@ -517,7 +517,7 @@ export default function AIRiskAssessmentPage() {
                                         {/* Suggested Controls */}
                                         {controls.length > 0 && !isEditing && (
                                             <div className="flex flex-wrap gap-1.5">
-                                                <span className="text-xs text-slate-500 mr-1">Suggested controls:</span>
+                                                <span className="text-xs text-content-subtle mr-1">Suggested controls:</span>
                                                 {controls.map((c, ci) => (
                                                     <span key={ci} className="text-xs bg-blue-900/30 text-blue-300 px-2 py-0.5 rounded">{c}</span>
                                                 ))}
@@ -542,14 +542,14 @@ export default function AIRiskAssessmentPage() {
                                             <>
                                                 <button
                                                     onClick={() => setDecision(item.id, 'accept')}
-                                                    className={`btn text-xs ${dec === 'accept' ? 'bg-emerald-700 text-white' : 'btn-secondary'}`}
+                                                    className={`btn text-xs ${dec === 'accept' ? 'bg-emerald-700 text-content-emphasis' : 'btn-secondary'}`}
                                                     id={`accept-${idx}`}
                                                 >
                                                     [+] Accept
                                                 </button>
                                                 <button
                                                     onClick={() => setDecision(item.id, 'reject')}
-                                                    className={`btn text-xs ${dec === 'reject' ? 'bg-red-700 text-white' : 'btn-secondary'}`}
+                                                    className={`btn text-xs ${dec === 'reject' ? 'bg-red-700 text-content-emphasis' : 'btn-secondary'}`}
                                                     id={`reject-${idx}`}
                                                 >
                                                     [-] Reject
@@ -592,8 +592,8 @@ export default function AIRiskAssessmentPage() {
             {phase === 'applying' && (
                 <div className="glass-card p-12 text-center">
                     <div className="animate-pulse text-4xl mb-4">...</div>
-                    <h2 className="text-lg font-semibold text-white">Creating risk records…</h2>
-                    <p className="text-slate-400 text-sm mt-2">Adding accepted suggestions to your Risk Register.</p>
+                    <h2 className="text-lg font-semibold text-content-emphasis">Creating risk records…</h2>
+                    <p className="text-content-muted text-sm mt-2">Adding accepted suggestions to your Risk Register.</p>
                 </div>
             )}
 
@@ -601,10 +601,10 @@ export default function AIRiskAssessmentPage() {
             {phase === 'done' && (
                 <div className="glass-card p-8 text-center space-y-4" id="ai-done">
                     <div className="text-4xl">Done</div>
-                    <h2 className="text-lg font-semibold text-white">
+                    <h2 className="text-lg font-semibold text-content-emphasis">
                         {appliedCount} risk{appliedCount !== 1 ? 's' : ''} added to your register
                     </h2>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-content-muted">
                         AI suggestions have been applied. You can review and refine them in the Risk Register.
                     </p>
                     <div className="flex gap-3 justify-center pt-2">

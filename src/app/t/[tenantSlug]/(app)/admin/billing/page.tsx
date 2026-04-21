@@ -68,8 +68,8 @@ export default async function BillingPage({
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold">Billing</h1>
-                <p className="text-sm text-slate-400 mt-1">
-                    Manage your workspace plan and billing for <span className="text-white font-medium">{tenantCtx.tenant.name}</span>.
+                <p className="text-sm text-content-muted mt-1">
+                    Manage your workspace plan and billing for <span className="text-content-emphasis font-medium">{tenantCtx.tenant.name}</span>.
                 </p>
             </div>
 
@@ -85,7 +85,7 @@ export default async function BillingPage({
                                     ? 'Your trial expires today!'
                                     : `${trialDaysRemaining} day${trialDaysRemaining !== 1 ? 's' : ''} left in your trial`}
                             </p>
-                            <p className="text-xs text-slate-400 mt-0.5">
+                            <p className="text-xs text-content-muted mt-0.5">
                                 Trial ends on {formatDate(trialEnd)}. Upgrade to keep access to premium features.
                             </p>
                         </div>
@@ -99,7 +99,7 @@ export default async function BillingPage({
                 <h2 className="text-lg font-semibold mb-4">Current Plan</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Plan</p>
+                        <p className="text-xs text-content-subtle uppercase tracking-wider mb-1">Plan</p>
                         <span className={`badge ${
                             plan === 'ENTERPRISE' ? 'badge-warning' :
                             plan === 'PRO' ? 'badge-info' :
@@ -110,7 +110,7 @@ export default async function BillingPage({
                         </span>
                     </div>
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Status</p>
+                        <p className="text-xs text-content-subtle uppercase tracking-wider mb-1">Status</p>
                         <span className={`badge ${
                             status === 'ACTIVE' ? 'badge-info' :
                             status === 'TRIALING' ? 'badge-warning' :
@@ -122,14 +122,14 @@ export default async function BillingPage({
                         </span>
                     </div>
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Renewal</p>
-                        <p className="text-sm text-white">
+                        <p className="text-xs text-content-subtle uppercase tracking-wider mb-1">Renewal</p>
+                        <p className="text-sm text-content-emphasis">
                             {periodEnd ? formatDate(periodEnd) : '—'}
                         </p>
                     </div>
                     <div>
-                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Trial Ends</p>
-                        <p className="text-sm text-white">
+                        <p className="text-xs text-content-subtle uppercase tracking-wider mb-1">Trial Ends</p>
+                        <p className="text-sm text-content-emphasis">
                             {trialEnd ? (
                                 <>
                                     {formatDate(trialEnd)}
@@ -148,7 +148,7 @@ export default async function BillingPage({
                 {status === 'PAST_DUE' && (
                     <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                         <p className="text-sm text-red-400 font-medium">Payment issue detected</p>
-                        <p className="text-xs text-slate-400 mt-1">Please update your payment method to avoid service interruption.</p>
+                        <p className="text-xs text-content-muted mt-1">Please update your payment method to avoid service interruption.</p>
                     </div>
                 )}
             </section>
@@ -160,10 +160,10 @@ export default async function BillingPage({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="glass-card p-6 border border-brand-500/30 hover:border-brand-500/60 transition">
                             <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-white font-semibold">Pro</h3>
+                                <h3 className="text-content-emphasis font-semibold">Pro</h3>
                                 <span className="badge badge-info">Recommended</span>
                             </div>
-                            <ul className="text-sm text-slate-400 space-y-1 mb-4">
+                            <ul className="text-sm text-content-muted space-y-1 mb-4">
                                 <li>Unlimited controls & policies</li>
                                 <li>Advanced reporting</li>
                                 <li>Audit readiness features</li>
@@ -173,10 +173,10 @@ export default async function BillingPage({
                         </div>
                         <div className="glass-card p-6 border border-purple-500/30 hover:border-purple-500/60 transition">
                             <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-white font-semibold">Enterprise</h3>
+                                <h3 className="text-content-emphasis font-semibold">Enterprise</h3>
                                 <span className="badge badge-warning">Premium</span>
                             </div>
-                            <ul className="text-sm text-slate-400 space-y-1 mb-4">
+                            <ul className="text-sm text-content-muted space-y-1 mb-4">
                                 <li>Everything in Pro</li>
                                 <li>SSO & advanced security</li>
                                 <li>Custom integrations</li>
@@ -193,7 +193,7 @@ export default async function BillingPage({
                 <section>
                     <h2 className="text-lg font-semibold mb-4">Manage Subscription</h2>
                     <div className="glass-card p-6">
-                        <p className="text-sm text-slate-400 mb-4">
+                        <p className="text-sm text-content-muted mb-4">
                             Update payment method, view invoices, or change your plan via the Stripe Customer Portal.
                         </p>
                         <BillingActions portal tenantSlug={tenantSlug} />

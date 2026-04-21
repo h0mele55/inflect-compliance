@@ -35,15 +35,15 @@ export default function AppSectionError({
                     </svg>
                 </div>
 
-                <h2 className="text-xl font-bold text-white mb-2">
+                <h2 className="text-xl font-bold text-content-emphasis mb-2">
                     Something went wrong
                 </h2>
 
-                <p className="text-sm text-slate-400 mb-6">
+                <p className="text-sm text-content-muted mb-6">
                     This page encountered an error. You can try again or navigate to
                     another section using the sidebar.
                     {error.digest && (
-                        <span className="block mt-2 text-xs font-mono text-slate-600">
+                        <span className="block mt-2 text-xs font-mono text-content-subtle">
                             Error ID: {error.digest}
                         </span>
                     )}

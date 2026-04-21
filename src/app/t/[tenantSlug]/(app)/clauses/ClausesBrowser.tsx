@@ -55,12 +55,12 @@ export function ClausesBrowser({ clauses: initialClauses, tenantSlug }: ClausesB
             <div className="lg:col-span-1 space-y-2">
                 {clauses.map(c => (
                     <button key={c.id} onClick={() => setSelected(c)}
-                        className={`w-full text-left glass-card p-4 hover:bg-slate-700/30 transition ${selected?.id === c.id ? 'ring-2 ring-brand-500' : ''}`}>
+                        className={`w-full text-left glass-card p-4 hover:bg-bg-elevated/30 transition ${selected?.id === c.id ? 'ring-2 ring-brand-500' : ''}`}>
                         <div className="flex items-center justify-between">
                             <span className="font-medium text-sm">{t('clause')} {c.number}</span>
                             <span className={`badge ${STATUS_COLORS[c.status]}`}>{statusLabel(c.status)}</span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-1">{c.title}</p>
+                        <p className="text-xs text-content-muted mt-1">{c.title}</p>
                     </button>
                 ))}
             </div>
@@ -87,25 +87,25 @@ export function ClausesBrowser({ clauses: initialClauses, tenantSlug }: ClausesB
                                 />
                             </div>
                         </div>
-                        <p className="text-sm text-slate-300 mb-4">{selected.description}</p>
+                        <p className="text-sm text-content-default mb-4">{selected.description}</p>
                         <div className="mb-4">
-                            <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2">{t('requiredArtifacts')}</h3>
-                            <p className="text-sm text-slate-400">{selected.artifacts}</p>
+                            <h3 className="text-xs font-semibold text-content-muted uppercase mb-2">{t('requiredArtifacts')}</h3>
+                            <p className="text-sm text-content-muted">{selected.artifacts}</p>
                         </div>
                         <div>
-                            <h3 className="text-xs font-semibold text-slate-400 uppercase mb-2">{t('checklist')}</h3>
+                            <h3 className="text-xs font-semibold text-content-muted uppercase mb-2">{t('checklist')}</h3>
                             <div className="space-y-2">
                                 {selected.checklist?.map((item: string, i: number) => (
-                                    <label key={i} className="flex items-start gap-2 text-sm text-slate-300 cursor-pointer group">
+                                    <label key={i} className="flex items-start gap-2 text-sm text-content-default cursor-pointer group">
                                         <input type="checkbox" className="mt-1 accent-brand-500" />
-                                        <span className="group-hover:text-white transition">{item}</span>
+                                        <span className="group-hover:text-content-emphasis transition">{item}</span>
                                     </label>
                                 ))}
                             </div>
                         </div>
                     </div>
                 ) : (
-                    <div className="glass-card p-12 text-center text-slate-500">
+                    <div className="glass-card p-12 text-center text-content-subtle">
                         <p>{t('selectClause')}</p>
                     </div>
                 )}

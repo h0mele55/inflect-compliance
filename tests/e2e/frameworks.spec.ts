@@ -29,130 +29,85 @@ test.describe('Framework Coverage UI', () => {
     });
 
     test('framework cards are visible', async () => {
-        // Wait for loading to finish - cards or empty state
-        await page.waitForTimeout(3000);
-        const cards = await page.locator('[id^="fw-card-"]').count();
-        // Cards may or may not exist depending on seed state
-        // Just verify page loaded without errors
-        expect(cards).toBeGreaterThanOrEqual(0);
+        // Seed guarantees at least ISO27001 + SOC2 + NIS2 + ISO9001 + ISO28000 + ISO39001.
+        const cards = page.locator('[id^="fw-card-"]');
+        await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+        expect(await cards.count()).toBeGreaterThanOrEqual(1);
     });
 
     test('can navigate to framework detail', async () => {
         const viewBtn = page.locator('[id^="view-framework-"]').first();
-        const hasFrameworks = await viewBtn.isVisible().catch(() => false);
-        if (!hasFrameworks) {
-            test.skip();
-            return;
-        }
+        await expect(viewBtn).toBeVisible({ timeout: 30_000 });
         await viewBtn.click();
         // Framework detail is a client page that fetches 4 API endpoints.
         // On first access, Next.js JIT-compiles the page + all API routes,
         // which can take 30-60s in cold environments.
         await page.waitForLoadState('networkidle').catch(() => {});
-        await page.waitForSelector('#framework-detail-heading', { timeout: 60000 });
-        await expect(page.locator('#framework-detail-heading')).toBeVisible();
+        await expect(page.locator('#framework-detail-heading')).toBeVisible({ timeout: 60_000 });
     });
 
     test('detail page shows tabs', async () => {
-        const heading = page.locator('#framework-detail-heading');
-        if (!await heading.isVisible().catch(() => false)) {
-            // Navigate to first available framework
-            await page.goto(`/t/${tenantSlug}/frameworks/ISO27001`);
-            await page.waitForSelector('#framework-detail-heading', { timeout: 15000 }).catch(() => null);
-        }
-        if (!await page.locator('#framework-detail-heading').isVisible().catch(() => false)) {
-            test.skip();
-            return;
-        }
+        // The previous test may have navigated away; re-establish the
+        // framework detail view deterministically via the URL.
+        await page.goto(`/t/${tenantSlug}/frameworks/ISO27001`);
+        await expect(page.locator('#framework-detail-heading')).toBeVisible({ timeout: 60_000 });
         await expect(page.locator('#tab-requirements')).toBeVisible();
         await expect(page.locator('#tab-packs')).toBeVisible();
         await expect(page.locator('#tab-coverage')).toBeVisible();
     });
 
     test('requirements tab works', async () => {
-        const reqsTab = page.locator('#tab-requirements');
-        if (!await reqsTab.isVisible().catch(() => false)) { test.skip(); return; }
-        await reqsTab.click();
-        await page.waitForSelector('#requirements-panel', { timeout: 10000 }).catch(() => null);
-        const panel = page.locator('#requirements-panel');
-        if (await panel.isVisible()) {
-            await expect(page.locator('#requirements-search')).toBeVisible();
-        }
+        await expect(page.locator('#tab-requirements')).toBeVisible({ timeout: 30_000 });
+        await page.locator('#tab-requirements').click();
+        await expect(page.locator('#requirements-panel')).toBeVisible({ timeout: 30_000 });
+        await expect(page.locator('#requirements-search')).toBeVisible();
     });
 
     test('packs tab works', async () => {
-        const packsTab = page.locator('#tab-packs');
-        if (!await packsTab.isVisible().catch(() => false)) { test.skip(); return; }
-        await packsTab.click();
-        await page.waitForSelector('#packs-panel', { timeout: 10000 }).catch(() => null);
-        await expect(page.locator('#packs-panel')).toBeVisible();
+        await expect(page.locator('#tab-packs')).toBeVisible({ timeout: 30_000 });
+        await page.locator('#tab-packs').click();
+        await expect(page.locator('#packs-panel')).toBeVisible({ timeout: 30_000 });
     });
 
     test('coverage tab works', async () => {
-        const covTab = page.locator('#tab-coverage');
-        if (!await covTab.isVisible().catch(() => false)) { test.skip(); return; }
-        await covTab.click();
-        await page.waitForSelector('#coverage-panel', { timeout: 10000 }).catch(() => null);
+        await expect(page.locator('#tab-coverage')).toBeVisible({ timeout: 30_000 });
+        await page.locator('#tab-coverage').click();
+        await expect(page.locator('#coverage-panel')).toBeVisible({ timeout: 30_000 });
     });
 
     test('install wizard loads', async () => {
         await page.goto(`/t/${tenantSlug}/frameworks/ISO27001/install`);
         await page.waitForLoadState('networkidle');
-        await page.waitForSelector('#install-wizard-heading', { timeout: 15000 }).catch(() => null);
-        const heading = page.locator('#install-wizard-heading');
-        if (!await heading.isVisible().catch(() => false)) { test.skip(); return; }
-        await expect(heading).toContainText('Install');
+        await expect(page.locator('#install-wizard-heading')).toContainText('Install', { timeout: 30_000 });
     });
 
     test('install wizard shows preview', async () => {
-        const heading = page.locator('#install-wizard-heading');
-        if (!await heading.isVisible().catch(() => false)) { test.skip(); return; }
-        // Wait for preview to load (pack auto-selects)
-        await page.waitForSelector('#preview-new-controls', { timeout: 15000 }).catch(() => null);
-        const previewEl = page.locator('#preview-new-controls');
-        if (await previewEl.isVisible().catch(() => false)) {
-            const text = await previewEl.textContent();
-            expect(parseInt(text || '0')).toBeGreaterThanOrEqual(0);
-        }
+        // The wizard auto-selects the first pack and renders the preview
+        // counter; its value depends on seed state but must be numeric.
+        await expect(page.locator('#install-wizard-heading')).toBeVisible({ timeout: 30_000 });
+        await expect(page.locator('#preview-new-controls')).toBeVisible({ timeout: 30_000 });
+        const text = await page.locator('#preview-new-controls').textContent();
+        expect(parseInt(text || 'NaN')).toBeGreaterThanOrEqual(0);
     });
 
     test('can install pack', async () => {
         const installBtn = page.locator('#confirm-install-btn');
-        if (!await installBtn.isVisible().catch(() => false)) { test.skip(); return; }
-        const btnText = await installBtn.textContent();
-        if (btnText?.includes('already installed')) {
-            // Already installed — verify
+        await expect(installBtn).toBeVisible({ timeout: 30_000 });
+        const btnText = (await installBtn.textContent()) || '';
+        if (btnText.includes('already installed')) {
+            // Idempotent path: seed already installed the pack links, so
+            // the button reflects the "already installed" end state.
             expect(btnText).toContain('already installed');
             return;
         }
         await installBtn.click();
-        await page.waitForSelector('#install-result', { timeout: 60000 }).catch(() => null);
-        if (await page.locator('#install-result').isVisible().catch(() => false)) {
-            await expect(page.locator('#install-result')).toContainText('Successfully');
-        }
+        await expect(page.locator('#install-result')).toContainText('Successfully', { timeout: 60_000 });
     });
 
-    test('coverage report page loads', async () => {
-        await page.goto(`/t/${tenantSlug}/frameworks/ISO27001/coverage`);
-        await page.waitForLoadState('networkidle');
-        await page.waitForSelector('#coverage-report-heading', { timeout: 15000 }).catch(() => null);
-        const heading = page.locator('#coverage-report-heading');
-        if (!await heading.isVisible().catch(() => false)) { test.skip(); return; }
-        await expect(heading).toContainText('Coverage Report');
-    });
-
-    test('coverage report has metrics', async () => {
-        const total = page.locator('#cov-total');
-        if (!await total.isVisible().catch(() => false)) { test.skip(); return; }
-        await expect(total).toBeVisible();
-        await expect(page.locator('#cov-percent')).toBeVisible();
-    });
-
-    test('coverage report has export and filter buttons', async () => {
-        const csvBtn = page.locator('#export-csv-btn');
-        if (!await csvBtn.isVisible().catch(() => false)) { test.skip(); return; }
-        await expect(csvBtn).toBeVisible();
-        await expect(page.locator('#export-json-btn')).toBeVisible();
-        await expect(page.locator('#filter-all')).toBeVisible();
-    });
+    // Coverage data is exposed via the in-page Coverage tab on the
+    // framework detail page (see "coverage tab works" above). There is
+    // no separate `/frameworks/[key]/coverage` route in the product
+    // surface — the standalone-route smoke tests previously here were
+    // always skipped and have been removed in the Epic 55/56 cleanup
+    // pass.
 });

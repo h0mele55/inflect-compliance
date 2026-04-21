@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { statusBadgeVariants } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@dub/utils';
 
 // ─── Types ───
@@ -435,28 +436,37 @@ export default function MembersAdminPage() {
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-1 flex-wrap">
-                                            <button
-                                                className={cn(
-                                                    statusBadgeVariants({ variant: ROLE_VARIANT[m.role] || 'neutral' }),
-                                                    'cursor-pointer hover:opacity-80 transition',
-                                                )}
-                                                onClick={() => {
-                                                    if (m.status === 'ACTIVE') {
-                                                        setEditingRoleId(m.id);
-                                                        setPendingRole(m.role);
-                                                        setPendingCustomRoleId(m.customRoleId);
-                                                    }
-                                                }}
-                                                title={m.status === 'ACTIVE' ? 'Click to change role' : ''}
-                                                id={`role-badge-${m.id}`}
+                                            <Tooltip
+                                                content="Click to change role"
+                                                disabled={m.status !== 'ACTIVE'}
                                             >
-                                                {m.role}
-                                                {m.status === 'ACTIVE' && <ChevronDown className="w-3 h-3 ml-0.5" />}
-                                            </button>
+                                                <button
+                                                    className={cn(
+                                                        statusBadgeVariants({ variant: ROLE_VARIANT[m.role] || 'neutral' }),
+                                                        'cursor-pointer hover:opacity-80 transition',
+                                                    )}
+                                                    onClick={() => {
+                                                        if (m.status === 'ACTIVE') {
+                                                            setEditingRoleId(m.id);
+                                                            setPendingRole(m.role);
+                                                            setPendingCustomRoleId(m.customRoleId);
+                                                        }
+                                                    }}
+                                                    id={`role-badge-${m.id}`}
+                                                >
+                                                    {m.role}
+                                                    {m.status === 'ACTIVE' && <ChevronDown className="w-3 h-3 ml-0.5" />}
+                                                </button>
+                                            </Tooltip>
                                             {m.customRole && (
-                                                <span className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30" title={`Custom role: ${m.customRole.name}`}>
-                                                    {m.customRole.name}
-                                                </span>
+                                                <Tooltip
+                                                    title="Custom role"
+                                                    content={m.customRole.name}
+                                                >
+                                                    <span className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30 cursor-help">
+                                                        {m.customRole.name}
+                                                    </span>
+                                                </Tooltip>
                                             )}
                                         </div>
                                     )}

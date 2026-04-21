@@ -9,6 +9,7 @@ import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-c
 import { SkeletonLine, SkeletonCard } from '@/components/ui/skeleton';
 import { UserCombobox } from '@/components/ui/user-combobox';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { CopyText } from '@/components/ui/copy-text';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -238,7 +239,7 @@ export default function TaskDetailPage() {
         </div>
     );
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
-    if (!task) return <div className="p-12 text-center text-slate-500">Task not found.</div>;
+    if (!task) return <div className="p-12 text-center text-content-subtle">Task not found.</div>;
 
     const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
         { key: 'overview', label: 'Overview', icon: <AppIcon name="overview" size={14} /> },
@@ -257,10 +258,19 @@ export default function TaskDetailPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <Link href={tenantHref('/tasks')} className="text-slate-400 text-xs hover:text-white transition">← Tasks</Link>
+                    <Link href={tenantHref('/tasks')} className="text-content-muted text-xs hover:text-content-emphasis transition">← Tasks</Link>
                     <h1 className="text-2xl font-bold mt-1" id="task-title">{task.title}</h1>
                     <div className="flex gap-2 mt-1 flex-wrap items-center">
-                        {task.key && <span className="text-xs font-mono text-slate-500">{task.key}</span>}
+                        {task.key && (
+                            <CopyText
+                                value={task.key}
+                                label={`Copy task key ${task.key}`}
+                                successMessage="Task key copied"
+                                className="text-xs text-content-subtle"
+                            >
+                                {task.key}
+                            </CopyText>
+                        )}
                         <span className={`badge ${STATUS_BADGE[task.status] || 'badge-neutral'}`} id="task-status">
                             {STATUS_LABELS[task.status] || task.status}
                         </span>
@@ -298,8 +308,8 @@ export default function TaskDetailPage() {
             {permissions.canWrite && (
                 <div className="glass-card p-4">
                     <div className="flex items-center gap-3">
-                        <span className="text-sm text-slate-400">Assignee:</span>
-                        <span className="text-sm text-white font-medium" id="task-assignee">
+                        <span className="text-sm text-content-muted">Assignee:</span>
+                        <span className="text-sm text-content-emphasis font-medium" id="task-assignee">
                             {task.assignee?.name || task.assigneeUserId || 'Unassigned'}
                         </span>
                         <div className="w-64">
@@ -323,11 +333,11 @@ export default function TaskDetailPage() {
             )}
 
             {/* Tabs */}
-            <div className="flex gap-1 border-b border-slate-700">
+            <div className="flex gap-1 border-b border-border-default">
                 {tabs.map(t => (
                     <button
                         key={t.key}
-                        className={`px-4 py-2 text-sm font-medium transition border-b-2 ${tab === t.key ? 'border-brand-400 text-white' : 'border-transparent text-slate-400 hover:text-white'}`}
+                        className={`px-4 py-2 text-sm font-medium transition border-b-2 ${tab === t.key ? 'border-brand-400 text-content-emphasis' : 'border-transparent text-content-muted hover:text-content-emphasis'}`}
                         onClick={() => setTab(t.key)}
                         id={`tab-${t.key}`}
                     >
@@ -341,72 +351,72 @@ export default function TaskDetailPage() {
                 <div className="glass-card p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-6">
                         <div className="col-span-2">
-                            <span className="text-xs text-slate-500 uppercase">Description</span>
-                            <p className="text-sm text-slate-300 mt-1 whitespace-pre-wrap">{task.description || 'No description.'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Description</span>
+                            <p className="text-sm text-content-default mt-1 whitespace-pre-wrap">{task.description || 'No description.'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Type</span>
-                            <p className="text-sm text-slate-300 mt-1">{TYPE_LABELS[task.type] || task.type}</p>
+                            <span className="text-xs text-content-subtle uppercase">Type</span>
+                            <p className="text-sm text-content-default mt-1">{TYPE_LABELS[task.type] || task.type}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Priority</span>
-                            <p className="text-sm text-slate-300 mt-1">{PRIORITY_LABELS[task.priority] || task.priority}</p>
+                            <span className="text-xs text-content-subtle uppercase">Priority</span>
+                            <p className="text-sm text-content-default mt-1">{PRIORITY_LABELS[task.priority] || task.priority}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Assignee</span>
-                            <p className="text-sm text-slate-300 mt-1">{task.assignee?.name || '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Assignee</span>
+                            <p className="text-sm text-content-default mt-1">{task.assignee?.name || '—'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Reporter</span>
-                            <p className="text-sm text-slate-300 mt-1">{task.createdBy?.name || '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Reporter</span>
+                            <p className="text-sm text-content-default mt-1">{task.createdBy?.name || '—'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Due Date</span>
-                            <p className="text-sm text-slate-300 mt-1">{task.dueAt ? formatDate(task.dueAt) : '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Due Date</span>
+                            <p className="text-sm text-content-default mt-1">{task.dueAt ? formatDate(task.dueAt) : '—'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Created</span>
-                            <p className="text-sm text-slate-300 mt-1">{formatDateTime(task.createdAt)}</p>
+                            <span className="text-xs text-content-subtle uppercase">Created</span>
+                            <p className="text-sm text-content-default mt-1">{formatDateTime(task.createdAt)}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Created By</span>
-                            <p className="text-sm text-slate-300 mt-1">{task.createdBy?.name || '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Created By</span>
+                            <p className="text-sm text-content-default mt-1">{task.createdBy?.name || '—'}</p>
                         </div>
                         {task.control && (
                             <div>
-                                <span className="text-xs text-slate-500 uppercase">Control</span>
-                                <p className="text-sm text-slate-300 mt-1">{task.control.code} — {task.control.name}</p>
+                                <span className="text-xs text-content-subtle uppercase">Control</span>
+                                <p className="text-sm text-content-default mt-1">{task.control.code} — {task.control.name}</p>
                             </div>
                         )}
                         {task.completedAt && (
                             <div>
-                                <span className="text-xs text-slate-500 uppercase">Completed At</span>
+                                <span className="text-xs text-content-subtle uppercase">Completed At</span>
                                 <p className="text-sm text-emerald-400 mt-1">{formatDateTime(task.completedAt)}</p>
                             </div>
                         )}
                         {task.resolution && (
                             <div className="col-span-2">
-                                <span className="text-xs text-slate-500 uppercase">Resolution</span>
-                                <p className="text-sm text-slate-300 mt-1 whitespace-pre-wrap">{task.resolution}</p>
+                                <span className="text-xs text-content-subtle uppercase">Resolution</span>
+                                <p className="text-sm text-content-default mt-1 whitespace-pre-wrap">{task.resolution}</p>
                             </div>
                         )}
                     </div>
 
                     {/* Audit / Finding Fields from metadataJson */}
                     {(task.type === 'AUDIT_FINDING' || task.type === 'CONTROL_GAP') && (metadata.findingSource || metadata.controlGapType) && (
-                        <div className="border-t border-slate-700 pt-4 mt-4">
-                            <h3 className="text-sm font-semibold text-slate-300 mb-3">Audit Details</h3>
+                        <div className="border-t border-border-default pt-4 mt-4">
+                            <h3 className="text-sm font-semibold text-content-default mb-3">Audit Details</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 {metadata.findingSource && (
                                     <div>
-                                        <span className="text-xs text-slate-500 uppercase">Finding Source</span>
-                                        <p className="text-sm text-slate-300 mt-1">{FINDING_SOURCE_LABELS[metadata.findingSource] || metadata.findingSource}</p>
+                                        <span className="text-xs text-content-subtle uppercase">Finding Source</span>
+                                        <p className="text-sm text-content-default mt-1">{FINDING_SOURCE_LABELS[metadata.findingSource] || metadata.findingSource}</p>
                                     </div>
                                 )}
                                 {metadata.controlGapType && (
                                     <div>
-                                        <span className="text-xs text-slate-500 uppercase">Control Gap Type</span>
-                                        <p className="text-sm text-slate-300 mt-1">{GAP_TYPE_LABELS[metadata.controlGapType] || metadata.controlGapType}</p>
+                                        <span className="text-xs text-content-subtle uppercase">Control Gap Type</span>
+                                        <p className="text-sm text-content-default mt-1">{GAP_TYPE_LABELS[metadata.controlGapType] || metadata.controlGapType}</p>
                                     </div>
                                 )}
                             </div>
@@ -445,7 +455,7 @@ export default function TaskDetailPage() {
                                 ))}
                             </div>
                         ) : links.length === 0 ? (
-                            <div className="p-8 text-center text-slate-500 text-sm">No links yet</div>
+                            <div className="p-8 text-center text-content-subtle text-sm">No links yet</div>
                         ) : (
                             <table className="data-table" id="links-list">
                                 <thead>
@@ -455,9 +465,9 @@ export default function TaskDetailPage() {
                                     {links.map((l: any) => (
                                         <tr key={l.id}>
                                             <td><span className="badge badge-info text-xs">{l.entityType}</span></td>
-                                            <td className="text-sm text-slate-300 font-mono">{l.entityId}</td>
-                                            <td className="text-xs text-slate-400">{l.relation?.replace(/_/g, ' ') || '—'}</td>
-                                            <td className="text-xs text-slate-400">{formatDate(l.createdAt)}</td>
+                                            <td className="text-sm text-content-default font-mono">{l.entityId}</td>
+                                            <td className="text-xs text-content-muted">{l.relation?.replace(/_/g, ' ') || '—'}</td>
+                                            <td className="text-xs text-content-muted">{formatDate(l.createdAt)}</td>
                                             {permissions.canWrite && (
                                                 <td>
                                                     <button className="text-red-400 text-xs hover:text-red-300" onClick={() => removeLink(l.id)}>
@@ -504,16 +514,16 @@ export default function TaskDetailPage() {
                                 ))}
                             </div>
                         ) : comments.length === 0 ? (
-                            <div className="p-8 text-center text-slate-500 text-sm">No comments yet</div>
+                            <div className="p-8 text-center text-content-subtle text-sm">No comments yet</div>
                         ) : (
-                            <div className="divide-y divide-slate-700/50">
+                            <div className="divide-y divide-border-default/50">
                                 {comments.map((c: any) => (
                                     <div key={c.id} className="px-5 py-3">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-sm font-medium text-white">{c.createdBy?.name || 'Unknown'}</span>
-                                            <span className="text-xs text-slate-500">{formatDateTime(c.createdAt)}</span>
+                                            <span className="text-sm font-medium text-content-emphasis">{c.createdBy?.name || 'Unknown'}</span>
+                                            <span className="text-xs text-content-subtle">{formatDateTime(c.createdAt)}</span>
                                         </div>
-                                        <p className="text-sm text-slate-300 whitespace-pre-wrap">{c.body}</p>
+                                        <p className="text-sm text-content-default whitespace-pre-wrap">{c.body}</p>
                                     </div>
                                 ))}
                             </div>
@@ -529,7 +539,7 @@ export default function TaskDetailPage() {
                         <div className="p-4 space-y-3">
                             {Array.from({ length: 4 }).map((_, i) => (
                                 <div key={i} className="flex items-start gap-3">
-                                    <div className="animate-pulse rounded-full bg-slate-700/60 w-2 h-2 mt-2" />
+                                    <div className="animate-pulse rounded-full bg-bg-elevated/60 w-2 h-2 mt-2" />
                                     <div className="flex-1 space-y-1">
                                         <SkeletonLine className="w-48" />
                                         <SkeletonLine className="w-full" />
@@ -538,19 +548,19 @@ export default function TaskDetailPage() {
                             ))}
                         </div>
                     ) : activity.length === 0 ? (
-                        <div className="p-8 text-center text-slate-500 text-sm">No activity yet</div>
+                        <div className="p-8 text-center text-content-subtle text-sm">No activity yet</div>
                     ) : (
-                        <div className="divide-y divide-slate-700/50">
+                        <div className="divide-y divide-border-default/50">
                             {activity.map((evt: any) => (
                                 <div key={evt.id} className="px-5 py-3 flex items-start gap-3">
                                     <div className="w-2 h-2 rounded-full bg-brand-400 mt-2 shrink-0" />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-0.5">
-                                            <span className="text-sm font-medium text-white">{evt.user?.name || 'System'}</span>
+                                            <span className="text-sm font-medium text-content-emphasis">{evt.user?.name || 'System'}</span>
                                             <span className="badge badge-neutral text-xs">{evt.action?.replace(/_/g, ' ')}</span>
                                         </div>
-                                        <p className="text-xs text-slate-400 truncate">{evt.details?.split('\n')[0]}</p>
-                                        <span className="text-xs text-slate-500">{formatDateTime(evt.createdAt)}</span>
+                                        <p className="text-xs text-content-muted truncate">{evt.details?.split('\n')[0]}</p>
+                                        <span className="text-xs text-content-subtle">{formatDateTime(evt.createdAt)}</span>
                                     </div>
                                 </div>
                             ))}

@@ -167,12 +167,15 @@ describe('CSP Hardening', () => {
     });
 
     test('CSP module does NOT have unsafe-inline in production script-src', () => {
-        // unsafe-inline should only appear in dev-conditional blocks
-        const scriptLines = csp.split('\n')
-            .filter(l => l.includes("'unsafe-inline'"));
-        for (const line of scriptLines) {
-            expect(line).toMatch(/isDev|dev/i);
-        }
+        // script-src must never allow 'unsafe-inline' (strict-dynamic +
+        // nonce only). style-src intentionally carries 'unsafe-inline'
+        // so dynamic SSR style="" attributes render — assert at runtime
+        // instead of scanning source, since the csp.ts layout now has
+        // an unconditional 'unsafe-inline' in the style-src block.
+        const { buildCspHeader, generateNonce } = require('../../src/lib/security/csp');
+        const header: string = buildCspHeader(generateNonce(), false);
+        const scriptSrc = header.split(';').find((d: string) => d.trim().startsWith('script-src'))!;
+        expect(scriptSrc).not.toContain("'unsafe-inline'");
     });
 
     test('CSP has report-to directive', () => {

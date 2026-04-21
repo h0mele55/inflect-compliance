@@ -28,6 +28,7 @@ import { ComponentProps, type HTMLAttributes, type ReactNode } from "react";
 import { ContentProps, type DialogProps, Drawer } from "vaul";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { useMediaQuery } from "./hooks";
+import { Tooltip } from "./tooltip";
 
 // ─── Size variants (desktop width) ──────────────────────────────────
 
@@ -229,16 +230,18 @@ function Header({
                 {children}
             </div>
             {showCloseButton ? (
-                <Drawer.Close asChild>
-                    <button
-                        type="button"
-                        aria-label="Close"
-                        data-sheet-close
-                        className="shrink-0 rounded-md p-1.5 text-content-muted transition-colors hover:bg-bg-muted hover:text-content-emphasis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <X className="size-4" />
-                    </button>
-                </Drawer.Close>
+                <Tooltip content="Close" shortcut="Esc">
+                    <Drawer.Close asChild>
+                        <button
+                            type="button"
+                            aria-label="Close"
+                            data-sheet-close
+                            className="shrink-0 rounded-md p-1.5 text-content-muted transition-colors hover:bg-bg-muted hover:text-content-emphasis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <X className="size-4" />
+                        </button>
+                    </Drawer.Close>
+                </Tooltip>
             ) : null}
         </div>
     );

@@ -71,6 +71,10 @@ export async function installPack(ctx: RequestContext, packKey: string) {
     });
     if (!pack) throw notFound('Pack not found');
 
+    // ISO27001 has 93 controls × (lookup + create + 5 default tasks +
+    // requirement-link upserts), which is too much work for the default
+    // 5 s Prisma interactive-transaction timeout. Bump it to 60 s so the
+    // entire pack install runs atomically.
     return runInTenantContext(ctx, async (tdb) => {
         let controlsCreated = 0;
         let tasksCreated = 0;
@@ -153,7 +157,7 @@ export async function installPack(ctx: RequestContext, packKey: string) {
             tasksCreated,
             mappingsCreated,
         };
-    });
+    }, { timeout: 60_000, maxWait: 10_000 });
 }
 
 // в”Ђв”Ђв”Ђ Coverage Computation в”Ђв”Ђв”Ђ

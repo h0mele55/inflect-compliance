@@ -236,12 +236,13 @@ describe('NewEvidenceTextModal — shared Modal composition', () => {
 
 describe('EvidenceClient — modal entry points', () => {
     it('imports both modals', () => {
-        expect(CLIENT_SRC).toMatch(
-            /from ['"]\.\/UploadEvidenceModal['"]/,
-        );
-        expect(CLIENT_SRC).toMatch(
-            /from ['"]\.\/NewEvidenceTextModal['"]/,
-        );
+        // Accept both static and dynamic imports (lazy-loading via next/dynamic)
+        const hasUpload = /from ['"]\.\/UploadEvidenceModal['"]/.test(CLIENT_SRC) ||
+            /import\(['"]\.\/UploadEvidenceModal['"]\)/.test(CLIENT_SRC);
+        expect(hasUpload).toBe(true);
+        const hasText = /from ['"]\.\/NewEvidenceTextModal['"]/.test(CLIENT_SRC) ||
+            /import\(['"]\.\/NewEvidenceTextModal['"]\)/.test(CLIENT_SRC);
+        expect(hasText).toBe(true);
     });
 
     it('mounts <UploadEvidenceModal> with tenant helpers and controls', () => {

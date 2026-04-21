@@ -8,5 +8,5 @@ export default function IssueDashboardRedirect() {
     const router = useRouter();
     const tenantHref = useTenantHref();
     useEffect(() => { router.replace(tenantHref('/tasks/dashboard')); }, [router, tenantHref]);
-    return <div className="p-12 text-center text-slate-500 animate-pulse">Redirecting to Tasks…</div>;
+    return <div className="p-12 text-center text-content-subtle animate-pulse">Redirecting to Tasks…</div>;
 }

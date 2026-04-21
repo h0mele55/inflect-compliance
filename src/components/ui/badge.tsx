@@ -1,40 +1,67 @@
+/**
+ * Semantic Badge primitive (Epic 56).
+ *
+ * The unopinionated, composable badge used across the app — status chips,
+ * category tags, counters, version pills. Token-backed and CVA-driven so
+ * semantics stay consistent with the Button / StatusBadge / Tooltip layer.
+ *
+ * Prefer this over the legacy `className="badge badge-*"` CSS helpers
+ * (`src/app/globals.css`). Reach for `<StatusBadge>` instead when the
+ * badge needs a built-in icon or an explanatory tooltip — StatusBadge is
+ * the higher-level composition; Badge is the raw primitive.
+ *
+ *   <Badge variant="success">Published</Badge>
+ *   <Badge variant="error"   size="sm">Overdue</Badge>
+ *   <Badge variant="info">AI-Powered</Badge>
+ */
+
 import { cn } from "@dub/utils";
 import { cva, type VariantProps } from "class-variance-authority";
+import { forwardRef } from "react";
 
 const badgeVariants = cva(
-  "max-w-fit rounded-full border px-2 py-px text-xs font-medium whitespace-nowrap",
-  {
-    variants: {
-      variant: {
-        default: "border-neutral-400 text-neutral-500",
-        violet: "border-violet-600 bg-violet-600 text-white",
-        blue: "border-blue-500 bg-blue-500 text-white",
-        green: "border-green-100 bg-green-100 text-green-900",
-        sky: "border-sky-900 bg-sky-900 text-white",
-        black: "border-black bg-black text-white",
-        gray: "border-neutral-200 bg-neutral-100 text-neutral-800",
-        neutral: "border-neutral-400 text-neutral-500",
-        amber: "border-amber-800 bg-amber-800 text-white",
-        blueGradient:
-          "bg-gradient-to-r from-blue-100 via-blue-100/50 to-blue-100 border border-blue-200 text-blue-900",
-        rainbow:
-          "bg-gradient-to-r from-violet-600 to-pink-600 text-white border-transparent",
-      },
+    "inline-flex max-w-fit items-center gap-1 whitespace-nowrap rounded-full font-medium",
+    {
+        variants: {
+            variant: {
+                neutral: "bg-bg-subtle text-content-muted",
+                success: "bg-bg-success text-content-success",
+                warning: "bg-bg-warning text-content-warning",
+                error: "bg-bg-error text-content-error",
+                info: "bg-bg-info text-content-info",
+                attention: "bg-bg-attention text-content-attention",
+                brand: "bg-brand-subtle text-brand-muted",
+                outline:
+                    "border border-border-default bg-transparent text-content-muted",
+            },
+            size: {
+                sm: "px-1.5 py-0.5 text-[10px] leading-none",
+                md: "px-2 py-0.5 text-xs leading-tight",
+                lg: "px-2.5 py-1 text-[13px] leading-tight",
+            },
+        },
+        defaultVariants: {
+            variant: "neutral",
+            size: "md",
+        },
     },
-    defaultVariants: {
-      variant: "neutral",
-    },
-  },
 );
 
-interface BadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof badgeVariants> {}
+export interface BadgeProps
+    extends React.HTMLAttributes<HTMLSpanElement>,
+        VariantProps<typeof badgeVariants> {}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
-  return (
-    <span className={cn(badgeVariants({ variant }), className)} {...props} />
-  );
-}
+export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(function Badge(
+    { className, variant, size, ...props },
+    ref,
+) {
+    return (
+        <span
+            ref={ref}
+            className={cn(badgeVariants({ variant, size }), className)}
+            {...props}
+        />
+    );
+});
 
-export { Badge, badgeVariants };
+export { badgeVariants };

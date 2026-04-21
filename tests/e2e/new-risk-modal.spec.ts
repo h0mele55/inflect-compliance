@@ -12,19 +12,26 @@ import { loginAndGetTenant, safeGoto } from './e2e-utils';
  */
 
 test.describe('Epic 54 — New Risk modal', () => {
-    test.describe.configure({ mode: 'serial' });
+    // Each modal test gets its own fresh browser context. The default
+    // serial mode shares context across tests, and Radix Dialog leaves
+    // residual portal/focus-trap state that blocks the second open()
+    // in `next dev`. Per-test contexts are slightly slower but
+    // deterministic.
 
     let tenantSlug: string;
 
     test('clicking + New Risk opens the modal without navigating away', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/risks`);
+        // Reload to clear any Radix focus-trap state left behind by
+        // earlier modal-heavy specs in the same Playwright run.
+        await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#new-risk-btn', { timeout: 15000 });
         const listUrl = page.url();
 
         await page.click('#new-risk-btn');
 
-        await expect(page.locator('#risk-title')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#risk-title')).toBeVisible({ timeout: 60_000 });
         expect(page.url()).toBe(listUrl);
 
         // Close the modal so it doesn't leak into downstream serial-mode
@@ -37,23 +44,34 @@ test.describe('Epic 54 — New Risk modal', () => {
     test('Submit is disabled until Title is filled', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/risks`);
+        await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#new-risk-btn', { timeout: 15000 });
         await page.click('#new-risk-btn');
-        await expect(page.locator('#risk-title')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#risk-title')).toBeVisible({ timeout: 60_000 });
 
         await expect(page.locator('#submit-risk')).toBeDisabled();
         await page.fill('#risk-title', 'T');
         await expect(page.locator('#submit-risk')).toBeEnabled();
         await page.fill('#risk-title', '');
         await expect(page.locator('#submit-risk')).toBeDisabled();
+
+        // Close the modal so downstream serial-mode tests start with a
+        // clean overlay/focus-trap stack.
+        await page.click('#new-risk-cancel-btn');
+        await expect(page.locator('#risk-title')).toBeHidden({ timeout: 5000 });
     });
 
     test('Cancel closes the modal and the list stays visible', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/risks`);
+        // Reset transient focus-trap / overlay state from previous
+        // serial-mode tests; otherwise the new-risk-btn click can be
+        // absorbed by a lingering Radix overlay and the modal never
+        // mounts.
+        await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#new-risk-btn', { timeout: 15000 });
         await page.click('#new-risk-btn');
-        await expect(page.locator('#risk-title')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#risk-title')).toBeVisible({ timeout: 60_000 });
 
         await page.click('#new-risk-cancel-btn');
 
@@ -66,7 +84,7 @@ test.describe('Epic 54 — New Risk modal', () => {
         await safeGoto(page, `/t/${tenantSlug}/risks`);
         await page.waitForSelector('#new-risk-btn', { timeout: 15000 });
         await page.click('#new-risk-btn');
-        await expect(page.locator('#risk-title')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#risk-title')).toBeVisible({ timeout: 30_000 });
 
         const uid = Date.now().toString(36);
         const title = `Modal Risk ${uid}`;
@@ -88,6 +106,15 @@ test.describe('Epic 54 — New Risk modal', () => {
         await expect(page.locator('#risk-title')).toBeHidden({ timeout: 10000 });
 
         // List refreshes — the newly created risk appears.
+        // Serial-mode E2E runs accumulate rows across tests, so the new
+        // risk may land on page 2 of the register. Narrow the view via
+        // the search box (submit-on-Enter) so the assertion is
+        // pagination-independent.
+        const searchBox = page.getByPlaceholder(/Search risks/i).first();
+        if (await searchBox.count() > 0) {
+            await searchBox.fill(title);
+            await searchBox.press('Enter');
+        }
         await expect(page.locator('[data-testid="risks-table"]')).toContainText(
             title,
             { timeout: 15000 },

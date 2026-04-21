@@ -1,10 +1,12 @@
 'use client';
 import { formatDate } from '@/lib/format-date';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { ArrowLeft, Plus, Trash2, CheckCircle, XCircle, Loader2, Link2, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { Combobox } from '@/components/ui/combobox';
+import { Tooltip } from '@/components/ui/tooltip';
+import { DataTable, createColumns } from '@/components/ui/table';
 
 interface ConnectionDTO {
     id: string;
@@ -190,14 +192,14 @@ export default function AdminIntegrationsPage() {
                 {/* Webhook endpoint info */}
                 {webhookBaseUrl && (
                     <div className="glass-card p-4">
-                        <p className="text-xs text-slate-400 mb-1">Webhook Base URL</p>
+                        <p className="text-xs text-content-muted mb-1">Webhook Base URL</p>
                         <code className="text-sm text-brand-400 font-mono">{webhookBaseUrl}/&#123;provider&#125;</code>
                     </div>
                 )}
 
                 {/* Connections list */}
                 <div className="glass-card overflow-hidden">
-                    <div className="flex justify-between items-center p-4 border-b border-slate-700">
+                    <div className="flex justify-between items-center p-4 border-b border-border-default">
                         <h2 className="text-lg font-semibold">Configured Connections</h2>
                         <button
                             onClick={() => { resetForm(); setShowForm(true); }}
@@ -209,78 +211,63 @@ export default function AdminIntegrationsPage() {
                     </div>
 
                     {loading ? (
-                        <div className="p-8 text-center text-slate-500">
+                        <div className="p-8 text-center text-content-subtle">
                             <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
                             <span className="sr-only">Fetching integrations</span>
                         </div>
                     ) : connections.length === 0 ? (
-                        <div className="p-8 text-center text-slate-500">
+                        <div className="p-8 text-center text-content-subtle">
                             No integrations configured. Click &quot;Add Integration&quot; to get started.
                         </div>
                     ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Provider</th>
-                                    <th>Name</th>
-                                    <th>Status</th>
-                                    <th>Secrets</th>
-                                    <th>Last Test</th>
-                                    <th>Executions</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {connections.map(conn => (
-                                    <tr key={conn.id}>
-                                        <td>
-                                            <span className="badge badge-info">{conn.provider}</span>
-                                        </td>
-                                        <td className="font-medium">{conn.name}</td>
-                                        <td>
-                                            <span className={`badge ${conn.isEnabled ? 'badge-success' : 'badge-error'}`}>
-                                                {conn.isEnabled ? 'Active' : 'Disabled'}
-                                            </span>
-                                        </td>
-                                        <td className="text-slate-500 font-mono text-xs">••••••••</td>
-                                        <td className="text-xs text-slate-400">
-                                            {conn.lastTestedAt ? (
-                                                <span className="flex items-center gap-1">
-                                                    {conn.lastTestStatus === 'ok'
-                                                        ? <CheckCircle className="w-3 h-3 text-emerald-400" />
-                                                        : <XCircle className="w-3 h-3 text-red-400" />
-                                                    }
-                                                    {formatDate(conn.lastTestedAt)}
-                                                </span>
-                                            ) : '—'}
-                                        </td>
-                                        <td className="text-xs">{conn._count?.executions ?? 0}</td>
-                                        <td>
-                                            <div className="flex gap-1">
-                                                <button
-                                                    onClick={() => handleTest(conn)}
-                                                    className="btn btn-secondary btn-xs"
-                                                    disabled={testing === conn.id}
-                                                    title="Test connection"
-                                                >
-                                                    {testing === conn.id
-                                                        ? <Loader2 className="w-3 h-3 animate-spin" />
-                                                        : <Link2 className="w-3 h-3" />
-                                                    }
+                        (() => {
+                            const connCols = createColumns<ConnectionDTO>([
+                                { accessorKey: 'provider', header: 'Provider', cell: ({ getValue }: any) => <span className="badge badge-info">{getValue()}</span> },
+                                { accessorKey: 'name', header: 'Name', cell: ({ getValue }: any) => <span className="font-medium">{getValue()}</span> },
+                                {
+                                    id: 'status', header: 'Status', accessorKey: 'isEnabled',
+                                    cell: ({ row }: any) => <span className={`badge ${row.original.isEnabled ? 'badge-success' : 'badge-error'}`}>{row.original.isEnabled ? 'Active' : 'Disabled'}</span>,
+                                },
+                                { id: 'secrets', header: 'Secrets', cell: () => <span className="text-content-subtle font-mono text-xs">••••••••</span> },
+                                {
+                                    id: 'lastTest', header: 'Last Test', accessorKey: 'lastTestedAt',
+                                    cell: ({ row }: any) => row.original.lastTestedAt ? (
+                                        <span className="flex items-center gap-1 text-xs text-content-muted">
+                                            {row.original.lastTestStatus === 'ok' ? <CheckCircle className="w-3 h-3 text-emerald-400" /> : <XCircle className="w-3 h-3 text-red-400" />}
+                                            {formatDate(row.original.lastTestedAt)}
+                                        </span>
+                                    ) : <span className="text-content-subtle text-xs">—</span>,
+                                },
+                                { id: 'executions', header: 'Executions', accessorFn: (c: ConnectionDTO) => c._count?.executions ?? 0, cell: ({ getValue }: any) => <span className="text-xs">{getValue()}</span> },
+                                {
+                                    id: 'actions', header: 'Actions',
+                                    cell: ({ row }: any) => (
+                                        <div className="flex gap-1">
+                                            <Tooltip content="Test connection">
+                                                <button onClick={() => handleTest(row.original)} className="btn btn-secondary btn-xs" disabled={testing === row.original.id} aria-label="Test connection">
+                                                    {testing === row.original.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDisable(conn.id)}
-                                                    className="btn btn-secondary btn-xs text-red-400"
-                                                    title="Disable"
-                                                >
+                                            </Tooltip>
+                                            <Tooltip content="Disable integration">
+                                                <button onClick={() => handleDisable(row.original.id)} className="btn btn-secondary btn-xs text-red-400" aria-label="Disable integration">
                                                     <Trash2 className="w-3 h-3" />
                                                 </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                            </Tooltip>
+                                        </div>
+                                    ),
+                                },
+                            ]);
+                            return (
+                                <DataTable
+                                    data={connections}
+                                    columns={connCols}
+                                    getRowId={(c) => c.id}
+                                    emptyState='No integrations configured. Click "Add Integration" to get started.'
+                                    resourceName={(p) => p ? 'connections' : 'connection'}
+                                    data-testid="integrations-table"
+                                />
+                            );
+                        })()
                     )}
                 </div>
 
@@ -293,7 +280,7 @@ export default function AdminIntegrationsPage() {
 
                         {/* Provider select */}
                         <div>
-                            <label className="block text-sm text-slate-400 mb-1">Provider</label>
+                            <label className="block text-sm text-content-muted mb-1">Provider</label>
                             <Combobox
                                 id="integration-provider-select"
                                 selected={providers.map(p => ({ value: p.id, label: p.displayName })).find(o => o.value === formProvider) ?? null}
@@ -304,13 +291,13 @@ export default function AdminIntegrationsPage() {
                                 matchTriggerWidth
                             />
                             {selectedProvider && (
-                                <p className="text-xs text-slate-500 mt-1">{selectedProvider.description}</p>
+                                <p className="text-xs text-content-subtle mt-1">{selectedProvider.description}</p>
                             )}
                         </div>
 
                         {/* Name */}
                         <div>
-                            <label className="block text-sm text-slate-400 mb-1">Connection Name</label>
+                            <label className="block text-sm text-content-muted mb-1">Connection Name</label>
                             <input
                                 type="text"
                                 value={formName}
@@ -324,10 +311,10 @@ export default function AdminIntegrationsPage() {
                         {/* Config fields */}
                         {selectedProvider && selectedProvider.configSchema.configFields.length > 0 && (
                             <div className="space-y-3">
-                                <h4 className="text-sm font-medium text-slate-300">Configuration</h4>
+                                <h4 className="text-sm font-medium text-content-default">Configuration</h4>
                                 {selectedProvider.configSchema.configFields.map(field => (
                                     <div key={field.key}>
-                                        <label className="block text-xs text-slate-400 mb-1">
+                                        <label className="block text-xs text-content-muted mb-1">
                                             {field.label} {field.required && <span className="text-red-400">*</span>}
                                         </label>
                                         <input
@@ -338,7 +325,7 @@ export default function AdminIntegrationsPage() {
                                             placeholder={field.placeholder}
                                         />
                                         {field.description && (
-                                            <p className="text-xs text-slate-600 mt-0.5">{field.description}</p>
+                                            <p className="text-xs text-content-subtle mt-0.5">{field.description}</p>
                                         )}
                                     </div>
                                 ))}
@@ -349,7 +336,7 @@ export default function AdminIntegrationsPage() {
                         {selectedProvider && selectedProvider.configSchema.secretFields.length > 0 && (
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-medium text-slate-300">Secrets</h4>
+                                    <h4 className="text-sm font-medium text-content-default">Secrets</h4>
                                     <button
                                         onClick={() => setShowSecrets(!showSecrets)}
                                         className="btn btn-secondary btn-xs"
@@ -365,7 +352,7 @@ export default function AdminIntegrationsPage() {
                                 </div>
                                 {selectedProvider.configSchema.secretFields.map(field => (
                                     <div key={field.key}>
-                                        <label className="block text-xs text-slate-400 mb-1">
+                                        <label className="block text-xs text-content-muted mb-1">
                                             {field.label} {field.required && <span className="text-red-400">*</span>}
                                         </label>
                                         <input
@@ -384,7 +371,7 @@ export default function AdminIntegrationsPage() {
                         {/* Supported checks */}
                         {selectedProvider && (
                             <div>
-                                <h4 className="text-sm font-medium text-slate-300 mb-1">Supported Checks</h4>
+                                <h4 className="text-sm font-medium text-content-default mb-1">Supported Checks</h4>
                                 <div className="flex flex-wrap gap-1">
                                     {selectedProvider.supportedChecks.map(check => (
                                         <span key={check} className="badge badge-neutral text-xs">

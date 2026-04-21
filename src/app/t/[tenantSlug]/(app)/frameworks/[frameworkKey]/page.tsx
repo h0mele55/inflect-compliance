@@ -41,7 +41,7 @@ export default function FrameworkDetailPage() {
         })();
     }, [apiUrl, frameworkKey]);
 
-    if (loading) return <div className="p-8 animate-pulse text-slate-400">Loading framework...</div>;
+    if (loading) return <div className="p-8 animate-pulse text-content-muted">Loading framework...</div>;
     if (!framework) return <div className="p-8 text-red-400">Framework not found</div>;
 
     // Group requirements by section
@@ -79,14 +79,14 @@ export default function FrameworkDetailPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <div className="flex items-center gap-3">
-                        <Link href={tenantHref('/frameworks')} className="text-slate-400 hover:text-white transition-colors">← Frameworks</Link>
+                        <Link href={tenantHref('/frameworks')} className="text-content-muted hover:text-content-emphasis transition-colors">← Frameworks</Link>
                     </div>
-                    <h1 className="text-2xl font-bold text-white mt-2" id="framework-detail-heading">{framework.name}</h1>
+                    <h1 className="text-2xl font-bold text-content-emphasis mt-2" id="framework-detail-heading">{framework.name}</h1>
                     <div className="flex items-center gap-2 mt-1">
                         {framework.version && <span className="badge badge-primary text-xs">v{framework.version}</span>}
-                        {framework.kind && <span className="text-xs text-slate-500">{framework.kind.replace('_', ' ')}</span>}
+                        {framework.kind && <span className="text-xs text-content-subtle">{framework.kind.replace('_', ' ')}</span>}
                     </div>
-                    {framework.description && <p className="text-sm text-slate-400 mt-2">{framework.description}</p>}
+                    {framework.description && <p className="text-sm text-content-muted mt-2">{framework.description}</p>}
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Link href={tenantHref(`/frameworks/${frameworkKey}/templates`)} className="btn btn-secondary" id="browse-templates-cta">
@@ -101,12 +101,12 @@ export default function FrameworkDetailPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-slate-800/50 p-1 rounded-lg w-full sm:w-fit overflow-x-auto" id="framework-tabs">
+            <div className="flex gap-1 bg-bg-default/50 p-1 rounded-lg w-full sm:w-fit overflow-x-auto" id="framework-tabs">
                 {tabs.map(tab => (
                     <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === tab.key ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-white'
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === tab.key ? 'bg-brand-600 text-content-emphasis' : 'text-content-muted hover:text-content-emphasis'
                             }`}
                         id={`tab-${tab.key}`}
                     >
@@ -128,7 +128,7 @@ export default function FrameworkDetailPage() {
                             className="input w-full sm:w-72"
                             id="requirements-search"
                         />
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-content-subtle">
                             {Object.values(filteredGroups).flat().length} showing
                         </span>
                     </div>
@@ -146,11 +146,11 @@ export default function FrameworkDetailPage() {
                                         <div key={r.id}>
                                             <button
                                                 onClick={() => setExpandedReq(isExpanded ? null : r.id)}
-                                                className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-slate-700/30 transition-colors text-left"
+                                                className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-bg-elevated/30 transition-colors text-left"
                                             >
-                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isMapped ? 'bg-emerald-500' : 'bg-slate-600'}`} />
-                                                <code className="text-xs text-slate-500 font-mono w-16 sm:w-28 flex-shrink-0 truncate">{r.code}</code>
-                                                <span className="text-sm text-slate-300 flex-1">{r.title}</span>
+                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isMapped ? 'bg-emerald-500' : 'bg-border-emphasis'}`} />
+                                                <code className="text-xs text-content-subtle font-mono w-16 sm:w-28 flex-shrink-0 truncate">{r.code}</code>
+                                                <span className="text-sm text-content-default flex-1">{r.title}</span>
                                                 {isMapped ? (
                                                     <span className="badge badge-success text-xs">Mapped ({controls.length})</span>
                                                 ) : (
@@ -158,12 +158,12 @@ export default function FrameworkDetailPage() {
                                                 )}
                                             </button>
                                             {isExpanded && controls.length > 0 && (
-                                                <div className="ml-4 sm:ml-12 mt-1 mb-2 p-3 rounded-lg bg-slate-800/50 border border-slate-700/30">
-                                                    <p className="text-xs text-slate-500 mb-2">Mapped Controls:</p>
+                                                <div className="ml-4 sm:ml-12 mt-1 mb-2 p-3 rounded-lg bg-bg-default/50 border border-border-default/30">
+                                                    <p className="text-xs text-content-subtle mb-2">Mapped Controls:</p>
                                                     {controls.map((ctrl: any, i: number) => (
                                                         <div key={i} className="flex items-center gap-2 text-sm py-1">
                                                             <code className="text-xs text-brand-400 font-mono">{ctrl.controlCode}</code>
-                                                            <span className="text-slate-300">{ctrl.controlName}</span>
+                                                            <span className="text-content-default">{ctrl.controlName}</span>
                                                             <span className={`badge text-xs ${ctrl.controlStatus === 'IMPLEMENTED' ? 'badge-success' : ctrl.controlStatus === 'IN_PROGRESS' ? 'badge-warning' : 'badge-primary'}`}>
                                                                 {ctrl.controlStatus}
                                                             </span>
@@ -187,9 +187,9 @@ export default function FrameworkDetailPage() {
                         <div key={p.id} className="glass-card">
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <h3 className="text-lg font-semibold text-white">{p.name}</h3>
-                                    {p.description && <p className="text-sm text-slate-400 mt-1">{p.description}</p>}
-                                    <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+                                    <h3 className="text-lg font-semibold text-content-emphasis">{p.name}</h3>
+                                    {p.description && <p className="text-sm text-content-muted mt-1">{p.description}</p>}
+                                    <div className="flex items-center gap-3 mt-2 text-xs text-content-subtle">
                                         <span>{p._count?.templateLinks || 0} templates</span>
                                         {p.version && <span>v{p.version}</span>}
                                     </div>
@@ -207,7 +207,7 @@ export default function FrameworkDetailPage() {
                         </div>
                     ))}
                     {packs.length === 0 && (
-                        <div className="glass-card text-center py-8 text-slate-500">No packs available for this framework.</div>
+                        <div className="glass-card text-center py-8 text-content-subtle">No packs available for this framework.</div>
                     )}
                 </div>
             )}
@@ -218,28 +218,28 @@ export default function FrameworkDetailPage() {
                     {/* Summary cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="glass-card text-center">
-                            <div className="text-3xl font-bold text-white">{coverage.total}</div>
-                            <div className="text-xs text-slate-400 mt-1">Total Requirements</div>
+                            <div className="text-3xl font-bold text-content-emphasis">{coverage.total}</div>
+                            <div className="text-xs text-content-muted mt-1">Total Requirements</div>
                         </div>
                         <div className="glass-card text-center">
                             <div className="text-3xl font-bold text-emerald-400">{coverage.mapped}</div>
-                            <div className="text-xs text-slate-400 mt-1">Mapped</div>
+                            <div className="text-xs text-content-muted mt-1">Mapped</div>
                         </div>
                         <div className="glass-card text-center">
                             <div className={`text-3xl font-bold ${coverage.unmapped > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{coverage.unmapped}</div>
-                            <div className="text-xs text-slate-400 mt-1">Unmapped</div>
+                            <div className="text-xs text-content-muted mt-1">Unmapped</div>
                         </div>
                     </div>
 
                     {/* Coverage donut */}
                     <div className="glass-card">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold text-white">Overall Coverage</h3>
+                            <h3 className="text-lg font-semibold text-content-emphasis">Overall Coverage</h3>
                             <span className={`text-2xl font-bold ${coverage.coveragePercent === 100 ? 'text-emerald-400' : 'text-brand-400'}`}>
                                 {coverage.coveragePercent}%
                             </span>
                         </div>
-                        <div className="w-full h-3 rounded-full bg-slate-700/50 overflow-hidden">
+                        <div className="w-full h-3 rounded-full bg-bg-elevated/50 overflow-hidden">
                             <div
                                 className={`h-full rounded-full transition-all duration-1000 ${coverage.coveragePercent === 100 ? 'bg-emerald-500' : 'bg-brand-500'}`}
                                 style={{ width: `${coverage.coveragePercent}%` }}
@@ -250,17 +250,17 @@ export default function FrameworkDetailPage() {
                     {/* Section breakdown */}
                     {coverage.bySection?.length > 0 && (
                         <div className="glass-card">
-                            <h3 className="text-sm font-semibold text-white mb-3">Coverage by Section</h3>
+                            <h3 className="text-sm font-semibold text-content-emphasis mb-3">Coverage by Section</h3>
                             <div className="space-y-3">
                                 {coverage.bySection.map((s: any) => (
                                     <div key={s.section}>
                                         <div className="flex items-center justify-between text-xs mb-1">
-                                            <span className="text-slate-300">{s.section}</span>
-                                            <span className="text-slate-400">{s.mapped}/{s.total} ({s.coveragePercent}%)</span>
+                                            <span className="text-content-default">{s.section}</span>
+                                            <span className="text-content-muted">{s.mapped}/{s.total} ({s.coveragePercent}%)</span>
                                         </div>
-                                        <div className="w-full h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
+                                        <div className="w-full h-1.5 rounded-full bg-bg-elevated/50 overflow-hidden">
                                             <div
-                                                className={`h-full rounded-full ${s.coveragePercent === 100 ? 'bg-emerald-500' : s.coveragePercent > 0 ? 'bg-brand-500' : 'bg-slate-600'}`}
+                                                className={`h-full rounded-full ${s.coveragePercent === 100 ? 'bg-emerald-500' : s.coveragePercent > 0 ? 'bg-brand-500' : 'bg-border-emphasis'}`}
                                                 style={{ width: `${s.coveragePercent}%` }}
                                             />
                                         </div>
@@ -278,10 +278,10 @@ export default function FrameworkDetailPage() {
                             </h3>
                             <div className="space-y-1 max-h-64 overflow-y-auto">
                                 {coverage.unmappedRequirements.map((r: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-md hover:bg-slate-700/20 text-sm">
-                                        <span className="w-2 h-2 rounded-full bg-slate-600 flex-shrink-0" />
-                                        <code className="text-xs text-slate-500 font-mono w-16 sm:w-28 flex-shrink-0 truncate">{r.code}</code>
-                                        <span className="text-slate-400">{r.title}</span>
+                                    <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-md hover:bg-bg-elevated/20 text-sm">
+                                        <span className="w-2 h-2 rounded-full bg-border-emphasis flex-shrink-0" />
+                                        <code className="text-xs text-content-subtle font-mono w-16 sm:w-28 flex-shrink-0 truncate">{r.code}</code>
+                                        <span className="text-content-muted">{r.title}</span>
                                     </div>
                                 ))}
                             </div>

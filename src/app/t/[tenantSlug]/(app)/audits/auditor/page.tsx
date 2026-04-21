@@ -42,14 +42,14 @@ export default function AuditorPortalPage() {
         <div className="space-y-6 animate-fadeIn">
             <div>
                 <h1 className="text-2xl font-bold" id="auditor-heading">Auditor Portal</h1>
-                <p className="text-slate-400 text-sm">Review assigned audit packs</p>
+                <p className="text-content-muted text-sm">Review assigned audit packs</p>
             </div>
 
             {packs.length === 0 ? (
                 <div className="glass-card p-12 text-center">
-                    <div className="mb-4"><AppIcon name="lock" size={48} className="text-slate-400" /></div>
+                    <div className="mb-4"><AppIcon name="lock" size={48} className="text-content-muted" /></div>
                     <h3 className="text-lg font-semibold mb-2">No assigned packs</h3>
-                    <p className="text-slate-400 text-sm">You have not been assigned any audit packs yet.</p>
+                    <p className="text-content-muted text-sm">You have not been assigned any audit packs yet.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -58,15 +58,15 @@ export default function AuditorPortalPage() {
                             const meta = FW_META[p.cycle?.frameworkKey] || { icon: 'shield' as AppIconName, label: p.cycle?.frameworkKey || '' };
                             return (
                                 <button key={p.id} onClick={() => loadPack(p.id)}
-                                    className={`w-full text-left glass-card p-4 hover:bg-slate-700/30 transition ${selectedPack?.id === p.id ? 'ring-2 ring-brand-500' : ''}`}>
+                                    className={`w-full text-left glass-card p-4 hover:bg-bg-elevated/30 transition ${selectedPack?.id === p.id ? 'ring-2 ring-brand-500' : ''}`}>
                                     <div className="flex items-center gap-3">
                                         <AppIcon name={meta.icon} size={20} />
                                         <div className="min-w-0">
                                             <p className="font-medium text-sm truncate">{p.name}</p>
-                                            <p className="text-xs text-slate-500">{meta.label} · {p.status}</p>
+                                            <p className="text-xs text-content-subtle">{meta.label} · {p.status}</p>
                                         </div>
                                     </div>
-                                    <p className="text-xs text-slate-500 mt-1">{p.items?.length || 0} items</p>
+                                    <p className="text-xs text-content-subtle mt-1">{p.items?.length || 0} items</p>
                                 </button>
                             );
                         })}
@@ -77,7 +77,7 @@ export default function AuditorPortalPage() {
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <h2 className="text-lg font-bold" id="auditor-pack-name">{selectedPack.name}</h2>
-                                        <p className="text-sm text-slate-400">
+                                        <p className="text-sm text-content-muted">
                                             {selectedPack.status} · {selectedPack._count?.items || 0} items
                                             {selectedPack.frozenAt && ` · Frozen: ${formatDate(selectedPack.frozenAt)}`}
                                         </p>
@@ -96,15 +96,15 @@ export default function AuditorPortalPage() {
                                     });
                                     return Object.entries(grouped).map(([type, items]) => (
                                         <div key={type}>
-                                            <h3 className="text-sm font-semibold text-slate-300 mb-1">{type} ({items.length})</h3>
-                                            <div className="border border-slate-700/50 rounded-lg divide-y divide-slate-700/50">
+                                            <h3 className="text-sm font-semibold text-content-default mb-1">{type} ({items.length})</h3>
+                                            <div className="border border-border-default/50 rounded-lg divide-y divide-border-default/50">
                                                 {items.map((item: any) => {
                                                     let snap: any = {};
                                                     try { snap = JSON.parse(item.snapshotJson || '{}'); } catch { /* */ }
                                                     return (
                                                         <div key={item.id} className="p-2 text-sm">
                                                             <span className="font-medium">{snap.code || snap.title || snap.name || item.entityId}</span>
-                                                            {snap.description && <span className="text-xs text-slate-500 ml-2">{snap.description}</span>}
+                                                            {snap.description && <span className="text-xs text-content-subtle ml-2">{snap.description}</span>}
                                                         </div>
                                                     );
                                                 })}
@@ -114,7 +114,7 @@ export default function AuditorPortalPage() {
                                 })()}
                             </div>
                         ) : (
-                            <div className="glass-card p-12 text-center text-slate-500">
+                            <div className="glass-card p-12 text-center text-content-subtle">
                                 Select a pack to review
                             </div>
                         )}

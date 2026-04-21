@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
 import { Combobox } from '@/components/ui/combobox';
+import { Tooltip } from '@/components/ui/tooltip';
 
 const CRIT_BADGE: Record<string, string> = { LOW: 'badge-neutral', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
 const STATUS_BADGE: Record<string, string> = {
@@ -154,7 +155,7 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <Link href={tenantHref(`/vendors/${params.vendorId}`)} className="text-slate-400 hover:text-white">← Back to Vendor</Link>
+                    <Link href={tenantHref(`/vendors/${params.vendorId}`)} className="text-content-muted hover:text-content-emphasis">← Back to Vendor</Link>
                 </div>
             </div>
 
@@ -163,13 +164,13 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
                     <h1 className="text-xl font-bold" id="assessment-title">{assessment.template?.name || 'Assessment'}</h1>
                     <span className={`badge ${STATUS_BADGE[assessment.status]}`} id="assessment-status">{assessment.status}</span>
                 </div>
-                <div className="flex gap-4 text-sm text-slate-400">
-                    <span>Score: <strong className="text-white" id="assessment-score">{assessment.score != null ? assessment.score.toFixed(1) : '—'}</strong></span>
+                <div className="flex gap-4 text-sm text-content-muted">
+                    <span>Score: <strong className="text-content-emphasis" id="assessment-score">{assessment.score != null ? assessment.score.toFixed(1) : '—'}</strong></span>
                     <span>Rating: {assessment.riskRating ? <span className={`badge ${CRIT_BADGE[assessment.riskRating]}`} id="assessment-rating">{assessment.riskRating}</span> : '—'}</span>
                     <span>Requested by: {assessment.requestedBy?.name || '—'}</span>
                 </div>
-                {assessment.decidedBy && <p className="text-sm text-slate-400">Decided by: {assessment.decidedBy.name} on {formatDate(assessment.decidedAt)}</p>}
-                {assessment.notes && <p className="text-sm text-slate-300 bg-slate-800/50 p-2 rounded">{assessment.notes}</p>}
+                {assessment.decidedBy && <p className="text-sm text-content-muted">Decided by: {assessment.decidedBy.name} on {formatDate(assessment.decidedAt)}</p>}
+                {assessment.notes && <p className="text-sm text-content-default bg-bg-default/50 p-2 rounded">{assessment.notes}</p>}
             </div>
 
             {/* Saved message */}
@@ -178,16 +179,18 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
             {/* Questions by section */}
             {Object.entries(sections).map(([section, sQuestions]) => (
                 <div key={section} className="card p-5 space-y-4">
-                    <h2 className="text-lg font-semibold border-b border-slate-700 pb-2">{section}</h2>
+                    <h2 className="text-lg font-semibold border-b border-border-default pb-2">{section}</h2>
                     {sQuestions.map((q, idx) => (
                         <div key={q.id} className="space-y-1.5">
                             <div className="flex items-start gap-2">
-                                <span className="text-xs text-slate-500 font-mono mt-0.5">{q.sortOrder}.</span>
+                                <span className="text-xs text-content-subtle font-mono mt-0.5">{q.sortOrder}.</span>
                                 <div className="flex-1">
                                     <p className="text-sm font-medium">{q.prompt}{q.required && <span className="text-red-400 ml-1">*</span>}</p>
                                     <div className="mt-1.5">{renderInput(q)}</div>
                                 </div>
-                                <span className="text-xs text-slate-500" title="Weight">w:{q.weight}</span>
+                                <Tooltip content="Question weight — multiplies the response score in the overall risk calculation.">
+                                    <span className="text-xs text-content-subtle cursor-help">w:{q.weight}</span>
+                                </Tooltip>
                             </div>
                         </div>
                     ))}
@@ -219,7 +222,7 @@ export default function AssessmentPage({ params }: { params: { tenantSlug: strin
                     </div>
                 )}
                 {isDecided && (
-                    <div className="text-sm text-slate-400">
+                    <div className="text-sm text-content-muted">
                         Assessment is <strong className={assessment.status === 'APPROVED' ? 'text-green-400' : 'text-red-400'}>{assessment.status}</strong>.
                         {assessment.riskRating && <span className="ml-2">Risk Rating: <span className={`badge ${CRIT_BADGE[assessment.riskRating]}`}>{assessment.riskRating}</span></span>}
                     </div>

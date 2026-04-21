@@ -15,12 +15,11 @@
  *     framework surfaces live outside this scope (see below for the
  *     explicit exclusion list).
  *
- * Why not 0? Three surfaces remain in-scope-but-intentionally-deferred:
- * audits checklist inline result cell (AuditsClient.tsx) and framework
- * templates cascade filters (category + section). These are documented
- * in `docs/combobox-form-strategy.md` as "Deferred — complex cascade /
- * specialised UX" and can be migrated when the team chooses to
- * prioritise them.
+ * Baseline is 0: every native `<select>` inside the tenant app pages
+ * has been migrated to `<Combobox>` (or `<RadioGroup>` where the
+ * surface warranted inline options). New surfaces must not reintroduce
+ * native selects — reach for the shared primitives instead. See
+ * `docs/combobox-form-strategy.md` for the decision tree.
  */
 
 import * as fs from 'fs';
@@ -30,7 +29,7 @@ const APP_PAGES_ROOT = path.resolve(__dirname, '../../src/app/t');
 
 // Recorded at the Epic 55 close-out pass. Lower when you migrate;
 // never raise.
-const BASELINE_NATIVE_SELECTS = 3;
+const BASELINE_NATIVE_SELECTS = 0;
 
 function walk(dir: string, out: string[]): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -117,6 +116,9 @@ describe('Epic 55 — migrated surfaces must not regress to native <select>', ()
         'risks/ai/page.tsx',
         'policies/templates/page.tsx',
         'tests/runs/[runId]/page.tsx',
+        // Session 3 — final native-select closeouts (baseline → 0)
+        'audits/AuditsClient.tsx',
+        'frameworks/[frameworkKey]/templates/page.tsx',
     ].map((rel) => `[tenantSlug]/(app)/${rel}`);
 
     it.each(MIGRATED_FILES)(

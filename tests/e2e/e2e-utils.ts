@@ -6,6 +6,33 @@
  */
 import { type Page } from '@playwright/test';
 
+/**
+ * Pick an option from one of the shared `<Combobox>` controls (Epic 55
+ * replaced the legacy `<select>` here). Resolves the trigger by `id`,
+ * opens the popover, and clicks the option whose accessible name
+ * matches `optionLabel` (regex or string).
+ *
+ * Drop-in replacement for `page.selectOption('#foo', 'BAR')` against
+ * the migrated dropdowns — pass the visible LABEL of the desired
+ * option, not the underlying enum value.
+ */
+export async function selectComboboxOption(
+    page: Page,
+    triggerId: string,
+    optionLabel: string | RegExp,
+) {
+    await page.locator(`#${triggerId}`).click();
+    const matcher =
+        optionLabel instanceof RegExp
+            ? optionLabel
+            : new RegExp(`^\\s*${escapeRegex(optionLabel)}\\s*$`);
+    await page.getByRole('option', { name: matcher }).first().click();
+}
+
+function escapeRegex(s: string): string {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export const DEFAULT_USER = { email: 'admin@acme.com', password: 'password123' };
 
 /** Errors that indicate a transient server/network issue worth retrying. */
@@ -66,10 +93,19 @@ export async function loginAndGetTenant(
     page.on('console', msg => {
         if (msg.type() === 'error') {
             const text = msg.text();
-            // Suppress known-benign Next.js dev server warnings:
-            // - RSC payload fetch failures during JIT compilation (graceful fallback to browser nav)
-            // - ClientFetchError from session polling during page transitions
+            // Suppress known-benign network noise. These messages are the
+            // browser's automatic console log for any subresource that
+            // doesn't return 2xx — they're not JS errors and the tests
+            // that care about the response already assert on it directly.
+            // - RSC payload fetch failures during JIT compilation
+            // - ClientFetchError from session polling during transitions
+            // - `Failed to load resource: <status>` for 4xx / 5xx / aborted /
+            //   ERR_SSL_PROTOCOL_ERROR caused by chromium's speculative
+            //   prefetch of same-origin links while the previous navigation
+            //   is tearing down, and by tests that deliberately probe a
+            //   forbidden route (non-admin → /admin/*, expecting 403).
             if (text.includes('Failed to fetch RSC payload') || text.includes('ClientFetchError')) return;
+            if (text.startsWith('Failed to load resource')) return;
             console.log('BROWSER CONSOLE ERROR:', text);
         }
     });

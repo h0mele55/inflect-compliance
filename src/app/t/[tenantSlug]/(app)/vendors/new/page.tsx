@@ -6,6 +6,9 @@ import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
 // Epic 55 — vendor status is a two-option choice ("onboarding" vs
 // "active"). RadioGroup is the right primitive: both options are
@@ -83,49 +86,79 @@ export default function CreateVendorPage() {
     return (
         <div className="max-w-2xl mx-auto space-y-6">
             <div className="flex items-center gap-3">
-                <Link href={tenantHref('/vendors')} className="text-slate-400 hover:text-white">← Back</Link>
+                <Link href={tenantHref('/vendors')} className="text-content-muted hover:text-content-emphasis">← Back</Link>
                 <h1 className="text-2xl font-bold">New Vendor</h1>
             </div>
 
-            {error && <div className="bg-red-500/20 text-red-300 p-3 rounded" id="create-vendor-error">{error}</div>}
+            {error && (
+                <div
+                    role="alert"
+                    className="rounded border border-border-error bg-bg-error text-content-error p-3"
+                    id="create-vendor-error"
+                >
+                    {error}
+                </div>
+            )}
 
-            <form onSubmit={handleSubmit} className="card space-y-4 p-6">
+            <form onSubmit={handleSubmit} className="card space-y-4 p-6" noValidate>
                 {/* Name */}
-                <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Vendor Name *</label>
-                    <input className="input w-full" value={form.name} onChange={e => update('name', e.target.value)} required id="vendor-name-input" />
+                <FormField label="Vendor Name" required>
+                    <Input
+                        id="vendor-name-input"
+                        value={form.name}
+                        onChange={e => update('name', e.target.value)}
+                        required
+                    />
+                </FormField>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField label="Legal Name">
+                        <Input
+                            id="vendor-legal-name"
+                            value={form.legalName}
+                            onChange={e => update('legalName', e.target.value)}
+                        />
+                    </FormField>
+                    <FormField label="Domain">
+                        <Input
+                            id="vendor-domain"
+                            value={form.domain}
+                            onChange={e => update('domain', e.target.value)}
+                            placeholder="e.g. aws.amazon.com"
+                        />
+                    </FormField>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Legal Name</label>
-                        <input className="input w-full" value={form.legalName} onChange={e => update('legalName', e.target.value)} id="vendor-legal-name" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Domain</label>
-                        <input className="input w-full" value={form.domain} onChange={e => update('domain', e.target.value)} placeholder="e.g. aws.amazon.com" id="vendor-domain" />
-                    </div>
+                    <FormField label="Website URL">
+                        <Input
+                            id="vendor-website"
+                            type="url"
+                            value={form.websiteUrl}
+                            onChange={e => update('websiteUrl', e.target.value)}
+                        />
+                    </FormField>
+                    <FormField label="Country">
+                        <Input
+                            id="vendor-country"
+                            value={form.country}
+                            onChange={e => update('country', e.target.value)}
+                        />
+                    </FormField>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Website URL</label>
-                        <input className="input w-full" type="url" value={form.websiteUrl} onChange={e => update('websiteUrl', e.target.value)} id="vendor-website" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Country</label>
-                        <input className="input w-full" value={form.country} onChange={e => update('country', e.target.value)} id="vendor-country" />
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
-                    <textarea className="input w-full h-20" value={form.description} onChange={e => update('description', e.target.value)} id="vendor-description" />
-                </div>
+                <FormField label="Description">
+                    <Textarea
+                        id="vendor-description"
+                        className="h-20"
+                        value={form.description}
+                        onChange={e => update('description', e.target.value)}
+                    />
+                </FormField>
 
                 <div className="grid grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Status</label>
+                        <label className="block text-sm font-medium text-content-default mb-1">Status</label>
                         <RadioGroup
                             id="vendor-status-select"
                             value={form.status}
@@ -145,8 +178,7 @@ export default function CreateVendorPage() {
                             })}
                         </RadioGroup>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Criticality</label>
+                    <FormField label="Criticality">
                         <Combobox
                             id="vendor-criticality-select"
                             name="criticality"
@@ -159,9 +191,8 @@ export default function CreateVendorPage() {
                             buttonProps={{ className: 'w-full' }}
                             caret
                         />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Data Access</label>
+                    </FormField>
+                    <FormField label="Data Access">
                         <Combobox
                             id="vendor-data-access"
                             name="dataAccess"
@@ -174,21 +205,29 @@ export default function CreateVendorPage() {
                             buttonProps={{ className: 'w-full' }}
                             caret
                         />
-                    </div>
+                    </FormField>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Next Review Date</label>
-                        <input className="input w-full" type="date" value={form.nextReviewAt} onChange={e => update('nextReviewAt', e.target.value)} id="vendor-next-review" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Contract Renewal Date</label>
-                        <input className="input w-full" type="date" value={form.contractRenewalAt} onChange={e => update('contractRenewalAt', e.target.value)} id="vendor-contract-renewal" />
-                    </div>
+                    <FormField label="Next Review Date">
+                        <Input
+                            id="vendor-next-review"
+                            type="date"
+                            value={form.nextReviewAt}
+                            onChange={e => update('nextReviewAt', e.target.value)}
+                        />
+                    </FormField>
+                    <FormField label="Contract Renewal Date">
+                        <Input
+                            id="vendor-contract-renewal"
+                            type="date"
+                            value={form.contractRenewalAt}
+                            onChange={e => update('contractRenewalAt', e.target.value)}
+                        />
+                    </FormField>
                 </div>
 
-                <label className="flex items-center gap-2 text-sm text-slate-300">
+                <label className="flex items-center gap-2 text-sm text-content-default">
                     <input type="checkbox" checked={form.isSubprocessor} onChange={e => update('isSubprocessor', e.target.checked)} id="vendor-subprocessor" />
                     This vendor is a sub-processor
                 </label>

@@ -179,21 +179,18 @@ test.describe('DataTable Platform — Row click navigation', () => {
         await page.waitForLoadState('networkidle');
         await page.waitForSelector('h1', { timeout: 15000 });
 
-        // Check if there are any table rows
+        // Seed provisions 4 tenant controls; assert visibility. Selection
+        // is enabled on the controls page so the first cell is a "Select"
+        // button — clicking the row itself may land on the checkbox and
+        // the DataTable ignores clicks on interactive children. Target
+        // the second visible cell (e.g. the code cell) which is not
+        // interactive.
         const rows = page.locator('tbody tr');
-        const count = await rows.count();
-        if (count === 0) {
-            test.skip();
-            return;
-        }
+        await expect(rows.first()).toBeVisible({ timeout: 15_000 });
 
-        // Click first row
-        const firstRow = rows.first();
-        await firstRow.click();
-
-        // Should navigate to a detail page (URL should change)
-        await page.waitForURL(/\/controls\/[a-zA-Z0-9-]+$/, { timeout: 10000 });
-        await expect(page.locator('#control-title')).toBeVisible({ timeout: 10000 });
+        await rows.first().locator('td').nth(1).click();
+        await page.waitForURL(/\/controls\/[a-zA-Z0-9-]+$/, { timeout: 10_000 });
+        await expect(page.locator('#control-title')).toBeVisible({ timeout: 10_000 });
     });
 
     test('Policies row click navigates to detail', async ({ page }) => {
@@ -202,15 +199,12 @@ test.describe('DataTable Platform — Row click navigation', () => {
         await page.waitForLoadState('networkidle');
         await page.waitForSelector('h1', { timeout: 15000 });
 
+        // Seed provisions 3 published policies.
         const rows = page.locator('[data-testid="policies-table"] tbody tr');
-        const count = await rows.count();
-        if (count === 0) {
-            test.skip();
-            return;
-        }
+        await expect(rows.first()).toBeVisible({ timeout: 15_000 });
 
         await rows.first().click();
-        await page.waitForURL(/\/policies\/[a-zA-Z0-9-]+$/, { timeout: 10000 });
+        await page.waitForURL(/\/policies\/[a-zA-Z0-9-]+$/, { timeout: 10_000 });
     });
 });
 

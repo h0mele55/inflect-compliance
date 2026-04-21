@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { Role } from '@prisma/client';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { Tooltip } from '@/components/ui/tooltip';
 
 // ─── Types ───
 
@@ -97,7 +98,7 @@ function PermissionGrid({
             <table className="data-table text-xs">
                 <thead>
                     <tr>
-                        <th className="sticky left-0 bg-slate-800/90 z-10 text-left">Resource</th>
+                        <th className="sticky left-0 bg-bg-default/90 z-10 text-left">Resource</th>
                         {allActions.map((action) => (
                             <th key={action} className="text-center capitalize px-2">
                                 {action}
@@ -110,13 +111,13 @@ function PermissionGrid({
                         const resourceActions = PERMISSION_SCHEMA[resource];
                         return (
                             <tr key={resource}>
-                                <td className="sticky left-0 bg-slate-800/50 text-xs font-medium text-slate-300">
+                                <td className="sticky left-0 bg-bg-default/50 text-xs font-medium text-content-default">
                                     {RESOURCE_LABELS[resource]}
                                 </td>
                                 {allActions.map((action) => {
                                     const hasAction = resourceActions.includes(action);
                                     if (!hasAction) {
-                                        return <td key={action} className="text-center"><span className="text-slate-700">—</span></td>;
+                                        return <td key={action} className="text-center"><span className="text-content-subtle">—</span></td>;
                                     }
                                     const granted = (permissions[resource] as Record<string, boolean>)[action] ?? false;
                                     return (
@@ -129,7 +130,7 @@ function PermissionGrid({
                                                     inline-flex items-center justify-center w-5 h-5 rounded transition
                                                     ${granted
                                                         ? 'bg-emerald-500/30 text-emerald-400 hover:bg-emerald-500/50'
-                                                        : 'bg-slate-700/50 text-slate-600 hover:bg-slate-700/80'
+                                                        : 'bg-bg-elevated/50 text-content-subtle hover:bg-bg-elevated/80'
                                                     }
                                                     ${readonly ? 'cursor-default' : 'cursor-pointer'}
                                                 `}
@@ -185,7 +186,7 @@ function RoleForm({
         <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
+                    <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">
                         Role Name *
                     </label>
                     <input
@@ -199,7 +200,7 @@ function RoleForm({
                     />
                 </div>
                 <div>
-                    <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
+                    <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">
                         Base Role (fallback)
                     </label>
                     <Combobox
@@ -210,14 +211,14 @@ function RoleForm({
                         options={BASE_ROLE_OPTIONS}
                         matchTriggerWidth
                     />
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-[10px] text-content-subtle mt-1">
                         Used for coarse authorization when custom permissions don&apos;t apply.
                     </p>
                 </div>
             </div>
 
             <div>
-                <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
+                <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">
                     Description
                 </label>
                 <input
@@ -245,15 +246,15 @@ function RoleForm({
                 {showGrid && (
                     <div className="mt-3 glass-card p-4">
                         <div className="flex items-center justify-between mb-3">
-                            <h4 className="text-xs text-slate-400 uppercase tracking-wider">Permissions</h4>
+                            <h4 className="text-xs text-content-muted uppercase tracking-wider">Permissions</h4>
                             <div className="flex gap-1">
-                                <span className="text-[10px] text-slate-500">Preset from:</span>
+                                <span className="text-[10px] text-content-subtle">Preset from:</span>
                                 {BASE_ROLES.map((r) => (
                                     <button
                                         key={r}
                                         type="button"
                                         onClick={() => setPermissions(getPermissionsForRole(r))}
-                                        className="text-[10px] px-2 py-0.5 rounded bg-slate-700/50 text-slate-300 hover:bg-slate-600/50 transition"
+                                        className="text-[10px] px-2 py-0.5 rounded bg-bg-elevated/50 text-content-default hover:bg-bg-muted/50 transition"
                                         id={`preset-${r}`}
                                     >
                                         {r}
@@ -415,9 +416,9 @@ export default function CustomRolesPage() {
                     Custom Roles
                 </h1>
                 <div className="glass-card p-8 space-y-4">
-                    <div className="h-4 bg-slate-700/50 rounded w-1/3 animate-pulse" />
-                    <div className="h-4 bg-slate-700/50 rounded w-2/3 animate-pulse" />
-                    <div className="h-4 bg-slate-700/50 rounded w-1/2 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/50 rounded w-1/3 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/50 rounded w-2/3 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/50 rounded w-1/2 animate-pulse" />
                 </div>
             </div>
         );
@@ -432,7 +433,7 @@ export default function CustomRolesPage() {
                         <Shield className="w-6 h-6 text-brand-400" />
                         Custom Roles
                     </h1>
-                    <p className="text-sm text-slate-400 mt-1">
+                    <p className="text-sm text-content-muted mt-1">
                         {roles.length} custom role{roles.length !== 1 ? 's' : ''} defined.
                         Members assigned a custom role use its permissions instead of the built-in role defaults.
                     </p>
@@ -472,7 +473,7 @@ export default function CustomRolesPage() {
             {/* Create Form */}
             {showCreate && (
                 <div className="glass-card p-6 border border-brand-500/30" id="create-role-form">
-                    <h3 className="text-sm font-semibold text-white mb-4">Create Custom Role</h3>
+                    <h3 className="text-sm font-semibold text-content-emphasis mb-4">Create Custom Role</h3>
                     <RoleForm
                         onSubmit={handleCreate}
                         onCancel={() => setShowCreate(false)}
@@ -500,7 +501,7 @@ export default function CustomRolesPage() {
                             editingId === role.id ? (
                                 <tr key={role.id}>
                                     <td colSpan={6} className="p-4">
-                                        <h3 className="text-sm font-semibold text-white mb-4">
+                                        <h3 className="text-sm font-semibold text-content-emphasis mb-4">
                                             Edit: {role.name}
                                         </h3>
                                         <RoleForm
@@ -514,44 +515,48 @@ export default function CustomRolesPage() {
                                 </tr>
                             ) : (
                                 <tr key={role.id} data-role-id={role.id}>
-                                    <td className="text-sm font-medium text-white">{role.name}</td>
+                                    <td className="text-sm font-medium text-content-emphasis">{role.name}</td>
                                     <td>
                                         <span className={`badge ${ROLE_COLORS[role.baseRole] || 'badge-neutral'}`}>
                                             {role.baseRole}
                                         </span>
                                     </td>
-                                    <td className="text-xs text-slate-400 max-w-xs truncate">
+                                    <td className="text-xs text-content-muted max-w-xs truncate">
                                         {role.description || '—'}
                                     </td>
                                     <td>
-                                        <span className="flex items-center gap-1 text-xs text-slate-300">
+                                        <span className="flex items-center gap-1 text-xs text-content-default">
                                             <Users className="w-3 h-3" />
                                             {role._count.memberships}
                                         </span>
                                     </td>
                                     <td>
-                                        <span className="text-xs text-slate-400 font-mono">
+                                        <span className="text-xs text-content-muted font-mono">
                                             {countGranted(role.permissionsJson)}
                                         </span>
                                     </td>
                                     <td className="text-right">
                                         <div className="flex gap-1 justify-end">
-                                            <button
-                                                onClick={() => setEditingId(role.id)}
-                                                className="btn btn-secondary text-xs py-1 px-2"
-                                                title="Edit"
-                                                id={`edit-role-${role.id}`}
-                                            >
-                                                <Pencil className="w-3 h-3" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(role)}
-                                                className="btn btn-secondary text-xs py-1 px-2 text-red-400 hover:bg-red-500/10"
-                                                title="Delete"
-                                                id={`delete-role-${role.id}`}
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </button>
+                                            <Tooltip content="Edit role">
+                                                <button
+                                                    onClick={() => setEditingId(role.id)}
+                                                    className="btn btn-secondary text-xs py-1 px-2"
+                                                    aria-label="Edit role"
+                                                    id={`edit-role-${role.id}`}
+                                                >
+                                                    <Pencil className="w-3 h-3" />
+                                                </button>
+                                            </Tooltip>
+                                            <Tooltip content="Delete role">
+                                                <button
+                                                    onClick={() => handleDelete(role)}
+                                                    className="btn btn-secondary text-xs py-1 px-2 text-red-400 hover:bg-red-500/10"
+                                                    aria-label="Delete role"
+                                                    id={`delete-role-${role.id}`}
+                                                >
+                                                    <Trash2 className="w-3 h-3" />
+                                                </button>
+                                            </Tooltip>
                                         </div>
                                     </td>
                                 </tr>
@@ -559,7 +564,7 @@ export default function CustomRolesPage() {
                         ))}
                         {roles.length === 0 && !showCreate && (
                             <tr>
-                                <td colSpan={6} className="text-center text-slate-500 py-8">
+                                <td colSpan={6} className="text-center text-content-subtle py-8">
                                     No custom roles defined yet. Click &quot;Create Custom Role&quot; to get started.
                                 </td>
                             </tr>

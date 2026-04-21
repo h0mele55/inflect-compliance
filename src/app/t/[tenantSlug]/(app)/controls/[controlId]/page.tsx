@@ -13,6 +13,8 @@ import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-c
 import { extractMutationError } from '@/lib/mutations';
 import { Modal } from '@/components/ui/modal';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { Tooltip } from '@/components/ui/tooltip';
+import { CopyText } from '@/components/ui/copy-text';
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 
@@ -456,21 +458,21 @@ export default function ControlDetailPage() {
         <div className="space-y-6 animate-fadeIn" aria-busy="true">
             <div className="flex items-center justify-between">
                 <div className="space-y-2">
-                    <div className="animate-pulse rounded bg-slate-700/60 h-4 w-24" />
-                    <div className="animate-pulse rounded bg-slate-700/60 h-7 w-64" />
+                    <div className="animate-pulse rounded bg-bg-elevated/60 h-4 w-24" />
+                    <div className="animate-pulse rounded bg-bg-elevated/60 h-7 w-64" />
                 </div>
             </div>
-            <div className="flex gap-1 border-b border-slate-700">
+            <div className="flex gap-1 border-b border-border-default">
                 {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="animate-pulse rounded bg-slate-700/60 h-8 w-20 mx-1" />
+                    <div key={i} className="animate-pulse rounded bg-bg-elevated/60 h-8 w-20 mx-1" />
                 ))}
             </div>
             <div className="glass-card p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-6">
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div key={i} className="space-y-1">
-                            <div className="animate-pulse rounded bg-slate-700/60 h-3 w-16" />
-                            <div className="animate-pulse rounded bg-slate-700/60 h-4 w-full" />
+                            <div className="animate-pulse rounded bg-bg-elevated/60 h-3 w-16" />
+                            <div className="animate-pulse rounded bg-bg-elevated/60 h-4 w-full" />
                         </div>
                     ))}
                 </div>
@@ -478,7 +480,7 @@ export default function ControlDetailPage() {
         </div>
     );
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
-    if (!control) return <div className="p-12 text-center text-slate-500">Control not found.</div>;
+    if (!control) return <div className="p-12 text-center text-content-subtle">Control not found.</div>;
 
     const doneTasks = control.controlTasks?.filter((t: ControlTaskDTO) => t.status === 'DONE').length ?? 0;
     const totalTasks = control.controlTasks?.length ?? 0;
@@ -498,10 +500,19 @@ export default function ControlDetailPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <Link href={tenantHref('/controls')} className="text-slate-400 text-xs hover:text-white transition">← Controls</Link>
+                    <Link href={tenantHref('/controls')} className="text-content-muted text-xs hover:text-content-emphasis transition">← Controls</Link>
                     <h1 className="text-2xl font-bold mt-1" id="control-title">{control.name}</h1>
                     <div className="flex gap-2 mt-1 flex-wrap items-center">
-                        {control.code && <span className="text-xs font-mono text-slate-500">{control.code}</span>}
+                        {control.code && (
+                            <CopyText
+                                value={control.code}
+                                label={`Copy control code ${control.code}`}
+                                successMessage="Control code copied"
+                                className="text-xs text-content-subtle"
+                            >
+                                {control.code}
+                            </CopyText>
+                        )}
                         <span className={`badge ${STATUS_BADGE[control.status] || 'badge-neutral'}`} id="control-status">
                             {STATUS_LABELS[control.status] || control.status}
                         </span>
@@ -509,30 +520,40 @@ export default function ControlDetailPage() {
                             {control.applicability === 'NOT_APPLICABLE' ? 'Not Applicable' : 'Applicable'}
                         </span>
                         {syncStatus === 'CONFLICT' && (
-                            <span
-                                className="badge badge-error flex items-center gap-1 animate-pulse"
-                                title={syncError ?? 'Sync conflict detected — local and remote state diverged'}
-                                id="sync-conflict-badge"
+                            <Tooltip
+                                title="Sync conflict"
+                                content={syncError ?? 'Local and remote state diverged — resolve before editing.'}
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-                                Sync Conflict
-                            </span>
+                                <span
+                                    className="badge badge-error flex items-center gap-1 animate-pulse cursor-help"
+                                    id="sync-conflict-badge"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                                    Sync Conflict
+                                </span>
+                            </Tooltip>
                         )}
                         {syncStatus === 'FAILED' && (
-                            <span
-                                className="badge badge-error flex items-center gap-1"
-                                title={syncError ?? 'Last sync failed'}
-                                id="sync-failed-badge"
+                            <Tooltip
+                                title="Last sync failed"
+                                content={syncError ?? 'The integration could not reach the source system.'}
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
-                                Sync Failed
-                            </span>
+                                <span
+                                    className="badge badge-error flex items-center gap-1 cursor-help"
+                                    id="sync-failed-badge"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                                    Sync Failed
+                                </span>
+                            </Tooltip>
                         )}
                         {syncStatus === 'SYNCED' && (
-                            <span className="badge badge-success flex items-center gap-1" id="sync-ok-badge" title={syncLastAt ? `Last synced: ${formatDateTime(syncLastAt)}` : 'Synced'}>
-                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                                Synced
-                            </span>
+                            <Tooltip content={syncLastAt ? `Last synced: ${formatDateTime(syncLastAt)}` : 'Synced'}>
+                                <span className="badge badge-success flex items-center gap-1 cursor-help" id="sync-ok-badge">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                                    Synced
+                                </span>
+                            </Tooltip>
                         )}
                     </div>
                 </div>
@@ -566,11 +587,11 @@ export default function ControlDetailPage() {
                 <div className="glass-card p-4 space-y-3">
                     <h3 className="text-sm font-semibold">Set Applicability</h3>
                     <div className="flex gap-4">
-                        <label className="flex items-center gap-2 text-sm text-slate-300">
+                        <label className="flex items-center gap-2 text-sm text-content-default">
                             <input type="radio" value="APPLICABLE" checked={appChoice === 'APPLICABLE'} onChange={() => setAppChoice('APPLICABLE')} />
                             Applicable
                         </label>
-                        <label className="flex items-center gap-2 text-sm text-slate-300">
+                        <label className="flex items-center gap-2 text-sm text-content-default">
                             <input type="radio" value="NOT_APPLICABLE" checked={appChoice === 'NOT_APPLICABLE'} onChange={() => setAppChoice('NOT_APPLICABLE')} />
                             Not Applicable
                         </label>
@@ -585,11 +606,11 @@ export default function ControlDetailPage() {
             )}
 
             {/* Tabs */}
-            <div className="flex gap-1 border-b border-slate-700">
+            <div className="flex gap-1 border-b border-border-default">
                 {tabs.map(t => (
                     <button
                         key={t.key}
-                        className={`px-4 py-2 text-sm font-medium transition border-b-2 ${tab === t.key ? 'border-brand-400 text-white' : 'border-transparent text-slate-400 hover:text-white'}`}
+                        className={`px-4 py-2 text-sm font-medium transition border-b-2 ${tab === t.key ? 'border-brand-400 text-content-emphasis' : 'border-transparent text-content-muted hover:text-content-emphasis'}`}
                         onClick={() => setTab(t.key)}
                         id={`tab-${t.key}`}
                     >
@@ -618,73 +639,74 @@ export default function ControlDetailPage() {
                     )}
                     <div className="grid grid-cols-2 gap-6">
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Description</span>
-                            <p className="text-sm text-slate-300 mt-1">{control.description || 'No description.'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Description</span>
+                            <p className="text-sm text-content-default mt-1">{control.description || 'No description.'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Intent</span>
-                            <p className="text-sm text-slate-300 mt-1">{control.intent || '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Intent</span>
+                            <p className="text-sm text-content-default mt-1">{control.intent || '—'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Category</span>
-                            <p className="text-sm text-slate-300 mt-1">{control.category || '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Category</span>
+                            <p className="text-sm text-content-default mt-1">{control.category || '—'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Frequency</span>
-                            <p className="text-sm text-slate-300 mt-1">{control.frequency ? FREQ_LABELS[control.frequency] || control.frequency : '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Frequency</span>
+                            <p className="text-sm text-content-default mt-1">{control.frequency ? FREQ_LABELS[control.frequency] || control.frequency : '—'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Owner</span>
-                            <p className="text-sm text-slate-300 mt-1">{control.owner?.name || '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Owner</span>
+                            <p className="text-sm text-content-default mt-1">{control.owner?.name || '—'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Tasks Progress</span>
-                            <p className="text-sm text-slate-300 mt-1">{doneTasks}/{totalTasks} completed</p>
+                            <span className="text-xs text-content-subtle uppercase">Tasks Progress</span>
+                            <p className="text-sm text-content-default mt-1">{doneTasks}/{totalTasks} completed</p>
                         </div>
                         {control.applicability === 'NOT_APPLICABLE' && control.applicabilityJustification && (
                             <div className="col-span-2">
-                                <span className="text-xs text-slate-500 uppercase">N/A Justification</span>
+                                <span className="text-xs text-content-subtle uppercase">N/A Justification</span>
                                 <p className="text-sm text-yellow-400 mt-1">{control.applicabilityJustification}</p>
                             </div>
                         )}
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Contributors</span>
-                            <div className="text-sm text-slate-300 mt-1">
+                            <span className="text-xs text-content-subtle uppercase">Contributors</span>
+                            <div className="text-sm text-content-default mt-1">
                                 {(control.contributors?.length ?? 0) > 0 ? control.contributors?.map((c: ContributorDTO) => (
                                     <span key={c.user.id} className="badge badge-neutral text-xs mr-1">{c.user.name ?? '—'}</span>
                                 )) : '—'}
                             </div>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Last Tested</span>
-                            <p className="text-sm text-slate-300 mt-1">{control.lastTested ? formatDate(control.lastTested) : '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Last Tested</span>
+                            <p className="text-sm text-content-default mt-1">{control.lastTested ? formatDate(control.lastTested) : '—'}</p>
                         </div>
                         <div>
-                            <span className="text-xs text-slate-500 uppercase">Next Due</span>
-                            <p className="text-sm text-slate-300 mt-1">{control.nextDueAt ? formatDate(control.nextDueAt) : '—'}</p>
+                            <span className="text-xs text-content-subtle uppercase">Next Due</span>
+                            <p className="text-sm text-content-default mt-1">{control.nextDueAt ? formatDate(control.nextDueAt) : '—'}</p>
                         </div>
                     </div>
                     {/* Automation Section */}
-                    <div className="border-t border-slate-700 pt-4 mt-4">
+                    <div className="border-t border-border-default pt-4 mt-4">
                         <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-sm font-semibold text-slate-300">Automation</h3>
+                            <h3 className="text-sm font-semibold text-content-default">Automation</h3>
                             <div className="flex items-center gap-2">
                                 {/* Sync Now button — only when automationKey is set */}
                                 {control.automationKey && permissions.canWrite && !editingAutomation && (
-                                    <button
-                                        className="btn btn-secondary btn-xs flex items-center gap-1 disabled:opacity-50"
-                                        onClick={handleSyncNow}
-                                        disabled={syncing}
-                                        id="sync-now-btn"
-                                        title="Manually trigger a sync check now"
-                                    >
-                                        {syncing ? (
-                                            <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                                        ) : (
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-                                        )}
-                                        {syncing ? 'Syncing…' : 'Sync Now'}
-                                    </button>
+                                    <Tooltip content="Manually trigger a sync check against the source system.">
+                                        <button
+                                            className="btn btn-secondary btn-xs flex items-center gap-1 disabled:opacity-50"
+                                            onClick={handleSyncNow}
+                                            disabled={syncing}
+                                            id="sync-now-btn"
+                                        >
+                                            {syncing ? (
+                                                <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                                            ) : (
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+                                            )}
+                                            {syncing ? 'Syncing…' : 'Sync Now'}
+                                        </button>
+                                    </Tooltip>
                                 )}
                                 {permissions.canWrite && (
                                     <button className="text-xs text-brand-400 hover:underline" onClick={() => { setAutoEvidenceSource(control.evidenceSource || ''); setAutoKey(control.automationKey || ''); setEditingAutomation(!editingAutomation); }} id="edit-automation-btn">
@@ -699,7 +721,7 @@ export default function ControlDetailPage() {
                             <div className={`mb-3 p-2.5 rounded text-xs flex items-start gap-2 ${
                                 syncResult.status === 'PASSED' ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
                                 : syncResult.status === 'FAILED' || syncResult.status === 'ERROR' ? 'bg-red-500/10 border border-red-500/30 text-red-400'
-                                : 'bg-slate-700/50 border border-slate-600 text-slate-300'
+                                : 'bg-bg-elevated/50 border border-border-emphasis text-content-default'
                             }`} id="sync-result-banner">
                                 <span className="font-semibold">{syncResult.status}</span>
                                 {syncResult.summary && <span className="opacity-80">{syncResult.summary}</span>}
@@ -727,16 +749,16 @@ export default function ControlDetailPage() {
                         ) : (
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <span className="text-xs text-slate-500">Evidence Source</span>
-                                    <p className="text-sm text-slate-300 mt-1">{control.evidenceSource || '—'}</p>
+                                    <span className="text-xs text-content-subtle">Evidence Source</span>
+                                    <p className="text-sm text-content-default mt-1">{control.evidenceSource || '—'}</p>
                                 </div>
                                 <div>
-                                    <span className="text-xs text-slate-500">Automation Key</span>
-                                    <p className="text-sm text-slate-300 mt-1 font-mono">{control.automationKey || '—'}</p>
+                                    <span className="text-xs text-content-subtle">Automation Key</span>
+                                    <p className="text-sm text-content-default mt-1 font-mono">{control.automationKey || '—'}</p>
                                 </div>
                                 {syncStatus && (
                                     <div>
-                                        <span className="text-xs text-slate-500">Sync Status</span>
+                                        <span className="text-xs text-content-subtle">Sync Status</span>
                                         <div className="mt-1 flex items-center gap-1.5">
                                             <span className={`badge text-xs ${
                                                 syncStatus === 'SYNCED' ? 'badge-success'
@@ -746,7 +768,7 @@ export default function ControlDetailPage() {
                                                 : 'badge-neutral'
                                             }`}>{syncStatus}</span>
                                             {syncLastAt && (
-                                                <span className="text-xs text-slate-600">{formatDateTime(syncLastAt)}</span>
+                                                <span className="text-xs text-content-subtle">{formatDateTime(syncLastAt)}</span>
                                             )}
                                         </div>
                                         {syncError && syncStatus !== 'SYNCED' && (
@@ -901,7 +923,7 @@ export default function ControlDetailPage() {
 
             {/* Success toast */}
             {editSuccess && (
-                <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg animate-fadeIn text-sm" id="edit-success-toast">
+                <div className="fixed bottom-6 right-6 z-50 bg-emerald-600 text-content-emphasis px-4 py-2 rounded-lg shadow-lg animate-fadeIn text-sm" id="edit-success-toast">
                     Control updated
                 </div>
             )}
@@ -927,7 +949,7 @@ export default function ControlDetailPage() {
                     )}
                     <div className="glass-card overflow-hidden">
                         {(control.controlTasks?.length ?? 0) === 0 ? (
-                            <div className="p-8 text-center text-slate-500 text-sm">No tasks yet</div>
+                            <div className="p-8 text-center text-content-subtle text-sm">No tasks yet</div>
                         ) : (
                             <table className="data-table" id="tasks-table">
                                 <thead>
@@ -936,10 +958,10 @@ export default function ControlDetailPage() {
                                 <tbody>
                                     {control.controlTasks?.map((t: ControlTaskDTO) => (
                                         <tr key={t.id}>
-                                            <td className="text-sm text-white">{t.title}</td>
+                                            <td className="text-sm text-content-emphasis">{t.title}</td>
                                             <td><span className={`badge ${TASK_STATUS_BADGE[t.status] || 'badge-neutral'}`}>{t.status}</span></td>
-                                            <td className="text-xs text-slate-400">{t.assignee?.name || '—'}</td>
-                                            <td className="text-xs text-slate-400">{t.dueAt ? formatDate(t.dueAt) : '—'}</td>
+                                            <td className="text-xs text-content-muted">{t.assignee?.name || '—'}</td>
+                                            <td className="text-xs text-content-muted">{t.dueAt ? formatDate(t.dueAt) : '—'}</td>
                                             {permissions.canWrite && (
                                                 <td>
                                                     {t.status !== 'DONE' && (
@@ -957,7 +979,7 @@ export default function ControlDetailPage() {
                     </div>
                     {/* Linked Work Items (via TaskLink) */}
                     <div className="glass-card p-4 mt-4" id="linked-work-items-section">
-                        <h3 className="text-sm font-semibold mb-3 text-slate-300">Linked Work Items (Tasks)</h3>
+                        <h3 className="text-sm font-semibold mb-3 text-content-default">Linked Work Items (Tasks)</h3>
                         <LinkedTasksPanel
                             apiBase={apiUrl('')}
                             entityType="CONTROL"
@@ -983,18 +1005,18 @@ export default function ControlDetailPage() {
                     {/* File upload form for this control */}
                     {showFileUpload && permissions.canWrite && (
                         <form onSubmit={handleFileUpload} className="glass-card p-4 space-y-3" id="control-upload-form">
-                            <h4 className="text-sm font-semibold text-white">Upload Evidence for {control.name}</h4>
+                            <h4 className="text-sm font-semibold text-content-emphasis">Upload Evidence for {control.name}</h4>
                             <input
                                 ref={fileUploadRef}
                                 type="file"
-                                className="input w-full file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-brand-500 file:text-white hover:file:bg-brand-400"
+                                className="input w-full file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-brand-500 file:text-content-emphasis hover:file:bg-brand-400"
                                 onChange={e => setFileToUpload(e.target.files?.[0] || null)}
                                 required
                                 id="control-file-input"
                                 accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.csv,.txt,.doc,.docx,.xlsx,.xls,.json,.zip"
                             />
                             {fileToUpload && (
-                                <p className="text-xs text-slate-400">{fileToUpload.name} ({fileToUpload.size < 1048576 ? `${(fileToUpload.size / 1024).toFixed(1)} KB` : `${(fileToUpload.size / 1048576).toFixed(1)} MB`})</p>
+                                <p className="text-xs text-content-muted">{fileToUpload.name} ({fileToUpload.size < 1048576 ? `${(fileToUpload.size / 1024).toFixed(1)} KB` : `${(fileToUpload.size / 1048576).toFixed(1)} MB`})</p>
                             )}
                             <input
                                 type="text"
@@ -1008,7 +1030,7 @@ export default function ControlDetailPage() {
                                 <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2">{fileUploadError}</div>
                             )}
                             {fileUploading && (
-                                <div className="w-full bg-slate-700 rounded-full h-2">
+                                <div className="w-full bg-bg-elevated rounded-full h-2">
                                     <div className="bg-brand-500 h-2 rounded-full transition-all" style={{ width: '60%' }} />
                                 </div>
                             )}
@@ -1034,7 +1056,7 @@ export default function ControlDetailPage() {
                             const hasLinks = (control.evidenceLinks?.length ?? 0) > 0;
                             const hasEvidence = directEvidence.length > 0;
                             if (!hasLinks && !hasEvidence) {
-                                return <div className="p-8 text-center text-slate-500 text-sm" id="no-evidence">No evidence linked</div>;
+                                return <div className="p-8 text-center text-content-subtle text-sm" id="no-evidence">No evidence linked</div>;
                             }
                             return (
                                 <table className="data-table" id="evidence-table">
@@ -1048,8 +1070,8 @@ export default function ControlDetailPage() {
                                                 <td className="text-sm">
                                                     {el.url ? <a href={el.url} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">{el.url}</a> : (el.note || '—')}
                                                 </td>
-                                                <td className="text-xs text-slate-400">{el.createdBy?.name || '—'}</td>
-                                                <td className="text-xs text-slate-400">{el.createdAt ? formatDate(el.createdAt) : '—'}</td>
+                                                <td className="text-xs text-content-muted">{el.createdBy?.name || '—'}</td>
+                                                <td className="text-xs text-content-muted">{el.createdAt ? formatDate(el.createdAt) : '—'}</td>
                                                 {permissions.canWrite && (
                                                     <td>
                                                         <button className="text-red-400 text-xs hover:text-red-300" onClick={() => unlinkEvidence(el.id)} id={`unlink-${el.id}`}>
@@ -1071,7 +1093,7 @@ export default function ControlDetailPage() {
                                                         {ev.status}
                                                     </span>
                                                 </td>
-                                                <td className="text-xs text-slate-400">{ev.createdAt ? formatDate(ev.createdAt) : '—'}</td>
+                                                <td className="text-xs text-content-muted">{ev.createdAt ? formatDate(ev.createdAt) : '—'}</td>
                                                 {permissions.canWrite && <td />}
                                             </tr>
                                         ))}
@@ -1121,7 +1143,7 @@ export default function ControlDetailPage() {
                     )}
                     <div className="glass-card overflow-hidden">
                         {(control.frameworkMappings?.length ?? 0) === 0 ? (
-                            <div className="p-8 text-center text-slate-500 text-sm">No framework mappings</div>
+                            <div className="p-8 text-center text-content-subtle text-sm">No framework mappings</div>
                         ) : (
                             <table className="data-table" id="mappings-table">
                                 <thead>
@@ -1130,9 +1152,18 @@ export default function ControlDetailPage() {
                                 <tbody>
                                     {control.frameworkMappings?.map((m: FrameworkMappingDTO) => (
                                         <tr key={m.id}>
-                                            <td className="text-sm text-white">{m.fromRequirement?.framework?.name || '—'}</td>
-                                            <td className="text-sm text-slate-300">
-                                                {m.fromRequirement?.code && <span className="font-mono text-xs text-slate-500 mr-2">{m.fromRequirement.code}</span>}
+                                            <td className="text-sm text-content-emphasis">{m.fromRequirement?.framework?.name || '—'}</td>
+                                            <td className="text-sm text-content-default">
+                                                {m.fromRequirement?.code && (
+                                                    <CopyText
+                                                        value={m.fromRequirement.code}
+                                                        label={`Copy requirement code ${m.fromRequirement.code}`}
+                                                        successMessage="Requirement code copied"
+                                                        className="mr-2 text-content-subtle"
+                                                    >
+                                                        {m.fromRequirement.code}
+                                                    </CopyText>
+                                                )}
                                                 {m.fromRequirement?.title || m.fromRequirement?.description || '—'}
                                             </td>
                                             {permissions.canWrite && (
@@ -1164,19 +1195,19 @@ export default function ControlDetailPage() {
             {tab === 'activity' && (
                 <div className="glass-card overflow-hidden">
                     {activityLoading ? (
-                        <div className="p-8 text-center text-slate-500 animate-pulse">Loading activity...</div>
+                        <div className="p-8 text-center text-content-subtle animate-pulse">Loading activity...</div>
                     ) : activity.length === 0 ? (
-                        <div className="p-8 text-center text-slate-500 text-sm">No activity recorded</div>
+                        <div className="p-8 text-center text-content-subtle text-sm">No activity recorded</div>
                     ) : (
-                        <div className="divide-y divide-slate-700/50" id="activity-feed">
+                        <div className="divide-y divide-border-default/50" id="activity-feed">
                             {activity.map((ev: AuditLogEntry) => (
                                 <div key={ev.id} className="px-5 py-3 flex items-start gap-3">
                                     <div className="mt-0.5">
                                         <span className="badge badge-info text-xs">{EVENT_LABELS[ev.action] || ev.action}</span>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm text-slate-300">{ev.details}</p>
-                                        <p className="text-xs text-slate-500 mt-0.5">
+                                        <p className="text-sm text-content-default">{ev.details}</p>
+                                        <p className="text-xs text-content-subtle mt-0.5">
                                             {ev.user?.name || 'System'} · {formatDateTime(ev.createdAt)}
                                         </p>
                                     </div>

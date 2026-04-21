@@ -1,12 +1,12 @@
 import {
     SkeletonPageHeader,
     SkeletonKpiGrid,
-    SkeletonCompactFilterBar,
+    SkeletonFilterToolbar,
     SkeletonDataTable,
 } from '@/components/ui/skeleton';
 
 /**
- * Risks loading skeleton — header + 4 KPI cards + filter bar + 8-col table.
+ * Risks loading skeleton — header + 4 KPI cards + filter toolbar + 8-col table.
  * Matches the real RisksClient layout for seamless streaming.
  */
 export default function RisksLoading() {
@@ -14,7 +14,7 @@ export default function RisksLoading() {
         <div className="space-y-6 animate-fadeIn" aria-busy="true" aria-label="Loading risks">
             <SkeletonPageHeader />
             <SkeletonKpiGrid count={4} />
-            <SkeletonCompactFilterBar />
+            <SkeletonFilterToolbar />
             <SkeletonDataTable rows={8} cols={8} />
         </div>
     );

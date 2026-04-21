@@ -1,7 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const STATUS_BADGE: Record<string, string> = {
@@ -106,10 +107,19 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
         return map[result] || result;
     };
 
+    const resultOptions = useMemo<ComboboxOption[]>(
+        () => [
+            { value: 'NOT_TESTED', label: t.notTested },
+            { value: 'PASS', label: t.pass },
+            { value: 'FAIL', label: t.fail },
+        ],
+        [t.notTested, t.pass, t.fail],
+    );
+
     return (
         <>
             <div className="flex flex-wrap items-center justify-between gap-3">
-                <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-slate-400 text-sm">{audits.length} audits</p></div>
+                <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-content-muted text-sm">{audits.length} audits</p></div>
                 <button onClick={() => setShowForm(!showForm)} className="btn btn-primary" id="new-audit-btn">{t.newAudit}</button>
             </div>
 
@@ -128,12 +138,12 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
                 <div className="space-y-2">
                     {audits.map((a: any) => (
                         <button key={a.id} onClick={() => loadAudit(a.id)}
-                            className={`w-full text-left glass-card p-4 hover:bg-slate-700/30 transition ${selected?.id === a.id ? 'ring-2 ring-brand-500' : ''}`}>
+                            className={`w-full text-left glass-card p-4 hover:bg-bg-elevated/30 transition ${selected?.id === a.id ? 'ring-2 ring-brand-500' : ''}`}>
                             <div className="flex items-center justify-between">
                                 <span className="font-medium text-sm">{a.title}</span>
                                 <span className={`badge ${STATUS_BADGE[a.status]}`}>{statusLabel(a.status)}</span>
                             </div>
-                            <p className="text-xs text-slate-500 mt-1">{a._count?.checklist || 0} items · {a._count?.findings || 0} {t.findingsTab.toLowerCase()}</p>
+                            <p className="text-xs text-content-subtle mt-1">{a._count?.checklist || 0} items · {a._count?.findings || 0} {t.findingsTab.toLowerCase()}</p>
                         </button>
                     ))}
                 </div>
@@ -148,21 +158,26 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
                                     {selected.status === 'IN_PROGRESS' && <button onClick={() => updateAuditStatus('COMPLETED')} className="btn btn-sm btn-success">{t.completed}</button>}
                                 </div>
                             </div>
-                            {selected.scope && <p className="text-sm text-slate-400">{selected.scope}</p>}
+                            {selected.scope && <p className="text-sm text-content-muted">{selected.scope}</p>}
 
                             <div>
-                                <h3 className="text-sm font-semibold text-slate-300 mb-3">{t.checklist} ({selected.checklist?.length || 0})</h3>
+                                <h3 className="text-sm font-semibold text-content-default mb-3">{t.checklist} ({selected.checklist?.length || 0})</h3>
                                 <div className="space-y-2">
                                     {selected.checklist?.map((item: any) => (
-                                        <div key={item.id} className="flex flex-col sm:flex-row items-start gap-3 p-3 border border-slate-700/50 rounded-lg">
-                                            <select className={`input w-full sm:w-32 text-xs`} value={item.result} onChange={e => updateChecklist(item.id, e.target.value)}>
-                                                <option value="NOT_TESTED">{t.notTested}</option>
-                                                <option value="PASS">{t.pass}</option>
-                                                <option value="FAIL">{t.fail}</option>
-                                            </select>
+                                        <div key={item.id} className="flex flex-col sm:flex-row items-start gap-3 p-3 border border-border-default/50 rounded-lg">
+                                            <Combobox
+                                                hideSearch
+                                                options={resultOptions}
+                                                selected={resultOptions.find(o => o.value === item.result) ?? null}
+                                                setSelected={(opt) => opt && updateChecklist(item.id, opt.value)}
+                                                matchTriggerWidth
+                                                buttonProps={{ className: 'w-full sm:w-32 text-xs' }}
+                                                aria-label={`Result for ${item.prompt}`}
+                                                caret
+                                            />
                                             <div className="flex-1">
-                                                <p className="text-sm text-slate-300">{item.prompt}</p>
-                                                {item.notes && <p className="text-xs text-slate-500 mt-1">{item.notes}</p>}
+                                                <p className="text-sm text-content-default">{item.prompt}</p>
+                                                {item.notes && <p className="text-xs text-content-subtle mt-1">{item.notes}</p>}
                                             </div>
                                             <span className={`badge ${RESULT_BADGE[item.result]}`}>{resultLabel(item.result)}</span>
                                         </div>
@@ -172,9 +187,9 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
 
                             {selected.findings?.length > 0 && (
                                 <div>
-                                    <h3 className="text-sm font-semibold text-slate-300 mb-2">{t.findingsTab} ({selected.findings.length})</h3>
+                                    <h3 className="text-sm font-semibold text-content-default mb-2">{t.findingsTab} ({selected.findings.length})</h3>
                                     {selected.findings.map((f: any) => (
-                                        <div key={f.id} className="p-3 border border-slate-700/50 rounded-lg mb-2">
+                                        <div key={f.id} className="p-3 border border-border-default/50 rounded-lg mb-2">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-sm font-medium">{f.title}</span>
                                                 <span className={`badge ${f.severity === 'CRITICAL' ? 'badge-danger' : f.severity === 'HIGH' ? 'badge-warning' : 'badge-info'}`}>{f.severity}</span>
@@ -185,7 +200,7 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
                             )}
                         </div>
                     ) : (
-                        <div className="glass-card p-12 text-center text-slate-500">{t.selectAudit}</div>
+                        <div className="glass-card p-12 text-center text-content-subtle">{t.selectAudit}</div>
                     )}
                 </div>
             </div>

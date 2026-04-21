@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { DataTable, createColumns } from '@/components/ui/table';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 
 interface NotificationSettings {
@@ -76,7 +77,7 @@ export default function NotificationSettingsPage() {
         }
     }
 
-    if (!settings) return <div className="p-8"><div className="h-6 w-full sm:w-48 bg-slate-700 rounded animate-pulse" /></div>;
+    if (!settings) return <div className="p-8"><div className="h-6 w-full sm:w-48 bg-bg-elevated rounded animate-pulse" /></div>;
 
     return (
         <div className="space-y-6 animate-fadeIn">
@@ -129,7 +130,7 @@ export default function NotificationSettingsPage() {
 
                     {/* From Name */}
                     <div>
-                        <label className="block text-xs text-slate-400 mb-1">Sender Name</label>
+                        <label className="block text-xs text-content-muted mb-1">Sender Name</label>
                         <input
                             type="text"
                             value={settings.defaultFromName}
@@ -141,7 +142,7 @@ export default function NotificationSettingsPage() {
 
                     {/* From Email */}
                     <div>
-                        <label className="block text-xs text-slate-400 mb-1">Sender Email</label>
+                        <label className="block text-xs text-content-muted mb-1">Sender Email</label>
                         <input
                             type="email"
                             value={settings.defaultFromEmail}
@@ -153,7 +154,7 @@ export default function NotificationSettingsPage() {
 
                     {/* Compliance Mailbox */}
                     <div>
-                        <label className="block text-xs text-slate-400 mb-1">Compliance Mailbox (BCC)</label>
+                        <label className="block text-xs text-content-muted mb-1">Compliance Mailbox (BCC)</label>
                         <input
                             type="email"
                             value={settings.complianceMailbox || ''}
@@ -161,7 +162,7 @@ export default function NotificationSettingsPage() {
                             className="input input-bordered w-full max-w-md"
                             placeholder="compliance@yourcompany.com (optional)"
                         />
-                        <p className="text-xs text-slate-500 mt-1">All outbound emails will be BCC&apos;d to this address.</p>
+                        <p className="text-xs text-content-subtle mt-1">All outbound emails will be BCC&apos;d to this address.</p>
                     </div>
 
                     {/* Save */}
@@ -174,37 +175,31 @@ export default function NotificationSettingsPage() {
                 </div>
             ) : (
                 <div className="glass-card p-6">
-                    {stats ? (
-                        <div className="overflow-hidden">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Period</th>
-                                        <th>Pending</th>
-                                        <th>Sent</th>
-                                        <th>Failed</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {[
-                                        { label: 'Last 24 hours', data: stats.last24h },
-                                        { label: 'Last 7 days', data: stats.last7d },
-                                        { label: 'Last 30 days', data: stats.last30d },
-                                    ].map(row => (
-                                        <tr key={row.label}>
-                                            <td className="font-medium">{row.label}</td>
-                                            <td><span className="badge badge-warning">{row.data.pending}</span></td>
-                                            <td><span className="badge badge-success">{row.data.sent}</span></td>
-                                            <td><span className="badge badge-error">{row.data.failed}</span></td>
-                                            <td className="text-slate-400">{row.data.pending + row.data.sent + row.data.failed}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <p className="text-slate-400"><span className="inline-block h-4 w-full sm:w-32 bg-slate-700 rounded animate-pulse" /></p>
+                    {stats ? (() => {
+                        const statsColumns = createColumns<{ label: string; pending: number; sent: number; failed: number; total: number }>([
+                            { accessorKey: 'label', header: 'Period', cell: ({ getValue }: any) => <span className="font-medium">{getValue()}</span> },
+                            { accessorKey: 'pending', header: 'Pending', cell: ({ getValue }: any) => <span className="badge badge-warning">{getValue()}</span> },
+                            { accessorKey: 'sent', header: 'Sent', cell: ({ getValue }: any) => <span className="badge badge-success">{getValue()}</span> },
+                            { accessorKey: 'failed', header: 'Failed', cell: ({ getValue }: any) => <span className="badge badge-error">{getValue()}</span> },
+                            { accessorKey: 'total', header: 'Total', cell: ({ getValue }: any) => <span className="text-content-muted">{getValue()}</span> },
+                        ]);
+                        const statsData = [
+                            { label: 'Last 24 hours', ...stats.last24h, total: stats.last24h.pending + stats.last24h.sent + stats.last24h.failed },
+                            { label: 'Last 7 days', ...stats.last7d, total: stats.last7d.pending + stats.last7d.sent + stats.last7d.failed },
+                            { label: 'Last 30 days', ...stats.last30d, total: stats.last30d.pending + stats.last30d.sent + stats.last30d.failed },
+                        ];
+                        return (
+                            <DataTable
+                                data={statsData}
+                                columns={statsColumns}
+                                getRowId={(r) => r.label}
+                                emptyState="No stats available"
+                                resourceName={(p) => p ? 'periods' : 'period'}
+                                data-testid="notification-stats-table"
+                            />
+                        );
+                    })() : (
+                        <p className="text-content-muted"><span className="inline-block h-4 w-full sm:w-32 bg-bg-elevated rounded animate-pulse" /></p>
                     )}
                 </div>
             )}

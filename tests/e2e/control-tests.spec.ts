@@ -105,10 +105,13 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await expect(page.locator('#test-run-status')).toContainText('COMPLETED', { timeout: 15000 });
         await expect(page.locator('#test-run-result')).toContainText('PASS', { timeout: 10000 });
 
-        // Link URL evidence
+        // Link URL evidence — Epic 55 migrated #evidence-kind-select
+        // from a native <select> to a <Combobox>; trigger it as a
+        // button + option click rather than via selectOption().
         await page.click('#link-evidence-btn');
         await page.waitForSelector('#evidence-kind-select', { timeout: 10000 });
-        await page.selectOption('#evidence-kind-select', 'LINK');
+        await page.locator('#evidence-kind-select').click();
+        await page.getByRole('option', { name: /URL.*Link/ }).click();
         // Wait for the form to re-render with LINK fields
         await page.waitForSelector('#evidence-url-input', { timeout: 5000 });
         await page.fill('#evidence-url-input', 'https://docs.example.com/access-review-q1');

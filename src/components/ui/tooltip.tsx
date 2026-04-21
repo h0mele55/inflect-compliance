@@ -1,290 +1,236 @@
 "use client";
 
-import { cn } from "@dub/utils";
+/**
+ * Rich Tooltip primitive (Epic 56).
+ *
+ * A single canonical tooltip for the whole app. Built on Radix Tooltip so we
+ * get focus/keyboard/Escape behavior and Portal rendering for free.
+ *
+ * Use it instead of the native `title=` attribute for any help affordance,
+ * disabled-state explanation, icon-button label, or short status hint.
+ *
+ *   <Tooltip content="Delete row">
+ *     <button aria-label="Delete"><TrashIcon /></button>
+ *   </Tooltip>
+ *
+ *   <Tooltip
+ *     title="ISO 27001 — Clause 9.3"
+ *     content="Management review ensures the ISMS remains suitable."
+ *     shortcut="?"
+ *   >
+ *     <Button variant="ghost" icon={<HelpIcon />} />
+ *   </Tooltip>
+ *
+ *   <InfoTooltip content="Evidence must be dated." />
+ *
+ * Use a Popover, not a Tooltip, when the content is interactive (links,
+ * buttons, form controls) or must stay open while the user reads it —
+ * tooltips disappear on blur/Escape and are announced as `role="tooltip"`.
+ */
+
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { HelpCircle } from "lucide-react";
-import Link from "next/link";
-import { ReactNode, useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import { Badge } from "./badge";
-import { Button, ButtonProps, buttonVariants } from "./button";
-import { useScrollProgress } from "./hooks/use-scroll-progress";
-import { PROSE_STYLES } from "./rich-text-area";
+import { forwardRef, type ReactNode } from "react";
+import { cn } from "@dub/utils";
 
-export function TooltipProvider({ children }: { children: ReactNode }) {
-  return (
-    <TooltipPrimitive.Provider delayDuration={150}>
-      {children}
-    </TooltipPrimitive.Provider>
-  );
-}
+export type TooltipSide = "top" | "right" | "bottom" | "left";
+export type TooltipAlign = "start" | "center" | "end";
 
-const TooltipMarkdown = ({
-  className,
-  children,
+/**
+ * Global provider. Mount once at the app root so Radix can share the
+ * delay timer across tooltips — once one is open, subsequent tooltips
+ * open instantly until the user pauses.
+ */
+export function TooltipProvider({
+    children,
+    delayDuration = 250,
+    skipDelayDuration = 300,
 }: {
-  className?: string;
-  children: string;
-}) => {
-  return (
-    <div
-      className={cn(
-        "prose prose-sm prose-neutral max-w-xs text-pretty px-4 py-2 text-center leading-snug transition-all",
-        "prose-a:cursor-alias prose-a:underline prose-a:decoration-dotted prose-a:underline-offset-2",
-        "prose-code:inline-block prose-code:leading-none",
-        PROSE_STYLES.condensed,
-        className,
-      )}
-    >
-      <ReactMarkdown
-        components={{
-          a: ({ node, ...props }) => {
-            if (props.href?.startsWith("/")) {
-              return (
-                <Link href={props.href} onClick={(e) => e.stopPropagation()}>
-                  {props.children}
-                </Link>
-              );
-            }
-            return (
-              <a
-                {...props}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-              />
-            );
-          },
-          code: ({ node, ...props }) => (
-            <code {...props} className="rounded-md bg-neutral-100 px-1 py-0.5" />
-          ),
-        }}
-      >
-        {children}
-      </ReactMarkdown>
-    </div>
-  );
-};
-export interface TooltipProps
-  extends Omit<TooltipPrimitive.TooltipContentProps, "content"> {
-  content:
-    | ReactNode
-    | string
-    | ((props: { setOpen: (open: boolean) => void }) => ReactNode);
-  contentClassName?: string;
-  disabled?: boolean;
-  disableHoverableContent?: TooltipPrimitive.TooltipProps["disableHoverableContent"];
-  delayDuration?: TooltipPrimitive.TooltipProps["delayDuration"];
+    children: ReactNode;
+    delayDuration?: number;
+    skipDelayDuration?: number;
+}) {
+    return (
+        <TooltipPrimitive.Provider
+            delayDuration={delayDuration}
+            skipDelayDuration={skipDelayDuration}
+        >
+            {children}
+        </TooltipPrimitive.Provider>
+    );
 }
 
+export interface TooltipProps {
+    /** Element that triggers the tooltip. Must accept a ref (Radix uses asChild). */
+    children: ReactNode;
+    /**
+     * Primary content. String renders as plain text. ReactNode lets callers
+     * compose headings, kbd, lists, status badges, etc.
+     */
+    content: ReactNode;
+    /** Optional bold heading rendered above `content`. */
+    title?: ReactNode;
+    /** Optional keyboard shortcut badge rendered on the right of the heading row. */
+    shortcut?: string;
+    /** Short-circuit: render children with no tooltip wiring. */
+    disabled?: boolean;
+    side?: TooltipSide;
+    align?: TooltipAlign;
+    sideOffset?: number;
+    /** Override the provider's delay for this tooltip only. */
+    delayDuration?: number;
+    /** Pass through to hide the tooltip when the pointer leaves its content. */
+    disableHoverableContent?: boolean;
+    /** Escape hatch for callers that need to style the content surface. */
+    contentClassName?: string;
+}
+
+/**
+ * Canonical tooltip. Wrap any focusable/hoverable element.
+ *
+ * Content supports a short string or composed ReactNode; use `title` for the
+ * heading + body pattern instead of building markup every time.
+ */
 export function Tooltip({
-  children,
-  content,
-  contentClassName,
-  disabled,
-  side = "top",
-  disableHoverableContent,
-  delayDuration = 0,
-  ...rest
+    children,
+    content,
+    title,
+    shortcut,
+    disabled,
+    side = "top",
+    align = "center",
+    sideOffset = 6,
+    delayDuration,
+    disableHoverableContent,
+    contentClassName,
 }: TooltipProps) {
-  const [open, setOpen] = useState(false);
+    if (disabled || (content == null && title == null)) {
+        return <>{children}</>;
+    }
 
-  return (
-    <TooltipPrimitive.Root
-      open={disabled ? false : open}
-      onOpenChange={setOpen}
-      delayDuration={delayDuration}
-      disableHoverableContent={disableHoverableContent}
-    >
-      <TooltipPrimitive.Trigger
-        asChild
-        onClick={() => {
-          setOpen(true);
-        }}
-        onBlur={() => {
-          setOpen(false);
-        }}
-      >
-        {children}
-      </TooltipPrimitive.Trigger>
-      <TooltipPrimitive.Portal>
-        <TooltipPrimitive.Content
-          sideOffset={8}
-          side={side}
-          className="animate-slide-up-fade border-border-default bg-bg-default pointer-events-auto z-[99] items-center overflow-hidden rounded-xl border shadow-sm"
-          collisionPadding={0}
-          {...rest}
+    return (
+        <TooltipPrimitive.Root
+            delayDuration={delayDuration}
+            disableHoverableContent={disableHoverableContent}
         >
-          {typeof content === "string" ? (
-            <TooltipMarkdown className={contentClassName}>
-              {content}
-            </TooltipMarkdown>
-          ) : typeof content === "function" ? (
-            content({ setOpen })
-          ) : (
-            content
-          )}
-        </TooltipPrimitive.Content>
-      </TooltipPrimitive.Portal>
-    </TooltipPrimitive.Root>
-  );
+            <TooltipPrimitive.Trigger asChild>
+                {children}
+            </TooltipPrimitive.Trigger>
+            <TooltipPrimitive.Portal>
+                <TooltipPrimitive.Content
+                    side={side}
+                    align={align}
+                    sideOffset={sideOffset}
+                    collisionPadding={8}
+                    className={cn(
+                        // Layering: tooltips must always float above modals,
+                        // sheets and popovers (which top out at z-50).
+                        "z-[99] pointer-events-auto",
+                        // Surface (token-backed)
+                        "rounded-lg border border-border-default bg-bg-elevated shadow-lg",
+                        "max-w-xs px-3 py-2",
+                        "text-xs leading-snug text-content-default",
+                        // Motion — keyed to Radix's side data attributes so
+                        // the animation direction matches the tooltip position.
+                        "animate-slide-up-fade",
+                        "data-[side=bottom]:animate-slide-down-fade",
+                        "data-[state=closed]:opacity-0",
+                        contentClassName,
+                    )}
+                >
+                    <TooltipBody title={title} shortcut={shortcut}>
+                        {content}
+                    </TooltipBody>
+                </TooltipPrimitive.Content>
+            </TooltipPrimitive.Portal>
+        </TooltipPrimitive.Root>
+    );
 }
 
-export function TooltipContent({
-  title,
-  cta,
-  href,
-  target,
-  onClick,
+function TooltipBody({
+    title,
+    shortcut,
+    children,
 }: {
-  title: string;
-  cta?: string;
-  href?: string;
-  target?: string;
-  onClick?: () => void;
+    title?: ReactNode;
+    shortcut?: string;
+    children: ReactNode;
 }) {
-  return (
-    <div className="flex max-w-xs flex-col items-center space-y-3 p-4 text-center">
-      <TooltipMarkdown className="p-0">{title}</TooltipMarkdown>
-      {cta &&
-        (href ? (
-          <Link
-            href={href}
-            {...(target ? { target } : {})}
-            className={cn(
-              buttonVariants({ variant: "primary" }),
-              "flex h-8 w-full items-center justify-center whitespace-nowrap rounded-lg border px-4 text-sm",
+    const hasHeader = title != null || shortcut != null;
+    return (
+        <div className="flex flex-col gap-1">
+            {hasHeader && (
+                <div className="flex items-center justify-between gap-3">
+                    {title != null && (
+                        <span className="text-[13px] font-semibold text-content-emphasis">
+                            {title}
+                        </span>
+                    )}
+                    {shortcut && (
+                        <kbd className="ml-auto rounded border border-border-subtle bg-bg-subtle px-1.5 py-0.5 text-[10px] font-medium text-content-muted">
+                            {shortcut}
+                        </kbd>
+                    )}
+                </div>
             )}
-          >
-            {cta}
-          </Link>
-        ) : onClick ? (
-          <Button
-            onClick={onClick}
-            text={cta}
-            variant="primary"
-            className="h-8"
-          />
-        ) : null)}
-    </div>
-  );
+            {children != null && (
+                <div
+                    className={cn(
+                        hasHeader ? "text-content-muted" : "text-content-default",
+                    )}
+                >
+                    {children}
+                </div>
+            )}
+        </div>
+    );
 }
 
-export function InfoTooltip(props: Omit<TooltipProps, "children">) {
-  return (
-    <Tooltip {...props}>
-      <HelpCircle className="h-4 w-4 text-neutral-500" />
-    </Tooltip>
-  );
-}
+/**
+ * Standalone inline help icon. Use next to form labels, status pills, or
+ * any place where you need a short explanatory hint without an interactive
+ * trigger of its own.
+ */
+export const InfoTooltip = forwardRef<
+    HTMLButtonElement,
+    Omit<TooltipProps, "children"> & {
+        iconClassName?: string;
+        /** Accessible label for the help icon button. Defaults to "More information". */
+        "aria-label"?: string;
+    }
+>(function InfoTooltip(
+    { iconClassName, "aria-label": ariaLabel = "More information", ...tooltipProps },
+    ref,
+) {
+    return (
+        <Tooltip {...tooltipProps}>
+            <button
+                ref={ref}
+                type="button"
+                aria-label={ariaLabel}
+                className="inline-flex h-4 w-4 items-center justify-center rounded-full text-content-muted outline-none transition-colors hover:text-content-default focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+                <HelpCircle className={cn("h-4 w-4", iconClassName)} aria-hidden="true" />
+            </button>
+        </Tooltip>
+    );
+});
 
-export function BadgeTooltip({ children, content, ...props }: TooltipProps) {
-  return (
-    <Tooltip content={content} {...props}>
-      <div className="flex cursor-pointer items-center">
-        <Badge
-          variant="gray"
-          className="border-neutral-300 transition-all hover:bg-neutral-200"
-        >
-          {children}
-        </Badge>
-      </div>
-    </Tooltip>
-  );
-}
-
-export function ButtonTooltip({
-  children,
-  tooltipProps,
-  ...props
-}: {
-  children: ReactNode;
-  tooltipProps: TooltipProps;
-} & ButtonProps) {
-  return (
-    <Tooltip {...tooltipProps}>
-      <button
-        type="button"
-        {...props}
-        className={cn(
-          "flex h-6 w-6 items-center justify-center rounded-md text-neutral-500 transition-colors duration-75 hover:bg-neutral-100 active:bg-neutral-200 disabled:cursor-not-allowed disabled:hover:bg-transparent",
-          props.className,
-        )}
-      >
-        {children}
-      </button>
-    </Tooltip>
-  );
-}
-
+/**
+ * Optional wrap helper for callers that conditionally want a tooltip (e.g.,
+ * a status badge that only explains itself when context data exists).
+ *
+ *   <DynamicTooltipWrapper tooltipProps={value ? { content: describe(value) } : undefined}>
+ *     <StatusBadge ... />
+ *   </DynamicTooltipWrapper>
+ */
 export function DynamicTooltipWrapper({
-  children,
-  tooltipProps,
+    children,
+    tooltipProps,
 }: {
-  children: ReactNode;
-  tooltipProps?: TooltipProps;
+    children: ReactNode;
+    tooltipProps?: Omit<TooltipProps, "children">;
 }) {
-  return tooltipProps ? (
-    <Tooltip {...tooltipProps}>
-      <div>{children}</div>
-    </Tooltip>
-  ) : (
-    children
-  );
-}
-
-export function ScrollableTooltipContent({
-  children,
-  maxHeight = "240px",
-  className,
-}: {
-  children: ReactNode;
-  maxHeight?: string;
-  className?: string;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const { scrollProgress, updateScrollProgress } = useScrollProgress(
-    scrollRef,
-    {
-      direction: "vertical",
-    },
-  );
-
-  const [showTopGradient, setShowTopGradient] = useState(false);
-  const [showBottomGradient, setShowBottomGradient] = useState(false);
-
-  useEffect(() => {
-    const element = scrollRef.current;
-    if (!element) return;
-
-    const { scrollHeight, clientHeight } = element;
-    const canScroll = scrollHeight > clientHeight;
-
-    // Show top gradient if not at top and can scroll
-    setShowTopGradient(canScroll && scrollProgress > 0);
-    // Show bottom gradient if not at bottom and can scroll
-    setShowBottomGradient(canScroll && scrollProgress < 1);
-  }, [scrollProgress]);
-
-  return (
-    <div className="relative">
-      {showTopGradient && (
-        <div className="pointer-events-none absolute left-0 right-0 top-0 z-10 h-6 rounded-t-xl bg-gradient-to-b from-white to-transparent" />
-      )}
-      <div
-        ref={scrollRef}
-        onScroll={updateScrollProgress}
-        className={cn(
-          "flex flex-col gap-2 overflow-y-auto px-3 py-2",
-          className,
-        )}
-        style={{ maxHeight }}
-      >
-        {children}
-      </div>
-      {showBottomGradient && (
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 z-10 h-6 rounded-b-xl bg-gradient-to-t from-white to-transparent" />
-      )}
-    </div>
-  );
+    if (!tooltipProps) return <>{children}</>;
+    return <Tooltip {...tooltipProps}>{children}</Tooltip>;
 }

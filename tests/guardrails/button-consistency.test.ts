@@ -5,7 +5,8 @@
  * Scans all .tsx files under src/app/ for inline button styling
  * patterns that should use the .btn system instead.
  *
- * Allowlisted files can use inline button styling (e.g. CompactFilterBar).
+ * Allowlisted files can use inline button styling (navigation chrome,
+ * loading / error skeletons that can't depend on the full Button tree).
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -15,8 +16,6 @@ const APP_DIR = path.join(SRC_DIR, 'app');
 
 // Files that are allowed to have inline button styling
 const ALLOWLIST = [
-    // Filter bar has its own pill implementation that predates the btn system
-    'CompactFilterBar.tsx',
     // Layout components may have special styling
     'SidebarNav.tsx',
     // Loading/error skeletons may use inline styles

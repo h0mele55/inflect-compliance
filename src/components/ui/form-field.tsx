@@ -40,12 +40,27 @@ import * as React from "react";
 import { Label } from "./label";
 import { FormDescription } from "./form-description";
 import { FormError } from "./form-error";
+import { InfoTooltip } from "./tooltip";
 
 export interface FormFieldProps {
     /** The visible label text. Omit to render a label-less field. */
     label?: React.ReactNode;
     /** Helper text under the control. Hidden when `error` is present. */
     description?: React.ReactNode;
+    /**
+     * Contextual help surfaced via an inline info icon next to the
+     * label. Use this for non-obvious semantics (security policies,
+     * retention rules, scoring scales) that would clutter the form if
+     * rendered as always-visible `description` text. A short sentence
+     * is ideal; ReactNode is supported for richer content.
+     *
+     * Pick `hint` over `description` when the information is
+     * *optional*: most users won't need it, but those who do need it
+     * really do — e.g. "fail-closed", "SCIM NameID format", MFA policy
+     * impact. Pick `description` when every user should read the copy
+     * every time.
+     */
+    hint?: React.ReactNode;
     /** Error message. Renders `role="alert"` hint + invalid styling. */
     error?: string;
     /** Marks the field as required (adds asterisk + `aria-required`). */
@@ -71,6 +86,7 @@ const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
         {
             label,
             description,
+            hint,
             error,
             required,
             className,
@@ -126,20 +142,35 @@ const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
                 data-form-field
             >
                 {label && (
-                    <Label
-                        htmlFor={controlId}
-                        className={cn(isHorizontal && "shrink-0")}
-                    >
-                        {label}
-                        {required && (
-                            <span
-                                aria-hidden="true"
-                                className="ml-1 text-content-error"
-                            >
-                                *
-                            </span>
+                    <div
+                        className={cn(
+                            "flex items-center gap-1.5",
+                            isHorizontal && "shrink-0",
                         )}
-                    </Label>
+                    >
+                        <Label htmlFor={controlId}>
+                            {label}
+                            {required && (
+                                <span
+                                    aria-hidden="true"
+                                    className="ml-1 text-content-error"
+                                >
+                                    *
+                                </span>
+                            )}
+                        </Label>
+                        {hint && (
+                            <InfoTooltip
+                                content={hint}
+                                aria-label={
+                                    typeof label === "string"
+                                        ? `More info about ${label}`
+                                        : "More information"
+                                }
+                                iconClassName="h-3.5 w-3.5"
+                            />
+                        )}
+                    </div>
                 )}
                 <div className={cn(isHorizontal && "flex-1")}>
                     {injectedChild}

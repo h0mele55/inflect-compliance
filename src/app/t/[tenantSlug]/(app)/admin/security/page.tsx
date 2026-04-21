@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { ShieldCheck, Save, AlertTriangle, CheckCircle, LogOut, Users, UserX } from 'lucide-react';
+import { InfoTooltip } from '@/components/ui/tooltip';
 
 type MfaPolicy = 'DISABLED' | 'OPTIONAL' | 'REQUIRED';
 
@@ -153,10 +154,10 @@ export default function AdminSecurityPage() {
                 </h1>
                 <div className="glass-card p-8">
                     <div className="animate-pulse space-y-4">
-                        <div className="h-4 bg-slate-700 rounded w-1/3" />
-                        <div className="h-10 bg-slate-700 rounded w-full" />
-                        <div className="h-10 bg-slate-700 rounded w-full" />
-                        <div className="h-10 bg-slate-700 rounded w-full" />
+                        <div className="h-4 bg-bg-elevated rounded w-1/3" />
+                        <div className="h-10 bg-bg-elevated rounded w-full" />
+                        <div className="h-10 bg-bg-elevated rounded w-full" />
+                        <div className="h-10 bg-bg-elevated rounded w-full" />
                     </div>
                 </div>
             </div>
@@ -187,8 +188,15 @@ export default function AdminSecurityPage() {
             {/* MFA Policy Section */}
             <div className="glass-card p-6 space-y-5">
                 <div>
-                    <h2 className="text-lg font-semibold text-white mb-1">Multi-Factor Authentication Policy</h2>
-                    <p className="text-sm text-slate-400">
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-semibold text-content-emphasis">Multi-Factor Authentication Policy</h2>
+                        <InfoTooltip
+                            aria-label="About the MFA policy"
+                            iconClassName="h-4 w-4"
+                            content="Applies tenant-wide on the next login. Switching to Required forces everyone who isn't enrolled into the enrolment flow before they can access any page."
+                        />
+                    </div>
+                    <p className="text-sm text-content-muted mt-1">
                         Configure whether MFA is required, optional, or disabled for your organization.
                     </p>
                 </div>
@@ -200,7 +208,7 @@ export default function AdminSecurityPage() {
                             className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-all ${
                                 settings.mfaPolicy === option.value
                                     ? 'border-brand-500/60 bg-brand-500/10'
-                                    : 'border-slate-700 hover:border-slate-600'
+                                    : 'border-border-default hover:border-border-emphasis'
                             }`}
                         >
                             <input
@@ -213,7 +221,7 @@ export default function AdminSecurityPage() {
                             />
                             <div>
                                 <span className={`text-sm font-medium ${
-                                    settings.mfaPolicy === option.value ? 'text-brand-300' : 'text-white'
+                                    settings.mfaPolicy === option.value ? 'text-brand-300' : 'text-content-emphasis'
                                 }`}>
                                     {option.label}
                                     {option.value === 'REQUIRED' && (
@@ -222,7 +230,7 @@ export default function AdminSecurityPage() {
                                         </span>
                                     )}
                                 </span>
-                                <p className="text-xs text-slate-400 mt-1">{option.description}</p>
+                                <p className="text-xs text-content-muted mt-1">{option.description}</p>
                             </div>
                         </label>
                     ))}
@@ -248,14 +256,21 @@ export default function AdminSecurityPage() {
             {/* Session Settings */}
             <div className="glass-card p-6 space-y-4">
                 <div>
-                    <h2 className="text-lg font-semibold text-white mb-1">Session Settings</h2>
-                    <p className="text-sm text-slate-400">
+                    <h2 className="text-lg font-semibold text-content-emphasis mb-1">Session Settings</h2>
+                    <p className="text-sm text-content-muted">
                         Configure session timeout for your organization. Leave blank for the default.
                     </p>
                 </div>
 
                 <div>
-                    <label className="block text-sm text-slate-300 mb-1">Maximum Session Age (minutes)</label>
+                    <div className="mb-1 flex items-center gap-1.5">
+                        <label className="block text-sm text-content-default">Maximum Session Age (minutes)</label>
+                        <InfoTooltip
+                            aria-label="About session max age"
+                            iconClassName="h-3.5 w-3.5"
+                            content="Absolute lifetime of a login session — users must re-authenticate after this many minutes regardless of activity. Leave blank to inherit the platform default."
+                        />
+                    </div>
                     <input
                         type="number"
                         min={5}
@@ -268,7 +283,7 @@ export default function AdminSecurityPage() {
                         }}
                         className="input w-full max-w-xs"
                     />
-                    <p className="text-xs text-slate-500 mt-1">Min: 5 minutes. Max: 30 days (43200 min).</p>
+                    <p className="text-xs text-content-subtle mt-1">Min: 5 minutes. Max: 30 days (43200 min).</p>
                 </div>
             </div>
 
@@ -288,8 +303,8 @@ export default function AdminSecurityPage() {
             {/* ──── Session Management ──── */}
             <div className="glass-card p-6 space-y-5">
                 <div>
-                    <h2 className="text-lg font-semibold text-white mb-1">Session Management</h2>
-                    <p className="text-sm text-slate-400">
+                    <h2 className="text-lg font-semibold text-content-emphasis mb-1">Session Management</h2>
+                    <p className="text-sm text-content-muted">
                         Revoke active sessions. Revoked users must sign in again.
                     </p>
                 </div>
@@ -299,13 +314,13 @@ export default function AdminSecurityPage() {
                     <button
                         onClick={handleRevokeMySessions}
                         disabled={revoking}
-                        className="p-4 border border-slate-700 rounded-lg hover:border-brand-500/50 transition text-left flex items-start gap-3 group"
+                        className="p-4 border border-border-default rounded-lg hover:border-brand-500/50 transition text-left flex items-start gap-3 group"
                         id="revoke-my-sessions-btn"
                     >
-                        <LogOut className="w-5 h-5 text-slate-400 group-hover:text-brand-400 transition mt-0.5 shrink-0" />
+                        <LogOut className="w-5 h-5 text-content-muted group-hover:text-brand-400 transition mt-0.5 shrink-0" />
                         <div>
-                            <span className="text-sm font-medium text-white">Sign Out Other Sessions</span>
-                            <p className="text-xs text-slate-500 mt-1">Invalidate all your active sessions across devices.</p>
+                            <span className="text-sm font-medium text-content-emphasis">Sign Out Other Sessions</span>
+                            <p className="text-xs text-content-subtle mt-1">Invalidate all your active sessions across devices.</p>
                         </div>
                     </button>
 
@@ -319,14 +334,14 @@ export default function AdminSecurityPage() {
                         <Users className="w-5 h-5 text-red-400/70 group-hover:text-red-400 transition mt-0.5 shrink-0" />
                         <div>
                             <span className="text-sm font-medium text-red-300">Revoke All User Sessions</span>
-                            <p className="text-xs text-slate-500 mt-1">Force all organization members to sign in again. Use for incidents.</p>
+                            <p className="text-xs text-content-subtle mt-1">Force all organization members to sign in again. Use for incidents.</p>
                         </div>
                     </button>
                 </div>
 
                 {/* Revoke specific user */}
-                <div className="border-t border-slate-700/50 pt-4">
-                    <label className="block text-sm text-slate-300 mb-2">Revoke sessions for a specific user</label>
+                <div className="border-t border-border-default/50 pt-4">
+                    <label className="block text-sm text-content-default mb-2">Revoke sessions for a specific user</label>
                     <div className="flex gap-2">
                         <input
                             type="text"

@@ -37,7 +37,10 @@ import { Modal } from '@/components/ui/modal';
 import { FileUpload } from '@/components/ui/file-upload';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
+import { FormError } from '@/components/ui/form-error';
+import { InfoTooltip } from '@/components/ui/tooltip';
 import { queryKeys } from '@/lib/queryKeys';
+import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
 // ─── Constraints ────────────────────────────────────────────────────
 // 25 MB — generous enough for a signed PDF or a scanned policy pack,
@@ -200,9 +203,10 @@ export function UploadEvidenceModal({
             if (context?.previousList) {
                 queryClient.setQueryData(context.listKey, context.previousList);
             }
+            telemetry.trackError(err);
             setError(err instanceof Error ? err.message : 'Upload failed');
         },
-        onSuccess: (_data, _vars, context) => {
+        onSuccess: (data, _vars, context) => {
             if (context?.previousList) {
                 const currentList = queryClient.getQueryData<
                     { id: string }[]
@@ -214,6 +218,9 @@ export function UploadEvidenceModal({
                     );
                 }
             }
+            telemetry.trackSuccess({
+                evidenceId: (data as { id?: string })?.id,
+            });
             close();
         },
         onSettled: () => {
@@ -223,12 +230,20 @@ export function UploadEvidenceModal({
         },
     });
 
+    const telemetry = useFormTelemetry('UploadEvidenceModal');
+
     const canSubmit = !!file && !mutation.isPending;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!file || mutation.isPending) return;
         setError('');
+        telemetry.trackSubmit({
+            hasTitle: title.trim().length > 0,
+            hasControlLink: Boolean(controlId),
+            hasRetention: Boolean(retentionUntil),
+            sizeBytes: file.size,
+        });
         mutation.mutate({ file, title, controlId, retentionUntil });
     };
 
@@ -302,6 +317,11 @@ export function UploadEvidenceModal({
                                     setError('');
                                 }}
                             />
+                            {!file && error && (
+                                <FormError>
+                                    A file is required to upload evidence.
+                                </FormError>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -326,12 +346,19 @@ export function UploadEvidenceModal({
 
                             {/* Retention date */}
                             <div>
-                                <label
-                                    className="mb-1 block text-sm text-content-default"
-                                    htmlFor="retention-date-input"
-                                >
-                                    Retain until
-                                </label>
+                                <div className="mb-1 flex items-center gap-1.5">
+                                    <label
+                                        className="text-sm text-content-default"
+                                        htmlFor="retention-date-input"
+                                    >
+                                        Retain until
+                                    </label>
+                                    <InfoTooltip
+                                        aria-label="About retention dates"
+                                        iconClassName="h-3.5 w-3.5"
+                                        content="After this date the evidence is archived out of the active set. It stays in the audit log — admins can still recover it."
+                                    />
+                                </div>
                                 <input
                                     id="retention-date-input"
                                     type="date"

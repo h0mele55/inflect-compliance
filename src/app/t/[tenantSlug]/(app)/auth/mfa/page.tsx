@@ -90,8 +90,8 @@ export default function MfaChallengePage() {
                             <AlertTriangle className="w-8 h-8 text-amber-400" />
                         </div>
                     </div>
-                    <h1 className="text-xl font-bold text-white">MFA Enrollment Required</h1>
-                    <p className="text-sm text-slate-400">
+                    <h1 className="text-xl font-bold text-content-emphasis">MFA Enrollment Required</h1>
+                    <p className="text-sm text-content-muted">
                         Your organization requires multi-factor authentication.
                         Please set up MFA to continue.
                     </p>
@@ -118,8 +118,8 @@ export default function MfaChallengePage() {
                 </div>
 
                 <div className="text-center">
-                    <h1 className="text-xl font-bold text-white">Verify Your Identity</h1>
-                    <p className="text-sm text-slate-400 mt-2">
+                    <h1 className="text-xl font-bold text-content-emphasis">Verify Your Identity</h1>
+                    <p className="text-sm text-content-muted mt-2">
                         Enter the 6-digit code from your authenticator app to continue.
                     </p>
                 </div>
@@ -155,7 +155,7 @@ export default function MfaChallengePage() {
                     </button>
                 </div>
 
-                <p className="text-xs text-slate-500 text-center">
+                <p className="text-xs text-content-subtle text-center">
                     Can&apos;t access your authenticator? Contact your organization administrator.
                 </p>
             </div>

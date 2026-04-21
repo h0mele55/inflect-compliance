@@ -50,16 +50,16 @@ export default function CycleReadinessPage() {
     }, [apiUrl, cycleId]);
 
     if (loading) return <div className="p-8"><div className="glass-card animate-pulse h-64" /></div>;
-    if (!result) return <div className="p-8 text-center text-slate-400">Could not compute readiness.</div>;
+    if (!result) return <div className="p-8 text-center text-content-muted">Could not compute readiness.</div>;
 
     const bd = result.breakdown;
 
     return (
         <div className="space-y-6 animate-fadeIn">
             <div className="flex items-center gap-3">
-                <Link href={`/t/${tenantSlug}/audits/readiness`} className="text-slate-400 hover:text-white transition">← Readiness</Link>
-                <span className="text-slate-600">·</span>
-                <Link href={`/t/${tenantSlug}/audits/cycles/${cycleId}`} className="text-slate-400 hover:text-white transition">{cycle?.name || 'Cycle'}</Link>
+                <Link href={`/t/${tenantSlug}/audits/readiness`} className="text-content-muted hover:text-content-emphasis transition">← Readiness</Link>
+                <span className="text-content-subtle">·</span>
+                <Link href={`/t/${tenantSlug}/audits/cycles/${cycleId}`} className="text-content-muted hover:text-content-emphasis transition">{cycle?.name || 'Cycle'}</Link>
             </div>
 
             {/* Score + Breakdown */}
@@ -67,7 +67,7 @@ export default function CycleReadinessPage() {
                 <div className="flex items-start gap-8">
                     <div className="flex-shrink-0 text-center">
                         <ScoreRing score={result.score} />
-                        <p className="text-xs text-slate-400 mt-2">{result.frameworkKey} Readiness</p>
+                        <p className="text-xs text-content-muted mt-2">{result.frameworkKey} Readiness</p>
                     </div>
                     <div className="flex-1 space-y-3" id="readiness-breakdown">
                         {bd.coverage && (
@@ -106,7 +106,7 @@ export default function CycleReadinessPage() {
                         {result.recommendations.map((r: string, i: number) => (
                             <div key={i} className="flex items-start gap-2 text-sm">
                                 <span className="text-amber-400 flex-shrink-0">→</span>
-                                <span className="text-slate-300">{r}</span>
+                                <span className="text-content-default">{r}</span>
                             </div>
                         ))}
                     </div>
@@ -117,14 +117,14 @@ export default function CycleReadinessPage() {
             {result.gaps?.length > 0 && (
                 <div className="space-y-3" id="gaps-section">
                     <h3 className="text-sm font-semibold">Top Gaps ({result.gaps.length})</h3>
-                    <div className="glass-card divide-y divide-slate-700/50">
+                    <div className="glass-card divide-y divide-border-default/50">
                         {result.gaps.map((g: any, i: number) => (
                             <div key={i} className="p-3 flex items-center justify-between text-sm">
                                 <div className="flex items-center gap-3 min-w-0">
                                     <AppIcon name={GAP_ICON[g.type] || 'overview'} size={16} />
                                     <div className="min-w-0">
                                         <span className="font-medium truncate block">{g.title}</span>
-                                        <span className="text-xs text-slate-500">{g.details}</span>
+                                        <span className="text-xs text-content-subtle">{g.details}</span>
                                     </div>
                                 </div>
                                 <span className={`badge ${SEV_BADGE[g.severity] || 'badge-neutral'} text-xs ml-2`}>{g.severity}</span>
@@ -155,13 +155,13 @@ function BreakdownBar({ label, score, detail, weight }: { label: string; score: 
     return (
         <div>
             <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-slate-300">{label} ({Math.round(weight * 100)}%)</span>
-                <span className="text-slate-400">{score}%</span>
+                <span className="text-content-default">{label} ({Math.round(weight * 100)}%)</span>
+                <span className="text-content-muted">{score}%</span>
             </div>
-            <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+            <div className="h-2 bg-bg-elevated/50 rounded-full overflow-hidden">
                 <div className={`h-full ${color} rounded-full transition-all duration-1000`} style={{ width: `${score}%` }} />
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">{detail}</p>
+            <p className="text-xs text-content-subtle mt-0.5">{detail}</p>
         </div>
     );
 }

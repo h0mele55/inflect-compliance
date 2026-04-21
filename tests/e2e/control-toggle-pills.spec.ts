@@ -1,7 +1,18 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, Locator } from '@playwright/test';
 import { loginAndGetTenant } from './e2e-utils';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
+
+async function findApplicablePill(page: Page): Promise<Locator | null> {
+    const rows = page.locator('#controls-table tbody tr');
+    const count = await rows.count();
+    for (let i = 0; i < count; i++) {
+        const pill = rows.nth(i).locator('[id^="applicability-pill-"]');
+        const text = await pill.textContent();
+        if (text?.trim() === 'Yes') return pill;
+    }
+    return null;
+}
 
 test.describe('Control Toggle Pills', () => {
     test.describe.configure({ mode: 'serial' });
@@ -69,27 +80,12 @@ test.describe('Control Toggle Pills', () => {
         await page.goto(`/t/${tenantSlug}/controls`);
         await page.waitForSelector('#controls-table', { timeout: 15000 });
 
-        // Find a row with applicability "Yes" (APPLICABLE)
-        const rows = page.locator('#controls-table tbody tr');
-        const count = await rows.count();
-        let targetPill = null;
-
-        for (let i = 0; i < count; i++) {
-            const pill = rows.nth(i).locator('[id^="applicability-pill-"]');
-            const text = await pill.textContent();
-            if (text?.trim() === 'Yes') {
-                targetPill = pill;
-                break;
-            }
-        }
-
-        if (!targetPill) {
-            test.skip();
-            return;
-        }
+        // Seed resets applicability to APPLICABLE — we expect a "Yes" pill.
+        const targetPill = await findApplicablePill(page);
+        expect(targetPill, 'No APPLICABLE control found — seed reset may have failed').not.toBeNull();
 
         // Click to toggle to NOT_APPLICABLE — should open modal
-        await targetPill.click();
+        await targetPill!.click();
         await expect(page.locator('#justification-input')).toBeVisible({ timeout: 3000 });
         await expect(page.locator('#justification-input')).toBeVisible();
 
@@ -107,7 +103,7 @@ test.describe('Control Toggle Pills', () => {
         await expect(page.locator('#justification-input')).toBeHidden({ timeout: 3000 });
 
         // Pill should now show N/A
-        const text = await targetPill.textContent();
+        const text = await targetPill!.textContent();
         expect(text?.trim()).toBe('N/A');
     });
 
@@ -116,27 +112,14 @@ test.describe('Control Toggle Pills', () => {
         await page.goto(`/t/${tenantSlug}/controls`);
         await page.waitForSelector('#controls-table', { timeout: 15000 });
 
-        // Find a row with applicability "Yes"
-        const rows = page.locator('#controls-table tbody tr');
-        const count = await rows.count();
-        let targetPill = null;
-
-        for (let i = 0; i < count; i++) {
-            const pill = rows.nth(i).locator('[id^="applicability-pill-"]');
-            const text = await pill.textContent();
-            if (text?.trim() === 'Yes') {
-                targetPill = pill;
-                break;
-            }
-        }
-
-        if (!targetPill) {
-            test.skip();
-            return;
-        }
+        // The previous serial test sets one control to N/A; the seed
+        // reset + the other 3 seeded controls keep at least one "Yes"
+        // pill available here.
+        const targetPill = await findApplicablePill(page);
+        expect(targetPill, 'No APPLICABLE control left after prior test').not.toBeNull();
 
         // Click to open modal
-        await targetPill.click();
+        await targetPill!.click();
         await expect(page.locator('#justification-input')).toBeVisible({ timeout: 3000 });
 
         // Cancel
@@ -144,7 +127,7 @@ test.describe('Control Toggle Pills', () => {
         await expect(page.locator('#justification-input')).toBeHidden({ timeout: 3000 });
 
         // Pill should still show "Yes"
-        const text = await targetPill.textContent();
+        const text = await targetPill!.textContent();
         expect(text?.trim()).toBe('Yes');
     });
 

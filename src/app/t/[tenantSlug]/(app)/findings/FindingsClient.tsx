@@ -133,7 +133,7 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
             accessorKey: 'title',
             header: t.findingTitle,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            cell: ({ getValue }: any) => <span className="font-medium text-white text-sm">{getValue()}</span>,
+            cell: ({ getValue }: any) => <span className="font-medium text-content-emphasis text-sm">{getValue()}</span>,
         },
         {
             accessorKey: 'severity',
@@ -184,7 +184,7 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
         <>
             <div className="flex items-center justify-between">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-slate-400 text-sm">{findings.filter((f: any) => f.status !== 'CLOSED').length} {t.open.toLowerCase()}</p></div>
+                <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-content-muted text-sm">{findings.filter((f: any) => f.status !== 'CLOSED').length} {t.open.toLowerCase()}</p></div>
                 <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t.newFinding}</button>
             </div>
 

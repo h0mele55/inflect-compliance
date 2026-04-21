@@ -71,7 +71,7 @@ export function AdminClient({ auditLog, tenantSlug, translations: t }: AdminClie
             accessorKey: 'details',
             header: t.details,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            cell: ({ getValue }: any) => <span className="text-xs text-slate-400 max-w-xs truncate">{getValue()}</span>,
+            cell: ({ getValue }: any) => <span className="text-xs text-content-muted max-w-xs truncate">{getValue()}</span>,
         },
     ]), [t]);
 
@@ -93,12 +93,12 @@ export function AdminClient({ auditLog, tenantSlug, translations: t }: AdminClie
                 />
             ) : (
                 <div className="glass-card p-6">
-                    <p className="text-sm text-slate-400 mb-4">{t.templateDescription}</p>
+                    <p className="text-sm text-content-muted mb-4">{t.templateDescription}</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {templateKeys.map(key => (
-                            <div key={key} className="p-4 border border-slate-700 rounded-lg hover:border-brand-500 transition cursor-pointer">
-                                <span className="text-sm font-medium text-white">{t.templateLabels[key]}</span>
-                                <p className="text-xs text-slate-500 mt-1">{t.clickToUse}</p>
+                            <div key={key} className="p-4 border border-border-default rounded-lg hover:border-brand-500 transition cursor-pointer">
+                                <span className="text-sm font-medium text-content-emphasis">{t.templateLabels[key]}</span>
+                                <p className="text-xs text-content-subtle mt-1">{t.clickToUse}</p>
                             </div>
                         ))}
                     </div>

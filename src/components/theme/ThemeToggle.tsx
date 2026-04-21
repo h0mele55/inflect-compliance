@@ -9,6 +9,7 @@
  */
 
 import { Moon, Sun } from 'lucide-react';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useTheme } from './ThemeProvider';
 
 export interface ThemeToggleProps {
@@ -23,22 +24,23 @@ export function ThemeToggle({ className, id = 'theme-toggle' }: ThemeToggleProps
     const label = isDark ? 'Switch to light theme' : 'Switch to dark theme';
 
     return (
-        <button
-            type="button"
-            onClick={toggle}
-            aria-label={label}
-            aria-pressed={!isDark}
-            title={label}
-            id={id}
-            data-testid="theme-toggle"
-            data-theme-current={theme}
-            className={`icon-btn icon-btn-sm ${className ?? ''}`.trim()}
-        >
-            {isDark ? (
-                <Sun className="size-4" aria-hidden="true" />
-            ) : (
-                <Moon className="size-4" aria-hidden="true" />
-            )}
-        </button>
+        <Tooltip content={label}>
+            <button
+                type="button"
+                onClick={toggle}
+                aria-label={label}
+                aria-pressed={!isDark}
+                id={id}
+                data-testid="theme-toggle"
+                data-theme-current={theme}
+                className={`icon-btn icon-btn-sm ${className ?? ''}`.trim()}
+            >
+                {isDark ? (
+                    <Sun className="size-4" aria-hidden="true" />
+                ) : (
+                    <Moon className="size-4" aria-hidden="true" />
+                )}
+            </button>
+        </Tooltip>
     );
 }

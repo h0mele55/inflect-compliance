@@ -23,7 +23,10 @@ import { loginAndGetTenant, safeGoto } from './e2e-utils';
  */
 
 test.describe('Epic 54 — Evidence upload modal', () => {
-    test.describe.configure({ mode: 'serial' });
+    // Each modal test gets its own fresh browser context. Serial mode
+    // shares context across tests, and Radix Dialog leaves residual
+    // portal/focus-trap state that blocks the second open() in
+    // `next dev`.
 
     let tenantSlug: string;
 
@@ -53,19 +56,31 @@ test.describe('Epic 54 — Evidence upload modal', () => {
     test('submit is disabled until a file is attached', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/evidence`);
-        await page.waitForSelector('#upload-evidence-btn', { timeout: 15000 });
-        await page.click('#upload-evidence-btn');
-        await expect(page.locator('#upload-form')).toBeVisible({ timeout: 5000 });
+        // Reload to reset any Radix focus-trap state from the prior
+        // serial-mode test before clicking the open-modal button.
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        const openBtn = page.locator('#upload-evidence-btn');
+        await openBtn.waitFor({ state: 'visible', timeout: 15_000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await openBtn.click();
+        await expect(page.locator('#upload-form')).toBeVisible({ timeout: 60_000 });
 
         await expect(page.locator('#submit-upload-btn')).toBeDisabled();
+
+        // Close so the next serial test starts clean.
+        await page.click('#upload-evidence-cancel-btn');
+        await expect(page.locator('#upload-form')).toBeHidden({ timeout: 5000 });
     });
 
     test('attaching a file and submitting POSTs to /evidence/uploads', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/evidence`);
-        await page.waitForSelector('#upload-evidence-btn', { timeout: 15000 });
-        await page.click('#upload-evidence-btn');
-        await expect(page.locator('#upload-form')).toBeVisible({ timeout: 5000 });
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        const openBtn2 = page.locator('#upload-evidence-btn');
+        await openBtn2.waitFor({ state: 'visible', timeout: 15_000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await openBtn2.click();
+        await expect(page.locator('#upload-form')).toBeVisible({ timeout: 60_000 });
 
         const uid = Date.now().toString(36);
         const filename = `modal-evidence-${uid}.txt`;
@@ -104,8 +119,12 @@ test.describe('Epic 54 — Evidence upload modal', () => {
     test('Cancel closes the modal and leaves the list untouched', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/evidence`);
-        await page.click('#upload-evidence-btn');
-        await expect(page.locator('#upload-form')).toBeVisible({ timeout: 5000 });
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        const openBtn3 = page.locator('#upload-evidence-btn');
+        await openBtn3.waitFor({ state: 'visible', timeout: 15_000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await openBtn3.click();
+        await expect(page.locator('#upload-form')).toBeVisible({ timeout: 60_000 });
 
         await page.click('#upload-evidence-cancel-btn');
 
@@ -115,7 +134,8 @@ test.describe('Epic 54 — Evidence upload modal', () => {
 });
 
 test.describe('Epic 54 — Add text evidence modal', () => {
-    test.describe.configure({ mode: 'serial' });
+    // Each modal test gets its own fresh browser context — see the
+    // comment on the upload-modal describe block above.
 
     let tenantSlug: string;
 
@@ -126,7 +146,7 @@ test.describe('Epic 54 — Add text evidence modal', () => {
 
         await page.click('#add-text-evidence-btn');
 
-        await expect(page.locator('#text-evidence-form')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#text-evidence-form')).toBeVisible({ timeout: 30_000 });
         await expect(page.locator('#text-evidence-title-input')).toBeFocused({ timeout: 3000 });
 
         // Close so the open modal doesn't leak into the next serial test.
@@ -137,23 +157,33 @@ test.describe('Epic 54 — Add text evidence modal', () => {
     test('create button is disabled until title is filled', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/evidence`);
-        await page.waitForSelector('#add-text-evidence-btn', { timeout: 15000 });
-        await page.click('#add-text-evidence-btn');
-        await expect(page.locator('#text-evidence-form')).toBeVisible({ timeout: 5000 });
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        const textBtn = page.locator('#add-text-evidence-btn');
+        await textBtn.waitFor({ state: 'visible', timeout: 15_000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await textBtn.click();
+        await expect(page.locator('#text-evidence-form')).toBeVisible({ timeout: 60_000 });
 
         await expect(page.locator('#create-text-evidence-btn')).toBeDisabled();
         await page.fill('#text-evidence-title-input', 'T');
         await expect(page.locator('#create-text-evidence-btn')).toBeEnabled();
         await page.fill('#text-evidence-title-input', '');
         await expect(page.locator('#create-text-evidence-btn')).toBeDisabled();
+
+        // Close so the next serial test starts clean.
+        await page.click('#text-evidence-cancel-btn');
+        await expect(page.locator('#text-evidence-form')).toBeHidden({ timeout: 5000 });
     });
 
     test('submitting creates evidence and refreshes the list', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/evidence`);
-        await page.waitForSelector('#add-text-evidence-btn', { timeout: 15000 });
-        await page.click('#add-text-evidence-btn');
-        await expect(page.locator('#text-evidence-form')).toBeVisible({ timeout: 5000 });
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        const textBtn2 = page.locator('#add-text-evidence-btn');
+        await textBtn2.waitFor({ state: 'visible', timeout: 15_000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await textBtn2.click();
+        await expect(page.locator('#text-evidence-form')).toBeVisible({ timeout: 60_000 });
 
         const uid = Date.now().toString(36);
         const title = `Modal Text Evidence ${uid}`;

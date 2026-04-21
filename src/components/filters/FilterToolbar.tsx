@@ -17,7 +17,7 @@
  * Keyboard / a11y: the shared FilterSelect carries the `f` shortcut, Escape
  * cascade, and keyboard-driven option navigation. The search input uses
  * `type="search"` so browsers expose a clear affordance; commit semantics
- * match the prior CompactFilterBar (Enter + blur).
+ * match the pre-Epic 53 filter bar: commit on Enter + blur.
  */
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -93,7 +93,7 @@ export function FilterToolbar({
     const { remove, removeAll, clearAll, search, setSearch, state } = ctx;
 
     // Local draft so typing doesn't churn the URL on every keystroke —
-    // committed on Enter or blur. Matches the original CompactFilterBar UX.
+    // committed on Enter or blur, matching the pre-Epic 53 filter-bar UX.
     const [draft, setDraft] = useState(search);
     useEffect(() => setDraft(search), [search]);
 

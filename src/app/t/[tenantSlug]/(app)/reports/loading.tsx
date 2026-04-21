@@ -29,10 +29,10 @@ export default function ReportsLoading() {
             {/* Table skeleton */}
             <div className="glass-card overflow-hidden">
                 {/* Header */}
-                <div className="h-12 bg-slate-800/50 border-b border-slate-700/50" />
+                <div className="h-12 bg-bg-default/50 border-b border-border-default/50" />
                 {/* Rows */}
                 {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="h-12 border-b border-slate-700/50 px-4 flex items-center gap-4">
+                    <div key={i} className="h-12 border-b border-border-default/50 px-4 flex items-center gap-4">
                         <Skeleton className="h-4 w-1/4 rounded" />
                         <Skeleton className="h-4 w-1/3 rounded" />
                         <Skeleton className="h-4 w-1/6 rounded" />

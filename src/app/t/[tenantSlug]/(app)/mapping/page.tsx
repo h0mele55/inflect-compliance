@@ -12,7 +12,7 @@ export default function MappingPage() {
 
     useEffect(() => { fetch(apiUrl('/mapping')).then(r => r.json()).then(setData); }, [apiUrl]);
 
-    if (!data) return <div className="animate-pulse text-slate-400 p-8">{t('loading')}</div>;
+    if (!data) return <div className="animate-pulse text-content-muted p-8">{t('loading')}</div>;
 
     const items = tab === 'soc2' ? data.soc2 : data.nis2;
 
@@ -20,7 +20,7 @@ export default function MappingPage() {
         <div className="space-y-6 animate-fadeIn">
             <div>
                 <h1 className="text-2xl font-bold">{t('title')}</h1>
-                <p className="text-slate-400 text-sm">{t('subtitle')}</p>
+                <p className="text-content-muted text-sm">{t('subtitle')}</p>
             </div>
 
             <div className="flex gap-2">
@@ -40,12 +40,12 @@ export default function MappingPage() {
                                 {item.coverage}%
                             </span>
                         </div>
-                        <p className="text-xs text-slate-400 mb-3">{item.description}</p>
+                        <p className="text-xs text-content-muted mb-3">{item.description}</p>
                         <div className="flex items-center gap-3">
-                            <div className="flex-1 bg-slate-800 rounded-full h-2 overflow-hidden">
+                            <div className="flex-1 bg-bg-default rounded-full h-2 overflow-hidden">
                                 <div className="h-full bg-gradient-to-r from-brand-500 to-emerald-500 rounded-full transition-all" style={{ width: `${item.coverage}%` }} />
                             </div>
-                            <span className="text-xs text-slate-500">{t('controls', { implemented: item.implementedCount, total: item.controlCount })}</span>
+                            <span className="text-xs text-content-subtle">{t('controls', { implemented: item.implementedCount, total: item.controlCount })}</span>
                         </div>
                     </div>
                 ))}

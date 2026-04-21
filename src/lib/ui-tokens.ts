@@ -1,7 +1,7 @@
 /**
  * UI Tokens — single source of truth for pill sizing.
  *
- * Buttons (.btn) and filter pills (CompactFilterBar) share these tokens.
+ * Buttons (.btn) and FilterToolbar's filter pills share these tokens.
  * CSS implementation is in globals.css, this file provides the JS-side
  * constants for components that need to compose classNames.
  *

@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { loginAndGetTenant, gotoAndVerify } from './e2e-utils';
+import { loginAndGetTenant, gotoAndVerify, selectComboboxOption } from './e2e-utils';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
@@ -23,7 +23,9 @@ test.describe('Vendor Management', () => {
         await expect(page.locator('#vendor-name-input')).toBeVisible({ timeout: 15000 });
 
         await page.fill('#vendor-name-input', `E2E Vendor ${uid}`);
-        await page.selectOption('#vendor-criticality-select', 'HIGH');
+        // Epic 55: vendor-criticality-select migrated to <Combobox> —
+        // pick by visible label "High".
+        await selectComboboxOption(page, 'vendor-criticality-select', 'High');
         await page.click('#create-vendor-submit');
 
         await page.waitForURL(/\/vendors\//, { timeout: 60000 });
@@ -59,7 +61,9 @@ test.describe('Vendor Management', () => {
         await expect(page.locator('#add-doc-btn')).toBeVisible({ timeout: 20000 });
         await page.click('#add-doc-btn');
         await expect(page.locator('#doc-type-select')).toBeVisible({ timeout: 5000 });
-        await page.selectOption('#doc-type-select', 'SOC2');
+        // Epic 55: doc-type-select migrated to <Combobox>; option label
+        // for SOC2 is "SOC 2" (with the space).
+        await selectComboboxOption(page, 'doc-type-select', 'SOC 2');
         await page.fill('#doc-title-input', `SOC2 Report 2025 ${uid}`);
         await page.fill('#doc-url-input', 'https://example.com/soc2.pdf');
 

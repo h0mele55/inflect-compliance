@@ -14,12 +14,12 @@ import * as path from 'path';
  *   - CSS-in-JS runtime injections (styled-components, emotion, etc.)
  *
  * What is ALLOWED:
- *   - React `style={{}}` props in 'use client' components — these set styles
- *     via the CSSOM DOM API (element.style.x = y) during hydration, which is
- *     NOT blocked by CSP `style-src`. The SSR-rendered `style` attributes
- *     are briefly blocked but re-applied after hydration.
- *   - This is a deliberate trade-off: brief unstyled flash on progress bars
- *     during SSR→hydration is acceptable for compliance dashboard UX.
+ *   - React `style={{}}` props anywhere — style-src is set to
+ *     `'self' 'unsafe-inline' https://fonts.googleapis.com` (no
+ *     nonce), because per CSP L3 a nonce on style-src invalidates
+ *     'unsafe-inline' and blocks every SSR `style=""` attribute.
+ *     <style> tags are kept out of the codebase by the guardrails
+ *     below, and script-src remains strict (nonce + strict-dynamic).
  */
 
 const SRC_DIR = path.resolve(__dirname, '../../src');
@@ -175,7 +175,11 @@ describe('CSP Style Guardrails', () => {
 });
 
 describe('CSP Production style-src', () => {
-    it('production style-src does not contain unsafe-inline', () => {
+    it('production style-src allows unsafe-inline for dynamic style attributes', () => {
+        // Nonces/hashes don't match `style=""` attributes (only <style>
+        // tags), so progress-bar widths and colour-coded badges need
+        // 'unsafe-inline'. CSS injection has far lower blast radius than
+        // JS injection; script-src stays strict (nonce + strict-dynamic).
         const { buildCspHeader, generateNonce } = require('../../src/lib/security/csp');
         const nonce = generateNonce();
         const csp: string = buildCspHeader(nonce, false); // production
@@ -186,10 +190,12 @@ describe('CSP Production style-src', () => {
             .find((d: string) => d.startsWith('style-src'));
 
         expect(styleSrc).toBeDefined();
-        expect(styleSrc).not.toContain("'unsafe-inline'");
+        expect(styleSrc).toContain("'unsafe-inline'");
     });
 
-    it('production style-src allows self and nonce', () => {
+    it('production style-src allows self but omits the nonce', () => {
+        // A nonce on style-src would invalidate 'unsafe-inline' (per
+        // CSP L3) and block every SSR `style=""` attribute.
         const { buildCspHeader, generateNonce } = require('../../src/lib/security/csp');
         const nonce = generateNonce();
         const csp: string = buildCspHeader(nonce, false);
@@ -200,7 +206,7 @@ describe('CSP Production style-src', () => {
             .find((d: string) => d.startsWith('style-src'));
 
         expect(styleSrc).toContain("'self'");
-        expect(styleSrc).toContain(`'nonce-${nonce}'`);
+        expect(styleSrc).not.toContain(`'nonce-${nonce}'`);
     });
 
     it('style-src allows Google Fonts stylesheet origin', () => {

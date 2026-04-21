@@ -46,7 +46,7 @@ export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, 
             accessorKey: 'title',
             header: t.risk,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            cell: ({ getValue }: any) => <span className="font-medium text-sm text-white">{getValue()}</span>,
+            cell: ({ getValue }: any) => <span className="font-medium text-sm text-content-emphasis">{getValue()}</span>,
         },
         {
             accessorKey: 'asset',
@@ -58,7 +58,7 @@ export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, 
             accessorKey: 'threat',
             header: t.threat,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            cell: ({ getValue }: any) => <span className="text-xs text-slate-400">{getValue()}</span>,
+            cell: ({ getValue }: any) => <span className="text-xs text-content-muted">{getValue()}</span>,
         },
         {
             id: 'lxi',
@@ -92,14 +92,14 @@ export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             accessorFn: (r: any) => r.controls || '—',
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            cell: ({ getValue }: any) => <span className="text-xs text-slate-400">{getValue()}</span>,
+            cell: ({ getValue }: any) => <span className="text-xs text-content-muted">{getValue()}</span>,
         },
     ]), [t]);
 
     return (
         <>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div><h1 className="text-2xl font-bold" id="reports-heading">{t.title}</h1><p className="text-slate-400 text-sm">{t.subtitle}</p></div>
+                <div><h1 className="text-2xl font-bold" id="reports-heading">{t.title}</h1><p className="text-content-muted text-sm">{t.subtitle}</p></div>
                 <RequirePermission resource="reports" action="export">
                     <div className="flex flex-wrap gap-2">
                         <button onClick={() => downloadCSV(data.riskRegister, 'risk-register.csv')} className="btn btn-secondary" id="export-risks-btn">{t.exportRisks}</button>

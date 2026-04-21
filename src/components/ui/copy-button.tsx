@@ -1,57 +1,147 @@
+/**
+ * CopyButton — Epic 56 inline copy affordance.
+ *
+ * Icon-only button that copies a string to the clipboard, flashes a check
+ * mark, and emits a subtle toast. Wraps the primitive in a Tooltip so the
+ * hover/focus hint tells the user what they're about to copy.
+ *
+ *   <CopyButton value={apiKey} label="Copy API key" />
+ *   <CopyButton value={sharedUrl} label="Copy share link" onCopy={audit.copy} />
+ *
+ * Behavior:
+ *   - Never auto-fires — requires an explicit click / keyboard activation.
+ *   - Swallows the event so parent rows / accordions don't react.
+ *   - Surfaces failures with an error toast; inline icon flips back to
+ *     the copy glyph so the user can retry.
+ *   - Fires `onCopy(value)` only on success, once per click, so callers
+ *     can audit-log reveal-and-copy actions on secrets without double-
+ *     logging on retries.
+ */
+
 "use client";
+
 import { cn } from "@dub/utils";
-import { VariantProps, cva } from "class-variance-authority";
-import { LucideIcon } from "lucide-react";
+import { type VariantProps, cva } from "class-variance-authority";
+import { Check, Copy, type LucideIcon } from "lucide-react";
+import { forwardRef } from "react";
 import { toast } from "sonner";
+import { Tooltip } from "./tooltip";
 import { useCopyToClipboard } from "./hooks";
-import { Copy, Tick } from "./icons";
 
 const copyButtonVariants = cva(
-  "relative group rounded-full p-1.5 transition-all duration-75",
-  {
-    variants: {
-      variant: {
-        default: "bg-transparent hover:bg-neutral-100 active:bg-neutral-200",
-        neutral: "bg-transparent hover:bg-neutral-100 active:bg-neutral-200",
-      },
+    [
+        "group inline-flex items-center justify-center rounded-md",
+        "text-content-muted transition-colors duration-75",
+        "hover:bg-bg-muted hover:text-content-default",
+        "active:bg-bg-subtle",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-content-muted",
+    ].join(" "),
+    {
+        variants: {
+            size: {
+                sm: "h-6 w-6",
+                md: "h-7 w-7",
+                lg: "h-8 w-8",
+            },
+            variant: {
+                ghost: "bg-transparent",
+                subtle: "bg-bg-subtle",
+            },
+        },
+        defaultVariants: {
+            size: "md",
+            variant: "ghost",
+        },
     },
-    defaultVariants: {
-      variant: "default",
-    },
-  },
 );
 
-export function CopyButton({
-  variant = "default",
-  value,
-  className,
-  icon,
-  successMessage,
-}: {
-  value: string;
-  className?: string;
-  icon?: LucideIcon;
-  successMessage?: string;
-} & VariantProps<typeof copyButtonVariants>) {
-  const [copied, copyToClipboard] = useCopyToClipboard();
-  const Comp = icon || Copy;
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation();
-        toast.promise(copyToClipboard(value), {
-          success: successMessage || "Copied to clipboard!",
-        });
-      }}
-      className={cn(copyButtonVariants({ variant }), className)}
-      type="button"
-    >
-      <span className="sr-only">Copy</span>
-      {copied ? (
-        <Tick className="h-3.5 w-3.5" />
-      ) : (
-        <Comp className="h-3.5 w-3.5" />
-      )}
-    </button>
-  );
+export interface CopyButtonProps
+    extends VariantProps<typeof copyButtonVariants> {
+    /** Value written to the clipboard. */
+    value: string;
+    /**
+     * Accessible label and tooltip content. Defaults to "Copy". Prefer a
+     * specific label when the page has multiple copyable values ("Copy
+     * API key", "Copy share link") so screen reader users aren't left
+     * with ambiguous "Copy" / "Copy" / "Copy" announcements.
+     */
+    label?: string;
+    /** Toast shown on success. Defaults to `{label} copied`. */
+    successMessage?: string;
+    /** Toast shown on error. Defaults to "Copy failed". */
+    errorMessage?: string;
+    /** Override the default Copy icon (e.g., `Link` for a share URL). */
+    icon?: LucideIcon;
+    /** Instrumentation hook fired once per successful copy. */
+    onCopy?: (value: string) => void;
+    /** Disables both the button and the underlying clipboard write. */
+    disabled?: boolean;
+    className?: string;
+    /** Opt out of the Tooltip wrapper (e.g., inside another tooltip). */
+    disableTooltip?: boolean;
 }
+
+export const CopyButton = forwardRef<HTMLButtonElement, CopyButtonProps>(
+    function CopyButton(
+        {
+            value,
+            label = "Copy",
+            successMessage,
+            errorMessage = "Copy failed",
+            icon,
+            size,
+            variant,
+            onCopy,
+            disabled,
+            className,
+            disableTooltip,
+        },
+        ref,
+    ) {
+        const { copy, copied } = useCopyToClipboard();
+        const Glyph = icon ?? Copy;
+        const iconSize = size === "sm" ? "h-3 w-3" : size === "lg" ? "h-4 w-4" : "h-3.5 w-3.5";
+
+        const handleClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
+            event.stopPropagation();
+            if (disabled) return;
+            const ok = await copy(value);
+            if (ok) {
+                onCopy?.(value);
+                toast.success(successMessage ?? `${label} copied`);
+            } else {
+                toast.error(errorMessage);
+            }
+        };
+
+        const button = (
+            <button
+                ref={ref}
+                type="button"
+                aria-label={label}
+                aria-live="polite"
+                disabled={disabled}
+                data-copied={copied ? "true" : undefined}
+                onClick={handleClick}
+                className={cn(copyButtonVariants({ size, variant }), className)}
+            >
+                {copied ? (
+                    <Check
+                        className={cn(iconSize, "text-content-success")}
+                        aria-hidden="true"
+                    />
+                ) : (
+                    <Glyph className={iconSize} aria-hidden="true" />
+                )}
+            </button>
+        );
+
+        if (disableTooltip || disabled) return button;
+        return (
+            <Tooltip content={copied ? "Copied" : label} disableHoverableContent>
+                {button}
+            </Tooltip>
+        );
+    },
+);

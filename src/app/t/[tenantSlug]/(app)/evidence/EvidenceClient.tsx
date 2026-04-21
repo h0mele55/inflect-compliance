@@ -4,6 +4,12 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
+import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
+// Both evidence modals were previously lazy-loaded via next/dynamic,
+// but the JIT race in `next dev` made the modals occasionally fail to
+// mount in serial-mode E2E runs (Playwright clicked the trigger before
+// the chunk finished compiling). Static imports — the bundle cost is
+// acceptable and the E2E suite becomes deterministic.
 import { UploadEvidenceModal } from './UploadEvidenceModal';
 import { NewEvidenceTextModal } from './NewEvidenceTextModal';
 import {
@@ -14,6 +20,7 @@ import {
     useListPagination,
 } from '@/components/ui/table';
 import { useColumnVisibility } from '@/components/ui/hooks';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
     FilterProvider,
     useFilterContext,
@@ -43,12 +50,13 @@ const STATUS_BADGE: Record<string, string> = {
 type RetentionFilter = 'active' | 'expiring' | 'archived';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getRetentionStatus(ev: any): { label: string; badge: string; icon: string } {
+function getRetentionStatus(ev: any, now: Date | null): { label: string; badge: string; icon: string } {
     if (ev.isArchived) return { label: 'Archived', badge: 'badge-neutral', icon: '' };
     if (ev.expiredAt) return { label: 'Expired', badge: 'badge-danger', icon: '' };
     if (ev.retentionUntil) {
+        if (!now) return { label: 'Active', badge: 'badge-success', icon: '' };
         const until = new Date(ev.retentionUntil);
-        const daysLeft = Math.ceil((until.getTime() - Date.now()) / 86_400_000);
+        const daysLeft = Math.ceil((until.getTime() - now.getTime()) / 86_400_000);
         if (daysLeft <= 0) return { label: 'Expired', badge: 'badge-danger', icon: '' };
         if (daysLeft <= 30) return { label: `Expiring (${daysLeft}d)`, badge: 'badge-warning', icon: '' };
         return { label: 'Active', badge: 'badge-success', icon: '' };
@@ -219,16 +227,18 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     };
 
     // ─── Retention filter counts ───
-    const now = new Date();
-    const in30Days = new Date(Date.now() + 30 * 86_400_000);
+    // Null on SSR + first client render so the "Expiring" count matches
+    // exactly across hydration (avoids React #418/#422).
+    const hydratedNow = useHydratedNow();
 
     const activeEvidence = evidence.filter(ev => !ev.isArchived && !ev.expiredAt && !ev.deletedAt);
-    const expiringEvidence = evidence.filter(ev => {
+    const expiringEvidence = hydratedNow ? evidence.filter(ev => {
         if (ev.isArchived || ev.deletedAt) return false;
         if (!ev.retentionUntil) return false;
         const until = new Date(ev.retentionUntil);
-        return until <= in30Days && until > now;
-    });
+        const in30Days = new Date(hydratedNow.getTime() + 30 * 86_400_000);
+        return until <= in30Days && until > hydratedNow;
+    }) : [];
     const archivedEvidence = evidence.filter(ev => ev.isArchived || ev.expiredAt);
 
     // ─── Filtered evidence list (respects the active retention tab) ───
@@ -283,9 +293,9 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                 const ev = row.original;
                 return (
                     <div>
-                        <div className="font-medium text-white text-sm">{ev.title}</div>
+                        <div className="font-medium text-content-emphasis text-sm">{ev.title}</div>
                         {ev.fileName && ev.fileName !== ev.title && (
-                            <div className="text-xs text-slate-500">{ev.fileName}</div>
+                            <div className="text-xs text-content-subtle">{ev.fileName}</div>
                         )}
                     </div>
                 );
@@ -310,7 +320,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             accessorFn: (ev: any) => ev.control ? `${ev.control.annexId || ''} ${ev.control.name}` : '\u2014',
             cell: ({ getValue }: { getValue: () => string }) => (
-                <span className="text-xs text-slate-400">{getValue()}</span>
+                <span className="text-xs text-content-muted">{getValue()}</span>
             ),
         },
         {
@@ -319,7 +329,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             cell: ({ row }: { row: any }) => {
                 const ev = row.original;
-                const rs = getRetentionStatus(ev);
+                const rs = getRetentionStatus(ev, hydratedNow);
                 return (
                     <div className="text-xs">
                         <div className="flex items-center gap-1.5">
@@ -328,7 +338,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                             </span>
                         </div>
                         {ev.retentionUntil && !ev.isArchived && (
-                            <div className="text-slate-500 mt-0.5">{formatDate(ev.retentionUntil)}</div>
+                            <div className="text-content-subtle mt-0.5">{formatDate(ev.retentionUntil)}</div>
                         )}
                         {editingRetention === ev.id && (
                             <div className="mt-2 flex gap-1 items-center">
@@ -340,7 +350,9 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                                     id={`retention-edit-${ev.id}`}
                                 />
                                 <button onClick={() => saveRetention(ev.id)} className="btn btn-sm btn-primary text-xs py-0.5 px-1.5">Save</button>
-                                <button onClick={() => setEditingRetention(null)} className="btn btn-sm btn-secondary text-xs py-0.5 px-1.5" aria-label="Cancel">×</button>
+                                <Tooltip content="Cancel edit" shortcut="Esc">
+                                    <button onClick={() => setEditingRetention(null)} className="btn btn-sm btn-secondary text-xs py-0.5 px-1.5" aria-label="Cancel">×</button>
+                                </Tooltip>
                             </div>
                         )}
                     </div>
@@ -374,20 +386,28 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             cell: ({ row }: { row: any }) => {
                 const ev = row.original;
                 const isPending = ev.id?.startsWith('temp:');
-                if (isPending) return <span className="text-xs text-slate-500">Uploading...</span>;
+                if (isPending) return <span className="text-xs text-content-subtle">Uploading...</span>;
                 return (
                     <div className="flex gap-1 flex-wrap" onClick={e => e.stopPropagation()}>
                         {ev.type === 'FILE' && ev.fileRecordId && (
                             <a href={apiUrl(`/evidence/files/${ev.fileRecordId}/download`)} className="btn btn-sm btn-secondary" download id={`download-${ev.id}`}>⬇</a>
                         )}
                         {permissions.canWrite && !ev.isArchived && (
-                            <button onClick={() => { setEditingRetention(ev.id); setEditRetentionDate(ev.retentionUntil ? ev.retentionUntil.split('T')[0] : ''); }} className="btn btn-sm btn-secondary" title="Edit retention date" id={`edit-retention-${ev.id}`}>Edit</button>
+                            <Tooltip content="Edit retention date">
+                                <button
+                                    onClick={() => { setEditingRetention(ev.id); setEditRetentionDate(ev.retentionUntil ? ev.retentionUntil.split('T')[0] : ''); }}
+                                    className="btn btn-sm btn-secondary"
+                                    id={`edit-retention-${ev.id}`}
+                                >
+                                    Edit
+                                </button>
+                            </Tooltip>
                         )}
                         {permissions.canWrite && !ev.isArchived && (
-                            <button onClick={() => archiveEvidence(ev.id)} className="btn btn-sm btn-secondary" title="Archive this evidence" id={`archive-${ev.id}`}>Archive</button>
+                            <button onClick={() => archiveEvidence(ev.id)} className="btn btn-sm btn-secondary" id={`archive-${ev.id}`}>Archive</button>
                         )}
                         {permissions.canWrite && ev.isArchived && (
-                            <button onClick={() => unarchiveEvidence(ev.id)} className="btn btn-sm btn-primary" title="Unarchive this evidence" id={`unarchive-${ev.id}`}>Unarchive</button>
+                            <button onClick={() => unarchiveEvidence(ev.id)} className="btn btn-sm btn-primary" id={`unarchive-${ev.id}`}>Unarchive</button>
                         )}
                         {permissions.canWrite && ev.status === 'DRAFT' && (
                             <button onClick={() => submitReview(ev.id, 'SUBMITTED')} className="btn btn-sm btn-secondary">{t.submitForReview}</button>
@@ -415,7 +435,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">{t.title}</h1>
-                    <p className="text-slate-400 text-sm">{evidence.length} evidence items</p>
+                    <p className="text-content-muted text-sm">{evidence.length} evidence items</p>
                 </div>
                 {permissions.canWrite && (
                     <div className="flex gap-2">

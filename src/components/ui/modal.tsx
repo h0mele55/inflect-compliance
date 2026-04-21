@@ -48,6 +48,7 @@ import {
 } from "react";
 import { Drawer } from "vaul";
 import { useMediaQuery } from "./hooks";
+import { Tooltip } from "./tooltip";
 
 // ─── Size variants ──────────────────────────────────────────────────
 
@@ -244,16 +245,18 @@ function ModalRoot({
                     {fallbackDialogTitle}
                     {children}
                     {showCloseButton && !preventDefaultClose ? (
-                        <Dialog.Close asChild>
-                            <button
-                                type="button"
-                                aria-label="Close"
-                                className="absolute right-3 top-3 rounded-md p-1.5 text-content-muted transition-colors hover:bg-bg-muted hover:text-content-emphasis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                data-modal-close
-                            >
-                                <X className="size-4" />
-                            </button>
-                        </Dialog.Close>
+                        <Tooltip content="Close" shortcut="Esc">
+                            <Dialog.Close asChild>
+                                <button
+                                    type="button"
+                                    aria-label="Close"
+                                    className="absolute right-3 top-3 rounded-md p-1.5 text-content-muted transition-colors hover:bg-bg-muted hover:text-content-emphasis focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    data-modal-close
+                                >
+                                    <X className="size-4" />
+                                </button>
+                            </Dialog.Close>
+                        </Tooltip>
                     ) : null}
                 </Dialog.Content>
             </Dialog.Portal>

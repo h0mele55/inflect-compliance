@@ -15,6 +15,7 @@ import {
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildPolicyFilters, POLICY_FILTER_KEYS } from './filter-defs';
+import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 
 const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral',
@@ -63,6 +64,9 @@ function PoliciesPageInner({
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const router = useRouter();
+    // Null on SSR + first client render so the "Overdue" badge doesn't
+    // flip between server- and client-side `new Date()` values.
+    const hydratedNow = useHydratedNow();
 
     const { state, search, hasActive } = useFilters();
     const fetchParams = useMemo(
@@ -113,11 +117,11 @@ function PoliciesPageInner({
             header: 'Title',
             cell: ({ row }: any) => (
                 <div>
-                    <Link href={tenantHref(`/policies/${row.original.id}`)} className="font-medium text-white hover:text-brand-400 transition" onClick={(e) => e.stopPropagation()}>
+                    <Link href={tenantHref(`/policies/${row.original.id}`)} className="font-medium text-content-emphasis hover:text-brand-400 transition" onClick={(e) => e.stopPropagation()}>
                         {row.original.title}
                     </Link>
                     {row.original.description && (
-                        <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">{row.original.description}</p>
+                        <p className="text-xs text-content-subtle mt-0.5 truncate max-w-xs">{row.original.description}</p>
                     )}
                 </div>
             ),
@@ -133,24 +137,24 @@ function PoliciesPageInner({
             id: 'category',
             header: 'Category',
             accessorFn: (p: any) => p.category || '—',
-            cell: ({ getValue }: any) => <span className="text-xs text-slate-400">{getValue()}</span>,
+            cell: ({ getValue }: any) => <span className="text-xs text-content-muted">{getValue()}</span>,
         },
         {
             id: 'owner',
             header: 'Owner',
             accessorFn: (p: any) => p.owner?.name || '—',
-            cell: ({ getValue }: any) => <span className="text-xs text-slate-400">{getValue()}</span>,
+            cell: ({ getValue }: any) => <span className="text-xs text-content-muted">{getValue()}</span>,
         },
         {
             id: 'nextReviewAt',
             header: 'Next Review',
             cell: ({ row }: any) => {
                 const p = row.original;
-                if (!p.nextReviewAt) return <span className="text-xs text-slate-400">—</span>;
+                if (!p.nextReviewAt) return <span className="text-xs text-content-muted">—</span>;
                 return (
-                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <span className="flex items-center gap-1 text-xs text-content-muted">
                         {formatDate(p.nextReviewAt)}
-                        {new Date(p.nextReviewAt) < new Date() && p.status !== 'ARCHIVED' && (
+                        {hydratedNow && new Date(p.nextReviewAt) < hydratedNow && p.status !== 'ARCHIVED' && (
                             <span className="badge badge-danger text-xs">Overdue</span>
                         )}
                     </span>
@@ -161,9 +165,9 @@ function PoliciesPageInner({
             id: 'updatedAt',
             header: 'Updated',
             accessorFn: (p: any) => p.updatedAt,
-            cell: ({ getValue }: any) => <span className="text-xs text-slate-500">{formatDate(getValue())}</span>,
+            cell: ({ getValue }: any) => <span className="text-xs text-content-subtle">{formatDate(getValue())}</span>,
         },
-    ]), [tenantHref]);
+    ]), [tenantHref, hydratedNow]);
 
     return (
         <div className="space-y-6 animate-fadeIn">
@@ -171,7 +175,7 @@ function PoliciesPageInner({
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">{t.title}</h1>
-                    <p className="text-slate-400 text-sm">{policies.length} policies</p>
+                    <p className="text-content-muted text-sm">{policies.length} policies</p>
                 </div>
                 {permissions.canWrite && (
                     <div className="flex gap-2">

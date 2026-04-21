@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@dub/utils";
+import { Tooltip } from "../tooltip";
 import { addMonths, addYears, format, isSameMonth } from "date-fns";
 import {
   ChevronLeft,
@@ -26,7 +27,8 @@ const NavigationButton = forwardRef<HTMLButtonElement, NavigationButtonProps>(
     { onClick, icon: Icon, disabled, ...props }: NavigationButtonProps,
     forwardedRef,
   ) => {
-    return (
+    const label = props["aria-label"];
+    const button = (
       <button
         ref={forwardedRef}
         type="button"
@@ -43,6 +45,10 @@ const NavigationButton = forwardRef<HTMLButtonElement, NavigationButtonProps>(
         <Icon className="h-full w-full shrink-0" />
       </button>
     );
+    // Disabled buttons don't fire pointer events in most browsers, so the
+    // Tooltip never opens — skip wrapping to avoid a mute, no-op trigger.
+    if (!label || disabled) return button;
+    return <Tooltip content={label}>{button}</Tooltip>;
   },
 );
 

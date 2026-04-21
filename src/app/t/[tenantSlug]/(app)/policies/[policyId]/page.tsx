@@ -214,8 +214,8 @@ export default function PolicyDetailPage() {
             );
         }
         return (
-            <div className="prose prose-sm prose-invert max-w-none text-slate-300 whitespace-pre-wrap text-sm">
-                {v.contentText || <span className="text-slate-500 italic">No content</span>}
+            <div className="prose prose-sm prose-invert max-w-none text-content-default whitespace-pre-wrap text-sm">
+                {v.contentText || <span className="text-content-subtle italic">No content</span>}
             </div>
         );
     };
@@ -236,7 +236,7 @@ export default function PolicyDetailPage() {
 
     // ── Render ──
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading policy...</div>;
+    if (loading) return <div className="p-12 text-center text-content-subtle animate-pulse">Loading policy...</div>;
     if (error && !policy) return (
         <div className="glass-card p-12 text-center text-red-400 animate-fadeIn">
             <p className="text-lg">{error}</p>
@@ -258,16 +258,16 @@ export default function PolicyDetailPage() {
     return (
         <div className="space-y-6 animate-fadeIn">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-sm text-slate-400">
+            <div className="flex items-center gap-2 text-sm text-content-muted">
                 <Link href={tenantHref('/policies')} className="hover:text-brand-400 transition">Policies</Link>
                 <span>/</span>
-                <span className="text-slate-200 truncate">{policy.title}</span>
+                <span className="text-content-emphasis truncate">{policy.title}</span>
             </div>
 
             {error && (
                 <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                     {error}
-                    <button onClick={() => setError('')} className="ml-2 text-red-300 hover:text-white" aria-label="Dismiss error">×</button>
+                    <button onClick={() => setError('')} className="ml-2 text-red-300 hover:text-content-emphasis" aria-label="Dismiss error">×</button>
                 </div>
             )}
 
@@ -280,8 +280,8 @@ export default function PolicyDetailPage() {
                             <span className={`badge ${STATUS_BADGE[policy.status] || 'badge-neutral'}`} id="policy-status">{policy.status}</span>
                             {isOverdue && <span className="badge badge-danger text-xs">Overdue</span>}
                         </div>
-                        {policy.description && <p className="text-sm text-slate-400 mb-3">{policy.description}</p>}
-                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
+                        {policy.description && <p className="text-sm text-content-muted mb-3">{policy.description}</p>}
+                        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-content-subtle">
                             {policy.category && <span>{policy.category}</span>}
                             {policy.owner && <span>{policy.owner.name}</span>}
                             {policy.nextReviewAt && (
@@ -301,12 +301,12 @@ export default function PolicyDetailPage() {
                         {editingReview && (
                             <div className="flex gap-2 items-end mt-2">
                                 <div>
-                                    <label className="text-xs text-slate-500">Frequency (days)</label>
+                                    <label className="text-xs text-content-subtle">Frequency (days)</label>
                                     <input type="number" className="input w-24 text-sm" value={reviewDays}
                                         onChange={e => setReviewDays(e.target.value)} min={1} />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-500">Next review</label>
+                                    <label className="text-xs text-content-subtle">Next review</label>
                                     <input type="date" className="input w-36 text-sm" value={nextReview}
                                         onChange={e => setNextReview(e.target.value)} />
                                 </div>
@@ -324,7 +324,7 @@ export default function PolicyDetailPage() {
                         )}
                         {canAdmin && policy.status !== 'ARCHIVED' && (
                             <button onClick={archivePolicy} disabled={actionLoading === 'archive'}
-                                className="btn btn-ghost btn-sm text-slate-400 hover:text-red-400" id="archive-btn">
+                                className="btn btn-ghost btn-sm text-content-muted hover:text-red-400" id="archive-btn">
                                 {actionLoading === 'archive' ? '...' : 'Archive'}
                             </button>
                         )}
@@ -333,12 +333,12 @@ export default function PolicyDetailPage() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 border-b border-slate-700/50">
+            <div className="flex gap-1 border-b border-border-default/50">
                 {tabItems.map(t => (
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     <button key={t} onClick={() => setTab(t as any)}
                         id={`tab-${t}`}
-                        className={`px-4 py-2.5 text-sm font-medium transition border-b-2 ${tab === t ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-400 hover:text-slate-200'
+                        className={`px-4 py-2.5 text-sm font-medium transition border-b-2 ${tab === t ? 'border-brand-500 text-brand-400' : 'border-transparent text-content-muted hover:text-content-emphasis'
                             }`}>{tabLabels[t]}</button>
                 ))}
             </div>
@@ -349,7 +349,7 @@ export default function PolicyDetailPage() {
                     {currentVersion ? (
                         <>
                             <div className="flex items-center justify-between mb-4">
-                                <div className="text-sm text-slate-400">
+                                <div className="text-sm text-content-muted">
                                     Version {currentVersion.versionNumber} · {currentVersion.createdBy?.name} · {formatDate(currentVersion.createdAt)}
                                     {currentVersion.contentType === 'EXTERNAL_LINK' && <span className="ml-2 badge badge-info text-xs">External</span>}
                                 </div>
@@ -357,7 +357,7 @@ export default function PolicyDetailPage() {
                             {renderVersionContent(currentVersion)}
                         </>
                     ) : (
-                        <div className="text-center text-slate-500 py-8">
+                        <div className="text-center text-content-subtle py-8">
                             <p>No version published yet.</p>
                             {canWrite && <p className="text-sm mt-1">Create a version in the Editor tab.</p>}
                         </div>
@@ -369,7 +369,7 @@ export default function PolicyDetailPage() {
             {tab === 'versions' && (
                 <div className="space-y-3" id="version-history">
                     {versions.length === 0 ? (
-                        <div className="glass-card p-8 text-center text-slate-500">No versions yet.</div>
+                        <div className="glass-card p-8 text-center text-content-subtle">No versions yet.</div>
                     ) : versions.map((v: PolicyVersionDTO) => {
                         const vApprovals = (v.approvals || []).filter((a) => a.status === 'PENDING' || a.status === 'APPROVED' || a.status === 'REJECTED');
                         const hasPending = vApprovals.some((a) => a.status === 'PENDING');
@@ -383,7 +383,7 @@ export default function PolicyDetailPage() {
                                         <span className="text-sm font-semibold text-brand-400">v{v.versionNumber}</span>
                                         {isCurrentPublished && <span className="badge badge-success text-xs">Published</span>}
                                         {v.contentType === 'EXTERNAL_LINK' && <span className="badge badge-info text-xs">External Link</span>}
-                                        <span className="text-xs text-slate-500">
+                                        <span className="text-xs text-content-subtle">
                                             {v.createdBy?.name} · {formatDate(v.createdAt)}
                                         </span>
                                     </div>
@@ -402,19 +402,19 @@ export default function PolicyDetailPage() {
                                         )}
                                     </div>
                                 </div>
-                                {v.changeSummary && <p className="text-sm text-slate-400 italic">{v.changeSummary}</p>}
+                                {v.changeSummary && <p className="text-sm text-content-muted italic">{v.changeSummary}</p>}
                                 <details className="group">
                                     <summary className="text-xs text-brand-400 cursor-pointer hover:text-brand-300">Show content</summary>
-                                    <div className="mt-2 border-t border-slate-700 pt-2">{renderVersionContent(v)}</div>
+                                    <div className="mt-2 border-t border-border-default pt-2">{renderVersionContent(v)}</div>
                                 </details>
                                 {vApprovals.length > 0 && (
-                                    <div className="border-t border-slate-700/50 pt-2 space-y-1">
-                                        <p className="text-xs font-semibold text-slate-500">Approvals</p>
+                                    <div className="border-t border-border-default/50 pt-2 space-y-1">
+                                        <p className="text-xs font-semibold text-content-subtle">Approvals</p>
                                         {vApprovals.map((a) => (
                                             <div key={a.id} className="flex items-center justify-between text-xs">
                                                 <div className="flex items-center gap-2">
                                                     <span className={`badge text-xs ${APPROVAL_BADGE[a.status]}`}>{a.status}</span>
-                                                    <span className="text-slate-400">
+                                                    <span className="text-content-muted">
                                                         by {a.requestedBy?.name || 'Unknown'}
                                                         {a.decidedAt && ` · ${formatDate(a.decidedAt)}`}
                                                     </span>
@@ -443,7 +443,7 @@ export default function PolicyDetailPage() {
             {tab === 'editor' && canWrite && (
                 <div className="glass-card p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-slate-300">Create New Version</h3>
+                        <h3 className="text-sm font-semibold text-content-default">Create New Version</h3>
                     </div>
 
                     {/* Content type selector */}
@@ -456,7 +456,7 @@ export default function PolicyDetailPage() {
                             <button key={opt.key} onClick={() => setContentMode(opt.key)}
                                 className={`px-3 py-1.5 text-xs rounded-lg border transition ${contentMode === opt.key
                                         ? 'border-brand-500 bg-brand-500/10 text-brand-400'
-                                        : 'border-slate-700 text-slate-400 hover:text-slate-200'
+                                        : 'border-border-default text-content-muted hover:text-content-emphasis'
                                     }`} id={`mode-${opt.key.toLowerCase()}`}>{opt.label}</button>
                         ))}
                     </div>
@@ -465,13 +465,13 @@ export default function PolicyDetailPage() {
                     {contentMode === 'MARKDOWN' && (
                         <>
                             <div className="flex justify-end">
-                                <button onClick={() => setShowPreview(!showPreview)} className="btn btn-xs btn-ghost text-slate-400">
+                                <button onClick={() => setShowPreview(!showPreview)} className="btn btn-xs btn-ghost text-content-muted">
                                     {showPreview ? 'Edit' : 'Preview'}
                                 </button>
                             </div>
                             {showPreview ? (
-                                <div className="prose prose-sm prose-invert max-w-none text-slate-300 whitespace-pre-wrap text-sm min-h-[300px] border border-slate-700 rounded-lg p-4">
-                                    {editorContent || <span className="text-slate-500 italic">Nothing to preview</span>}
+                                <div className="prose prose-sm prose-invert max-w-none text-content-default whitespace-pre-wrap text-sm min-h-[300px] border border-border-default rounded-lg p-4">
+                                    {editorContent || <span className="text-content-subtle italic">Nothing to preview</span>}
                                 </div>
                             ) : (
                                 <textarea className="input w-full min-h-[300px] font-mono text-sm" value={editorContent}
@@ -488,7 +488,7 @@ export default function PolicyDetailPage() {
                             <input type="url" className="input w-full" value={externalUrl}
                                 onChange={e => setExternalUrl(e.target.value)}
                                 placeholder="https://docs.google.com/..." id="external-url-input" />
-                            <p className="text-xs text-slate-500 mt-1">Link to an external policy document (Google Docs, Confluence, etc.)</p>
+                            <p className="text-xs text-content-subtle mt-1">Link to an external policy document (Google Docs, Confluence, etc.)</p>
                         </div>
                     )}
 
@@ -520,11 +520,11 @@ export default function PolicyDetailPage() {
             {/* ── Activity Feed ── */}
             {tab === 'activity' && (
                 <div className="glass-card p-6" id="activity-feed">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-4">Activity Timeline</h3>
+                    <h3 className="text-sm font-semibold text-content-default mb-4">Activity Timeline</h3>
                     {activitiesLoading ? (
-                        <div className="text-center text-slate-500 animate-pulse py-8">Loading activity...</div>
+                        <div className="text-center text-content-subtle animate-pulse py-8">Loading activity...</div>
                     ) : activities.length === 0 ? (
-                        <div className="text-center text-slate-500 py-8">No activity recorded yet.</div>
+                        <div className="text-center text-content-subtle py-8">No activity recorded yet.</div>
                     ) : (
                         <div className="space-y-3">
                             {activities.map((evt: AuditLogEntry) => (
@@ -532,12 +532,12 @@ export default function PolicyDetailPage() {
                                     <span className="text-base mt-0.5">{EVENT_ICONS[evt.action] || 'event'}</span>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium text-slate-200 text-xs">
+                                            <span className="font-medium text-content-emphasis text-xs">
                                                 {evt.action.replace('POLICY_', '').replace(/_/g, ' ')}
                                             </span>
-                                            <span className="text-xs text-slate-500">{relativeTime(evt.createdAt)}</span>
+                                            <span className="text-xs text-content-subtle">{relativeTime(evt.createdAt)}</span>
                                         </div>
-                                        <p className="text-xs text-slate-400 mt-0.5 truncate">
+                                        <p className="text-xs text-content-muted mt-0.5 truncate">
                                             {evt.user?.name || 'System'}{evt.details ? ` — ${evt.details.split('\n')[0]}` : ''}
                                         </p>
                                     </div>

@@ -27,19 +27,19 @@ export default async function RecentActivityCard({
 
     return (
         <div className="glass-card p-5">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">{label}</h3>
+            <h3 className="text-sm font-semibold text-content-default mb-3">{label}</h3>
             <div className="space-y-2 max-h-40 overflow-y-auto">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {recentActivity.map((log: any) => (
                     <div key={log.id} className="flex flex-col sm:flex-row items-start gap-1 sm:gap-2 text-xs">
-                        <span className="text-slate-500 whitespace-nowrap">{formatDateTime(log.createdAt)}</span>
-                        <span className="text-slate-400">
-                            <span className="text-slate-300 font-medium">{log.user?.name}</span>{' '}
+                        <span className="text-content-subtle whitespace-nowrap">{formatDateTime(log.createdAt)}</span>
+                        <span className="text-content-muted">
+                            <span className="text-content-default font-medium">{log.user?.name}</span>{' '}
                             {log.action.toLowerCase()} {log.entity.toLowerCase()}
                         </span>
                     </div>
                 ))}
-                {recentActivity.length === 0 && <p className="text-slate-500 text-xs">{noActivityLabel}</p>}
+                {recentActivity.length === 0 && <p className="text-content-subtle text-xs">{noActivityLabel}</p>}
             </div>
         </div>
     );

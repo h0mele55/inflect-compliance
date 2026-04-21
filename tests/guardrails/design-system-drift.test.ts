@@ -24,6 +24,14 @@ const MIGRATED_PAGES = [
     'vendors/VendorsClient.tsx',
     'risks/[riskId]/page.tsx',
     'admin/members/page.tsx',
+    // Second migration pass — Epic 51 finishing guide. A page is only
+    // added here once it is clean on ALL three checks: raw color
+    // utilities, legacy `.btn btn-*`, and legacy `.badge badge-*`.
+    // Pages that have had their raw colors migrated but still use
+    // legacy button/badge CSS are tracked by the raw-color ratchet
+    // instead (`tests/guardrails/raw-color-ratchet.test.ts`) — they
+    // get promoted here when the component migration also lands.
+    'clauses/loading.tsx',
 ];
 
 const RAW_COLOR_RE = /\b(?:text|bg|border)-(?:slate|gray|neutral|zinc)-\d{2,3}\b/g;

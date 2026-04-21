@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { UserCombobox } from '@/components/ui/user-combobox';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { FormField } from '@/components/ui/form-field';
+import { FormError } from '@/components/ui/form-error';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip } from '@/components/ui/tooltip';
+import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
 const TYPE_OPTIONS: ComboboxOption[] = [
     { value: 'TASK', label: 'Task' },
@@ -89,11 +95,20 @@ export default function NewTaskPage() {
         return '';
     })();
 
+    const telemetry = useFormTelemetry('NewTaskPage');
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (validationMessage) { setError(validationMessage); return; }
         setSaving(true);
         setError('');
+        telemetry.trackSubmit({
+            type: form.type,
+            severity: form.severity,
+            priority: form.priority,
+            pendingLinkCount: pendingLinks.length,
+            hasAssignee: Boolean(form.assigneeUserId),
+        });
         try {
             // Build metadata from audit-specific fields
             const metadataJson: Record<string, string> = {};
@@ -133,9 +148,11 @@ export default function NewTaskPage() {
                 }).catch(() => { });
             }
 
+            telemetry.trackSuccess({ taskId: task.id });
             router.push(tenantHref(`/tasks/${task.id}`));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (e: any) {
+            telemetry.trackError(e);
             setError(e.message);
         } finally {
             setSaving(false);
@@ -145,27 +162,43 @@ export default function NewTaskPage() {
     return (
         <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
             <div>
-                <Link href={tenantHref('/tasks')} className="text-slate-400 text-xs hover:text-white transition">← Tasks</Link>
+                <Link href={tenantHref('/tasks')} className="text-content-muted text-xs hover:text-content-emphasis transition">← Tasks</Link>
                 <h1 className="text-2xl font-bold mt-1" id="new-task-heading">New Task</h1>
-                <p className="text-slate-400 text-sm">Create a new task to track.</p>
+                <p className="text-content-muted text-sm">Create a new task to track.</p>
             </div>
 
             {error && (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm" id="task-error">{error}</div>
+                <div
+                    role="alert"
+                    className="p-3 rounded-lg border border-border-error bg-bg-error text-content-error text-sm"
+                    id="task-error"
+                >
+                    {error}
+                </div>
             )}
 
-            <form onSubmit={handleSubmit} className="glass-card p-6 space-y-5">
-                <div>
-                    <label className="block text-sm text-slate-300 mb-1">Title *</label>
-                    <input type="text" className="input w-full" placeholder="Brief summary of the task" value={form.title} onChange={e => update('title', e.target.value)} required id="task-title-input" />
-                </div>
-                <div>
-                    <label className="block text-sm text-slate-300 mb-1">Description</label>
-                    <textarea className="input w-full" rows={3} placeholder="Detailed description (optional)" value={form.description} onChange={e => update('description', e.target.value)} id="task-description-input" />
-                </div>
+            <form onSubmit={handleSubmit} className="glass-card p-6 space-y-5" noValidate>
+                <FormField label="Title" required>
+                    <Input
+                        id="task-title-input"
+                        type="text"
+                        placeholder="Brief summary of the task"
+                        value={form.title}
+                        onChange={e => update('title', e.target.value)}
+                        required
+                    />
+                </FormField>
+                <FormField label="Description">
+                    <Textarea
+                        id="task-description-input"
+                        rows={3}
+                        placeholder="Detailed description (optional)"
+                        value={form.description}
+                        onChange={e => update('description', e.target.value)}
+                    />
+                </FormField>
                 <div className="grid grid-cols-3 gap-4">
-                    <div>
-                        <label className="block text-sm text-slate-300 mb-1">Type *</label>
+                    <FormField label="Type" required>
                         <Combobox
                             id="task-type-select"
                             name="type"
@@ -178,9 +211,8 @@ export default function NewTaskPage() {
                             buttonProps={{ className: 'w-full' }}
                             caret
                         />
-                    </div>
-                    <div>
-                        <label className="block text-sm text-slate-300 mb-1">Severity</label>
+                    </FormField>
+                    <FormField label="Severity">
                         <Combobox
                             id="task-severity-select"
                             name="severity"
@@ -193,9 +225,8 @@ export default function NewTaskPage() {
                             buttonProps={{ className: 'w-full' }}
                             caret
                         />
-                    </div>
-                    <div>
-                        <label className="block text-sm text-slate-300 mb-1">Priority</label>
+                    </FormField>
+                    <FormField label="Priority">
                         <Combobox
                             id="task-priority-select"
                             name="priority"
@@ -208,15 +239,18 @@ export default function NewTaskPage() {
                             buttonProps={{ className: 'w-full' }}
                             caret
                         />
-                    </div>
+                    </FormField>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm text-slate-300 mb-1">Due Date</label>
-                        <input type="date" className="input w-full" value={form.dueAt} onChange={e => update('dueAt', e.target.value)} id="task-due-input" />
-                    </div>
-                    <div>
-                        <label className="block text-sm text-slate-300 mb-1">Assignee</label>
+                    <FormField label="Due Date">
+                        <Input
+                            id="task-due-input"
+                            type="date"
+                            value={form.dueAt}
+                            onChange={e => update('dueAt', e.target.value)}
+                        />
+                    </FormField>
+                    <FormField label="Assignee">
                         <UserCombobox
                             id="task-assignee-input"
                             name="assigneeUserId"
@@ -228,22 +262,26 @@ export default function NewTaskPage() {
                             placeholder="Unassigned"
                             forceDropdown={false}
                         />
-                    </div>
+                    </FormField>
                 </div>
 
                 {/* Control picker */}
-                <div>
-                    <label className="block text-sm text-slate-300 mb-1">Control ID (optional)</label>
-                    <input type="text" className="input w-full" placeholder="Paste control ID to link" value={form.controlId} onChange={e => update('controlId', e.target.value)} id="task-control-input" />
-                </div>
+                <FormField label="Control ID (optional)">
+                    <Input
+                        id="task-control-input"
+                        type="text"
+                        placeholder="Paste control ID to link"
+                        value={form.controlId}
+                        onChange={e => update('controlId', e.target.value)}
+                    />
+                </FormField>
 
                 {/* Audit fields — shown for AUDIT_FINDING / CONTROL_GAP */}
                 {(form.type === 'AUDIT_FINDING' || form.type === 'CONTROL_GAP') && (
-                    <div className="border-t border-slate-700 pt-4 space-y-4">
-                        <h3 className="text-sm font-semibold text-slate-300">Audit Details</h3>
+                    <div className="border-t border-border-default pt-4 space-y-4">
+                        <h3 className="text-sm font-semibold text-content-default">Audit Details</h3>
                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm text-slate-300 mb-1">Finding Source</label>
+                            <FormField label="Finding Source">
                                 <Combobox
                                     id="finding-source-select"
                                     name="findingSource"
@@ -256,10 +294,9 @@ export default function NewTaskPage() {
                                     buttonProps={{ className: 'w-full' }}
                                     caret
                                 />
-                            </div>
+                            </FormField>
                             {form.type === 'CONTROL_GAP' && (
-                                <div>
-                                    <label className="block text-sm text-slate-300 mb-1">Control Gap Type</label>
+                                <FormField label="Control Gap Type">
                                     <Combobox
                                         id="gap-type-select"
                                         name="controlGapType"
@@ -272,23 +309,25 @@ export default function NewTaskPage() {
                                         buttonProps={{ className: 'w-full' }}
                                         caret
                                     />
-                                </div>
+                                </FormField>
                             )}
                         </div>
                     </div>
                 )}
 
                 {/* Links section */}
-                <div className="border-t border-slate-700 pt-4 space-y-3">
-                    <h3 className="text-sm font-semibold text-slate-300">Links</h3>
+                <div className="border-t border-border-default pt-4 space-y-3">
+                    <h3 className="text-sm font-semibold text-content-default">Links</h3>
                     {validationMessage && (
-                        <div className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2" id="link-validation-hint">
+                        <FormError
+                            id="link-validation-hint"
+                            className="bg-bg-warning/10 border border-border-warning/40 text-content-warning rounded px-3 py-2 mt-0"
+                        >
                             {validationMessage}
-                        </div>
+                        </FormError>
                     )}
                     <div className="flex gap-2 items-end">
-                        <div className="flex-1">
-                            <label className="block text-xs text-slate-400 mb-1">Entity Type</label>
+                        <FormField label="Entity Type" className="flex-1">
                             <Combobox
                                 id="link-entity-type"
                                 name="linkEntityType"
@@ -301,20 +340,28 @@ export default function NewTaskPage() {
                                 buttonProps={{ className: 'w-full' }}
                                 caret
                             />
-                        </div>
-                        <div className="flex-1">
-                            <label className="block text-xs text-slate-400 mb-1">Entity ID</label>
-                            <input type="text" className="input w-full text-sm" placeholder="Paste ID" value={linkEntityId} onChange={e => setLinkEntityId(e.target.value)} id="link-entity-id" />
-                        </div>
+                        </FormField>
+                        <FormField label="Entity ID" className="flex-1">
+                            <Input
+                                id="link-entity-id"
+                                type="text"
+                                className="text-sm"
+                                placeholder="Paste ID"
+                                value={linkEntityId}
+                                onChange={e => setLinkEntityId(e.target.value)}
+                            />
+                        </FormField>
                         <button type="button" className="btn btn-secondary" onClick={addPendingLink} id="add-link-btn">+ Add</button>
                     </div>
                     {pendingLinks.length > 0 && (
                         <div className="space-y-1" id="pending-links-list">
                             {pendingLinks.map((l, i) => (
-                                <div key={i} className="flex items-center gap-2 text-sm text-slate-300 bg-slate-800/50 rounded px-3 py-1.5">
+                                <div key={i} className="flex items-center gap-2 text-sm text-content-default bg-bg-default/50 rounded px-3 py-1.5">
                                     <span className="badge badge-info text-xs">{l.entityType}</span>
                                     <span className="font-mono text-xs flex-1">{l.entityId}</span>
-                                    <button type="button" className="text-red-400 text-xs hover:text-red-300" onClick={() => removePendingLink(i)} aria-label="Remove link">×</button>
+                                    <Tooltip content="Remove linked item">
+                                        <button type="button" className="text-red-400 text-xs hover:text-red-300" onClick={() => removePendingLink(i)} aria-label="Remove link">×</button>
+                                    </Tooltip>
                                 </div>
                             ))}
                         </div>

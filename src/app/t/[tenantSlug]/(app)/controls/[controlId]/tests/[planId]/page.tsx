@@ -126,15 +126,15 @@ export default function TestPlanDetailPage() {
         }
     };
 
-    if (loading) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading test plan...</div>;
+    if (loading) return <div className="p-12 text-center text-content-subtle animate-pulse">Loading test plan...</div>;
     if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
-    if (!plan) return <div className="p-12 text-center text-slate-500">Plan not found.</div>;
+    if (!plan) return <div className="p-12 text-center text-content-subtle">Plan not found.</div>;
 
     return (
         <div className="space-y-6 animate-fadeIn">
             {/* Breadcrumb */}
             <div>
-                <Link href={tenantHref(`/controls/${controlId}`)} className="text-slate-400 text-xs hover:text-white transition">
+                <Link href={tenantHref(`/controls/${controlId}`)} className="text-content-muted text-xs hover:text-content-emphasis transition">
                     ← Back to Control
                 </Link>
             </div>
@@ -147,13 +147,13 @@ export default function TestPlanDetailPage() {
                         <span className={`badge ${plan.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}`} id="test-plan-status">
                             {plan.status}
                         </span>
-                        <span className="text-xs text-slate-500">{FREQ_LABELS[plan.frequency] || plan.frequency}</span>
-                        <span className="text-xs text-slate-500">•</span>
-                        <span className="text-xs text-slate-500">{plan.method}</span>
+                        <span className="text-xs text-content-subtle">{FREQ_LABELS[plan.frequency] || plan.frequency}</span>
+                        <span className="text-xs text-content-subtle">•</span>
+                        <span className="text-xs text-content-subtle">{plan.method}</span>
                         {plan.nextDueAt && (
                             <>
-                                <span className="text-xs text-slate-500">•</span>
-                                <span className={`text-xs ${new Date(plan.nextDueAt) < new Date() ? 'text-red-400 font-semibold' : 'text-slate-400'}`}>
+                                <span className="text-xs text-content-subtle">•</span>
+                                <span className={`text-xs ${new Date(plan.nextDueAt) < new Date() ? 'text-red-400 font-semibold' : 'text-content-muted'}`}>
                                     Due: {formatDate(plan.nextDueAt)}
                                 </span>
                             </>
@@ -178,24 +178,24 @@ export default function TestPlanDetailPage() {
             {editing && permissions.canWrite && (
                 <div className="glass-card p-4 space-y-3 animate-fadeIn">
                     <div>
-                        <label className="text-xs text-slate-400 block mb-1">Name</label>
+                        <label className="text-xs text-content-muted block mb-1">Name</label>
                         <input className="input w-full" value={editName} onChange={e => setEditName(e.target.value)} id="edit-plan-name" />
                     </div>
                     <div>
-                        <label className="text-xs text-slate-400 block mb-1">Description</label>
+                        <label className="text-xs text-content-muted block mb-1">Description</label>
                         <textarea className="input w-full h-20" value={editDesc} onChange={e => setEditDesc(e.target.value)} />
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                         <div>
-                            <label className="text-xs text-slate-400 block mb-1">Frequency</label>
+                            <label className="text-xs text-content-muted block mb-1">Frequency</label>
                             <Combobox hideSearch selected={FREQ_CB_OPTIONS.find(o => o.value === editFreq) ?? null} setSelected={(opt) => setEditFreq(opt?.value ?? editFreq)} options={FREQ_CB_OPTIONS} matchTriggerWidth />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 block mb-1">Method</label>
+                            <label className="text-xs text-content-muted block mb-1">Method</label>
                             <Combobox hideSearch selected={METHOD_OPTIONS.find(o => o.value === editMethod) ?? null} setSelected={(opt) => setEditMethod(opt?.value ?? editMethod)} options={METHOD_OPTIONS} matchTriggerWidth />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 block mb-1">Status</label>
+                            <label className="text-xs text-content-muted block mb-1">Status</label>
                             <Combobox hideSearch id="edit-plan-status" selected={PLAN_STATUS_OPTIONS.find(o => o.value === editStatus) ?? null} setSelected={(opt) => setEditStatus(opt?.value ?? editStatus)} options={PLAN_STATUS_OPTIONS} matchTriggerWidth />
                         </div>
                     </div>
@@ -209,38 +209,38 @@ export default function TestPlanDetailPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 text-center">
                     <div className="text-2xl font-bold text-brand-400">{plan._count?.runs ?? 0}</div>
-                    <div className="text-xs text-slate-400 mt-1">Total Runs</div>
+                    <div className="text-xs text-content-muted mt-1">Total Runs</div>
                 </div>
                 <div className="glass-card p-4 text-center">
                     <div className="text-2xl font-bold text-green-400">
                         {plan.runs?.filter(r => r.result === 'PASS').length ?? 0}
                     </div>
-                    <div className="text-xs text-slate-400 mt-1">Passed</div>
+                    <div className="text-xs text-content-muted mt-1">Passed</div>
                 </div>
                 <div className="glass-card p-4 text-center">
                     <div className="text-2xl font-bold text-red-400">
                         {plan.runs?.filter(r => r.result === 'FAIL').length ?? 0}
                     </div>
-                    <div className="text-xs text-slate-400 mt-1">Failed</div>
+                    <div className="text-xs text-content-muted mt-1">Failed</div>
                 </div>
                 <div className="glass-card p-4 text-center">
-                    <div className="text-2xl font-bold text-slate-300">{plan._count?.steps ?? 0}</div>
-                    <div className="text-xs text-slate-400 mt-1">Steps</div>
+                    <div className="text-2xl font-bold text-content-default">{plan._count?.steps ?? 0}</div>
+                    <div className="text-xs text-content-muted mt-1">Steps</div>
                 </div>
             </div>
 
             {/* Description */}
             {plan.description && (
                 <div className="glass-card p-4">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-2">Description</h3>
-                    <p className="text-sm text-slate-400 whitespace-pre-wrap">{plan.description}</p>
+                    <h3 className="text-sm font-semibold text-content-default mb-2">Description</h3>
+                    <p className="text-sm text-content-muted whitespace-pre-wrap">{plan.description}</p>
                 </div>
             )}
 
             {/* Steps */}
             {plan.steps.length > 0 && (
                 <div className="glass-card p-4">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-3">Test Procedure</h3>
+                    <h3 className="text-sm font-semibold text-content-default mb-3">Test Procedure</h3>
                     <ol className="space-y-2">
                         {plan.steps.map((step, i) => (
                             <li key={step.id} className="flex gap-3 text-sm">
@@ -248,9 +248,9 @@ export default function TestPlanDetailPage() {
                                     {i + 1}
                                 </span>
                                 <div>
-                                    <p className="text-slate-300">{step.instruction}</p>
+                                    <p className="text-content-default">{step.instruction}</p>
                                     {step.expectedOutput && (
-                                        <p className="text-xs text-slate-500 mt-0.5">Expected: {step.expectedOutput}</p>
+                                        <p className="text-xs text-content-subtle mt-0.5">Expected: {step.expectedOutput}</p>
                                     )}
                                 </div>
                             </li>
@@ -262,7 +262,7 @@ export default function TestPlanDetailPage() {
             {/* Runs History */}
             <div className="glass-card p-4">
                 <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-slate-300">Test Run History</h3>
+                    <h3 className="text-sm font-semibold text-content-default">Test Run History</h3>
                     {permissions.canWrite && plan.status === 'ACTIVE' && (
                         <button className="btn btn-primary btn-xs" onClick={createRun} disabled={creatingRun}>
                             {creatingRun ? '...' : 'New Run'}
@@ -271,14 +271,14 @@ export default function TestPlanDetailPage() {
                 </div>
 
                 {plan.runs.length === 0 ? (
-                    <p className="text-sm text-slate-500">No test runs yet.</p>
+                    <p className="text-sm text-content-subtle">No test runs yet.</p>
                 ) : (
-                    <div className="divide-y divide-slate-700/50">
+                    <div className="divide-y divide-border-default/50">
                         {plan.runs.map(run => (
                             <Link
                                 key={run.id}
                                 href={tenantHref(`/tests/runs/${run.id}`)}
-                                className="flex items-center justify-between py-2.5 hover:bg-slate-800/30 px-2 rounded transition group"
+                                className="flex items-center justify-between py-2.5 hover:bg-bg-default/30 px-2 rounded transition group"
                                 id={`test-run-link-${run.id}`}
                             >
                                 <div className="flex items-center gap-3">
@@ -290,20 +290,20 @@ export default function TestPlanDetailPage() {
                                             {run.result}
                                         </span>
                                     )}
-                                    <span className="text-xs text-slate-400">
+                                    <span className="text-xs text-content-muted">
                                         {run.executedAt ? formatDate(run.executedAt) : 'Not executed'}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {run.executedBy && (
-                                        <span className="text-xs text-slate-500">
+                                        <span className="text-xs text-content-subtle">
                                             {run.executedBy.name || run.executedBy.email}
                                         </span>
                                     )}
                                     {run._count?.evidence ? (
-                                        <span className="text-xs text-slate-500">{run._count.evidence} evidence</span>
+                                        <span className="text-xs text-content-subtle">{run._count.evidence} evidence</span>
                                     ) : null}
-                                    <span className="text-xs text-slate-600 opacity-0 group-hover:opacity-100">→</span>
+                                    <span className="text-xs text-content-subtle opacity-0 group-hover:opacity-100">→</span>
                                 </div>
                             </Link>
                         ))}
@@ -312,7 +312,7 @@ export default function TestPlanDetailPage() {
             </div>
 
             {/* Meta */}
-            <div className="text-xs text-slate-600">
+            <div className="text-xs text-content-subtle">
                 Created {formatDate(plan.createdAt)} by {plan.createdBy?.name || plan.createdBy?.email || 'Unknown'}
                 {plan.owner && <> • Owner: {plan.owner.name || plan.owner.email}</>}
             </div>

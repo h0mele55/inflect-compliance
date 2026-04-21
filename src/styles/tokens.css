@@ -5,9 +5,14 @@
  * raw Tailwind color utilities. The Tailwind config maps these tokens
  * to utility classes like bg-bg-default, text-content-emphasis, etc.
  *
- * Current theme: dark (Inflect glassmorphism). Light mode values are
- * stubbed under [data-theme="light"] for future activation — they are
- * NOT shipped to the UI yet.
+ * Both themes are live:
+ *   - Dark (default, Inflect glassmorphism) under `:root`
+ *   - Light under `[data-theme="light"]` — toggleable via
+ *     `ThemeProvider` / the sidebar theme toggle, persisted in
+ *     localStorage, and picked up from `prefers-color-scheme` on the
+ *     first visit. Add a new token to `:root` only when you also add
+ *     the light counterpart here; the light-mode parity guardrail at
+ *     `tests/guardrails/light-mode-parity.test.ts` enforces this.
  *
  * Palette origin: Tailwind Slate + Indigo (brand).
  */
@@ -102,7 +107,8 @@
 
 
 /* ═══════════════════════════════════════════════════════════════════
-   LIGHT THEME (future — activate via data-theme="light" on <html>)
+   LIGHT THEME (live — activated by ThemeProvider setting
+   `data-theme="light"` on <html>).
    Only surfaces, content, borders, and status colors change.
    Brand, radius, shadow, and transitions stay the same.
    ═══════════════════════════════════════════════════════════════════ */

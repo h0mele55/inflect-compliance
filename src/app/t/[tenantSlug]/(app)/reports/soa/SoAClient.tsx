@@ -11,6 +11,7 @@ import type { SoAReportDTO, SoAEntryDTO } from '@/lib/dto/soa';
 import { PdfExportButton } from '@/components/PdfExportButton';
 import { RequirePermission } from '@/components/require-permission';
 import { Modal } from '@/components/ui/modal';
+import { Tooltip } from '@/components/ui/tooltip';
 
 // ─── Types ───
 
@@ -37,7 +38,7 @@ function ApplicabilityBadge({ value }: { value: boolean | null }) {
 }
 
 function StatusBadge({ value }: { value: string | null }) {
-    if (!value) return <span className="text-slate-500 text-xs">—</span>;
+    if (!value) return <span className="text-content-subtle text-xs">—</span>;
     const cls: Record<string, string> = {
         IMPLEMENTED: 'badge-success',
         IN_PROGRESS: 'badge-info',
@@ -172,7 +173,7 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-bold" id="soa-heading">Statement of Applicability</h1>
-                    <p className="text-slate-400 text-sm">ISO 27001:2022 Annex A — {summary.total} requirements</p>
+                    <p className="text-content-muted text-sm">ISO 27001:2022 Annex A — {summary.total} requirements</p>
                 </div>
                 <RequirePermission resource="reports" action="export">
                     <div className="flex flex-wrap gap-2">
@@ -202,9 +203,9 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
 
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                <SummaryCard label="Total" value={summary.total} icon={<FileText className="w-4 h-4 text-slate-400" />} />
+                <SummaryCard label="Total" value={summary.total} icon={<FileText className="w-4 h-4 text-content-muted" />} />
                 <SummaryCard label="Applicable" value={summary.applicable} icon={<CheckCircle2 className="w-4 h-4 text-emerald-400" />} />
-                <SummaryCard label="Not Applicable" value={summary.notApplicable} icon={<XCircle className="w-4 h-4 text-slate-400" />} />
+                <SummaryCard label="Not Applicable" value={summary.notApplicable} icon={<XCircle className="w-4 h-4 text-content-muted" />} />
                 <SummaryCard label="Unmapped" value={summary.unmapped} icon={<HelpCircle className="w-4 h-4 text-red-400" />} accent={summary.unmapped > 0 ? 'danger' : undefined} />
                 <SummaryCard label="Implemented" value={summary.implemented} icon={<CheckCircle2 className="w-4 h-4 text-emerald-400" />} />
                 <SummaryCard label="Missing Justification" value={summary.missingJustification} icon={<AlertTriangle className="w-4 h-4 text-amber-400" />} accent={summary.missingJustification > 0 ? 'warning' : undefined} />
@@ -234,10 +235,10 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-2">
                 <div className="relative flex-1 min-w-[180px] max-w-sm">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-content-subtle" />
                     <input
                         type="text"
-                        className="w-full pl-8 pr-8 py-1.5 text-xs bg-slate-800/60 border border-slate-600/50 rounded-full text-white placeholder-slate-500 focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                        className="w-full pl-8 pr-8 py-1.5 text-xs bg-bg-default/60 border border-border-emphasis/50 rounded-full text-content-emphasis placeholder-content-subtle focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
                         placeholder="Search by code or title…"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
@@ -246,7 +247,7 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                     {search && (
                         <button
                             type="button"
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-content-subtle hover:text-content-default"
                             onClick={() => setSearch('')}
                         >
                             <X className="w-3.5 h-3.5" />
@@ -274,7 +275,7 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                     </button>
                 )}
 
-                <span className="text-xs text-slate-500 ml-auto">
+                <span className="text-xs text-content-subtle ml-auto">
                     {filteredEntries.length} of {report.entries.length} requirements
                 </span>
             </div>
@@ -311,7 +312,7 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                         ))}
                         {filteredEntries.length === 0 && (
                             <tr>
-                                <td colSpan={canEdit ? 7 : 6} className="text-center text-slate-500 py-8">
+                                <td colSpan={canEdit ? 7 : 6} className="text-center text-content-subtle py-8">
                                     {gapsOnly ? 'No gaps found — all requirements are mapped with justifications!' : 'No matching requirements'}
                                 </td>
                             </tr>
@@ -480,15 +481,15 @@ function SoARow({
 
     return (
         <>
-            <tr className={`${hasGap ? 'bg-red-500/5' : ''} cursor-pointer hover:bg-slate-700/30`} onClick={onToggle}>
+            <tr className={`${hasGap ? 'bg-red-500/5' : ''} cursor-pointer hover:bg-bg-elevated/30`} onClick={onToggle}>
                 <td className="text-xs font-mono text-brand-400">{entry.requirementCode}</td>
-                <td className="text-sm text-white">
+                <td className="text-sm text-content-emphasis">
                     <div>{entry.requirementTitle}</div>
-                    {entry.section && <div className="text-[10px] text-slate-500">{entry.section}</div>}
+                    {entry.section && <div className="text-[10px] text-content-subtle">{entry.section}</div>}
                 </td>
                 <td><ApplicabilityBadge value={entry.applicable} /></td>
                 <td><StatusBadge value={entry.implementationStatus} /></td>
-                <td className="text-xs text-slate-400">
+                <td className="text-xs text-content-muted">
                     {entry.mappedControls.length > 0 ? (
                         <span className="inline-flex items-center gap-1">
                             <Link2 className="w-3 h-3" /> {entry.mappedControls.length}
@@ -500,21 +501,27 @@ function SoARow({
                     <td>
                         <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                             {entry.applicable === null && (
-                                <button className="btn btn-xs btn-primary" onClick={onMap} title="Map control">
-                                    <Plus className="w-3 h-3" />
-                                </button>
+                                <Tooltip content="Map control">
+                                    <button
+                                        className="btn btn-xs btn-primary"
+                                        onClick={onMap}
+                                        aria-label="Map control"
+                                    >
+                                        <Plus className="w-3 h-3" />
+                                    </button>
+                                </Tooltip>
                             )}
                         </div>
                     </td>
                 )}
             </tr>
             {expanded && entry.mappedControls.length > 0 && (
-                <tr className="bg-slate-800/40">
+                <tr className="bg-bg-default/40">
                     <td colSpan={canEdit ? 7 : 6} className="p-0">
                         <div className="px-6 py-3 space-y-2">
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Mapped Controls</div>
+                            <div className="text-[10px] uppercase tracking-wider text-content-subtle font-semibold">Mapped Controls</div>
                             {entry.mappedControls.map(c => (
-                                <div key={c.controlId} className="flex items-center justify-between text-xs bg-slate-900/40 rounded-lg px-3 py-2">
+                                <div key={c.controlId} className="flex items-center justify-between text-xs bg-bg-page/40 rounded-lg px-3 py-2">
                                     <div className="flex items-center gap-3">
                                         <a
                                             href={`/t/${tenantSlug}/controls/${c.controlId}`}
@@ -523,7 +530,7 @@ function SoARow({
                                         >
                                             {c.code || c.controlId.slice(0, 8)}
                                         </a>
-                                        <span className="text-slate-200">{c.title}</span>
+                                        <span className="text-content-emphasis">{c.title}</span>
                                         <span className={`badge ${c.applicability === 'APPLICABLE' ? 'badge-success' : 'badge-neutral'}`}>
                                             {c.applicability}
                                         </span>
@@ -531,7 +538,7 @@ function SoARow({
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {c.justification && (
-                                            <span className="text-slate-400 max-w-[200px] truncate" title={c.justification}>
+                                            <span className="text-content-muted max-w-[200px] truncate" title={c.justification}>
                                                 {c.justification}
                                             </span>
                                         )}
@@ -539,7 +546,6 @@ function SoARow({
                                             <button
                                                 className="btn btn-xs btn-danger"
                                                 onClick={(e) => { e.stopPropagation(); onJustify(c.controlId, c.code || c.controlId.slice(0, 8)); }}
-                                                title="Add justification"
                                             >
                                                 <MessageSquare className="w-3 h-3" /> Justify
                                             </button>
@@ -548,13 +554,13 @@ function SoARow({
                                 </div>
                             ))}
                             {entry.evidenceCount > 0 && (
-                                <div className="text-[10px] text-slate-500">Evidence: {entry.evidenceCount} items</div>
+                                <div className="text-[10px] text-content-subtle">Evidence: {entry.evidenceCount} items</div>
                             )}
                             {entry.openTaskCount > 0 && (
                                 <div className="text-[10px] text-amber-400">Open tasks: {entry.openTaskCount}</div>
                             )}
                             {entry.lastTestResult && (
-                                <div className="text-[10px] text-slate-500">
+                                <div className="text-[10px] text-content-subtle">
                                     Last test: <span className={entry.lastTestResult === 'PASS' ? 'text-emerald-400' : 'text-red-400'}>{entry.lastTestResult}</span>
                                 </div>
                             )}
@@ -569,14 +575,14 @@ function SoARow({
 // ─── Summary Card ───
 
 function SummaryCard({ label, value, icon, accent }: { label: string; value: number; icon: React.ReactNode; accent?: 'danger' | 'warning' }) {
-    const border = accent === 'danger' ? 'border-red-500/30' : accent === 'warning' ? 'border-amber-500/30' : 'border-slate-700/50';
+    const border = accent === 'danger' ? 'border-red-500/30' : accent === 'warning' ? 'border-amber-500/30' : 'border-border-default/50';
     return (
         <div className={`glass-card px-4 py-3 border ${border}`}>
             <div className="flex items-center justify-between">
                 {icon}
-                <span className="text-xl font-bold text-white">{value}</span>
+                <span className="text-xl font-bold text-content-emphasis">{value}</span>
             </div>
-            <div className="text-[10px] text-slate-400 mt-1">{label}</div>
+            <div className="text-[10px] text-content-muted mt-1">{label}</div>
         </div>
     );
 }

@@ -26,7 +26,7 @@ export default async function ClausesPage({
     return (
         <div className="space-y-6 animate-fadeIn">
             <h1 className="text-2xl font-bold">{t('title')}</h1>
-            <p className="text-slate-400 text-sm">{t('subtitle')}</p>
+            <p className="text-content-muted text-sm">{t('subtitle')}</p>
 
             <ClausesBrowser
                 clauses={JSON.parse(JSON.stringify(clauses))}

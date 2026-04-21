@@ -258,8 +258,16 @@ export function hasActiveFilters(state: FilterState): boolean {
 // ── Compatibility Bridge ────────────────────────────────────────────
 
 /**
- * Convert a CompactFilterBar-style flat Record<string, string> to FilterState.
- * The CompactFilterBar uses single values per key; this normalizes to arrays.
+ * Convert a flat `Record<string, string>` (the shape the legacy
+ * `CompactFilterBar` produced, and the shape `useUrlFilters` still
+ * returns for non-array URL params) into the canonical `FilterState`
+ * that `useFilterContext` / `FilterToolbar` consume.
+ *
+ * The flat shape has single values per key; this normalises to arrays
+ * so FilterState stays multi-value-first.
+ *
+ * Name is kept for backwards compatibility with existing call sites
+ * and tests.
  */
 export function fromCompactFilterState(
   flat: Record<string, string>,
@@ -274,8 +282,10 @@ export function fromCompactFilterState(
 }
 
 /**
- * Convert FilterState to CompactFilterBar-style flat Record<string, string>.
- * Takes the first value for each key (lossy for multi-value filters).
+ * Convert `FilterState` back to a flat `Record<string, string>` where
+ * each key maps to a comma-joined value. Used at the URL-sync
+ * boundary and for the `useUrlFilters` fallback. Name preserved for
+ * backwards compatibility.
  */
 export function toCompactFilterState(
   state: FilterState,

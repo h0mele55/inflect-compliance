@@ -5,6 +5,7 @@ import { useTenantContext, useTenantHref } from '@/lib/tenant-context-provider';
 import { hasFeature, FEATURE_LABELS, getRequiredPlan } from '@/lib/entitlements';
 import type { FeatureKey } from '@/lib/entitlements';
 import Link from 'next/link';
+import { Tooltip } from '@/components/ui/tooltip';
 
 /**
  * Client-side gate for premium features.
@@ -51,15 +52,20 @@ export function UpgradeGate({
             <div className="opacity-40 pointer-events-none select-none">
                 {children}
             </div>
-            <Link
-                href={tenantHref('/admin/billing')}
-                className="inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 transition whitespace-nowrap"
-                title={`${label} requires ${requiredPlan} plan`}
+            <Tooltip
+                title={label}
+                content={`Requires ${requiredPlan} plan — click to upgrade.`}
             >
-                <Lock className="w-3 h-3" />
-                {requiredPlan}
-                <ArrowUpRight className="w-3 h-3" />
-            </Link>
+                <Link
+                    href={tenantHref('/admin/billing')}
+                    className="inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 transition whitespace-nowrap"
+                    aria-label={`${label} requires ${requiredPlan} plan — upgrade`}
+                >
+                    <Lock className="w-3 h-3" />
+                    {requiredPlan}
+                    <ArrowUpRight className="w-3 h-3" />
+                </Link>
+            </Tooltip>
         </div>
     );
 }

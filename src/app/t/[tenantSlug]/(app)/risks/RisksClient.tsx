@@ -4,6 +4,12 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { queryKeys } from '@/lib/queryKeys';
+// NOTE: NewRiskModal was previously lazy-loaded via next/dynamic, but
+// the JIT race in `next dev` made the modal occasionally fail to mount
+// in serial-mode E2E runs (Playwright clicked the button before the
+// chunk finished compiling, leaving #risk-title undetected). Static
+// import — modal is small, the page bundle cost is negligible, and the
+// E2E suite becomes deterministic.
 import { NewRiskModal } from './NewRiskModal';
 import {
     ColumnsDropdown,
@@ -26,6 +32,7 @@ import {
     RISK_API_TRANSFORMS,
     RISK_FILTER_KEYS,
 } from './filter-defs';
+import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 
 interface RiskListItem {
     id: string;
@@ -210,13 +217,22 @@ function RisksPageInner({
     );
 
     // ── KPI Computations ──
+    // Local aggregations over the already-fetched page of risks — these
+    // power the KPI cards and the 5×5 heatmap, not a re-filter of the
+    // server-side data set. The `// guardrail-ignore` directives tell
+    // `tests/guardrails/no-client-side-filtering.test.ts` to skip them.
     const total = risks.length;
     const avgScore = total ? (risks.reduce((s, r) => s + r.inherentScore, 0) / total).toFixed(1) : '0.0';
+    // guardrail-ignore: KPI count across the loaded page, not a refilter.
     const openCount = risks.filter(r => r.status === 'OPEN' || r.status === 'MITIGATING').length;
-    const now = new Date();
-    const overdueRisks = risks.filter(r => r.nextReviewAt && new Date(r.nextReviewAt) < now);
+    // `now` is null during SSR and first client render so the overdue
+    // count matches exactly across hydration (avoids React #418/#422).
+    const now = useHydratedNow();
+    // guardrail-ignore: KPI count across the loaded page, not a refilter.
+    const overdueRisks = now ? risks.filter(r => r.nextReviewAt && new Date(r.nextReviewAt) < now) : [];
 
     const heatmap: number[][] = Array.from({ length: 5 }, (_, l) =>
+        // guardrail-ignore: bucketing the loaded page into the 5×5 heatmap.
         Array.from({ length: 5 }, (_, i) => risks.filter(r => r.likelihood === (5 - l) && r.impact === (i + 1)).length)
     );
 
@@ -233,7 +249,7 @@ function RisksPageInner({
             accessorKey: 'title',
             header: t.riskTitle,
             cell: ({ getValue }) => (
-                <span className="font-medium text-white text-sm">{getValue<string>()}</span>
+                <span className="font-medium text-content-emphasis text-sm">{getValue<string>()}</span>
             ),
         },
         {
@@ -248,7 +264,7 @@ function RisksPageInner({
             accessorKey: 'threat',
             header: t.threat,
             cell: ({ getValue }) => (
-                <span className="text-xs text-slate-400">{getValue<string>()}</span>
+                <span className="text-xs text-content-muted">{getValue<string>()}</span>
             ),
         },
         {
@@ -298,7 +314,7 @@ function RisksPageInner({
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">{t.title}</h1>
-                    <p className="text-slate-400 text-sm">{t.risksIdentified}</p>
+                    <p className="text-content-muted text-sm">{t.risksIdentified}</p>
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => setView(view === 'register' ? 'heatmap' : 'register')} className="btn btn-secondary">
@@ -328,19 +344,19 @@ function RisksPageInner({
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t.totalRisks}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wider">{t.totalRisks}</p>
                     <p className="text-3xl font-bold mt-2">{total}</p>
                 </div>
                 <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t.avgScore}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wider">{t.avgScore}</p>
                     <p className="text-3xl font-bold mt-2 text-amber-400">{avgScore}</p>
                 </div>
                 <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t.openRisks}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wider">{t.openRisks}</p>
                     <p className="text-3xl font-bold mt-2 text-emerald-400">{openCount}</p>
                 </div>
                 <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-slate-400 uppercase tracking-wider">{t.overdueReviews}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wider">{t.overdueReviews}</p>
                     <p className="text-3xl font-bold mt-2 text-red-400">{overdueRisks.length}</p>
                 </div>
             </div>
@@ -360,9 +376,9 @@ function RisksPageInner({
 
             {view === 'heatmap' ? (
                 <div className="glass-card p-6">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-4">{t.heatmapTitle}</h3>
+                    <h3 className="text-sm font-semibold text-content-default mb-4">{t.heatmapTitle}</h3>
                     <div className="flex gap-2">
-                        <div className="flex flex-col items-center justify-between text-xs text-slate-400 pr-2">
+                        <div className="flex flex-col items-center justify-between text-xs text-content-muted pr-2">
                             {[5, 4, 3, 2, 1].map(n => <span key={n} className="h-16 flex items-center">{n}</span>)}
                             <span className="mt-1">L↑</span>
                         </div>
@@ -382,10 +398,10 @@ function RisksPageInner({
                                     </div>
                                 ))}
                             </div>
-                            <div className="flex justify-between text-xs text-slate-400 mt-2 px-3">
+                            <div className="flex justify-between text-xs text-content-muted mt-2 px-3">
                                 {[1, 2, 3, 4, 5].map(n => <span key={n}>{n}</span>)}
                             </div>
-                            <div className="text-center text-xs text-slate-400 mt-1">Impact →</div>
+                            <div className="text-center text-xs text-content-muted mt-1">Impact →</div>
                         </div>
                     </div>
                 </div>

@@ -67,7 +67,7 @@ export default function TemplatesPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">Policy Templates</h1>
-                    <p className="text-slate-400 text-sm">{templates.length} templates available</p>
+                    <p className="text-content-muted text-sm">{templates.length} templates available</p>
                 </div>
                 <Link href={tenantHref('/policies')} className="btn btn-secondary">← Back to Policies</Link>
             </div>
@@ -92,9 +92,9 @@ export default function TemplatesPage() {
 
             {/* Grid */}
             {loading ? (
-                <div className="p-12 text-center text-slate-500 animate-pulse">Loading templates...</div>
+                <div className="p-12 text-center text-content-subtle animate-pulse">Loading templates...</div>
             ) : filtered.length === 0 ? (
-                <div className="glass-card p-12 text-center text-slate-500">
+                <div className="glass-card p-12 text-center text-content-subtle">
                     {templates.length === 0 ? 'No templates available yet.' : 'No templates match your filters.'}
                 </div>
             ) : (
@@ -102,21 +102,21 @@ export default function TemplatesPage() {
                     {filtered.map(tpl => (
                         <div key={tpl.id} className="glass-card p-5 flex flex-col justify-between hover:ring-1 hover:ring-brand-500/30 transition">
                             <div>
-                                <h3 className="font-semibold text-white text-sm mb-1">{tpl.title}</h3>
+                                <h3 className="font-semibold text-content-emphasis text-sm mb-1">{tpl.title}</h3>
                                 <div className="flex gap-2 mb-2">
                                     {tpl.category && <span className="badge badge-neutral text-xs">{tpl.category}</span>}
-                                    {tpl.language && <span className="text-xs text-slate-500">{tpl.language.toUpperCase()}</span>}
+                                    {tpl.language && <span className="text-xs text-content-subtle">{tpl.language.toUpperCase()}</span>}
                                 </div>
                                 {tpl.tags && (
                                     <div className="flex flex-wrap gap-1 mb-3">
                                         {tpl.tags.split(',').map((tag: string) => (
-                                            <span key={tag.trim()} className="text-xs px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-400">
+                                            <span key={tag.trim()} className="text-xs px-1.5 py-0.5 rounded bg-bg-elevated/50 text-content-muted">
                                                 {tag.trim()}
                                             </span>
                                         ))}
                                     </div>
                                 )}
-                                <p className="text-xs text-slate-500 line-clamp-3">
+                                <p className="text-xs text-content-subtle line-clamp-3">
                                     {tpl.contentText?.substring(0, 150)}...
                                 </p>
                             </div>

@@ -30,6 +30,11 @@ import {
 } from 'react';
 import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { FormField } from '@/components/ui/form-field';
+import { FormError } from '@/components/ui/form-error';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { InfoTooltip } from '@/components/ui/tooltip';
 import { queryKeys } from '@/lib/queryKeys';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
@@ -204,54 +209,39 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                     )}
 
                     <div className="space-y-4">
-                        <div>
-                            <label className="mb-1 block text-sm text-content-default" htmlFor="control-code-input">
-                                Code
-                            </label>
-                            <input
+                        <FormField label="Code">
+                            <Input
                                 id="control-code-input"
                                 type="text"
-                                className="input w-full"
                                 placeholder="e.g. CTRL-001"
                                 value={form.code}
                                 onChange={(e) => update('code', e.target.value)}
                                 autoComplete="off"
                             />
-                        </div>
-                        <div>
-                            <label className="mb-1 block text-sm text-content-default" htmlFor="control-name-input">
-                                Name <span className="text-content-error">*</span>
-                            </label>
-                            <input
+                        </FormField>
+                        <FormField label="Name" required>
+                            <Input
                                 id="control-name-input"
                                 ref={nameInputRef}
                                 type="text"
-                                className="input w-full"
                                 placeholder="e.g. Password Policy Enforcement"
                                 value={form.name}
                                 onChange={(e) => update('name', e.target.value)}
                                 required
                                 autoComplete="off"
                             />
-                        </div>
-                        <div>
-                            <label className="mb-1 block text-sm text-content-default" htmlFor="control-description-input">
-                                Description
-                            </label>
-                            <textarea
+                        </FormField>
+                        <FormField label="Description">
+                            <Textarea
                                 id="control-description-input"
-                                className="input w-full"
                                 rows={3}
                                 placeholder="Brief description of this control"
                                 value={form.description}
                                 onChange={(e) => update('description', e.target.value)}
                             />
-                        </div>
+                        </FormField>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div>
-                                <label className="mb-1 block text-sm text-content-default" htmlFor="control-category-input">
-                                    Category
-                                </label>
+                            <FormField label="Category">
                                 <Combobox
                                     id="control-category-input"
                                     name="category"
@@ -265,11 +255,11 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                                     buttonProps={{ className: 'w-full' }}
                                     caret
                                 />
-                            </div>
-                            <div>
-                                <label className="mb-1 block text-sm text-content-default" htmlFor="control-frequency-input">
-                                    Frequency
-                                </label>
+                            </FormField>
+                            <FormField
+                                label="Frequency"
+                                hint="How often the control is expected to be reviewed or re-tested (monthly, quarterly, annually). Drives the next-review date on the control dashboard."
+                            >
                                 <Combobox
                                     id="control-frequency-input"
                                     name="frequency"
@@ -283,12 +273,22 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                                     buttonProps={{ className: 'w-full' }}
                                     caret
                                 />
-                            </div>
+                            </FormField>
                         </div>
-                        <div>
-                            <span className="mb-1 block text-sm text-content-default">
-                                Applicability
-                            </span>
+                        <div role="group" aria-labelledby="applicability-legend">
+                            <div className="mb-1 flex items-center gap-1.5">
+                                <span
+                                    id="applicability-legend"
+                                    className="text-sm text-content-default"
+                                >
+                                    Applicability
+                                </span>
+                                <InfoTooltip
+                                    aria-label="About control applicability"
+                                    iconClassName="h-3.5 w-3.5"
+                                    content="Mark Not Applicable when scope legitimately excludes this control (e.g. no payment processing for PCI). The justification is required and appears verbatim in the SoA report."
+                                />
+                            </div>
                             <div className="flex gap-4">
                                 <label className="flex items-center gap-2 text-sm text-content-default">
                                     <input
@@ -312,15 +312,22 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                                 </label>
                             </div>
                             {applicability === 'NOT_APPLICABLE' && (
-                                <textarea
-                                    id="control-justification-input"
-                                    className="input mt-2 w-full"
-                                    rows={2}
-                                    placeholder="Justification is required..."
-                                    value={justification}
-                                    onChange={(e) => setJustification(e.target.value)}
-                                    required
-                                />
+                                <>
+                                    <Textarea
+                                        id="control-justification-input"
+                                        className="mt-2"
+                                        rows={2}
+                                        placeholder="Justification is required..."
+                                        value={justification}
+                                        onChange={(e) => setJustification(e.target.value)}
+                                        required
+                                        aria-label="Justification for non-applicable control"
+                                        invalid={!justification.trim()}
+                                    />
+                                    <FormError visible={!justification.trim()}>
+                                        Justification is required for non-applicable controls.
+                                    </FormError>
+                                </>
                             )}
                         </div>
                     </div>

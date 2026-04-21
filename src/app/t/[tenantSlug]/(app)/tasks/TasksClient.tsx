@@ -17,6 +17,8 @@ import { FilterToolbar } from '@/components/filters/FilterToolbar';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildTaskFilters, TASK_FILTER_KEYS } from './filter-defs';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { Tooltip } from '@/components/ui/tooltip';
+import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 
 const STATUS_BADGE: Record<string, string> = {
     OPEN: 'badge-neutral', TRIAGED: 'badge-info', IN_PROGRESS: 'badge-info',
@@ -45,12 +47,12 @@ const BULK_ACTION_OPTIONS: ComboboxOption[] = [
 // SLA windows (hours)
 const SLA_RESOLVE: Record<string, number> = { CRITICAL: 24, HIGH: 72, MEDIUM: 168, LOW: 720 };
 
-function getSlaLabel(severity: string, createdAt: string, status: string): string {
+function getSlaLabel(severity: string, createdAt: string, status: string, now: Date): string {
     if ((TERMINAL_WORK_ITEM_STATUSES as readonly string[]).includes(status)) return '';
     const hours = SLA_RESOLVE[severity];
     if (!hours) return '';
     const deadline = new Date(new Date(createdAt).getTime() + hours * 3600000);
-    return new Date() > deadline ? 'SLA Breached' : '';
+    return now > deadline ? 'SLA Breached' : '';
 }
 
 interface TaskListItem {
@@ -106,6 +108,10 @@ function TasksPageInner({
     const [hydrated, setHydrated] = useState(false);
     useEffect(() => { setHydrated(true); }, []);
 
+    // Null until after hydration — time-dependent UI (overdue/SLA
+    // badges) reads this so SSR and first-client render match exactly.
+    const hydratedNow = useHydratedNow();
+
     const { state, search, hasActive } = useFilters();
 
     // Bulk selection
@@ -156,7 +162,7 @@ function TasksPageInner({
         [tasks],
     );
 
-    const isOverdue = (task: TaskListItem) => task.dueAt && new Date(task.dueAt) < new Date() && !(TERMINAL_WORK_ITEM_STATUSES as readonly string[]).includes(task.status);
+    const isOverdue = (task: TaskListItem) => !!(hydratedNow && task.dueAt && new Date(task.dueAt) < hydratedNow && !(TERMINAL_WORK_ITEM_STATUSES as readonly string[]).includes(task.status));
 
     const toggleSelect = (id: string) => {
         setSelected(prev => {
@@ -262,15 +268,22 @@ function TasksPageInner({
                 accessorFn: (t) => t.title,
                 cell: ({ row }) => {
                     const task = row.original;
-                    const slaLabel = getSlaLabel(task.severity, task.createdAt, task.status);
+                    const slaLabel = hydratedNow ? getSlaLabel(task.severity, task.createdAt, task.status, hydratedNow) : '';
                     return (
                         <div>
-                            <Link href={tenantHref(`/tasks/${task.id}`)} className="font-medium text-white hover:text-brand-400 transition" onClick={(e) => e.stopPropagation()}>
-                                {task.key && <span className="text-xs font-mono text-slate-500 mr-2">{task.key}</span>}
+                            <Link href={tenantHref(`/tasks/${task.id}`)} className="font-medium text-content-emphasis hover:text-brand-400 transition" onClick={(e) => e.stopPropagation()}>
+                                {task.key && <span className="text-xs font-mono text-content-subtle mr-2">{task.key}</span>}
                                 {task.title}
                             </Link>
                             {isOverdue(task) && <span className="badge badge-danger text-xs ml-2">Overdue</span>}
-                            {slaLabel && <span className="badge badge-danger text-xs ml-1" title="SLA Breached">SLA</span>}
+                            {slaLabel && (
+                                <Tooltip
+                                    title="SLA Breached"
+                                    content={slaLabel}
+                                >
+                                    <span className="badge badge-danger text-xs ml-1 cursor-help">SLA</span>
+                                </Tooltip>
+                            )}
                         </div>
                     );
                 },
@@ -278,7 +291,7 @@ function TasksPageInner({
             {
                 accessorKey: 'type',
                 header: 'Type',
-                cell: ({ getValue }) => <span className="text-xs text-slate-400">{TYPE_LABELS[getValue<string>()] || getValue<string>()}</span>,
+                cell: ({ getValue }) => <span className="text-xs text-content-muted">{TYPE_LABELS[getValue<string>()] || getValue<string>()}</span>,
             },
             {
                 accessorKey: 'severity',
@@ -302,23 +315,23 @@ function TasksPageInner({
                 id: 'assignee',
                 header: 'Assignee',
                 accessorFn: (t) => t.assignee?.name || '—',
-                cell: ({ getValue }) => <span className="text-xs text-slate-400">{getValue<string>()}</span>,
+                cell: ({ getValue }) => <span className="text-xs text-content-muted">{getValue<string>()}</span>,
             },
             {
                 id: 'dueAt',
                 header: 'Due Date',
-                cell: ({ row }) => <span className="text-xs text-slate-400">{row.original.dueAt ? formatDate(row.original.dueAt) : '—'}</span>,
+                cell: ({ row }) => <span className="text-xs text-content-muted">{row.original.dueAt ? formatDate(row.original.dueAt) : '—'}</span>,
             },
             {
                 id: 'updatedAt',
                 header: 'Updated',
-                cell: ({ row }) => <span className="text-xs text-slate-400">{formatDate(row.original.updatedAt)}</span>,
+                cell: ({ row }) => <span className="text-xs text-content-muted">{formatDate(row.original.updatedAt)}</span>,
             },
         );
 
         return cols;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [appPermissions.tasks.edit, selected, tasks.length, tenantHref]);
+    }, [appPermissions.tasks.edit, selected, tasks.length, tenantHref, hydratedNow]);
 
     return (
         <div className="space-y-6 animate-fadeIn" data-hydrated={hydrated || undefined}>
@@ -326,7 +339,7 @@ function TasksPageInner({
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">Tasks</h1>
-                    <p className="text-slate-400 text-sm">{tasks.length} tasks in register</p>
+                    <p className="text-content-muted text-sm">{tasks.length} tasks in register</p>
                 </div>
                 <div className="flex gap-2">
                     <Link href={tenantHref('/tasks/dashboard')} className="btn btn-secondary inline-flex items-center gap-2" id="dashboard-btn"><AppIcon name="dashboard" size={16} /> Dashboard</Link>
@@ -385,7 +398,7 @@ function TasksPageInner({
                     >
                         {bulkMutation.isPending ? 'Applying...' : 'Apply'}
                     </button>
-                    <button className="text-xs text-slate-400 hover:text-white" onClick={() => setSelected(new Set())}>Clear</button>
+                    <button className="text-xs text-content-muted hover:text-content-emphasis" onClick={() => setSelected(new Set())}>Clear</button>
                 </div>
             )}
 

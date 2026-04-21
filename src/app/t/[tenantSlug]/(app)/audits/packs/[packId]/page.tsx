@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 import { RequirePermission } from '@/components/require-permission';
 import { UpgradeGate } from '@/components/UpgradeGate';
+import { CopyButton } from '@/components/ui/copy-button';
 
 const ENTITY_ICON: Record<string, AppIconName> = {
     CONTROL: 'controls', POLICY: 'policies', EVIDENCE: 'evidence', FILE: 'overview', ISSUE: 'warning',
@@ -65,7 +66,7 @@ export default function PackDetailPage() {
     };
 
     if (loading) return <div className="p-8"><div className="glass-card animate-pulse h-64" /></div>;
-    if (!pack) return <div className="p-8 text-center text-slate-400">Pack not found</div>;
+    if (!pack) return <div className="p-8 text-center text-content-muted">Pack not found</div>;
 
     const isDraft = pack.status === 'DRAFT';
     const isFrozen = pack.status === 'FROZEN' || pack.status === 'EXPORTED';
@@ -80,7 +81,7 @@ export default function PackDetailPage() {
     return (
         <div className="space-y-6 animate-fadeIn">
             <div className="flex items-center gap-3">
-                <Link href={`/t/${tenantSlug}/audits/cycles`} className="text-slate-400 hover:text-white transition">← Cycles</Link>
+                <Link href={`/t/${tenantSlug}/audits/cycles`} className="text-content-muted hover:text-content-emphasis transition">← Cycles</Link>
             </div>
 
             {/* Header */}
@@ -88,12 +89,12 @@ export default function PackDetailPage() {
                 <div className="flex items-start justify-between">
                     <div>
                         <h1 className="text-xl font-bold" id="pack-name">{pack.name}</h1>
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-content-muted">
                             {pack.cycle?.frameworkKey} · {pack._count?.items || 0} items ·
                             <span className={`badge ml-2 ${isDraft ? 'badge-neutral' : 'badge-info'}`} id="pack-status">{pack.status}</span>
                         </p>
                         {pack.frozenAt && (
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-content-subtle mt-1">
                                 Frozen {formatDateTime(pack.frozenAt)} by {pack.frozenBy?.name || pack.frozenBy?.email || 'Admin'}
                             </p>
                         )}
@@ -143,31 +144,35 @@ export default function PackDetailPage() {
             {/* Share Link */}
             {shareLink && (
                 <div className="glass-card p-4 border border-emerald-500/30 bg-emerald-500/5 animate-fadeIn" id="share-link-card">
-                    <div className="flex items-center justify-between">
-                        <div>
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
                             <p className="text-sm font-medium text-emerald-400">Share Link Generated</p>
-                            <p className="text-xs text-slate-400 mt-1 break-all" id="share-link-url">{shareLink}</p>
+                            <p className="text-xs text-content-muted mt-1 break-all" id="share-link-url">{shareLink}</p>
                         </div>
-                        <button onClick={() => { navigator.clipboard.writeText(shareLink); }}
-                            className="btn btn-sm btn-secondary">Copy</button>
+                        <CopyButton
+                            value={shareLink}
+                            label="Copy share link"
+                            successMessage="Share link copied"
+                            size="md"
+                        />
                     </div>
                 </div>
             )}
 
             {/* Items grouped by type */}
             {Object.keys(grouped).length === 0 ? (
-                <div className="glass-card p-12 text-center text-slate-400">
+                <div className="glass-card p-12 text-center text-content-muted">
                     <p>No items in this pack yet.</p>
                 </div>
             ) : (
                 Object.entries(grouped).map(([type, items]) => (
                     <div key={type} className="space-y-2">
-                        <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-content-default flex items-center gap-2">
                             <AppIcon name={ENTITY_ICON[type] || 'overview'} size={16} />
                             <span>{type}</span>
-                            <span className="text-slate-500">({items.length})</span>
+                            <span className="text-content-subtle">({items.length})</span>
                         </h3>
-                        <div className="glass-card divide-y divide-slate-700/50">
+                        <div className="glass-card divide-y divide-border-default/50">
                             {items.slice(0, 50).map((item: any) => {
                                 let snap: any = {};
                                 try { snap = JSON.parse(item.snapshotJson || '{}'); } catch { /* */ }
@@ -177,17 +182,17 @@ export default function PackDetailPage() {
                                     <div key={item.id} className="p-3 flex items-center justify-between text-sm">
                                         <div className="flex-1 min-w-0">
                                             <span className="font-medium truncate block">{name}</span>
-                                            {snap.description && <span className="text-xs text-slate-500 truncate block">{snap.description}</span>}
+                                            {snap.description && <span className="text-xs text-content-subtle truncate block">{snap.description}</span>}
                                         </div>
                                         <div className="flex items-center gap-2 ml-4">
                                             {status && <span className="badge badge-neutral text-xs">{status}</span>}
                                             {snap.taskCompletion && (
-                                                <span className="text-xs text-slate-500">
+                                                <span className="text-xs text-content-subtle">
                                                     Tasks: {snap.taskCompletion.done}/{snap.taskCompletion.total}
                                                 </span>
                                             )}
                                             {snap.evidenceCount !== undefined && (
-                                                <span className="text-xs text-slate-500">
+                                                <span className="text-xs text-content-subtle">
                                                     Evidence: {snap.evidenceCount}
                                                 </span>
                                             )}

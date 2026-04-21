@@ -63,8 +63,8 @@ export default async function RbacPage({
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold">Roles &amp; Access</h1>
-                <p className="text-sm text-slate-400 mt-1">
-                    Permission matrix for <span className="text-white font-medium">{tenantCtx.tenant.name}</span>.
+                <p className="text-sm text-content-muted mt-1">
+                    Permission matrix for <span className="text-content-emphasis font-medium">{tenantCtx.tenant.name}</span>.
                     Your role: <span className="badge badge-info">{tenantCtx.role}</span>
                 </p>
             </div>
@@ -85,10 +85,10 @@ export default async function RbacPage({
                         <tbody>
                             {members.map((m) => (
                                 <tr key={m.id}>
-                                    <td className="text-sm font-medium text-white">
+                                    <td className="text-sm font-medium text-content-emphasis">
                                         {m.user.name || '—'}
                                     </td>
-                                    <td className="text-xs text-slate-400">{m.user.email}</td>
+                                    <td className="text-xs text-content-muted">{m.user.email}</td>
                                     <td>
                                         <span className={`badge ${
                                             m.role === 'ADMIN' ? 'badge-danger' :
@@ -97,12 +97,12 @@ export default async function RbacPage({
                                             'badge-neutral'
                                         }`}>{m.role}</span>
                                     </td>
-                                    <td className="text-xs text-slate-500">{formatDate(m.createdAt)}</td>
+                                    <td className="text-xs text-content-subtle">{formatDate(m.createdAt)}</td>
                                 </tr>
                             ))}
                             {members.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="text-center text-slate-500 py-8">No members found.</td>
+                                    <td colSpan={4} className="text-center text-content-subtle py-8">No members found.</td>
                                 </tr>
                             )}
                         </tbody>
@@ -117,8 +117,8 @@ export default async function RbacPage({
                     <table className="data-table">
                         <thead>
                             <tr>
-                                <th className="sticky left-0 bg-slate-800/90 z-10">Resource</th>
-                                <th className="sticky left-[120px] bg-slate-800/90 z-10">Action</th>
+                                <th className="sticky left-0 bg-bg-default/90 z-10">Resource</th>
+                                <th className="sticky left-[120px] bg-bg-default/90 z-10">Action</th>
                                 {roles.map((r) => (
                                     <th key={r} className="text-center">{r}</th>
                                 ))}
@@ -127,8 +127,8 @@ export default async function RbacPage({
                         <tbody>
                             {permissionRows.map(({ resource, action }) => (
                                 <tr key={`${resource}.${action}`}>
-                                    <td className="text-xs font-medium text-slate-300 sticky left-0 bg-slate-800/50">{resource}</td>
-                                    <td className="text-xs text-slate-400 sticky left-[120px] bg-slate-800/50">{action}</td>
+                                    <td className="text-xs font-medium text-content-default sticky left-0 bg-bg-default/50">{resource}</td>
+                                    <td className="text-xs text-content-muted sticky left-[120px] bg-bg-default/50">{action}</td>
                                     {roles.map((role) => {
                                         const resourcePerms = permissionMatrix[role][resource as keyof PermissionSet];
                                         const granted = (resourcePerms as Record<string, boolean>)[action];
@@ -137,7 +137,7 @@ export default async function RbacPage({
                                                 {granted ? (
                                                     <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500/30 text-emerald-400"><Check size={10} /></span>
                                                 ) : (
-                                                    <span className="inline-block w-4 h-4 rounded-full bg-slate-700/50 text-slate-600 text-[10px] leading-4">—</span>
+                                                    <span className="inline-block w-4 h-4 rounded-full bg-bg-elevated/50 text-content-subtle text-[10px] leading-4">—</span>
                                                 )}
                                             </td>
                                         );

@@ -78,3 +78,10 @@ export {
 // ── Context & Hooks ──
 export type { FilterContextValue, UseFilterContextOptions } from "./filter-context";
 export { FilterProvider, useFilterContext, useFilters } from "./filter-context";
+
+// ── Presets (saved views) ──
+export type {
+  UseFilterPresetsOptions,
+  UseFilterPresetsResult,
+} from "./use-filter-presets";
+export { useFilterPresets } from "./use-filter-presets";

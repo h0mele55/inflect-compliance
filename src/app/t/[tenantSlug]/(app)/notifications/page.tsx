@@ -26,13 +26,13 @@ export default function NotificationsPage() {
                     <div key={n.id} className={`glass-card p-4 flex items-start gap-3 ${!n.read ? 'border-l-2 border-brand-500' : 'opacity-60'}`}>
                         <span className="text-lg"><AppIcon name={n.type === 'EVIDENCE' ? 'evidence' : n.type === 'FINDING' ? 'bug' : 'bell'} size={18} /></span>
                         <div className="flex-1">
-                            <p className="text-sm text-slate-200">{n.message}</p>
-                            <p className="text-xs text-slate-500 mt-1">{formatDateTime(n.createdAt)}</p>
+                            <p className="text-sm text-content-emphasis">{n.message}</p>
+                            <p className="text-xs text-content-subtle mt-1">{formatDateTime(n.createdAt)}</p>
                         </div>
                         {!n.read && <button onClick={() => markRead(n.id)} className="btn btn-ghost btn-sm text-xs">{t('markRead')}</button>}
                     </div>
                 ))}
-                {notifications.length === 0 && <div className="glass-card p-12 text-center text-slate-500">{t('noNotifications')}</div>}
+                {notifications.length === 0 && <div className="glass-card p-12 text-center text-content-subtle">{t('noNotifications')}</div>}
             </div>
         </div>
     );

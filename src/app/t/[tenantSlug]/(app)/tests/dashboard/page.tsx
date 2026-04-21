@@ -41,7 +41,7 @@ function ProgressBar({ value, color = 'brand' }: { value: number; color?: string
         amber: 'bg-amber-500',
     };
     return (
-        <div className="w-full bg-slate-700/50 rounded-full h-2.5">
+        <div className="w-full bg-bg-elevated/50 rounded-full h-2.5">
             <div
                 className={`h-2.5 rounded-full transition-all duration-700 ${colorMap[color] || 'bg-brand-500'}`}
                 style={{ width: `${Math.min(100, value)}%` }}
@@ -75,7 +75,7 @@ export default function TestDashboardPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    if (loading || !metrics) return <div className="p-12 text-center text-slate-500 animate-pulse">Loading dashboard...</div>;
+    if (loading || !metrics) return <div className="p-12 text-center text-content-subtle animate-pulse">Loading dashboard...</div>;
 
     return (
         <div className="space-y-8 animate-fadeIn">
@@ -83,17 +83,17 @@ export default function TestDashboardPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold" id="dashboard-title">Test Dashboard</h1>
-                    <p className="text-sm text-slate-400 mt-1">Testing health and framework readiness</p>
+                    <p className="text-sm text-content-muted mt-1">Testing health and framework readiness</p>
                 </div>
                 <div className="flex gap-3">
                     <Link href={tenantHref('/tests')} className="btn btn-ghost btn-sm">← Tests</Link>
                     <Link href={tenantHref('/tests/due')} className="btn btn-ghost btn-sm">Due Queue</Link>
-                    <div className="flex gap-1 bg-slate-800/50 rounded-lg p-1">
+                    <div className="flex gap-1 bg-bg-default/50 rounded-lg p-1">
                         {[30, 90].map(d => (
                             <button
                                 key={d}
                                 onClick={() => setPeriod(d)}
-                                className={`px-3 py-1 rounded text-xs font-medium transition ${period === d ? 'bg-brand-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                                className={`px-3 py-1 rounded text-xs font-medium transition ${period === d ? 'bg-brand-500 text-content-emphasis' : 'text-content-muted hover:text-content-emphasis'}`}
                                 id={`period-${d}-btn`}
                             >
                                 {d}d
@@ -118,27 +118,27 @@ export default function TestDashboardPage() {
                 <div className="glass-card p-6">
                     <h2 className="text-lg font-semibold mb-4">Result Distribution ({period}d)</h2>
                     {metrics.completedRuns === 0 ? (
-                        <p className="text-slate-500 text-sm">No completed runs in this period</p>
+                        <p className="text-content-subtle text-sm">No completed runs in this period</p>
                     ) : (
                         <div className="space-y-3">
                             <div>
                                 <div className="flex justify-between text-sm mb-1">
                                     <span className="text-green-400">Pass</span>
-                                    <span className="text-slate-400">{metrics.passRuns} ({metrics.passRate}%)</span>
+                                    <span className="text-content-muted">{metrics.passRuns} ({metrics.passRate}%)</span>
                                 </div>
                                 <ProgressBar value={metrics.passRate} color="green" />
                             </div>
                             <div>
                                 <div className="flex justify-between text-sm mb-1">
                                     <span className="text-red-400">Fail</span>
-                                    <span className="text-slate-400">{metrics.failRuns} ({metrics.failRate}%)</span>
+                                    <span className="text-content-muted">{metrics.failRuns} ({metrics.failRate}%)</span>
                                 </div>
                                 <ProgressBar value={metrics.failRate} color="red" />
                             </div>
                             <div>
                                 <div className="flex justify-between text-sm mb-1">
                                     <span className="text-amber-400">Inconclusive</span>
-                                    <span className="text-slate-400">{metrics.inconclusiveRuns}</span>
+                                    <span className="text-content-muted">{metrics.inconclusiveRuns}</span>
                                 </div>
                                 <ProgressBar value={metrics.completedRuns > 0 ? (metrics.inconclusiveRuns / metrics.completedRuns) * 100 : 0} color="amber" />
                             </div>
@@ -149,18 +149,18 @@ export default function TestDashboardPage() {
                 <div className="glass-card p-6">
                     <h2 className="text-lg font-semibold mb-4">Repeated Failures</h2>
                     {metrics.repeatedFailures.length === 0 ? (
-                        <p className="text-slate-500 text-sm">No controls with repeated failures</p>
+                        <p className="text-content-subtle text-sm">No controls with repeated failures</p>
                     ) : (
                         <div className="space-y-2">
                             {metrics.repeatedFailures.map(f => (
                                 <Link
                                     key={f.controlId}
                                     href={tenantHref(`/controls/${f.controlId}`)}
-                                    className="flex justify-between items-center p-2 rounded hover:bg-slate-800/30 transition"
+                                    className="flex justify-between items-center p-2 rounded hover:bg-bg-default/30 transition"
                                 >
                                     <div>
-                                        <span className="text-white text-sm font-medium">{f.controlCode || f.controlName}</span>
-                                        {f.controlCode && <span className="text-slate-400 text-xs ml-2">{f.controlName}</span>}
+                                        <span className="text-content-emphasis text-sm font-medium">{f.controlCode || f.controlName}</span>
+                                        {f.controlCode && <span className="text-content-muted text-xs ml-2">{f.controlName}</span>}
                                     </div>
                                     <span className="badge badge-xs badge-danger">{f.failCount} failures</span>
                                 </Link>
@@ -174,40 +174,40 @@ export default function TestDashboardPage() {
             {readiness.length > 0 && (
                 <div className="glass-card p-6">
                     <h2 className="text-lg font-semibold mb-4" id="framework-readiness-title">Framework Test Coverage</h2>
-                    <p className="text-sm text-slate-400 mb-4">
+                    <p className="text-sm text-content-muted mb-4">
                         How well your mapped controls are covered by active test plans and recent test runs
                     </p>
                     <div className="space-y-6">
                         {readiness.map(fw => (
-                            <div key={fw.frameworkKey} className="border border-slate-700/30 rounded-lg p-4">
+                            <div key={fw.frameworkKey} className="border border-border-default/30 rounded-lg p-4">
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="font-semibold text-white">{fw.frameworkName}</h3>
-                                    <span className="text-xs text-slate-400">{fw.totalMappedControls} mapped controls</span>
+                                    <h3 className="font-semibold text-content-emphasis">{fw.frameworkName}</h3>
+                                    <span className="text-xs text-content-muted">{fw.totalMappedControls} mapped controls</span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-4">
                                     <div>
                                         <div className="flex justify-between text-xs mb-1">
-                                            <span className="text-slate-400">Test Plan Coverage</span>
-                                            <span className="text-white">{fw.testPlanCoverage}%</span>
+                                            <span className="text-content-muted">Test Plan Coverage</span>
+                                            <span className="text-content-emphasis">{fw.testPlanCoverage}%</span>
                                         </div>
                                         <ProgressBar value={fw.testPlanCoverage} color={fw.testPlanCoverage >= 80 ? 'green' : fw.testPlanCoverage >= 50 ? 'amber' : 'red'} />
-                                        <p className="text-xs text-slate-500 mt-1">{fw.withTestPlan}/{fw.totalMappedControls} with plans</p>
+                                        <p className="text-xs text-content-subtle mt-1">{fw.withTestPlan}/{fw.totalMappedControls} with plans</p>
                                     </div>
                                     <div>
                                         <div className="flex justify-between text-xs mb-1">
-                                            <span className="text-slate-400">Recent Run Coverage (90d)</span>
-                                            <span className="text-white">{fw.testRunCoverage}%</span>
+                                            <span className="text-content-muted">Recent Run Coverage (90d)</span>
+                                            <span className="text-content-emphasis">{fw.testRunCoverage}%</span>
                                         </div>
                                         <ProgressBar value={fw.testRunCoverage} color={fw.testRunCoverage >= 80 ? 'green' : fw.testRunCoverage >= 50 ? 'amber' : 'red'} />
-                                        <p className="text-xs text-slate-500 mt-1">{fw.withRecentRun}/{fw.totalMappedControls} tested</p>
+                                        <p className="text-xs text-content-subtle mt-1">{fw.withRecentRun}/{fw.totalMappedControls} tested</p>
                                     </div>
                                     <div>
                                         <div className="flex justify-between text-xs mb-1">
-                                            <span className="text-slate-400">Pass Rate</span>
-                                            <span className="text-white">{fw.passRate}%</span>
+                                            <span className="text-content-muted">Pass Rate</span>
+                                            <span className="text-content-emphasis">{fw.passRate}%</span>
                                         </div>
                                         <ProgressBar value={fw.passRate} color={fw.passRate >= 80 ? 'green' : fw.passRate >= 50 ? 'amber' : 'red'} />
-                                        <p className="text-xs text-slate-500 mt-1">{fw.recentPasses}/{fw.recentRuns} passed</p>
+                                        <p className="text-xs text-content-subtle mt-1">{fw.recentPasses}/{fw.recentRuns} passed</p>
                                     </div>
                                 </div>
                             </div>
@@ -228,9 +228,9 @@ function MetricCard({ label, value, sub, color }: { label: string; value: string
     };
     return (
         <div className="glass-card p-4 text-center">
-            <div className={`text-2xl font-bold ${colorMap[color] || 'text-white'}`}>{value}</div>
-            <div className="text-xs text-slate-400 mt-1 font-medium">{label}</div>
-            <div className="text-xs text-slate-500 mt-0.5">{sub}</div>
+            <div className={`text-2xl font-bold ${colorMap[color] || 'text-content-emphasis'}`}>{value}</div>
+            <div className="text-xs text-content-muted mt-1 font-medium">{label}</div>
+            <div className="text-xs text-content-subtle mt-0.5">{sub}</div>
         </div>
     );
 }

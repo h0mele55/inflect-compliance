@@ -7,9 +7,9 @@ const CRIT_BADGE: Record<string, string> = { LOW: 'badge-neutral', MEDIUM: 'badg
 
 function MetricCard({ label, value, badge, href }: { label: string; value: number | string; badge?: string; href?: string }) {
     const inner = (
-        <div className={`card p-4 text-center ${href ? 'hover:bg-slate-700/50 cursor-pointer' : ''}`}>
+        <div className={`card p-4 text-center ${href ? 'hover:bg-bg-elevated/50 cursor-pointer' : ''}`}>
             <div className={`text-2xl font-bold ${badge || ''}`}>{value}</div>
-            <div className="text-xs text-slate-400 mt-1">{label}</div>
+            <div className="text-xs text-content-muted mt-1">{label}</div>
         </div>
     );
     return href ? <Link href={href}>{inner}</Link> : inner;
@@ -17,17 +17,17 @@ function MetricCard({ label, value, badge, href }: { label: string; value: numbe
 
 function BreakdownBar({ data, colors }: { data: Record<string, number>; colors: Record<string, string> }) {
     const total = Object.values(data).reduce((s, v) => s + v, 0);
-    if (total === 0) return <div className="text-sm text-slate-500">No data</div>;
+    if (total === 0) return <div className="text-sm text-content-subtle">No data</div>;
     return (
         <div className="space-y-2">
             {Object.entries(data).map(([key, count]) => (
                 <div key={key} className="flex items-center gap-2 text-sm">
-                    <span className="w-20 text-slate-400 text-xs">{key}</span>
-                    <div className="flex-1 bg-slate-800 rounded h-5 overflow-hidden">
+                    <span className="w-20 text-content-muted text-xs">{key}</span>
+                    <div className="flex-1 bg-bg-default rounded h-5 overflow-hidden">
                         <div className={`h-full ${colors[key] || 'bg-blue-500/60'} rounded`}
                             style={{ width: `${(count / total) * 100}%`, minWidth: count > 0 ? '8px' : '0' }} />
                     </div>
-                    <span className="w-8 text-right text-slate-300 font-mono text-xs">{count}</span>
+                    <span className="w-8 text-right text-content-default font-mono text-xs">{count}</span>
                 </div>
             ))}
         </div>
@@ -38,7 +38,7 @@ const CRIT_COLORS: Record<string, string> = {
     LOW: 'bg-green-500/60', MEDIUM: 'bg-yellow-500/60', HIGH: 'bg-orange-500/60', CRITICAL: 'bg-red-500/60',
 };
 const STATUS_COLORS: Record<string, string> = {
-    ACTIVE: 'bg-green-500/60', ONBOARDING: 'bg-blue-500/60', OFFBOARDING: 'bg-yellow-500/60', OFFBOARDED: 'bg-slate-500/60',
+    ACTIVE: 'bg-green-500/60', ONBOARDING: 'bg-blue-500/60', OFFBOARDING: 'bg-yellow-500/60', OFFBOARDED: 'bg-border-emphasis',
 };
 
 export default function VendorDashboardPage() {
@@ -57,7 +57,7 @@ export default function VendorDashboardPage() {
 
     useEffect(() => { fetchMetrics(); }, [fetchMetrics]);
 
-    if (loading) return <div className="text-slate-400 py-8 text-center">Loading dashboard…</div>;
+    if (loading) return <div className="text-content-muted py-8 text-center">Loading dashboard…</div>;
     if (!metrics) return <div className="text-red-400 py-8 text-center">Failed to load metrics</div>;
 
     return (
@@ -65,7 +65,7 @@ export default function VendorDashboardPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">Vendor Dashboard</h1>
-                    <p className="text-slate-400 text-sm">{metrics.totalVendors} total vendors</p>
+                    <p className="text-content-muted text-sm">{metrics.totalVendors} total vendors</p>
                 </div>
                 <Link href={tenantHref('/vendors')} className="btn btn-secondary">← Register</Link>
             </div>
@@ -99,7 +99,7 @@ export default function VendorDashboardPage() {
                     <h3 className="font-semibold">By Risk Rating</h3>
                     {Object.keys(metrics.byRiskRating).length > 0
                         ? <BreakdownBar data={metrics.byRiskRating} colors={CRIT_COLORS} />
-                        : <div className="text-sm text-slate-500">No assessments completed yet</div>}
+                        : <div className="text-sm text-content-subtle">No assessments completed yet</div>}
                 </div>
             </div>
 
@@ -110,7 +110,7 @@ export default function VendorDashboardPage() {
                         <span className="text-orange-400 text-lg font-semibold">!</span>
                         <span className="font-semibold">{metrics.expiringDocuments} document(s) expiring within 30 days</span>
                     </div>
-                    <p className="text-sm text-slate-400 mt-1">Review vendor documents tab to check validity dates.</p>
+                    <p className="text-sm text-content-muted mt-1">Review vendor documents tab to check validity dates.</p>
                 </div>
             )}
         </div>

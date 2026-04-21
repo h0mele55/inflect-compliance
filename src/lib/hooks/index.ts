@@ -8,6 +8,19 @@
 export { useApi, useMutation } from './use-api';
 export type { UseApiResult, UseMutationResult } from './use-api';
 
+export {
+    KeyboardShortcutProvider,
+    useKeyboardShortcut,
+    useRegisteredShortcuts,
+} from './use-keyboard-shortcut';
+export type {
+    RegisteredShortcut,
+    ShortcutHandler,
+    ShortcutInput,
+    ShortcutScope,
+    UseKeyboardShortcutOptions,
+} from './use-keyboard-shortcut';
+
 export { useControls, useControl, useControlDashboard, useCreateControl, useUpdateControl, useDeleteControl } from './use-controls';
 export { usePolicies, usePolicy, useCreatePolicy, useUpdatePolicy, useDeletePolicy } from './use-policies';
 export { useRisks, useRisk, useCreateRisk, useUpdateRisk, useDeleteRisk } from './use-risks';

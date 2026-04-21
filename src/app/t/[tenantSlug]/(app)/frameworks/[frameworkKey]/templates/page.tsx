@@ -1,7 +1,8 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function TemplateLibraryPage() {
@@ -95,20 +96,35 @@ export default function TemplateLibraryPage() {
     const installed = templates.filter(t => t.installed).length;
     const available = templates.filter(t => !t.installed).length;
 
-    if (loading) return <div className="p-8 animate-pulse text-slate-400">Loading template library...</div>;
+    const categoryOptions = useMemo<ComboboxOption[]>(
+        () => [
+            { value: '', label: 'All Categories' },
+            ...categories.map((c) => ({ value: c as string, label: c as string })),
+        ],
+        [categories],
+    );
+    const sectionOptions = useMemo<ComboboxOption[]>(
+        () => [
+            { value: '', label: 'All Sections' },
+            ...sections.map((s) => ({ value: s as string, label: s as string })),
+        ],
+        [sections],
+    );
+
+    if (loading) return <div className="p-8 animate-pulse text-content-muted">Loading template library...</div>;
 
     return (
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <Link href={tenantHref(`/frameworks/${frameworkKey}`)} className="text-slate-400 hover:text-white transition-colors text-sm">
+                    <Link href={tenantHref(`/frameworks/${frameworkKey}`)} className="text-content-muted hover:text-content-emphasis transition-colors text-sm">
                         ← Back to {framework?.name || frameworkKey}
                     </Link>
-                    <h1 className="text-2xl font-bold text-white mt-2" id="template-library-heading">
+                    <h1 className="text-2xl font-bold text-content-emphasis mt-2" id="template-library-heading">
                         Template Library — {framework?.name}
                     </h1>
-                    <div className="flex gap-3 mt-1 text-xs text-slate-500">
+                    <div className="flex gap-3 mt-1 text-xs text-content-subtle">
                         <span>{templates.length} templates</span>
                         <span className="text-emerald-500">{installed} installed</span>
                         <span className="text-brand-400">{available} available</span>
@@ -136,14 +152,28 @@ export default function TemplateLibraryPage() {
                     className="input w-60"
                     id="template-search"
                 />
-                <select value={category} onChange={e => setCategory(e.target.value)} className="input w-40" id="filter-category">
-                    <option value="">All Categories</option>
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <select value={section} onChange={e => setSection(e.target.value)} className="input w-48" id="filter-section">
-                    <option value="">All Sections</option>
-                    {sections.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <Combobox
+                    id="filter-category"
+                    options={categoryOptions}
+                    selected={categoryOptions.find(o => o.value === category) ?? categoryOptions[0]}
+                    setSelected={(opt) => setCategory(opt?.value ?? '')}
+                    placeholder="All Categories"
+                    searchPlaceholder="Search categories…"
+                    matchTriggerWidth
+                    buttonProps={{ className: 'w-40' }}
+                    caret
+                />
+                <Combobox
+                    id="filter-section"
+                    options={sectionOptions}
+                    selected={sectionOptions.find(o => o.value === section) ?? sectionOptions[0]}
+                    setSelected={(opt) => setSection(opt?.value ?? '')}
+                    placeholder="All Sections"
+                    searchPlaceholder="Search sections…"
+                    matchTriggerWidth
+                    buttonProps={{ className: 'w-48' }}
+                    caret
+                />
                 <button onClick={selectAll} className="btn btn-secondary text-xs" id="select-all-btn">Select All Uninstalled</button>
             </div>
 
@@ -175,7 +205,7 @@ export default function TemplateLibraryPage() {
                                         >
                                             <div className="flex items-center gap-2">
                                                 <code className="text-xs text-brand-400 font-mono">{t.code}</code>
-                                                <span className="text-sm font-medium text-white truncate">{t.title}</span>
+                                                <span className="text-sm font-medium text-content-emphasis truncate">{t.title}</span>
                                                 {t.installed ? (
                                                     <span className="badge badge-success text-xs flex-shrink-0">Installed</span>
                                                 ) : (
@@ -196,28 +226,28 @@ export default function TemplateLibraryPage() {
 
                                     {/* Badges row */}
                                     <div className="flex flex-wrap gap-1.5 mt-1">
-                                        {t.category && <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded">{t.category}</span>}
-                                        {t.defaultFrequency && <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded">{t.defaultFrequency}</span>}
-                                        <span className="text-xs text-slate-500">{t.tasks.length} tasks</span>
-                                        <span className="text-xs text-slate-500">{t.requirements.length} requirements</span>
+                                        {t.category && <span className="text-xs text-content-subtle bg-bg-default px-2 py-0.5 rounded">{t.category}</span>}
+                                        {t.defaultFrequency && <span className="text-xs text-content-subtle bg-bg-default px-2 py-0.5 rounded">{t.defaultFrequency}</span>}
+                                        <span className="text-xs text-content-subtle">{t.tasks.length} tasks</span>
+                                        <span className="text-xs text-content-subtle">{t.requirements.length} requirements</span>
                                     </div>
 
                                     {/* Expanded detail */}
                                     {isExpanded && (
-                                        <div className="mt-3 space-y-3 border-t border-slate-700/30 pt-3">
+                                        <div className="mt-3 space-y-3 border-t border-border-default/30 pt-3">
                                             {t.description && (
-                                                <p className="text-sm text-slate-400">{t.description}</p>
+                                                <p className="text-sm text-content-muted">{t.description}</p>
                                             )}
 
                                             {/* Requirements */}
                                             <div>
-                                                <h4 className="text-xs font-semibold text-slate-500 mb-1">Mapped Requirements</h4>
+                                                <h4 className="text-xs font-semibold text-content-subtle mb-1">Mapped Requirements</h4>
                                                 <div className="space-y-1">
                                                     {t.requirements.map((r: any, i: number) => (
                                                         <div key={i} className="flex items-center gap-2 text-xs">
                                                             <code className="text-brand-400 font-mono">{r.code}</code>
-                                                            <span className="text-slate-400">{r.title}</span>
-                                                            <span className="text-slate-600">({r.framework.name})</span>
+                                                            <span className="text-content-muted">{r.title}</span>
+                                                            <span className="text-content-subtle">({r.framework.name})</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -225,12 +255,12 @@ export default function TemplateLibraryPage() {
 
                                             {/* Tasks */}
                                             <div>
-                                                <h4 className="text-xs font-semibold text-slate-500 mb-1">Default Tasks</h4>
+                                                <h4 className="text-xs font-semibold text-content-subtle mb-1">Default Tasks</h4>
                                                 <div className="space-y-1">
                                                     {t.tasks.map((task: any, i: number) => (
                                                         <div key={i} className="flex items-center gap-2 text-xs">
-                                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                                                            <span className="text-slate-300">{task.title}</span>
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-border-emphasis" />
+                                                            <span className="text-content-default">{task.title}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -238,10 +268,10 @@ export default function TemplateLibraryPage() {
 
                                             {/* Suggested evidence */}
                                             <div>
-                                                <h4 className="text-xs font-semibold text-slate-500 mb-1">Suggested Evidence Types</h4>
+                                                <h4 className="text-xs font-semibold text-content-subtle mb-1">Suggested Evidence Types</h4>
                                                 <div className="flex flex-wrap gap-1">
                                                     {['DOCUMENT', 'SCREENSHOT', 'LOG'].map(type => (
-                                                        <span key={type} className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded">{type}</span>
+                                                        <span key={type} className="text-xs bg-bg-default text-content-muted px-2 py-0.5 rounded">{type}</span>
                                                     ))}
                                                 </div>
                                             </div>
@@ -254,7 +284,7 @@ export default function TemplateLibraryPage() {
                 })}
 
                 {templates.length === 0 && (
-                    <div className="glass-card text-center py-8 text-slate-500">No templates match your filters.</div>
+                    <div className="glass-card text-center py-8 text-content-subtle">No templates match your filters.</div>
                 )}
             </div>
         </div>

@@ -4,6 +4,8 @@ import { formatDate } from '@/lib/format-date';
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { ShieldCheck, QrCode, Copy, CheckCircle, XCircle, Trash2, AlertTriangle, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { useCopyToClipboard } from '@/components/ui/hooks';
 
 interface MfaStatus {
     isEnrolled: boolean;
@@ -32,7 +34,7 @@ export default function UserMfaPage() {
     const [success, setSuccess] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [copied, setCopied] = useState(false);
+    const { copy, copied } = useCopyToClipboard({ timeout: 2500 });
 
     const fetchStatus = useCallback(async () => {
         try {
@@ -118,9 +120,12 @@ export default function UserMfaPage() {
 
     const copySecret = async () => {
         if (!enrollment) return;
-        await navigator.clipboard.writeText(enrollment.secret);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        const ok = await copy(enrollment.secret);
+        if (ok) {
+            toast.success('Setup key copied — paste it into your authenticator app.');
+        } else {
+            toast.error('Copy failed — select the key and copy manually.');
+        }
     };
 
     if (loading) {
@@ -132,8 +137,8 @@ export default function UserMfaPage() {
                 </h1>
                 <div className="glass-card p-8">
                     <div className="animate-pulse space-y-4">
-                        <div className="h-4 bg-slate-700 rounded w-1/3" />
-                        <div className="h-20 bg-slate-700 rounded w-full" />
+                        <div className="h-4 bg-bg-elevated rounded w-1/3" />
+                        <div className="h-20 bg-bg-elevated rounded w-full" />
                     </div>
                 </div>
             </div>
@@ -151,7 +156,7 @@ export default function UserMfaPage() {
                 <div className="glass-card p-4 border border-red-500/50 bg-red-500/10 flex items-center gap-2">
                     <XCircle className="w-4 h-4 text-red-400 shrink-0" />
                     <span className="text-sm text-red-300">{error}</span>
-                    <button onClick={() => setError(null)} className="ml-auto text-xs text-slate-400 hover:text-white">
+                    <button onClick={() => setError(null)} className="ml-auto text-xs text-content-muted hover:text-content-emphasis">
                         <X className="w-4 h-4" />
                     </button>
                 </div>
@@ -169,9 +174,9 @@ export default function UserMfaPage() {
                 <div className="glass-card p-6 space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-lg font-semibold text-white">MFA Status</h2>
-                            <p className="text-sm text-slate-400 mt-1">
-                                Tenant policy: <span className="font-medium text-slate-300">{status.tenantMfaPolicy}</span>
+                            <h2 className="text-lg font-semibold text-content-emphasis">MFA Status</h2>
+                            <p className="text-sm text-content-muted mt-1">
+                                Tenant policy: <span className="font-medium text-content-default">{status.tenantMfaPolicy}</span>
                             </p>
                         </div>
                         <div>
@@ -181,7 +186,7 @@ export default function UserMfaPage() {
                                     Enrolled
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-slate-700/50 text-slate-400 border border-slate-600">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-bg-elevated/50 text-content-muted border border-border-emphasis">
                                     Not Enrolled
                                 </span>
                             )}
@@ -189,7 +194,7 @@ export default function UserMfaPage() {
                     </div>
 
                     {status.isVerified && status.verifiedAt && (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-content-subtle">
                             Enrolled since {formatDate(status.verifiedAt)}
                         </p>
                     )}
@@ -234,11 +239,11 @@ export default function UserMfaPage() {
             {step === 'enrolling' && enrollment && (
                 <div className="glass-card p-6 space-y-5">
                     <div>
-                        <h2 className="text-lg font-semibold text-white mb-1">Set Up Authenticator App</h2>
-                        <p className="text-sm text-slate-400">
+                        <h2 className="text-lg font-semibold text-content-emphasis mb-1">Set Up Authenticator App</h2>
+                        <p className="text-sm text-content-muted">
                             1. Open your authenticator app (Google Authenticator, Authy, 1Password, etc.)
                         </p>
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-content-muted">
                             2. Scan this QR code or manually enter the setup key
                         </p>
                     </div>
@@ -251,14 +256,14 @@ export default function UserMfaPage() {
                                 <QrCode className="w-full sm:w-32 h-32 text-slate-800" />
                             </div>
                         </div>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-content-subtle">
                             If you cannot scan, use the setup key below
                         </p>
                     </div>
 
                     {/* Setup Key */}
-                    <div className="p-4 rounded-lg border border-slate-700 bg-slate-800/50">
-                        <label className="text-xs text-slate-400 block mb-1">Setup Key</label>
+                    <div className="p-4 rounded-lg border border-border-default bg-bg-default/50">
+                        <label className="text-xs text-content-muted block mb-1">Setup Key</label>
                         <div className="flex items-center gap-2">
                             <code className="text-sm font-mono text-brand-300 tracking-wider break-all flex-1">
                                 {enrollment.secret}
@@ -266,7 +271,6 @@ export default function UserMfaPage() {
                             <button
                                 onClick={copySecret}
                                 className="btn btn-secondary text-xs shrink-0"
-                                title="Copy to clipboard"
                             >
                                 {copied ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                                 {copied ? 'Copied!' : 'Copy'}
@@ -276,7 +280,7 @@ export default function UserMfaPage() {
 
                     {/* Verification */}
                     <div>
-                        <h3 className="text-sm font-semibold text-white mb-2">
+                        <h3 className="text-sm font-semibold text-content-emphasis mb-2">
                             3. Enter the 6-digit code from your authenticator app
                         </h3>
                         <div className="flex gap-2">
@@ -304,7 +308,7 @@ export default function UserMfaPage() {
 
                     <button
                         onClick={() => { setStep('status'); setEnrollment(null); setCode(''); }}
-                        className="text-xs text-slate-500 hover:text-slate-300 transition"
+                        className="text-xs text-content-subtle hover:text-content-default transition"
                     >
                         Cancel enrollment
                     </button>

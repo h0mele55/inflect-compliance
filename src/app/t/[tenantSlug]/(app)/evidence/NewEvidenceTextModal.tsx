@@ -25,6 +25,7 @@ import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
 import { queryKeys } from '@/lib/queryKeys';
+import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
 interface ControlOption {
     id: string;
@@ -107,18 +108,24 @@ export function NewEvidenceTextModal({
             }
             return res.json();
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries({
                 queryKey: queryKeys.evidence.all(tenantSlug),
+            });
+            telemetry.trackSuccess({
+                evidenceId: (data as { id?: string })?.id,
             });
             close();
         },
         onError: (err) => {
+            telemetry.trackError(err);
             setError(
                 err instanceof Error ? err.message : 'Failed to create evidence',
             );
         },
     });
+
+    const telemetry = useFormTelemetry('NewEvidenceTextModal');
 
     const canSubmit =
         form.title.trim().length > 0 && !mutation.isPending;
@@ -127,6 +134,10 @@ export function NewEvidenceTextModal({
         e.preventDefault();
         if (!canSubmit) return;
         setError('');
+        telemetry.trackSubmit({
+            hasControlLink: Boolean(form.controlId),
+            contentLength: form.content?.length ?? 0,
+        });
         mutation.mutate(form);
     };
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { Shield, CheckCircle, XCircle, AlertTriangle, ExternalLink, Trash2, Save, Eye, EyeOff } from 'lucide-react';
+import { InfoTooltip } from '@/components/ui/tooltip';
 
 interface SsoProvider {
     id: string;
@@ -236,9 +237,9 @@ export default function SsoAdminPage() {
             <div className="space-y-6 animate-fadeIn">
                 <h1 className="text-2xl font-bold">SSO &amp; Identity</h1>
                 <div className="glass-card p-8 space-y-4">
-                    <div className="h-4 bg-slate-700/50 rounded w-1/3 animate-pulse" />
-                    <div className="h-4 bg-slate-700/50 rounded w-2/3 animate-pulse" />
-                    <div className="h-4 bg-slate-700/50 rounded w-1/2 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/50 rounded w-1/3 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/50 rounded w-2/3 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/50 rounded w-1/2 animate-pulse" />
                 </div>
             </div>
         );
@@ -252,7 +253,7 @@ export default function SsoAdminPage() {
                     <Shield className="w-6 h-6 text-brand-400" />
                     SSO &amp; Identity
                 </h1>
-                <p className="text-sm text-slate-400 mt-1">
+                <p className="text-sm text-content-muted mt-1">
                     Configure enterprise single sign-on for your workspace.
                 </p>
             </div>
@@ -299,7 +300,7 @@ export default function SsoAdminPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Provider name */}
                     <div>
-                        <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
+                        <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">
                             Provider Name
                         </label>
                         <input
@@ -313,7 +314,7 @@ export default function SsoAdminPage() {
 
                     {/* Email domains */}
                     <div>
-                        <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">
+                        <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">
                             Email Domains
                         </label>
                         <input
@@ -323,7 +324,7 @@ export default function SsoAdminPage() {
                             placeholder="acme.com, acme.io"
                             className="input w-full"
                         />
-                        <span className="text-xs text-slate-500 mt-0.5">Comma-separated</span>
+                        <span className="text-xs text-content-subtle mt-0.5">Comma-separated</span>
                     </div>
                 </div>
 
@@ -331,7 +332,7 @@ export default function SsoAdminPage() {
                 {tab === 'OIDC' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">Issuer URL</label>
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">Issuer URL</label>
                             <input
                                 id="sso-oidc-issuer"
                                 value={oidcIssuer}
@@ -341,7 +342,7 @@ export default function SsoAdminPage() {
                             />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">Client ID</label>
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">Client ID</label>
                             <input
                                 id="sso-oidc-client-id"
                                 value={oidcClientId}
@@ -351,7 +352,7 @@ export default function SsoAdminPage() {
                             />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">Client Secret</label>
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">Client Secret</label>
                             <div className="relative">
                                 <input
                                     id="sso-oidc-client-secret"
@@ -364,14 +365,14 @@ export default function SsoAdminPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowSecret(!showSecret)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-emphasis"
                                 >
                                     {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                             </div>
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">Scopes</label>
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">Scopes</label>
                             <input
                                 id="sso-oidc-scopes"
                                 value={oidcScopes}
@@ -384,7 +385,7 @@ export default function SsoAdminPage() {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div>
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">IdP Entity ID</label>
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">IdP Entity ID</label>
                             <input
                                 id="sso-saml-entity-id"
                                 value={samlEntityId}
@@ -394,7 +395,7 @@ export default function SsoAdminPage() {
                             />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">SSO URL</label>
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">SSO URL</label>
                             <input
                                 id="sso-saml-sso-url"
                                 value={samlSsoUrl}
@@ -404,7 +405,7 @@ export default function SsoAdminPage() {
                             />
                         </div>
                         <div className="md:col-span-2">
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">X.509 Certificate</label>
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">X.509 Certificate</label>
                             <textarea
                                 id="sso-saml-certificate"
                                 value={samlCertificate}
@@ -415,7 +416,14 @@ export default function SsoAdminPage() {
                             />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">NameID Format (optional)</label>
+                            <div className="mb-1 flex items-center gap-1.5">
+                                <label className="text-xs text-content-muted uppercase tracking-wider">NameID Format (optional)</label>
+                                <InfoTooltip
+                                    aria-label="About NameID format"
+                                    iconClassName="h-3.5 w-3.5"
+                                    content="Leave empty if your IdP issues email-format NameIDs (the common case). Override only if your IdP uses a non-standard URN — check the IdP's SAML attribute mapping."
+                                />
+                            </div>
                             <input
                                 id="sso-saml-nameid"
                                 value={samlNameIdFormat}
@@ -425,20 +433,20 @@ export default function SsoAdminPage() {
                             />
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 uppercase tracking-wider mb-1 block">ACS URL (your callback)</label>
+                            <label className="text-xs text-content-muted uppercase tracking-wider mb-1 block">ACS URL (your callback)</label>
                             <input
                                 readOnly
                                 value={typeof window !== 'undefined'
                                     ? `${window.location.origin}/api/auth/sso/saml/callback`
                                     : '/api/auth/sso/saml/callback'}
-                                className="input w-full text-xs text-slate-500 cursor-not-allowed"
+                                className="input w-full text-xs text-content-subtle cursor-not-allowed"
                             />
                         </div>
                     </div>
                 )}
 
                 {/* Toggles */}
-                <div className="flex items-center gap-6 mt-6 pt-4 border-t border-slate-700/50">
+                <div className="flex items-center gap-6 mt-6 pt-4 border-t border-border-default/50">
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input
                             type="checkbox"
@@ -447,7 +455,7 @@ export default function SsoAdminPage() {
                             className="accent-brand-500"
                             id="sso-enabled"
                         />
-                        <span className="text-sm text-white">Enable SSO</span>
+                        <span className="text-sm text-content-emphasis">Enable SSO</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -457,8 +465,13 @@ export default function SsoAdminPage() {
                             className="accent-amber-500"
                             id="sso-enforced"
                         />
-                        <span className="text-sm text-white">Enforce SSO</span>
-                        <span className="text-xs text-slate-500">(disables local login)</span>
+                        <span className="text-sm text-content-emphasis">Enforce SSO</span>
+                        <span className="text-xs text-content-subtle">(disables local login)</span>
+                        <InfoTooltip
+                            aria-label="About SSO enforcement"
+                            iconClassName="h-3.5 w-3.5"
+                            content="Everyone must sign in via your IdP once this saves. Local-password admins keep break-glass access — confirm at least one admin has a working password before enabling."
+                        />
                     </label>
                 </div>
 
@@ -510,9 +523,9 @@ export default function SsoAdminPage() {
             </div>
 
             {/* Info card */}
-            <div className="glass-card p-4 border border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white mb-2">How SSO works</h3>
-                <ul className="text-xs text-slate-400 space-y-1.5">
+            <div className="glass-card p-4 border border-border-default/50">
+                <h3 className="text-sm font-semibold text-content-emphasis mb-2">How SSO works</h3>
+                <ul className="text-xs text-content-muted space-y-1.5">
                     <li>• Users must already have an account and tenant membership to login via SSO</li>
                     <li>• SSO links are created automatically on first successful login</li>
                     <li>• When enforced, only admins with a local password can bypass SSO (break-glass)</li>

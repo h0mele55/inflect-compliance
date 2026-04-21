@@ -78,8 +78,16 @@ export function FilterSelect({
 
   const [isOpen, setIsOpen] = useState(false);
 
+  // Epic 57 — `F` on any list page opens the first FilterSelect
+  // trigger. The hook blocks the shortcut inside text inputs and any
+  // open overlay automatically; `enabled: !isOpen` keeps a no-op press
+  // from stealing keyboard focus while the filter panel is already
+  // mounted. `scope: 'global'` is explicit (default) so the palette
+  // can surface this as an app-wide binding.
   useKeyboardShortcut("f", () => setIsOpen(true), {
     enabled: !isOpen,
+    scope: "global",
+    description: "Open filters",
   });
 
   const [search, setSearch] = useState("");

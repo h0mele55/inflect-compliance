@@ -23,6 +23,7 @@ import { useState } from "react";
 import { Button } from "../button";
 import { Popover } from "../popover";
 import { ScrollContainer } from "../scroll-container";
+import { Tooltip } from "../tooltip";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -145,19 +146,20 @@ export function EditColumnsButton<T>({
       }
       align="end"
     >
-      <Button
-        type="button"
-        className={cn(
-          "size-8 shrink-0 whitespace-nowrap rounded-lg p-0",
-          someHidden && "ring-brand-500/30 ring-1",
-          className,
-        )}
-        variant="outline"
-        icon={<Settings className="h-4 w-4 shrink-0" />}
-        title={title}
-        aria-label={title}
-        data-testid="edit-columns-button"
-      />
+      <Tooltip content={title}>
+        <Button
+          type="button"
+          className={cn(
+            "size-8 shrink-0 whitespace-nowrap rounded-lg p-0",
+            someHidden && "ring-brand-500/30 ring-1",
+            className,
+          )}
+          variant="outline"
+          icon={<Settings className="h-4 w-4 shrink-0" />}
+          aria-label={title}
+          data-testid="edit-columns-button"
+        />
+      </Tooltip>
     </Popover>
   );
 }

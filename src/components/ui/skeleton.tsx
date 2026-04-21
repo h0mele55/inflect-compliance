@@ -169,9 +169,14 @@ export function SkeletonDataTable({ rows = 8, cols = 8 }: { rows?: number; cols?
     );
 }
 
-// ─── Compact filter bar (pill-style) ───
+// ─── Filter toolbar skeleton (Epic 53) ───
+//
+// Mirrors the shape of `<FilterToolbar>`: search input on the left,
+// one filter trigger pill + one active-filter pill on the right. The
+// name mirrors the live toolbar component so call sites read
+// straightforwardly.
 
-export function SkeletonCompactFilterBar() {
+export function SkeletonFilterToolbar() {
     return (
         <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[180px] max-w-sm">

@@ -4,6 +4,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { FormField } from '@/components/ui/form-field';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
 const POLICY_CATEGORIES: ComboboxOption[] = [
     'Information Security',
@@ -56,11 +60,18 @@ export default function NewPolicyPage() {
         setCategory(tpl.category || '');
     };
 
+    const telemetry = useFormTelemetry('NewPolicyPage');
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title.trim()) return;
         setLoading(true);
         setError('');
+        telemetry.trackSubmit({
+            fromTemplate: Boolean(isTemplateMode && templateId),
+            hasCategory: Boolean(category),
+            contentLength: content?.length ?? 0,
+        });
 
         try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -84,9 +95,11 @@ export default function NewPolicyPage() {
             }
 
             const policy = await res.json();
+            telemetry.trackSuccess({ policyId: policy.id });
             router.push(tenantHref(`/policies/${policy.id}`));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
+            telemetry.trackError(err);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -95,7 +108,7 @@ export default function NewPolicyPage() {
 
     if (!tenant.permissions.canWrite) {
         return (
-            <div className="glass-card p-12 text-center text-slate-500 animate-fadeIn">
+            <div className="glass-card p-12 text-center text-content-subtle animate-fadeIn">
                 <p className="text-lg mb-2">Permission Denied</p>
                 <p className="text-sm">You do not have permission to create policies.</p>
             </div>
@@ -108,7 +121,7 @@ export default function NewPolicyPage() {
                 <h1 className="text-2xl font-bold">
                     {isTemplateMode ? 'New Policy from Template' : 'New Policy'}
                 </h1>
-                <p className="text-slate-400 text-sm mt-1">
+                <p className="text-content-muted text-sm mt-1">
                     {isTemplateMode
                         ? 'Select a template to start with pre-written content.'
                         : 'Create a blank policy and add content later.'}
@@ -116,7 +129,11 @@ export default function NewPolicyPage() {
             </div>
 
             {error && (
-                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                <div
+                    role="alert"
+                    className="p-3 rounded-lg border border-border-error bg-bg-error text-content-error text-sm"
+                    id="new-policy-error"
+                >
                     {error}
                 </div>
             )}
@@ -124,9 +141,9 @@ export default function NewPolicyPage() {
             {/* Template picker */}
             {isTemplateMode && (
                 <div className="glass-card p-4 space-y-3">
-                    <h3 className="text-sm font-semibold text-slate-300">Choose a Template</h3>
+                    <h3 className="text-sm font-semibold text-content-default">Choose a Template</h3>
                     {templates.length === 0 ? (
-                        <p className="text-sm text-slate-500">No templates available.</p>
+                        <p className="text-sm text-content-subtle">No templates available.</p>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
                             {templates.map(tpl => (
@@ -135,12 +152,12 @@ export default function NewPolicyPage() {
                                     type="button"
                                     onClick={() => selectTemplate(tpl)}
                                     className={`text-left p-3 rounded-lg border transition text-sm ${templateId === tpl.id
-                                        ? 'border-brand-500 bg-brand-500/10 text-white'
-                                        : 'border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-700/50'
+                                        ? 'border-brand-500 bg-brand-500/10 text-content-emphasis'
+                                        : 'border-border-default bg-bg-default/50 text-content-default hover:bg-bg-elevated/50'
                                         }`}
                                 >
                                     <p className="font-medium">{tpl.title}</p>
-                                    {tpl.category && <p className="text-xs text-slate-500 mt-0.5">{tpl.category}</p>}
+                                    {tpl.category && <p className="text-xs text-content-subtle mt-0.5">{tpl.category}</p>}
                                 </button>
                             ))}
                         </div>
@@ -149,29 +166,32 @@ export default function NewPolicyPage() {
             )}
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="glass-card p-6 space-y-4">
-                <div>
-                    <label className="input-label">Title *</label>
-                    <input
-                        className="input w-full"
+            <form onSubmit={handleSubmit} className="glass-card p-6 space-y-4" noValidate>
+                <FormField
+                    label="Title"
+                    required
+                    error={
+                        title.length > 0 && !title.trim()
+                            ? 'Title cannot be empty.'
+                            : undefined
+                    }
+                >
+                    <Input
+                        id="policy-title-input"
                         required
                         value={title}
                         onChange={e => setTitle(e.target.value)}
                         placeholder="e.g. Information Security Policy"
-                        id="policy-title-input"
                     />
-                </div>
-                <div>
-                    <label className="input-label">Description</label>
-                    <input
-                        className="input w-full"
+                </FormField>
+                <FormField label="Description">
+                    <Input
                         value={description}
                         onChange={e => setDescription(e.target.value)}
                         placeholder="Brief description of this policy"
                     />
-                </div>
-                <div>
-                    <label className="input-label">Category</label>
+                </FormField>
+                <FormField label="Category">
                     <Combobox
                         id="policy-category-select"
                         name="category"
@@ -184,20 +204,19 @@ export default function NewPolicyPage() {
                         buttonProps={{ className: 'w-full' }}
                         caret
                     />
-                </div>
+                </FormField>
 
                 {/* Initial content for blank mode only */}
                 {!isTemplateMode && (
-                    <div>
-                        <label className="input-label">Initial Content (Markdown)</label>
-                        <textarea
-                            className="input w-full min-h-[200px] font-mono text-sm"
+                    <FormField label="Initial Content (Markdown)">
+                        <Textarea
+                            id="policy-content-input"
+                            className="min-h-[200px] font-mono text-sm"
                             value={content}
                             onChange={e => setContent(e.target.value)}
                             placeholder="# Policy Content&#10;&#10;Write your policy here in Markdown..."
-                            id="policy-content-input"
                         />
-                    </div>
+                    </FormField>
                 )}
 
                 <div className="flex gap-2 pt-2">

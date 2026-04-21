@@ -27,10 +27,15 @@ describe('CSP Module', () => {
             expect(csp).toContain('script-src');
         });
 
-        it('includes nonce in style-src', () => {
+        it('style-src uses unsafe-inline (no nonce)', () => {
+            // Nonce in style-src invalidates 'unsafe-inline' per CSP L3,
+            // which would block every `style=""` attribute. Drop the
+            // nonce; <style> tags are already kept out by the style
+            // guardrail.
             const csp = buildCspHeader(nonce);
-            expect(csp).toContain(`style-src`);
-            expect(csp).toContain(`'nonce-${nonce}'`);
+            const styleSrc = csp.split(';').find(d => d.trim().startsWith('style-src'))!;
+            expect(styleSrc).toContain("'unsafe-inline'");
+            expect(styleSrc).not.toContain(`'nonce-${nonce}'`);
         });
 
         it('includes strict-dynamic for script-src', () => {
@@ -43,9 +48,19 @@ describe('CSP Module', () => {
             expect(csp).not.toContain("'unsafe-eval'");
         });
 
-        it('does NOT include unsafe-inline in production mode', () => {
+        it('does NOT include unsafe-inline in script-src in production mode', () => {
             const csp = buildCspHeader(nonce, false);
-            expect(csp).not.toContain("'unsafe-inline'");
+            const scriptSrc = csp.split(';').find(d => d.trim().startsWith('script-src'));
+            expect(scriptSrc).not.toContain("'unsafe-inline'");
+        });
+
+        it('DOES include unsafe-inline in style-src in production mode', () => {
+            // Style attributes can't be nonced (per CSP L3), so we
+            // accept 'unsafe-inline' on style-src. <style> tags stay
+            // nonce-gated because nonce takes precedence there.
+            const csp = buildCspHeader(nonce, false);
+            const styleSrc = csp.split(';').find(d => d.trim().startsWith('style-src'));
+            expect(styleSrc).toContain("'unsafe-inline'");
         });
 
         it('includes unsafe-eval in development mode for HMR', () => {

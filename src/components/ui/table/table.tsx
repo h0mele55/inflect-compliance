@@ -154,10 +154,17 @@ export function useTable<T extends any>(
               minSize: SELECT_COLUMN_WIDTH,
               size: SELECT_COLUMN_WIDTH,
               maxSize: SELECT_COLUMN_WIDTH,
+              // NB: outer wrapper is a <div>, not a <button>. Radix
+              // `Checkbox` renders an internal <button>, so nesting it
+              // inside <button> triggers a hydration mismatch
+              // ("<button> cannot be a descendant of <button>"). The
+              // inner Checkbox already owns keyboard focus; this
+              // wrapper exists only to widen the click target.
               header: ({ table }: { table: TableType<T> }) => (
-                <button
-                  type="button"
-                  className="flex size-full items-center justify-center"
+                <div
+                  role="button"
+                  tabIndex={-1}
+                  className="flex size-full cursor-pointer items-center justify-center"
                   onClick={(e) => {
                     e.stopPropagation();
                     table.toggleAllRowsSelected();
@@ -174,10 +181,10 @@ export function useTable<T extends any>(
                           : false
                     }
                   />
-                </button>
+                </div>
               ),
               cell: ({ row, table }: { row: Row<T>; table: TableType<T> }) => {
-                const onSelectRow = (e: MouseEvent<HTMLButtonElement>) => {
+                const onSelectRow = (e: MouseEvent<HTMLDivElement>) => {
                   e.stopPropagation();
                   const currentId = getRowId?.(row.original);
                   const rows = table.getRowModel().rows;
@@ -239,9 +246,10 @@ export function useTable<T extends any>(
                 };
 
                 return (
-                  <button
-                    type="button"
-                    className="flex size-full items-center justify-center"
+                  <div
+                    role="button"
+                    tabIndex={-1}
+                    className="flex size-full cursor-pointer items-center justify-center"
                     onClick={onSelectRow}
                     title="Select"
                   >
@@ -249,7 +257,7 @@ export function useTable<T extends any>(
                       className="border-slate-500 pointer-events-none size-4 rounded data-[state=checked]:bg-brand-600 data-[state=indeterminate]:bg-brand-600"
                       checked={row.getIsSelected()}
                     />
-                  </button>
+                  </div>
                 );
               },
             },

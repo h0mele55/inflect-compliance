@@ -21,7 +21,12 @@ import { loginAndGetTenant, safeGoto } from './e2e-utils';
  */
 
 test.describe('Epic 54 — Create Control modal', () => {
-    test.describe.configure({ mode: 'serial' });
+    // Each modal test gets its own fresh browser context. The default
+    // serial mode shares context across tests in this describe block,
+    // and Radix Dialog leaves residual portal/focus-trap state in the
+    // shared context that prevents the second open() from mounting the
+    // modal in `next dev`. Per-test contexts are slightly slower but
+    // make the suite deterministic.
 
     let tenantSlug: string;
 
@@ -34,16 +39,24 @@ test.describe('Epic 54 — Create Control modal', () => {
         await page.click('#new-control-btn');
 
         // Modal form fields become visible — no /controls/new navigation.
-        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 30_000 });
         expect(page.url()).toBe(listUrl);
+
+        // Close the modal so downstream serial-mode tests start with a
+        // clean overlay/focus-trap stack.
+        await page.click('#new-control-cancel-btn');
+        await expect(page.locator('#control-name-input')).toBeHidden({ timeout: 5000 });
     });
 
     test('Cancel closes the modal and leaves the list untouched', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls`);
+        // Reload to shake off any Radix overlay state left over from
+        // the previous test in this serial describe block.
+        await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#new-control-btn', { timeout: 15000 });
         await page.click('#new-control-btn');
-        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 30_000 });
 
         await page.click('#new-control-cancel-btn');
 
@@ -55,21 +68,36 @@ test.describe('Epic 54 — Create Control modal', () => {
     test('Create Control button is disabled until Name is filled', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls`);
-        await page.click('#new-control-btn');
-        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 5000 });
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        // Wait for the new-control-btn to be hydrated — without this
+        // the click can race the React event-handler attach and be
+        // dropped, leaving the modal closed.
+        const newBtn = page.locator('#new-control-btn');
+        await newBtn.waitFor({ state: 'visible', timeout: 15_000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await newBtn.click();
+        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 60_000 });
 
         await expect(page.locator('#create-control-btn')).toBeDisabled();
         await page.fill('#control-name-input', 'A');
         await expect(page.locator('#create-control-btn')).toBeEnabled();
         await page.fill('#control-name-input', '');
         await expect(page.locator('#create-control-btn')).toBeDisabled();
+
+        // Close so downstream tests don't inherit the dangling modal.
+        await page.click('#new-control-cancel-btn');
+        await expect(page.locator('#control-name-input')).toBeHidden({ timeout: 5000 });
     });
 
     test('submitting creates the control and navigates to the detail page', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls`);
-        await page.click('#new-control-btn');
-        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 5000 });
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        const newBtn2 = page.locator('#new-control-btn');
+        await newBtn2.waitFor({ state: 'visible', timeout: 15_000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await newBtn2.click();
+        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 60_000 });
 
         const uid = Date.now().toString(36);
         const name = `Modal E2E Control ${uid}`;

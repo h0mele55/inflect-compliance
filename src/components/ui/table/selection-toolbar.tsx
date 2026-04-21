@@ -11,6 +11,7 @@ import {
 } from "react";
 import { Checkbox } from "../checkbox";
 import { useKeyboardShortcut } from "../hooks/use-keyboard-shortcut";
+import { DynamicTooltipWrapper, Tooltip } from "../tooltip";
 
 // ── Batch Action Types ──────────────────────────────────────────────
 
@@ -112,19 +113,22 @@ export function renderBatchActions<T>(
     return (
       <>
         {actions.map((action) => (
-          <BatchActionButton
+          <DynamicTooltipWrapper
             key={action.label}
-            variant={action.variant}
-            icon={action.icon}
-            disabled={action.disabled}
-            title={action.title}
-            onClick={(e) => {
-              e.stopPropagation();
-              action.onClick(selectedRows);
-            }}
+            tooltipProps={action.title ? { content: action.title } : undefined}
           >
-            {action.label}
-          </BatchActionButton>
+            <BatchActionButton
+              variant={action.variant}
+              icon={action.icon}
+              disabled={action.disabled}
+              onClick={(e) => {
+                e.stopPropagation();
+                action.onClick(selectedRows);
+              }}
+            >
+              {action.label}
+            </BatchActionButton>
+          </DynamicTooltipWrapper>
         ))}
       </>
     );
@@ -150,10 +154,15 @@ export function SelectionToolbar<T>({
     if (selectedCount !== 0) setLastSelectedCount(selectedCount);
   }, [selectedCount]);
 
+  // Epic 57 — Escape clears the current row selection. Priority 2 so
+  // this beats the filter-list clear (priority 1) when both are
+  // active; both remain below any open overlay's native Escape (our
+  // global-scope hook is skipped while a modal/sheet is mounted).
   useKeyboardShortcut("Escape", () => table.resetRowSelection(), {
     enabled: selectedCount > 0,
-    priority: 2, // Take priority over clearing filters
-    modal: false,
+    priority: 2,
+    scope: "global",
+    description: "Clear selection",
   });
 
   return (
@@ -174,35 +183,43 @@ export function SelectionToolbar<T>({
       <div className="flex h-11 items-center py-2.5 pr-2">
         {/* Select-all / indeterminate checkbox */}
         <div className="relative flex h-full w-12 shrink-0 items-center justify-center">
-          <button
-            type="button"
-            className="absolute inset-0 flex items-center justify-center"
-            onClick={(e) => {
-              e.stopPropagation();
-              table.toggleAllRowsSelected();
-            }}
-            title={
+          <Tooltip
+            content={
               table.getIsAllRowsSelected()
                 ? "Deselect all"
                 : `Select all ${totalCount}`
             }
-            aria-label={
-              table.getIsAllRowsSelected()
-                ? "Deselect all rows"
-                : "Select all rows"
-            }
           >
-            <Checkbox
-              className="border-slate-500 pointer-events-none size-4 rounded data-[state=checked]:bg-brand-600 data-[state=indeterminate]:bg-brand-600"
-              checked={
+            {/* NB: <div role="button">, not <button>. Radix Checkbox
+                inside renders its own <button>, so a <button> wrapper
+                causes the "<button> cannot be a descendant of <button>"
+                hydration mismatch. */}
+            <div
+              role="button"
+              tabIndex={-1}
+              className="absolute inset-0 flex cursor-pointer items-center justify-center"
+              onClick={(e) => {
+                e.stopPropagation();
+                table.toggleAllRowsSelected();
+              }}
+              aria-label={
                 table.getIsAllRowsSelected()
-                  ? true
-                  : table.getIsSomeRowsSelected()
-                    ? "indeterminate"
-                    : false
+                  ? "Deselect all rows"
+                  : "Select all rows"
               }
-            />
-          </button>
+            >
+              <Checkbox
+                className="border-slate-500 pointer-events-none size-4 rounded data-[state=checked]:bg-brand-600 data-[state=indeterminate]:bg-brand-600"
+                checked={
+                  table.getIsAllRowsSelected()
+                    ? true
+                    : table.getIsSomeRowsSelected()
+                      ? "indeterminate"
+                      : false
+                }
+              />
+            </div>
+          </Tooltip>
         </div>
 
         {/* Count + actions */}
@@ -225,6 +242,7 @@ export function SelectionToolbar<T>({
           />
 
           {/* Clear selection button */}
+          <Tooltip content="Clear selection" shortcut="Esc">
           <button
             type="button"
             className={cn(
@@ -235,11 +253,11 @@ export function SelectionToolbar<T>({
               e.stopPropagation();
               table.resetRowSelection();
             }}
-            title="Clear selection (Esc)"
             aria-label="Clear selection"
           >
             Clear
           </button>
+          </Tooltip>
 
           {/* Pluggable batch action buttons */}
           <div

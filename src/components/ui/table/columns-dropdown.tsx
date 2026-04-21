@@ -36,6 +36,7 @@ import type { VisibilityState } from "@tanstack/react-table";
 import { Button } from "../button";
 import { Popover } from "../popover";
 import { ScrollContainer } from "../scroll-container";
+import { Tooltip } from "../tooltip";
 import { cn } from "./table-utils";
 
 export interface ColumnsDropdownColumn {
@@ -175,20 +176,21 @@ export function ColumnsDropdown({
                 </ScrollContainer>
             }
         >
-            <Button
-                type="button"
-                className={cn(
-                    "size-9 shrink-0 whitespace-nowrap rounded-lg p-0",
-                    someHidden && "ring-1 ring-brand-500/30",
-                    className,
-                )}
-                variant="outline"
-                icon={<Settings className="h-4 w-4 shrink-0" />}
-                title="Edit columns"
-                aria-label="Edit columns"
-                data-testid="edit-columns-button"
-                id={id}
-            />
+            <Tooltip content="Edit columns">
+                <Button
+                    type="button"
+                    className={cn(
+                        "size-9 shrink-0 whitespace-nowrap rounded-lg p-0",
+                        someHidden && "ring-1 ring-brand-500/30",
+                        className,
+                    )}
+                    variant="outline"
+                    icon={<Settings className="h-4 w-4 shrink-0" />}
+                    aria-label="Edit columns"
+                    data-testid="edit-columns-button"
+                    id={id}
+                />
+            </Tooltip>
         </Popover>
     );
 }

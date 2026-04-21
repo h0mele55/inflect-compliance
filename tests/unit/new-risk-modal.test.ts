@@ -200,7 +200,10 @@ describe('/risks/new — redirect compat shim', () => {
 
 describe('RisksClient — modal entry + auto-open', () => {
     it('imports NewRiskModal', () => {
-        expect(CLIENT_SRC).toMatch(/from ['"]\.\/NewRiskModal['"]/);
+        // Accept both static and dynamic imports (lazy-loading via next/dynamic)
+        const hasImport = /from ['"]\.\/NewRiskModal['"]/.test(CLIENT_SRC) ||
+            /import\(['"]\.\/NewRiskModal['"]\)/.test(CLIENT_SRC);
+        expect(hasImport).toBe(true);
     });
 
     it('turned #new-risk-btn into a modal trigger (no more Link)', () => {

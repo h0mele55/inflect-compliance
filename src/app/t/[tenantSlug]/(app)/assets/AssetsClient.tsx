@@ -127,7 +127,7 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
         {
             accessorKey: 'name',
             header: t.name,
-            cell: ({ getValue }: any) => <span className="font-medium text-white">{getValue()}</span>,
+            cell: ({ getValue }: any) => <span className="font-medium text-content-emphasis">{getValue()}</span>,
         },
         {
             accessorKey: 'type',
@@ -163,7 +163,7 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">{t.title}</h1>
-                    <p className="text-slate-400 text-sm">{assets.length} assets</p>
+                    <p className="text-content-muted text-sm">{assets.length} assets</p>
                 </div>
                 <div className="flex gap-2">
                     <Link href={tenantHref('/coverage')} className="btn btn-secondary">Coverage</Link>
