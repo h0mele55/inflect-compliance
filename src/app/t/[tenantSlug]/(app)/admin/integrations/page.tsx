@@ -193,7 +193,7 @@ export default function AdminIntegrationsPage() {
                 {webhookBaseUrl && (
                     <div className="glass-card p-4">
                         <p className="text-xs text-content-muted mb-1">Webhook Base URL</p>
-                        <code className="text-sm text-brand-400 font-mono">{webhookBaseUrl}/&#123;provider&#125;</code>
+                        <code className="text-sm text-[var(--brand-default)] font-mono">{webhookBaseUrl}/&#123;provider&#125;</code>
                     </div>
                 )}
 

@@ -208,7 +208,7 @@ export default function PolicyDetailPage() {
         if (v.contentType === 'EXTERNAL_LINK' && v.externalUrl) {
             return (
                 <a href={v.externalUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-brand-400 hover:text-brand-300 underline flex items-center gap-1">
+                    className="text-[var(--brand-default)] hover:text-[var(--brand-muted)] underline flex items-center gap-1">
                     {v.externalUrl}
                 </a>
             );
@@ -259,7 +259,7 @@ export default function PolicyDetailPage() {
         <div className="space-y-6 animate-fadeIn">
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-content-muted">
-                <Link href={tenantHref('/policies')} className="hover:text-brand-400 transition">Policies</Link>
+                <Link href={tenantHref('/policies')} className="hover:text-[var(--brand-default)] transition">Policies</Link>
                 <span>/</span>
                 <span className="text-content-emphasis truncate">{policy.title}</span>
             </div>
@@ -294,7 +294,7 @@ export default function PolicyDetailPage() {
                         </div>
                         {/* Review edit toggle */}
                         {canWrite && !editingReview && (
-                            <button onClick={() => setEditingReview(true)} className="text-xs text-brand-400 hover:text-brand-300 mt-2">
+                            <button onClick={() => setEditingReview(true)} className="text-xs text-[var(--brand-default)] hover:text-[var(--brand-muted)] mt-2">
                                 Edit review schedule
                             </button>
                         )}
@@ -338,7 +338,7 @@ export default function PolicyDetailPage() {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     <button key={t} onClick={() => setTab(t as any)}
                         id={`tab-${t}`}
-                        className={`px-4 py-2.5 text-sm font-medium transition border-b-2 ${tab === t ? 'border-brand-500 text-brand-400' : 'border-transparent text-content-muted hover:text-content-emphasis'
+                        className={`px-4 py-2.5 text-sm font-medium transition border-b-2 ${tab === t ? 'border-[var(--brand-default)] text-[var(--brand-default)]' : 'border-transparent text-content-muted hover:text-content-emphasis'
                             }`}>{tabLabels[t]}</button>
                 ))}
             </div>
@@ -380,7 +380,7 @@ export default function PolicyDetailPage() {
                             <div key={v.id} className="glass-card p-4 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <span className="text-sm font-semibold text-brand-400">v{v.versionNumber}</span>
+                                        <span className="text-sm font-semibold text-[var(--brand-default)]">v{v.versionNumber}</span>
                                         {isCurrentPublished && <span className="badge badge-success text-xs">Published</span>}
                                         {v.contentType === 'EXTERNAL_LINK' && <span className="badge badge-info text-xs">External Link</span>}
                                         <span className="text-xs text-content-subtle">
@@ -404,7 +404,7 @@ export default function PolicyDetailPage() {
                                 </div>
                                 {v.changeSummary && <p className="text-sm text-content-muted italic">{v.changeSummary}</p>}
                                 <details className="group">
-                                    <summary className="text-xs text-brand-400 cursor-pointer hover:text-brand-300">Show content</summary>
+                                    <summary className="text-xs text-[var(--brand-default)] cursor-pointer hover:text-[var(--brand-muted)]">Show content</summary>
                                     <div className="mt-2 border-t border-border-default pt-2">{renderVersionContent(v)}</div>
                                 </details>
                                 {vApprovals.length > 0 && (
@@ -455,7 +455,7 @@ export default function PolicyDetailPage() {
                         ]).map(opt => (
                             <button key={opt.key} onClick={() => setContentMode(opt.key)}
                                 className={`px-3 py-1.5 text-xs rounded-lg border transition ${contentMode === opt.key
-                                        ? 'border-brand-500 bg-brand-500/10 text-brand-400'
+                                        ? 'border-[var(--brand-default)] bg-[var(--brand-subtle)] text-[var(--brand-default)]'
                                         : 'border-border-default text-content-muted hover:text-content-emphasis'
                                     }`} id={`mode-${opt.key.toLowerCase()}`}>{opt.label}</button>
                         ))}
@@ -500,7 +500,7 @@ export default function PolicyDetailPage() {
                                 onChange={e => setSelectedFile(e.target.files?.[0] || null)}
                                 accept=".pdf,.doc,.docx,.txt,.md" />
                             {selectedFile && (
-                                <p className="text-xs text-brand-400 mt-1">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
+                                <p className="text-xs text-[var(--brand-default)] mt-1">{selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)</p>
                             )}
                         </div>
                     )}

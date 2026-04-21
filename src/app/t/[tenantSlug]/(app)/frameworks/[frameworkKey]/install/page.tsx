@@ -124,7 +124,7 @@ export default function InstallWizardPage() {
                     ) : (
                         <div className="space-y-2">
                             {packs.map(p => (
-                                <label key={p.key} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedPack === p.key ? 'border-brand-500 bg-brand-500/10' : 'border-border-default hover:border-border-emphasis'
+                                <label key={p.key} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedPack === p.key ? 'border-[var(--brand-default)] bg-[var(--brand-subtle)]' : 'border-border-default hover:border-border-emphasis'
                                     }`}>
                                     <input
                                         type="radio"
@@ -132,7 +132,7 @@ export default function InstallWizardPage() {
                                         value={p.key}
                                         checked={selectedPack === p.key}
                                         onChange={() => setSelectedPack(p.key)}
-                                        className="accent-brand-500"
+                                        className="accent-[var(--brand-default)]"
                                     />
                                     <div>
                                         <div className="text-sm font-medium text-content-emphasis">{p.name}</div>
@@ -152,7 +152,7 @@ export default function InstallWizardPage() {
                         <h2 className="text-lg font-semibold text-content-emphasis mb-4">Install Preview</h2>
                         <div className="grid grid-cols-3 gap-4 mb-4">
                             <div className="text-center p-3 rounded-lg bg-bg-default/50">
-                                <div className="text-2xl font-bold text-brand-400" id="preview-new-controls">{preview.newControls}</div>
+                                <div className="text-2xl font-bold text-[var(--brand-default)]" id="preview-new-controls">{preview.newControls}</div>
                                 <div className="text-xs text-content-muted">New Controls</div>
                             </div>
                             <div className="text-center p-3 rounded-lg bg-bg-default/50">
@@ -169,11 +169,11 @@ export default function InstallWizardPage() {
                         <div className="max-h-64 overflow-y-auto space-y-1 border-t border-border-default/50 pt-3">
                             {preview.templates?.map((t: any) => (
                                 <div key={t.code} className="flex items-center gap-3 px-3 py-1.5 rounded-md text-sm">
-                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.alreadyInstalled ? 'bg-emerald-500' : 'bg-brand-500'}`} />
+                                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.alreadyInstalled ? 'bg-emerald-500' : 'bg-[var(--brand-default)]'}`} />
                                     <code className="text-xs text-content-subtle font-mono w-24 flex-shrink-0">{t.code}</code>
                                     <span className="text-content-default flex-1">{t.title}</span>
                                     {t.alreadyInstalled && <span className="text-xs text-emerald-500">exists</span>}
-                                    {!t.alreadyInstalled && <span className="text-xs text-brand-400">{t.tasks} tasks</span>}
+                                    {!t.alreadyInstalled && <span className="text-xs text-[var(--brand-default)]">{t.tasks} tasks</span>}
                                 </div>
                             ))}
                         </div>
@@ -217,8 +217,8 @@ export default function InstallWizardPage() {
                             <div className="text-2xl font-bold text-emerald-400" id="result-controls">{result.controlsCreated}</div>
                             <div className="text-xs text-content-muted">Controls Created</div>
                         </div>
-                        <div className="p-3 rounded-lg bg-brand-500/10">
-                            <div className="text-2xl font-bold text-brand-400" id="result-tasks">{result.tasksCreated}</div>
+                        <div className="p-3 rounded-lg bg-[var(--brand-subtle)]">
+                            <div className="text-2xl font-bold text-[var(--brand-default)]" id="result-tasks">{result.tasksCreated}</div>
                             <div className="text-xs text-content-muted">Tasks Created</div>
                         </div>
                         <div className="p-3 rounded-lg bg-purple-500/10">

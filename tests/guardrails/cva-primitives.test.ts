@@ -42,8 +42,9 @@ describe('Button primitive', () => {
     });
 
     it('uses semantic tokens for primary variant', () => {
-        expect(variantsSrc).toMatch(/bg-brand-6[0-9]{2}/);
-        expect(variantsSrc).toMatch(/border-brand-6[0-9]{2}/);
+        // Primary button uses CSS variable-based brand colors for theme compatibility
+        expect(variantsSrc).toMatch(/--brand-emphasis/);
+        expect(variantsSrc).toMatch(/--brand-default/);
     });
 
     it('uses semantic tokens for secondary variant', () => {

@@ -237,7 +237,7 @@ function RoleForm({
                 <button
                     type="button"
                     onClick={() => setShowGrid(!showGrid)}
-                    className="flex items-center gap-1 text-sm text-brand-400 hover:text-brand-300 transition"
+                    className="flex items-center gap-1 text-sm text-[var(--brand-default)] hover:text-[var(--brand-muted)] transition"
                     id="toggle-permissions-btn"
                 >
                     {showGrid ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -412,7 +412,7 @@ export default function CustomRolesPage() {
         return (
             <div className="space-y-6 animate-fadeIn">
                 <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <Shield className="w-6 h-6 text-brand-400" />
+                    <Shield className="w-6 h-6 text-[var(--brand-default)]" />
                     Custom Roles
                 </h1>
                 <div className="glass-card p-8 space-y-4">
@@ -430,7 +430,7 @@ export default function CustomRolesPage() {
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <Shield className="w-6 h-6 text-brand-400" />
+                        <Shield className="w-6 h-6 text-[var(--brand-default)]" />
                         Custom Roles
                     </h1>
                     <p className="text-sm text-content-muted mt-1">
@@ -472,7 +472,7 @@ export default function CustomRolesPage() {
 
             {/* Create Form */}
             {showCreate && (
-                <div className="glass-card p-6 border border-brand-500/30" id="create-role-form">
+                <div className="glass-card p-6 border border-[var(--brand-default)]/30" id="create-role-form">
                     <h3 className="text-sm font-semibold text-content-emphasis mb-4">Create Custom Role</h3>
                     <RoleForm
                         onSubmit={handleCreate}

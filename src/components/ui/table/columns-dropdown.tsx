@@ -129,7 +129,7 @@ export function ColumnsDropdown({
                                             className={cn(
                                                 "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                                                 isVisible
-                                                    ? "border-brand-500 bg-brand-600 text-white"
+                                                    ? "border-[var(--brand-default)] bg-[var(--brand-emphasis)] text-white"
                                                     : "border-border-default bg-transparent",
                                             )}
                                         >
@@ -181,7 +181,7 @@ export function ColumnsDropdown({
                     type="button"
                     className={cn(
                         "size-9 shrink-0 whitespace-nowrap rounded-lg p-0",
-                        someHidden && "ring-1 ring-brand-500/30",
+                        someHidden && "ring-1 ring-[var(--brand-default)]/30",
                         className,
                     )}
                     variant="outline"

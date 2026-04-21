@@ -113,7 +113,7 @@ export default function RiskDashboardPage() {
                                     </div>
                                     <div className="h-2 bg-bg-default rounded-full overflow-hidden">
                                         <div
-                                            className="h-full rounded-full bg-gradient-to-r from-brand-500 to-purple-500 transition-all"
+                                            className="h-full rounded-full bg-gradient-to-r from-[var(--brand-default)] to-[var(--brand-muted)] transition-all"
                                             style={{ width: `${(count / total) * 100}%` }}
                                         />
                                     </div>

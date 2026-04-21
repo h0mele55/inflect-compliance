@@ -151,7 +151,7 @@ export function EditColumnsButton<T>({
           type="button"
           className={cn(
             "size-8 shrink-0 whitespace-nowrap rounded-lg p-0",
-            someHidden && "ring-brand-500/30 ring-1",
+            someHidden && "ring-[var(--brand-default)]/30 ring-1",
             className,
           )}
           variant="outline"

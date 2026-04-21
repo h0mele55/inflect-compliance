@@ -250,7 +250,7 @@ export default function SsoAdminPage() {
             {/* Header */}
             <div>
                 <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <Shield className="w-6 h-6 text-brand-400" />
+                    <Shield className="w-6 h-6 text-[var(--brand-default)]" />
                     SSO &amp; Identity
                 </h1>
                 <p className="text-sm text-content-muted mt-1">
@@ -452,7 +452,7 @@ export default function SsoAdminPage() {
                             type="checkbox"
                             checked={formEnabled}
                             onChange={(e) => setFormEnabled(e.target.checked)}
-                            className="accent-brand-500"
+                            className="accent-[var(--brand-default)]"
                             id="sso-enabled"
                         />
                         <span className="text-sm text-content-emphasis">Enable SSO</span>

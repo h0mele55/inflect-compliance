@@ -230,7 +230,7 @@ export default function TestRunPage() {
 
             {/* Complete Form — only if not completed */}
             {!isCompleted && permissions.canWrite && (
-                <div className="glass-card p-5 space-y-4 border-l-4 border-brand-500">
+                <div className="glass-card p-5 space-y-4 border-l-4 border-[var(--brand-default)]">
                     <h3 className="text-sm font-semibold text-content-emphasis">Complete This Test Run</h3>
 
                     <div>
@@ -357,7 +357,7 @@ export default function TestRunPage() {
                             <>
                                 <div>
                                     <label className="text-xs text-content-muted block mb-1">File</label>
-                                    <label className="flex flex-col items-center justify-center w-full p-4 border-2 border-dashed border-border-emphasis rounded-lg cursor-pointer hover:border-brand-500/50 transition-colors bg-bg-page/30">
+                                    <label className="flex flex-col items-center justify-center w-full p-4 border-2 border-dashed border-border-emphasis rounded-lg cursor-pointer hover:border-[var(--brand-default)]/50 transition-colors bg-bg-page/30">
                                         <input
                                             type="file"
                                             className="hidden"
@@ -370,7 +370,7 @@ export default function TestRunPage() {
                                         />
                                         {evFile ? (
                                             <div className="text-sm text-content-emphasis flex items-center gap-2">
-                                                <Paperclip className="w-4 h-4 text-brand-400" aria-hidden="true" />
+                                                <Paperclip className="w-4 h-4 text-[var(--brand-default)]" aria-hidden="true" />
                                                 <span>{evFile.name}</span>
                                                 <span className="text-xs text-content-subtle">({(evFile.size / 1024).toFixed(1)} KB)</span>
                                             </div>
@@ -428,7 +428,7 @@ export default function TestRunPage() {
                                             <span className="text-sm text-content-default">{ev.evidence.title}</span>
                                         )}
                                         {ev.url && (
-                                            <a href={ev.url} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-400 hover:underline truncate">
+                                            <a href={ev.url} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--brand-default)] hover:underline truncate">
                                                 {ev.url}
                                             </a>
                                         )}

@@ -117,7 +117,7 @@ function PoliciesPageInner({
             header: 'Title',
             cell: ({ row }: any) => (
                 <div>
-                    <Link href={tenantHref(`/policies/${row.original.id}`)} className="font-medium text-content-emphasis hover:text-brand-400 transition" onClick={(e) => e.stopPropagation()}>
+                    <Link href={tenantHref(`/policies/${row.original.id}`)} className="font-medium text-content-emphasis hover:text-[var(--brand-default)] transition" onClick={(e) => e.stopPropagation()}>
                         {row.original.title}
                     </Link>
                     {row.original.description && (

@@ -127,7 +127,7 @@ export default function TemplateLibraryPage() {
                     <div className="flex gap-3 mt-1 text-xs text-content-subtle">
                         <span>{templates.length} templates</span>
                         <span className="text-emerald-500">{installed} installed</span>
-                        <span className="text-brand-400">{available} available</span>
+                        <span className="text-[var(--brand-default)]">{available} available</span>
                     </div>
                 </div>
                 {selected.size > 0 && (
@@ -184,7 +184,7 @@ export default function TemplateLibraryPage() {
                     const isSelected = selected.has(t.code);
 
                     return (
-                        <div key={t.code} className={`glass-card transition-colors ${isSelected ? 'ring-1 ring-brand-500/50' : ''}`} id={`template-${t.code}`}>
+                        <div key={t.code} className={`glass-card transition-colors ${isSelected ? 'ring-1 ring-[var(--ring)]/50' : ''}`} id={`template-${t.code}`}>
                             <div className="flex items-start gap-3">
                                 {/* Checkbox */}
                                 {!t.installed && (
@@ -192,7 +192,7 @@ export default function TemplateLibraryPage() {
                                         type="checkbox"
                                         checked={isSelected}
                                         onChange={() => toggleSelect(t.code)}
-                                        className="mt-1 accent-brand-500"
+                                        className="mt-1 accent-[var(--brand-default)]"
                                     />
                                 )}
 
@@ -204,7 +204,7 @@ export default function TemplateLibraryPage() {
                                             className="text-left flex-1 min-w-0"
                                         >
                                             <div className="flex items-center gap-2">
-                                                <code className="text-xs text-brand-400 font-mono">{t.code}</code>
+                                                <code className="text-xs text-[var(--brand-default)] font-mono">{t.code}</code>
                                                 <span className="text-sm font-medium text-content-emphasis truncate">{t.title}</span>
                                                 {t.installed ? (
                                                     <span className="badge badge-success text-xs flex-shrink-0">Installed</span>
@@ -245,7 +245,7 @@ export default function TemplateLibraryPage() {
                                                 <div className="space-y-1">
                                                     {t.requirements.map((r: any, i: number) => (
                                                         <div key={i} className="flex items-center gap-2 text-xs">
-                                                            <code className="text-brand-400 font-mono">{r.code}</code>
+                                                            <code className="text-[var(--brand-default)] font-mono">{r.code}</code>
                                                             <span className="text-content-muted">{r.title}</span>
                                                             <span className="text-content-subtle">({r.framework.name})</span>
                                                         </div>

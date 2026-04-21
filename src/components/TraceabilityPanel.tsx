@@ -326,7 +326,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                         const c = l.control;
                                         return (
                                             <tr key={l.id} className={l.id?.startsWith('temp:') ? 'opacity-50 animate-pulse' : ''}>
-                                                <td className="font-mono text-xs text-brand-300">{c?.code || '—'}</td>
+                                                <td className="font-mono text-xs text-[var(--brand-muted)]">{c?.code || '—'}</td>
                                                 <td className="text-sm text-content-default">{c?.name || '—'}</td>
                                                 <td><span className="badge badge-info text-xs">{c?.status || '—'}</span></td>
                                                 <td className="text-xs text-content-muted">{l.rationale || '—'}</td>

@@ -406,7 +406,7 @@ function ControlsPageInner({
                 <div>
                     <Link
                         href={tenantHref(`/controls/${row.original.id}`)}
-                        className="font-medium text-content-emphasis hover:text-brand-400 transition"
+                        className="font-medium text-content-emphasis hover:text-[var(--brand-default)] transition"
                         id={`control-link-${row.original.id}`}
                         onClick={(e) => e.stopPropagation()}
                     >

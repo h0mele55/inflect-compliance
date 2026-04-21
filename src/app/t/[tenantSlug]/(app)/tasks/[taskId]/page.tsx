@@ -337,7 +337,7 @@ export default function TaskDetailPage() {
                 {tabs.map(t => (
                     <button
                         key={t.key}
-                        className={`px-4 py-2 text-sm font-medium transition border-b-2 ${tab === t.key ? 'border-brand-400 text-content-emphasis' : 'border-transparent text-content-muted hover:text-content-emphasis'}`}
+                        className={`px-4 py-2 text-sm font-medium transition border-b-2 ${tab === t.key ? 'border-[var(--brand-default)] text-content-emphasis' : 'border-transparent text-content-muted hover:text-content-emphasis'}`}
                         onClick={() => setTab(t.key)}
                         id={`tab-${t.key}`}
                     >
@@ -553,7 +553,7 @@ export default function TaskDetailPage() {
                         <div className="divide-y divide-border-default/50">
                             {activity.map((evt: any) => (
                                 <div key={evt.id} className="px-5 py-3 flex items-start gap-3">
-                                    <div className="w-2 h-2 rounded-full bg-brand-400 mt-2 shrink-0" />
+                                    <div className="w-2 h-2 rounded-full bg-[var(--brand-default)] mt-2 shrink-0" />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-0.5">
                                             <span className="text-sm font-medium text-content-emphasis">{evt.user?.name || 'System'}</span>

@@ -51,16 +51,16 @@ export default function DiffPage() {
                 </h1>
                 {diff && (
                     <p className="text-sm text-content-muted mt-1">
-                        Comparing <span className="text-brand-400">{diff.from.name} v{diff.from.version}</span>
+                        Comparing <span className="text-[var(--brand-default)]">{diff.from.name} v{diff.from.version}</span>
                         {' → '}
-                        <span className="text-brand-400">{diff.to.name} v{diff.to.version}</span>
+                        <span className="text-[var(--brand-default)]">{diff.to.name} v{diff.to.version}</span>
                     </p>
                 )}
             </div>
 
             {!fromKey && (
                 <div className="glass-card text-center py-8 text-content-muted">
-                    <p>Specify a <code className="text-brand-400">?from=FRAMEWORK_KEY</code> query parameter to compare.</p>
+                    <p>Specify a <code className="text-[var(--brand-default)]">?from=FRAMEWORK_KEY</code> query parameter to compare.</p>
                     <p className="text-xs mt-2 text-content-subtle">This page compares the &quot;from&quot; framework to this framework to show added/removed/changed requirements.</p>
                 </div>
             )}
@@ -111,7 +111,7 @@ export default function DiffPage() {
                         {activeTab === 'added' && diff.added.map((r: any, i: number) => (
                             <div key={i} className="glass-card flex items-center gap-3">
                                 <span className="text-emerald-500 text-lg font-bold">+</span>
-                                <code className="text-xs text-brand-400 font-mono w-28 flex-shrink-0">{r.code}</code>
+                                <code className="text-xs text-[var(--brand-default)] font-mono w-28 flex-shrink-0">{r.code}</code>
                                 <span className="text-sm text-content-default">{r.title}</span>
                                 {r.section && <span className="text-xs text-content-subtle ml-auto">{r.section}</span>}
                             </div>
@@ -130,7 +130,7 @@ export default function DiffPage() {
                             <div key={i} className="glass-card">
                                 <div className="flex items-center gap-3 mb-2">
                                     <span className="text-amber-500 text-lg font-bold">~</span>
-                                    <code className="text-xs text-brand-400 font-mono">{r.code}</code>
+                                    <code className="text-xs text-[var(--brand-default)] font-mono">{r.code}</code>
                                     <span className="text-xs text-content-subtle">Changed: {r.changes.join(', ')}</span>
                                 </div>
                                 <div className="ml-8 space-y-1">

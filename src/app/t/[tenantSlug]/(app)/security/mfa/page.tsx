@@ -132,7 +132,7 @@ export default function UserMfaPage() {
         return (
             <div className="space-y-6 animate-fadeIn">
                 <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <ShieldCheck className="w-6 h-6 text-brand-400" />
+                    <ShieldCheck className="w-6 h-6 text-[var(--brand-default)]" />
                     Multi-Factor Authentication
                 </h1>
                 <div className="glass-card p-8">
@@ -148,7 +148,7 @@ export default function UserMfaPage() {
     return (
         <div className="space-y-6 animate-fadeIn max-w-2xl">
             <h1 className="text-2xl font-bold flex items-center gap-2">
-                <ShieldCheck className="w-6 h-6 text-brand-400" />
+                <ShieldCheck className="w-6 h-6 text-[var(--brand-default)]" />
                 Multi-Factor Authentication
             </h1>
 
@@ -265,7 +265,7 @@ export default function UserMfaPage() {
                     <div className="p-4 rounded-lg border border-border-default bg-bg-default/50">
                         <label className="text-xs text-content-muted block mb-1">Setup Key</label>
                         <div className="flex items-center gap-2">
-                            <code className="text-sm font-mono text-brand-300 tracking-wider break-all flex-1">
+                            <code className="text-sm font-mono text-[var(--brand-muted)] tracking-wider break-all flex-1">
                                 {enrollment.secret}
                             </code>
                             <button

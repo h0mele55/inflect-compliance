@@ -145,7 +145,7 @@ function ScopePicker({
                                         className={`
                                             w-full text-left text-[11px] px-2 py-1 rounded transition
                                             ${isSelected
-                                                ? 'bg-brand-500/20 text-brand-300 border border-brand-500/40'
+                                                ? 'bg-[var(--brand-subtle)] text-[var(--brand-muted)] border border-[var(--brand-default)]/40'
                                                 : 'bg-bg-elevated/30 text-content-muted border border-transparent hover:border-border-emphasis'
                                             }
                                         `}
@@ -449,7 +449,7 @@ export default function ApiKeysPage() {
         return (
             <div className="space-y-6 animate-fadeIn">
                 <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <KeyRound className="w-6 h-6 text-brand-400" />
+                    <KeyRound className="w-6 h-6 text-[var(--brand-default)]" />
                     API Keys
                 </h1>
                 <div className="glass-card p-8 space-y-4">
@@ -466,7 +466,7 @@ export default function ApiKeysPage() {
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <KeyRound className="w-6 h-6 text-brand-400" />
+                        <KeyRound className="w-6 h-6 text-[var(--brand-default)]" />
                         API Keys
                     </h1>
                     <p className="text-sm text-content-muted mt-1">
@@ -514,7 +514,7 @@ export default function ApiKeysPage() {
 
             {/* Create Form */}
             {showCreate && (
-                <div className="glass-card p-6 border border-brand-500/30 space-y-4" id="create-key-form">
+                <div className="glass-card p-6 border border-[var(--brand-default)]/30 space-y-4" id="create-key-form">
                     <h3 className="text-sm font-semibold text-content-emphasis">Create API Key</h3>
 
                     <div>

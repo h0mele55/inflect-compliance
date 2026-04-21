@@ -135,7 +135,7 @@ export default function FrameworkDetailPage() {
 
                     {Object.entries(filteredGroups).map(([section, reqs]) => (
                         <div key={section} className="glass-card">
-                            <h3 className="text-sm font-semibold text-brand-300 mb-3">{section}</h3>
+                            <h3 className="text-sm font-semibold text-[var(--brand-muted)] mb-3">{section}</h3>
                             <div className="space-y-1">
                                 {(reqs as any[]).map((r: any) => {
                                     const isMapped = mappedReqCodes.has(r.code);
@@ -162,7 +162,7 @@ export default function FrameworkDetailPage() {
                                                     <p className="text-xs text-content-subtle mb-2">Mapped Controls:</p>
                                                     {controls.map((ctrl: any, i: number) => (
                                                         <div key={i} className="flex items-center gap-2 text-sm py-1">
-                                                            <code className="text-xs text-brand-400 font-mono">{ctrl.controlCode}</code>
+                                                            <code className="text-xs text-[var(--brand-default)] font-mono">{ctrl.controlCode}</code>
                                                             <span className="text-content-default">{ctrl.controlName}</span>
                                                             <span className={`badge text-xs ${ctrl.controlStatus === 'IMPLEMENTED' ? 'badge-success' : ctrl.controlStatus === 'IN_PROGRESS' ? 'badge-warning' : 'badge-primary'}`}>
                                                                 {ctrl.controlStatus}
@@ -235,13 +235,13 @@ export default function FrameworkDetailPage() {
                     <div className="glass-card">
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-semibold text-content-emphasis">Overall Coverage</h3>
-                            <span className={`text-2xl font-bold ${coverage.coveragePercent === 100 ? 'text-emerald-400' : 'text-brand-400'}`}>
+                            <span className={`text-2xl font-bold ${coverage.coveragePercent === 100 ? 'text-emerald-400' : 'text-[var(--brand-default)]'}`}>
                                 {coverage.coveragePercent}%
                             </span>
                         </div>
                         <div className="w-full h-3 rounded-full bg-bg-elevated/50 overflow-hidden">
                             <div
-                                className={`h-full rounded-full transition-all duration-1000 ${coverage.coveragePercent === 100 ? 'bg-emerald-500' : 'bg-brand-500'}`}
+                                className={`h-full rounded-full transition-all duration-1000 ${coverage.coveragePercent === 100 ? 'bg-emerald-500' : 'bg-[var(--brand-default)]'}`}
                                 style={{ width: `${coverage.coveragePercent}%` }}
                             />
                         </div>
@@ -260,7 +260,7 @@ export default function FrameworkDetailPage() {
                                         </div>
                                         <div className="w-full h-1.5 rounded-full bg-bg-elevated/50 overflow-hidden">
                                             <div
-                                                className={`h-full rounded-full ${s.coveragePercent === 100 ? 'bg-emerald-500' : s.coveragePercent > 0 ? 'bg-brand-500' : 'bg-border-emphasis'}`}
+                                                className={`h-full rounded-full ${s.coveragePercent === 100 ? 'bg-emerald-500' : s.coveragePercent > 0 ? 'bg-[var(--brand-default)]' : 'bg-border-emphasis'}`}
                                                 style={{ width: `${s.coveragePercent}%` }}
                                             />
                                         </div>

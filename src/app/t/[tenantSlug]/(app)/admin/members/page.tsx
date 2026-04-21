@@ -246,7 +246,7 @@ export default function MembersAdminPage() {
         return (
             <div className="space-y-6 animate-fadeIn">
                 <h1 className="text-2xl font-bold flex items-center gap-2 text-content-emphasis">
-                    <Users className="w-6 h-6 text-brand-400" />
+                    <Users className="w-6 h-6 text-[var(--brand-default)]" />
                     Members &amp; Roles
                 </h1>
                 <div className="glass-card p-8 space-y-4">
@@ -264,7 +264,7 @@ export default function MembersAdminPage() {
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <h1 className="text-2xl font-bold flex items-center gap-2 text-content-emphasis">
-                        <Users className="w-6 h-6 text-brand-400" />
+                        <Users className="w-6 h-6 text-[var(--brand-default)]" />
                         Members &amp; Roles
                     </h1>
                     <p className="text-sm text-content-muted mt-1">
@@ -304,7 +304,7 @@ export default function MembersAdminPage() {
 
             {/* Invite Form */}
             {showInvite && (
-                <div className="glass-card p-6 border border-brand-500/30" id="invite-form">
+                <div className="glass-card p-6 border border-[var(--brand-default)]/30" id="invite-form">
                     <h3 className="text-sm font-semibold text-content-emphasis mb-4">Invite a New Member</h3>
                     <div className="flex gap-3 items-end flex-wrap">
                         <div className="flex-1 min-w-[200px]">
@@ -384,7 +384,7 @@ export default function MembersAdminPage() {
                             <tr key={m.id} data-member-id={m.id}>
                                 <td className="text-sm font-medium text-content-emphasis">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center text-xs font-semibold">
+                                        <div className="w-7 h-7 rounded-full bg-[var(--brand-subtle)] text-[var(--brand-default)] flex items-center justify-center text-xs font-semibold">
                                             {(m.user.name || m.user.email).charAt(0).toUpperCase()}
                                         </div>
                                         {m.user.name || '—'}

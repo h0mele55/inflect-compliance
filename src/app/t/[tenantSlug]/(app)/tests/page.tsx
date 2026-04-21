@@ -91,8 +91,8 @@ export default function TestsRollupPage() {
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-brand-500/50 transition" onClick={() => setFilter('all')}>
-                    <div className="text-2xl font-bold text-brand-400">{plans.length}</div>
+                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition" onClick={() => setFilter('all')}>
+                    <div className="text-2xl font-bold text-[var(--brand-default)]">{plans.length}</div>
                     <div className="text-xs text-content-muted mt-1">Total Plans</div>
                 </div>
                 <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-red-500/50 transition" onClick={() => setFilter('due')}>
@@ -135,7 +135,7 @@ export default function TestsRollupPage() {
                         id: 'plan', header: 'Plan', accessorKey: 'name',
                         cell: ({ row }) => (
                             <div>
-                                <Link href={tenantHref(`/controls/${row.original.control.id}/tests/${row.original.id}`)} className="text-content-emphasis font-medium hover:text-brand-400 transition">
+                                <Link href={tenantHref(`/controls/${row.original.control.id}/tests/${row.original.id}`)} className="text-content-emphasis font-medium hover:text-[var(--brand-default)] transition">
                                     {row.original.name}
                                 </Link>
                                 <div className="flex items-center gap-1 mt-0.5">
@@ -181,7 +181,7 @@ export default function TestsRollupPage() {
                     {
                         id: 'actions', header: '',
                         cell: ({ row }) => (
-                            <Link href={tenantHref(`/controls/${row.original.control.id}/tests/${row.original.id}`)} className="text-xs text-brand-400 hover:underline">
+                            <Link href={tenantHref(`/controls/${row.original.control.id}/tests/${row.original.id}`)} className="text-xs text-[var(--brand-default)] hover:underline">
                                 View →
                             </Link>
                         ),

@@ -11,7 +11,7 @@ import { DataTable, createColumns } from '@/components/ui/table';
 
 const EVENT_CONFIG: Record<string, { label: string; icon: typeof Activity; color: string }> = {
     'checkout.session.completed': { label: 'Checkout completed', icon: CreditCard, color: 'text-emerald-400' },
-    'customer.subscription.created': { label: 'Subscription created', icon: CheckCircle, color: 'text-brand-400' },
+    'customer.subscription.created': { label: 'Subscription created', icon: CheckCircle, color: 'text-[var(--brand-default)]' },
     'customer.subscription.updated': { label: 'Subscription updated', icon: Activity, color: 'text-blue-400' },
     'customer.subscription.deleted': { label: 'Subscription canceled', icon: XCircle, color: 'text-red-400' },
     'invoice.payment_failed': { label: 'Payment failed', icon: AlertTriangle, color: 'text-red-400' },

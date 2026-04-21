@@ -208,7 +208,7 @@ export default function TestPlanDetailPage() {
             {/* Info Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 text-center">
-                    <div className="text-2xl font-bold text-brand-400">{plan._count?.runs ?? 0}</div>
+                    <div className="text-2xl font-bold text-[var(--brand-default)]">{plan._count?.runs ?? 0}</div>
                     <div className="text-xs text-content-muted mt-1">Total Runs</div>
                 </div>
                 <div className="glass-card p-4 text-center">
@@ -244,7 +244,7 @@ export default function TestPlanDetailPage() {
                     <ol className="space-y-2">
                         {plan.steps.map((step, i) => (
                             <li key={step.id} className="flex gap-3 text-sm">
-                                <span className="w-6 h-6 rounded-full bg-brand-500/20 text-brand-400 text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="w-6 h-6 rounded-full bg-[var(--brand-subtle)] text-[var(--brand-default)] text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
                                     {i + 1}
                                 </span>
                                 <div>

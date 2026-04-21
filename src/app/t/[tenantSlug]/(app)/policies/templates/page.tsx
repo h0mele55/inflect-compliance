@@ -100,7 +100,7 @@ export default function TemplatesPage() {
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="template-grid">
                     {filtered.map(tpl => (
-                        <div key={tpl.id} className="glass-card p-5 flex flex-col justify-between hover:ring-1 hover:ring-brand-500/30 transition">
+                        <div key={tpl.id} className="glass-card p-5 flex flex-col justify-between hover:ring-1 hover:ring-[var(--brand-default)]/30 transition">
                             <div>
                                 <h3 className="font-semibold text-content-emphasis text-sm mb-1">{tpl.title}</h3>
                                 <div className="flex gap-2 mb-2">

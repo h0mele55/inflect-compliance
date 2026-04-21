@@ -225,7 +225,7 @@ function ControlCoverageSection({ exec, href, t }: {
                 { label: 'Not Started', value: controlCoverage.notStarted, color: 'bg-border-emphasis' },
             ]}
             footer={
-                <Link href={href('/clauses')} className="text-brand-400 hover:text-brand-300">
+                <Link href={href('/clauses')} className="text-[var(--brand-default)] hover:text-[var(--brand-muted)]">
                     {t('viewAllClauses')}
                 </Link>
             }

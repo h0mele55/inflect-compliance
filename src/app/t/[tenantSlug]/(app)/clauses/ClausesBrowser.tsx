@@ -55,7 +55,7 @@ export function ClausesBrowser({ clauses: initialClauses, tenantSlug }: ClausesB
             <div className="lg:col-span-1 space-y-2">
                 {clauses.map(c => (
                     <button key={c.id} onClick={() => setSelected(c)}
-                        className={`w-full text-left glass-card p-4 hover:bg-bg-elevated/30 transition ${selected?.id === c.id ? 'ring-2 ring-brand-500' : ''}`}>
+                        className={`w-full text-left glass-card p-4 hover:bg-bg-elevated/30 transition ${selected?.id === c.id ? 'ring-2 ring-[var(--ring)]' : ''}`}>
                         <div className="flex items-center justify-between">
                             <span className="font-medium text-sm">{t('clause')} {c.number}</span>
                             <span className={`badge ${STATUS_COLORS[c.status]}`}>{statusLabel(c.status)}</span>
@@ -97,7 +97,7 @@ export function ClausesBrowser({ clauses: initialClauses, tenantSlug }: ClausesB
                             <div className="space-y-2">
                                 {selected.checklist?.map((item: string, i: number) => (
                                     <label key={i} className="flex items-start gap-2 text-sm text-content-default cursor-pointer group">
-                                        <input type="checkbox" className="mt-1 accent-brand-500" />
+                                        <input type="checkbox" className="mt-1 accent-[var(--brand-default)]" />
                                         <span className="group-hover:text-content-emphasis transition">{item}</span>
                                     </label>
                                 ))}

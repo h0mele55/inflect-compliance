@@ -113,7 +113,7 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
             header: 'Name',
             cell: ({ row }: any) => (
                 <div className="font-medium">
-                    <Link href={tenantHref(`/vendors/${row.original.id}`)} className="text-brand-400 hover:underline" id={`vendor-link-${row.original.id}`} onClick={(e) => e.stopPropagation()}>
+                    <Link href={tenantHref(`/vendors/${row.original.id}`)} className="text-[var(--brand-default)] hover:underline" id={`vendor-link-${row.original.id}`} onClick={(e) => e.stopPropagation()}>
                         {row.original.name}
                     </Link>
                     {row.original.isSubprocessor && <span className="ml-2 text-xs bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">Sub-processor</span>}

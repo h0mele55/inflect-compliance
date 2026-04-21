@@ -166,7 +166,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                                 <div className="flex-1 min-w-0">
                                     <Link
                                         href={tenantHref(`/controls/${controlId}/tests/${plan.id}`)}
-                                        className="text-sm font-medium text-white hover:text-brand-400 transition"
+                                        className="text-sm font-medium text-white hover:text-[var(--brand-default)] transition"
                                         id={`test-plan-link-${plan.id}`}
                                     >
                                         {plan.name}

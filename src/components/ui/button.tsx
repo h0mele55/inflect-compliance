@@ -122,7 +122,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             className={cn(
               "hidden rounded px-2 py-0.5 text-xs font-light transition-all duration-75 md:inline-block",
               {
-                "bg-brand-700 text-brand-200 group-hover:bg-brand-600":
+                "bg-[var(--brand-default)] text-white/70 group-hover:bg-[var(--brand-muted)]":
                   variant === "primary",
                 "bg-bg-elevated text-content-muted":
                   variant === "secondary" || variant === "outline",

@@ -149,7 +149,7 @@ export default function AdminSecurityPage() {
         return (
             <div className="space-y-6 animate-fadeIn">
                 <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <ShieldCheck className="w-6 h-6 text-brand-400" />
+                    <ShieldCheck className="w-6 h-6 text-[var(--brand-default)]" />
                     Security & MFA
                 </h1>
                 <div className="glass-card p-8">
@@ -167,7 +167,7 @@ export default function AdminSecurityPage() {
     return (
         <div className="space-y-6 animate-fadeIn">
             <h1 className="text-2xl font-bold flex items-center gap-2">
-                <ShieldCheck className="w-6 h-6 text-brand-400" />
+                <ShieldCheck className="w-6 h-6 text-[var(--brand-default)]" />
                 Security & MFA
             </h1>
 
@@ -207,7 +207,7 @@ export default function AdminSecurityPage() {
                             key={option.value}
                             className={`flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-all ${
                                 settings.mfaPolicy === option.value
-                                    ? 'border-brand-500/60 bg-brand-500/10'
+                                    ? 'border-[var(--brand-default)]/60 bg-[var(--brand-subtle)]'
                                     : 'border-border-default hover:border-border-emphasis'
                             }`}
                         >
@@ -217,11 +217,11 @@ export default function AdminSecurityPage() {
                                 value={option.value}
                                 checked={settings.mfaPolicy === option.value}
                                 onChange={() => setSettings(s => ({ ...s, mfaPolicy: option.value }))}
-                                className="mt-1 accent-brand-500"
+                                className="mt-1 accent-[var(--brand-default)]"
                             />
                             <div>
                                 <span className={`text-sm font-medium ${
-                                    settings.mfaPolicy === option.value ? 'text-brand-300' : 'text-content-emphasis'
+                                    settings.mfaPolicy === option.value ? 'text-[var(--brand-muted)]' : 'text-content-emphasis'
                                 }`}>
                                     {option.label}
                                     {option.value === 'REQUIRED' && (
@@ -314,10 +314,10 @@ export default function AdminSecurityPage() {
                     <button
                         onClick={handleRevokeMySessions}
                         disabled={revoking}
-                        className="p-4 border border-border-default rounded-lg hover:border-brand-500/50 transition text-left flex items-start gap-3 group"
+                        className="p-4 border border-border-default rounded-lg hover:border-[var(--brand-default)]/50 transition text-left flex items-start gap-3 group"
                         id="revoke-my-sessions-btn"
                     >
-                        <LogOut className="w-5 h-5 text-content-muted group-hover:text-brand-400 transition mt-0.5 shrink-0" />
+                        <LogOut className="w-5 h-5 text-content-muted group-hover:text-[var(--brand-default)] transition mt-0.5 shrink-0" />
                         <div>
                             <span className="text-sm font-medium text-content-emphasis">Sign Out Other Sessions</span>
                             <p className="text-xs text-content-subtle mt-1">Invalidate all your active sessions across devices.</p>

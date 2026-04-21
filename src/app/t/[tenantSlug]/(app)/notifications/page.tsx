@@ -23,7 +23,7 @@ export default function NotificationsPage() {
             <h1 className="text-2xl font-bold">{t('title')}</h1>
             <div className="space-y-2">
                 {notifications.map(n => (
-                    <div key={n.id} className={`glass-card p-4 flex items-start gap-3 ${!n.read ? 'border-l-2 border-brand-500' : 'opacity-60'}`}>
+                    <div key={n.id} className={`glass-card p-4 flex items-start gap-3 ${!n.read ? 'border-l-2 border-[var(--brand-default)]' : 'opacity-60'}`}>
                         <span className="text-lg"><AppIcon name={n.type === 'EVIDENCE' ? 'evidence' : n.type === 'FINDING' ? 'bug' : 'bell'} size={18} /></span>
                         <div className="flex-1">
                             <p className="text-sm text-content-emphasis">{n.message}</p>

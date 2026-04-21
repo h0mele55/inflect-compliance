@@ -15,13 +15,13 @@ export default function OnboardingBanner() {
     if (!permissions.canAdmin) return null;
 
     return (
-        <div className="glass-card p-5 border-brand-500/30 bg-gradient-to-r from-brand-600/10 to-purple-600/10">
+        <div className="glass-card p-5 border-[var(--brand-default)]/30 bg-gradient-to-r from-[var(--brand-subtle)] to-[var(--brand-subtle)]">
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--brand-emphasis)] to-[var(--brand-default)] flex items-center justify-center flex-shrink-0">
                     <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-white">Complete your setup</h3>
+                    <h3 className="text-sm font-semibold text-content-emphasis">Complete your setup</h3>
                     <p className="text-xs text-content-muted mt-0.5">Finish the onboarding wizard to configure your compliance workspace.</p>
                 </div>
                 <Link href={tenantHref('/onboarding')} className="btn btn-primary btn-sm flex-shrink-0" data-testid="onboarding-cta">

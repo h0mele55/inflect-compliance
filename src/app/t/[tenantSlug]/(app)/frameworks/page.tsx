@@ -64,7 +64,7 @@ export default async function FrameworksPage({
                     const coveragePercent = cov?.coveragePercent ?? 0;
 
                     return (
-                        <div key={fw.id} className="glass-card hover:border-brand-400/40 transition-all group relative overflow-hidden" id={`fw-card-${fw.key}`}>
+                        <div key={fw.id} className="glass-card hover:border-[var(--brand-default)]/40 transition-all group relative overflow-hidden" id={`fw-card-${fw.key}`}>
                             {/* Gradient accent */}
                             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${meta.color}`} />
 
@@ -72,7 +72,7 @@ export default async function FrameworksPage({
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <FwIcon className="w-6 h-6 text-content-emphasis" aria-hidden="true" />
-                                        <h2 className="text-lg font-semibold text-content-emphasis group-hover:text-brand-300 transition-colors">{fw.name}</h2>
+                                        <h2 className="text-lg font-semibold text-content-emphasis group-hover:text-[var(--brand-muted)] transition-colors">{fw.name}</h2>
                                     </div>
                                     <div className="flex items-center gap-2 mt-1">
                                         {fw.version && <span className="badge badge-primary text-xs">v{fw.version}</span>}
@@ -99,13 +99,13 @@ export default async function FrameworksPage({
                                 <div className="mt-3" id={`fw-coverage-${fw.key}`}>
                                     <div className="flex items-center justify-between text-xs mb-1">
                                         <span className="text-content-muted">Coverage</span>
-                                        <span className={coveragePercent === 100 ? 'text-emerald-400' : coveragePercent > 0 ? 'text-brand-400' : 'text-content-subtle'}>
+                                        <span className={coveragePercent === 100 ? 'text-emerald-400' : coveragePercent > 0 ? 'text-[var(--brand-default)]' : 'text-content-subtle'}>
                                             {coveragePercent}%
                                         </span>
                                     </div>
                                     <div className="w-full h-1.5 rounded-full bg-bg-elevated/50 overflow-hidden">
                                         <div
-                                            className={`h-full rounded-full transition-all duration-500 ${coveragePercent === 100 ? 'bg-emerald-500' : coveragePercent > 0 ? 'bg-brand-500' : 'bg-border-emphasis'
+                                            className={`h-full rounded-full transition-all duration-500 ${coveragePercent === 100 ? 'bg-emerald-500' : coveragePercent > 0 ? 'bg-[var(--brand-default)]' : 'bg-border-emphasis'
                                                 }`}
                                             style={{ width: `${coveragePercent}%` }}
                                         />

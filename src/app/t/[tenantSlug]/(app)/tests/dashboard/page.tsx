@@ -35,7 +35,7 @@ interface FrameworkReadiness {
 
 function ProgressBar({ value, color = 'brand' }: { value: number; color?: string }) {
     const colorMap: Record<string, string> = {
-        brand: 'bg-brand-500',
+        brand: 'bg-[var(--brand-default)]',
         green: 'bg-green-500',
         red: 'bg-red-500',
         amber: 'bg-amber-500',
@@ -43,7 +43,7 @@ function ProgressBar({ value, color = 'brand' }: { value: number; color?: string
     return (
         <div className="w-full bg-bg-elevated/50 rounded-full h-2.5">
             <div
-                className={`h-2.5 rounded-full transition-all duration-700 ${colorMap[color] || 'bg-brand-500'}`}
+                className={`h-2.5 rounded-full transition-all duration-700 ${colorMap[color] || 'bg-[var(--brand-default)]'}`}
                 style={{ width: `${Math.min(100, value)}%` }}
             />
         </div>
@@ -93,7 +93,7 @@ export default function TestDashboardPage() {
                             <button
                                 key={d}
                                 onClick={() => setPeriod(d)}
-                                className={`px-3 py-1 rounded text-xs font-medium transition ${period === d ? 'bg-brand-500 text-content-emphasis' : 'text-content-muted hover:text-content-emphasis'}`}
+                                className={`px-3 py-1 rounded text-xs font-medium transition ${period === d ? 'bg-[var(--brand-default)] text-content-emphasis' : 'text-content-muted hover:text-content-emphasis'}`}
                                 id={`period-${d}-btn`}
                             >
                                 {d}d
@@ -224,7 +224,7 @@ function MetricCard({ label, value, sub, color }: { label: string; value: string
         green: 'text-green-400',
         red: 'text-red-400',
         amber: 'text-amber-400',
-        brand: 'text-brand-400',
+        brand: 'text-[var(--brand-default)]',
     };
     return (
         <div className="glass-card p-4 text-center">

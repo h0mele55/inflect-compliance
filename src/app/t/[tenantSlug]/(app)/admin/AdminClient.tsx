@@ -96,7 +96,7 @@ export function AdminClient({ auditLog, tenantSlug, translations: t }: AdminClie
                     <p className="text-sm text-content-muted mb-4">{t.templateDescription}</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {templateKeys.map(key => (
-                            <div key={key} className="p-4 border border-border-default rounded-lg hover:border-brand-500 transition cursor-pointer">
+                            <div key={key} className="p-4 border border-border-default rounded-lg hover:border-[var(--brand-default)] transition cursor-pointer">
                                 <span className="text-sm font-medium text-content-emphasis">{t.templateLabels[key]}</span>
                                 <p className="text-xs text-content-subtle mt-1">{t.clickToUse}</p>
                             </div>

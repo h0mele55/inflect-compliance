@@ -52,7 +52,7 @@ export default function ProgressCard({
     label,
     value,
     max = 100,
-    gradient = 'from-brand-500 to-emerald-500',
+    gradient = 'from-[var(--brand-default)] to-emerald-500',
     segments,
     footer,
     className = '',

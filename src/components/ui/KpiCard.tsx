@@ -75,7 +75,7 @@ export default function KpiCard({
     value,
     format = 'number',
     icon: Icon,
-    gradient = 'from-brand-500 to-indigo-400',
+    gradient = 'from-[var(--brand-default)] to-[var(--brand-muted)]',
     subtitle,
     delta,
     deltaLabel,

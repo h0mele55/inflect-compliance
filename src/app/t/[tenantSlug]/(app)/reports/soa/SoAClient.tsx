@@ -238,7 +238,7 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-content-subtle" />
                     <input
                         type="text"
-                        className="w-full pl-8 pr-8 py-1.5 text-xs bg-bg-default/60 border border-border-emphasis/50 rounded-full text-content-emphasis placeholder-content-subtle focus:outline-none focus:border-brand-500/50 focus:ring-1 focus:ring-brand-500/20 transition-all"
+                        className="w-full pl-8 pr-8 py-1.5 text-xs bg-bg-default/60 border border-border-emphasis/50 rounded-full text-content-emphasis placeholder-content-subtle focus:outline-none focus:border-[var(--brand-default)]/50 focus:ring-1 focus:ring-[var(--brand-default)]/20 transition-all"
                         placeholder="Search by code or title…"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
@@ -482,7 +482,7 @@ function SoARow({
     return (
         <>
             <tr className={`${hasGap ? 'bg-red-500/5' : ''} cursor-pointer hover:bg-bg-elevated/30`} onClick={onToggle}>
-                <td className="text-xs font-mono text-brand-400">{entry.requirementCode}</td>
+                <td className="text-xs font-mono text-[var(--brand-default)]">{entry.requirementCode}</td>
                 <td className="text-sm text-content-emphasis">
                     <div>{entry.requirementTitle}</div>
                     {entry.section && <div className="text-[10px] text-content-subtle">{entry.section}</div>}
@@ -525,7 +525,7 @@ function SoARow({
                                     <div className="flex items-center gap-3">
                                         <a
                                             href={`/t/${tenantSlug}/controls/${c.controlId}`}
-                                            className="font-mono text-brand-400 hover:underline"
+                                            className="font-mono text-[var(--brand-default)] hover:underline"
                                             onClick={e => e.stopPropagation()}
                                         >
                                             {c.code || c.controlId.slice(0, 8)}

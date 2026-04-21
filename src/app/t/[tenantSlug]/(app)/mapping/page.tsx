@@ -33,7 +33,7 @@ export default function MappingPage() {
                     <div key={item.code} className="glass-card p-5">
                         <div className="flex items-center justify-between mb-2">
                             <div>
-                                <span className="text-xs font-mono text-brand-400 mr-2">{item.code}</span>
+                                <span className="text-xs font-mono text-[var(--brand-default)] mr-2">{item.code}</span>
                                 <span className="font-medium text-sm">{item.name}</span>
                             </div>
                             <span className="text-sm font-bold" style={{ color: item.coverage >= 80 ? '#22c55e' : item.coverage >= 50 ? '#f59e0b' : '#ef4444' }}>
@@ -43,7 +43,7 @@ export default function MappingPage() {
                         <p className="text-xs text-content-muted mb-3">{item.description}</p>
                         <div className="flex items-center gap-3">
                             <div className="flex-1 bg-bg-default rounded-full h-2 overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-brand-500 to-emerald-500 rounded-full transition-all" style={{ width: `${item.coverage}%` }} />
+                                <div className="h-full bg-gradient-to-r from-[var(--brand-default)] to-emerald-500 rounded-full transition-all" style={{ width: `${item.coverage}%` }} />
                             </div>
                             <span className="text-xs text-content-subtle">{t('controls', { implemented: item.implementedCount, total: item.controlCount })}</span>
                         </div>

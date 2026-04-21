@@ -158,7 +158,7 @@ export default async function BillingPage({
                 <section>
                     <h2 className="text-lg font-semibold mb-4">Upgrade</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="glass-card p-6 border border-brand-500/30 hover:border-brand-500/60 transition">
+                        <div className="glass-card p-6 border border-[var(--brand-default)]/30 hover:border-[var(--brand-default)]/60 transition">
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="text-content-emphasis font-semibold">Pro</h3>
                                 <span className="badge badge-info">Recommended</span>

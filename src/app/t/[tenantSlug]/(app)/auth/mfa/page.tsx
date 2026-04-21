@@ -112,8 +112,8 @@ export default function MfaChallengePage() {
         <div className="min-h-[60vh] flex items-center justify-center">
             <div className="glass-card p-8 max-w-md w-full space-y-5">
                 <div className="flex justify-center">
-                    <div className="w-16 h-16 rounded-full bg-brand-500/20 flex items-center justify-center">
-                        <ShieldCheck className="w-8 h-8 text-brand-400" />
+                    <div className="w-16 h-16 rounded-full bg-[var(--brand-subtle)] flex items-center justify-center">
+                        <ShieldCheck className="w-8 h-8 text-[var(--brand-default)]" />
                     </div>
                 </div>
 

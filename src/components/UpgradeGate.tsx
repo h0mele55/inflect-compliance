@@ -58,7 +58,7 @@ export function UpgradeGate({
             >
                 <Link
                     href={tenantHref('/admin/billing')}
-                    className="inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 transition whitespace-nowrap"
+                    className="inline-flex items-center gap-1.5 text-xs text-[var(--brand-default)] hover:text-[var(--brand-emphasis)] transition whitespace-nowrap"
                     aria-label={`${label} requires ${requiredPlan} plan — upgrade`}
                 >
                     <Lock className="w-3 h-3" />

@@ -271,7 +271,7 @@ function TasksPageInner({
                     const slaLabel = hydratedNow ? getSlaLabel(task.severity, task.createdAt, task.status, hydratedNow) : '';
                     return (
                         <div>
-                            <Link href={tenantHref(`/tasks/${task.id}`)} className="font-medium text-content-emphasis hover:text-brand-400 transition" onClick={(e) => e.stopPropagation()}>
+                            <Link href={tenantHref(`/tasks/${task.id}`)} className="font-medium text-content-emphasis hover:text-[var(--brand-default)] transition" onClick={(e) => e.stopPropagation()}>
                                 {task.key && <span className="text-xs font-mono text-content-subtle mr-2">{task.key}</span>}
                                 {task.title}
                             </Link>
@@ -360,8 +360,8 @@ function TasksPageInner({
 
             {/* Bulk Actions Toolbar */}
             {appPermissions.tasks.edit && selected.size > 0 && (
-                <div className="glass-card p-3 flex items-center gap-3 border border-brand-500/30" id="bulk-toolbar">
-                    <span className="text-sm text-brand-400 font-medium">{selected.size} selected</span>
+                <div className="glass-card p-3 flex items-center gap-3 border border-[var(--brand-default)]/30" id="bulk-toolbar">
+                    <span className="text-sm text-[var(--brand-default)] font-medium">{selected.size} selected</span>
                     <Combobox
                         hideSearch
                         id="bulk-action-select"

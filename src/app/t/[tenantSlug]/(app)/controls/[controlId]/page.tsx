@@ -610,7 +610,7 @@ export default function ControlDetailPage() {
                 {tabs.map(t => (
                     <button
                         key={t.key}
-                        className={`px-4 py-2 text-sm font-medium transition border-b-2 ${tab === t.key ? 'border-brand-400 text-content-emphasis' : 'border-transparent text-content-muted hover:text-content-emphasis'}`}
+                        className={`px-4 py-2 text-sm font-medium transition border-b-2 ${tab === t.key ? 'border-[var(--brand-default)] text-content-emphasis' : 'border-transparent text-content-muted hover:text-content-emphasis'}`}
                         onClick={() => setTab(t.key)}
                         id={`tab-${t.key}`}
                     >
@@ -709,7 +709,7 @@ export default function ControlDetailPage() {
                                     </Tooltip>
                                 )}
                                 {permissions.canWrite && (
-                                    <button className="text-xs text-brand-400 hover:underline" onClick={() => { setAutoEvidenceSource(control.evidenceSource || ''); setAutoKey(control.automationKey || ''); setEditingAutomation(!editingAutomation); }} id="edit-automation-btn">
+                                    <button className="text-xs text-[var(--brand-default)] hover:underline" onClick={() => { setAutoEvidenceSource(control.evidenceSource || ''); setAutoKey(control.automationKey || ''); setEditingAutomation(!editingAutomation); }} id="edit-automation-btn">
                                         {editingAutomation ? 'Cancel' : 'Edit'}
                                     </button>
                                 )}
@@ -1009,7 +1009,7 @@ export default function ControlDetailPage() {
                             <input
                                 ref={fileUploadRef}
                                 type="file"
-                                className="input w-full file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-brand-500 file:text-content-emphasis hover:file:bg-brand-400"
+                                className="input w-full file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-[var(--brand-default)] file:text-content-emphasis hover:file:bg-[var(--brand-default)]"
                                 onChange={e => setFileToUpload(e.target.files?.[0] || null)}
                                 required
                                 id="control-file-input"
@@ -1031,7 +1031,7 @@ export default function ControlDetailPage() {
                             )}
                             {fileUploading && (
                                 <div className="w-full bg-bg-elevated rounded-full h-2">
-                                    <div className="bg-brand-500 h-2 rounded-full transition-all" style={{ width: '60%' }} />
+                                    <div className="bg-[var(--brand-default)] h-2 rounded-full transition-all" style={{ width: '60%' }} />
                                 </div>
                             )}
                             <button type="submit" disabled={fileUploading || !fileToUpload} className="btn btn-primary" id="submit-control-upload">
@@ -1068,7 +1068,7 @@ export default function ControlDetailPage() {
                                             <tr key={`link-${el.id}`}>
                                                 <td><span className={`badge ${el.kind === 'FILE' ? 'badge-success' : 'badge-info'} text-xs`}>{el.kind}</span></td>
                                                 <td className="text-sm">
-                                                    {el.url ? <a href={el.url} target="_blank" rel="noopener noreferrer" className="text-brand-400 hover:underline">{el.url}</a> : (el.note || '—')}
+                                                    {el.url ? <a href={el.url} target="_blank" rel="noopener noreferrer" className="text-[var(--brand-default)] hover:underline">{el.url}</a> : (el.note || '—')}
                                                 </td>
                                                 <td className="text-xs text-content-muted">{el.createdBy?.name || '—'}</td>
                                                 <td className="text-xs text-content-muted">{el.createdAt ? formatDate(el.createdAt) : '—'}</td>
@@ -1086,7 +1086,7 @@ export default function ControlDetailPage() {
                                             <tr key={`ev-${ev.id}`}>
                                                 <td><span className={`badge ${ev.type === 'FILE' ? 'badge-success' : ev.type === 'TEXT' ? 'badge-neutral' : 'badge-info'} text-xs`}>{ev.type}</span></td>
                                                 <td className="text-sm">
-                                                    <Link href={tenantHref(`/evidence`)} className="text-brand-400 hover:underline">{ev.title}</Link>
+                                                    <Link href={tenantHref(`/evidence`)} className="text-[var(--brand-default)] hover:underline">{ev.title}</Link>
                                                 </td>
                                                 <td>
                                                     <span className={`badge text-xs ${ev.status === 'APPROVED' ? 'badge-success' : ev.status === 'REJECTED' ? 'badge-danger' : ev.status === 'SUBMITTED' ? 'badge-info' : 'badge-neutral'}`}>

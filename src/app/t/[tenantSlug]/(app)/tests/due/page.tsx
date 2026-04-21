@@ -116,7 +116,7 @@ export default function DueQueuePage() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-4">
                 <div className="glass-card p-4 text-center">
-                    <div className="text-2xl font-bold text-brand-400">{queue.length}</div>
+                    <div className="text-2xl font-bold text-[var(--brand-default)]">{queue.length}</div>
                     <div className="text-xs text-content-muted mt-1">Due / Due Soon</div>
                 </div>
                 <div className="glass-card p-4 text-center">
@@ -135,7 +135,7 @@ export default function DueQueuePage() {
                     {
                         id: 'plan', header: 'Plan', accessorKey: 'name',
                         cell: ({ row }) => (
-                            <Link href={tenantHref(`/controls/${row.original.controlId}/tests/${row.original.id}`)} className="text-content-emphasis font-medium hover:text-brand-400 transition">
+                            <Link href={tenantHref(`/controls/${row.original.controlId}/tests/${row.original.id}`)} className="text-content-emphasis font-medium hover:text-[var(--brand-default)] transition">
                                 {row.original.name}
                             </Link>
                         ),
