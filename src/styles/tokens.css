@@ -124,7 +124,7 @@
   /* ── Surfaces ──────────────────────────────────────────────────── */
   --bg-page:      #F4F2ED;                  /* warm off-white — app background */
   --bg-default:   #F8F6F3;                  /* warm off-white — cards, panels, modals */
-  --bg-muted:     #EDEAE4;                  /* warm light gray — hover, pressed */
+  --bg-muted:     #F0EDE7;                  /* warm light gray — hover, pressed */
   --bg-subtle:    rgba(139, 130, 118, 0.07); /* warm taupe @ 7% — selection, faint tints */
   --bg-elevated:  #FDFCFA;                  /* lightest off-white — tooltips, dropdowns above default */
   --bg-inverted:  #1A1A1A;                  /* near-black — primary button bg */
