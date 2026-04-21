@@ -47,18 +47,18 @@
     "nav": {
         "dashboard": "Dashboard",
         "clauses": "Clauses (4–10)",
-        "assets": "Assets",
+        "assets": "Asset",
         "risks": "Risk",
         "controls": "Control",
         "evidence": "Evidence",
-        "policies": "Policies",
+        "policies": "Policy",
         "audits": "Audits",
         "findings": "Findings",
         "issues": "Issues",
-        "tasks": "Tasks",
+        "tasks": "Task",
         "mapping": "Framework Map",
-        "reports": "Reports",
-        "notifications": "Notifications",
+        "reports": "Report",
+        "notifications": "Notify",
         "admin": "Admin"
     },
     "dashboard": {

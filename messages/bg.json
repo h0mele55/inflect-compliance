@@ -47,18 +47,18 @@
     "nav": {
         "dashboard": "Табло",
         "clauses": "Клаузи (4–10)",
-        "assets": "Активи",
+        "assets": "Актив",
         "risks": "Риск",
         "controls": "Контрол",
         "evidence": "Доказателства",
-        "policies": "Политики",
+        "policies": "Политика",
         "audits": "Одити",
         "findings": "Констатации",
         "issues": "Проблеми",
-        "tasks": "Задачи",
+        "tasks": "Задача",
         "mapping": "Рамки",
-        "reports": "Отчети",
-        "notifications": "Известия",
+        "reports": "Отчет",
+        "notifications": "Известие",
         "admin": "Администрация"
     },
     "dashboard": {
