@@ -1,0 +1,72 @@
+#
+# GHCR publish — fast-path build + push for Watchtower auto-deploy.
+#
+# Runs on every push to `main` (in parallel with CI). Pushes an
+# image tagged `:latest` and `:sha-<short>` to GHCR. The VM's
+# Watchtower container polls :latest and rolls the running app.
+#
+# Separate from the heavier `deploy.yml` pipeline (which gates on
+# CI + has staging/production environments) — this one exists purely
+# so `git push` → running in prod is ~5 min.
+#
+name: Publish image to GHCR
+
+on:
+    push:
+        branches: [main]
+    workflow_dispatch:
+
+concurrency:
+    group: ghcr-publish-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+    packages: write
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+    build-push:
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Log in to GHCR
+              uses: docker/login-action@v3
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Extract image tags
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  tags: |
+                      type=raw,value=latest
+                      type=sha,prefix=sha-,format=short
+                  # Lowercase is required by GHCR — metadata-action handles it
+                  # via the default `image` normalisation.
+                  flavor: |
+                      latest=false
+
+            - name: Build and push
+              uses: docker/build-push-action@v6
+              with:
+                  context: .
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+                  platforms: linux/amd64

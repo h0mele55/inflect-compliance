@@ -1,0 +1,139 @@
+#
+# Production Docker Compose for inflect-compliance.
+#
+# Runs on a single VM. Caddy terminates TLS (LE via sslip.io) and
+# proxies to the Next.js app. Postgres + PgBouncer + Redis + ClamAV
+# are internal-only (no host port publishing) so the only public
+# listeners are 80/443 on Caddy.
+#
+
+services:
+  # ── Postgres ──────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: inflect_compliance
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-roles.sh:/docker-entrypoint-initdb.d/01-init-roles.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inflect_compliance"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # ── PgBouncer ─────────────────────────────────────────────────
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: inflect_compliance
+      POOL_MODE: transaction
+      DEFAULT_POOL_SIZE: "25"
+      MAX_CLIENT_CONN: "200"
+      MAX_DB_CONNECTIONS: "50"
+      AUTH_TYPE: scram-sha-256
+      STATS_PERIOD: "60"
+      ADMIN_USERS: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # ── Redis ─────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # ── ClamAV ────────────────────────────────────────────────────
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    volumes:
+      - clamav-defs:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/clamdcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+
+  # ── App (Next.js) — auto-updated by Watchtower ────────────────
+  app:
+    image: ghcr.io/h0mele55/inflect-compliance:latest
+    restart: unless-stopped
+    pull_policy: always
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./.env.prod
+    volumes:
+      - app-uploads:/data/uploads
+    expose:
+      - "3000"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+  # ── Watchtower ────────────────────────────────────────────────
+  # Polls GHCR every 60s. Only containers with
+  # `com.centurylinklabs.watchtower.enable=true` are watched —
+  # Postgres / Redis / Caddy / ClamAV stay pinned.
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # GHCR auth — populated by `docker login ghcr.io` on the host.
+      - /root/.docker/config.json:/config.json:ro
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_POLL_INTERVAL: "60"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_NOTIFICATIONS_LEVEL: "info"
+    command: --label-enable --interval 60 --cleanup
+
+  # ── Caddy (TLS + reverse proxy) ───────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  pgdata:
+  redisdata:
+  clamav-defs:
+  app-uploads:
+  caddy-data:
+  caddy-config:
