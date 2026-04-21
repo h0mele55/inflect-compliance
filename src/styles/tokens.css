@@ -122,11 +122,11 @@
    ═══════════════════════════════════════════════════════════════════ */
 [data-theme="light"] {
   /* ── Surfaces ──────────────────────────────────────────────────── */
-  --bg-page:      #FAF9F7;                  /* warm off-white — app background */
-  --bg-default:   #FFFFFF;                  /* white — cards, panels, modals */
+  --bg-page:      #F4F2ED;                  /* warm off-white — app background */
+  --bg-default:   #FBFAF8;                  /* soft off-white — cards, panels, modals */
   --bg-muted:     #F3F1EE;                  /* warm light gray — hover, pressed */
   --bg-subtle:    rgba(139, 130, 118, 0.07); /* warm taupe @ 7% — selection, faint tints */
-  --bg-elevated:  #FFFFFF;                  /* white — tooltips, dropdowns above default */
+  --bg-elevated:  #FDFCFA;                  /* lightest off-white — tooltips, dropdowns above default */
   --bg-inverted:  #1A1A1A;                  /* near-black — primary button bg */
   --bg-overlay:   rgba(26, 26, 26, 0.45);   /* charcoal overlay — modals, drawers */
 
@@ -177,7 +177,7 @@
   --ring-default: rgba(208, 74, 2, 0.40);   /* brand-orange focus ring */
   --focus-ring:   rgba(208, 74, 2, 0.40);
   --ring:                   rgba(208, 74, 2, 0.40);
-  --ring-offset-background: #FFFFFF;
+  --ring-offset-background: #FBFAF8;
   --primary:                #D04A02;
 
   /* ── Glass (warm light variant) ─────────────────────────────────── */
