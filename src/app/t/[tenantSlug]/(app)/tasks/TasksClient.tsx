@@ -435,6 +435,7 @@ function TasksPageInner({
                 emptyState="No tasks found. Create a task to get started."
                 resourceName={(p) => p ? 'tasks' : 'task'}
                 data-testid="tasks-table"
+                className="hover:bg-bg-muted"
             />
         </div>
     );

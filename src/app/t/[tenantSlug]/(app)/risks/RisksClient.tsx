@@ -343,7 +343,10 @@ function RisksPageInner({
 
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="glass-card p-5 text-center">
+                <div
+                    className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition"
+                    onClick={() => filterCtx.clearAll()}
+                >
                     <p className="text-xs text-content-muted uppercase tracking-wider">{t.totalRisks}</p>
                     <p className="text-3xl font-bold mt-2">{total}</p>
                 </div>
@@ -351,7 +354,10 @@ function RisksPageInner({
                     <p className="text-xs text-content-muted uppercase tracking-wider">{t.avgScore}</p>
                     <p className="text-3xl font-bold mt-2 text-amber-400">{avgScore}</p>
                 </div>
-                <div className="glass-card p-5 text-center">
+                <div
+                    className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition"
+                    onClick={() => filterCtx.set('status', 'OPEN')}
+                >
                     <p className="text-xs text-content-muted uppercase tracking-wider">{t.openRisks}</p>
                     <p className="text-3xl font-bold mt-2 text-emerald-400">{openCount}</p>
                 </div>
@@ -424,6 +430,7 @@ function RisksPageInner({
                     onPaginationChange={pg.setPagination}
                     rowCount={risks.length}
                     data-testid="risks-table"
+                    className="hover:bg-bg-muted"
                 />
             )}
 

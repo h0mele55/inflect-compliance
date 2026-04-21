@@ -570,6 +570,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                 onPaginationChange={pg.setPagination}
                 rowCount={displayEvidence.length}
                 data-testid="evidence-table"
+                className="hover:bg-bg-muted"
             />
         </div>
     );

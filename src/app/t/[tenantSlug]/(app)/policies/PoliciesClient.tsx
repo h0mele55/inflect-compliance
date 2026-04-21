@@ -206,6 +206,7 @@ function PoliciesPageInner({
                 emptyState={hasActive ? 'No policies match your filters' : 'No policies found. Create your first policy to get started.'}
                 resourceName={(p) => p ? 'policies' : 'policy'}
                 data-testid="policies-table"
+                className="hover:bg-bg-muted"
             />
         </div>
     );

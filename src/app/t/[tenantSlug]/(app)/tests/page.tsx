@@ -40,7 +40,7 @@ export default function TestsRollupPage() {
 
     const [plans, setPlans] = useState<TestPlanSummary[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'due' | 'failed'>('all');
+    const [filter, setFilter] = useState<'all' | 'due' | 'failed' | 'passed'>('all');
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -67,6 +67,7 @@ export default function TestsRollupPage() {
     const filteredPlans = plans.filter(p => {
         if (filter === 'due') return p.nextDueAt && isOverdue(p.nextDueAt);
         if (filter === 'failed') return getLastResult(p) === 'FAIL';
+        if (filter === 'passed') return getLastResult(p) === 'PASS';
         return true;
     });
 
@@ -95,19 +96,19 @@ export default function TestsRollupPage() {
                     <div className="text-2xl font-bold text-[var(--brand-default)]">{plans.length}</div>
                     <div className="text-xs text-content-muted mt-1">Total Plans</div>
                 </div>
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-red-500/50 transition" onClick={() => setFilter('due')}>
+                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition" onClick={() => setFilter('due')}>
                     <div className={`text-2xl font-bold ${duePlans.length > 0 ? 'text-red-400' : 'text-green-400'}`}>
                         {duePlans.length}
                     </div>
                     <div className="text-xs text-content-muted mt-1">Overdue</div>
                 </div>
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-red-500/50 transition" onClick={() => setFilter('failed')}>
+                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition" onClick={() => setFilter('failed')}>
                     <div className={`text-2xl font-bold ${failedPlans.length > 0 ? 'text-red-400' : 'text-green-400'}`}>
                         {failedPlans.length}
                     </div>
                     <div className="text-xs text-content-muted mt-1">Last Failed</div>
                 </div>
-                <div className="glass-card p-4 text-center">
+                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition" onClick={() => setFilter('passed')}>
                     <div className="text-2xl font-bold text-green-400">
                         {plans.filter(p => getLastResult(p) === 'PASS').length}
                     </div>

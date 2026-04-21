@@ -123,8 +123,8 @@
 [data-theme="light"] {
   /* ── Surfaces ──────────────────────────────────────────────────── */
   --bg-page:      #F4F2ED;                  /* warm off-white — app background */
-  --bg-default:   #FBFAF8;                  /* soft off-white — cards, panels, modals */
-  --bg-muted:     #F3F1EE;                  /* warm light gray — hover, pressed */
+  --bg-default:   #F8F6F3;                  /* warm off-white — cards, panels, modals */
+  --bg-muted:     #EDEAE4;                  /* warm light gray — hover, pressed */
   --bg-subtle:    rgba(139, 130, 118, 0.07); /* warm taupe @ 7% — selection, faint tints */
   --bg-elevated:  #FDFCFA;                  /* lightest off-white — tooltips, dropdowns above default */
   --bg-inverted:  #1A1A1A;                  /* near-black — primary button bg */
@@ -177,11 +177,11 @@
   --ring-default: rgba(208, 74, 2, 0.40);   /* brand-orange focus ring */
   --focus-ring:   rgba(208, 74, 2, 0.40);
   --ring:                   rgba(208, 74, 2, 0.40);
-  --ring-offset-background: #FBFAF8;
+  --ring-offset-background: #F8F6F3;
   --primary:                #D04A02;
 
   /* ── Glass (warm light variant) ─────────────────────────────────── */
-  --glass-bg:     rgba(255, 255, 255, 0.85);
+  --glass-bg:     rgba(248, 246, 243, 0.85); /* tinted to --bg-default so .glass-card matches solid card surfaces */
   --glass-border: rgba(229, 226, 222, 0.50);
   --glass-blur:   12px;
 

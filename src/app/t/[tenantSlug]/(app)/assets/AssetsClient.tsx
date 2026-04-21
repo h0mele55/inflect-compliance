@@ -203,6 +203,7 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
                 emptyState={hasActive ? 'No assets match your filters' : t.noAssets}
                 resourceName={(p) => p ? 'assets' : 'asset'}
                 data-testid="assets-table"
+                className="hover:bg-bg-muted"
             />
         </>
     );

@@ -59,7 +59,7 @@ export function useNavSections(): NavSectionDef[] {
                 { href: tenantHref('/evidence'), label: t('evidence'), icon: Paperclip },
                 { href: tenantHref('/policies'), label: t('policies'), icon: FileText },
                 { href: tenantHref('/tasks'), label: t('tasks'), icon: ClipboardList },
-                { href: tenantHref('/tests'), label: 'Tests', icon: FlaskConical },
+                { href: tenantHref('/tests'), label: 'Test', icon: FlaskConical },
             ],
         },
         {

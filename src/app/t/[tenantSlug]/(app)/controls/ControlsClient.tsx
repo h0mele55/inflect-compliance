@@ -601,6 +601,7 @@ function ControlsPageInner({
                 onPaginationChange={pg.setPagination}
                 rowCount={controls.length}
                 data-testid="controls-table"
+                className="hover:bg-bg-muted"
                 // Enable row selection so the Epic 52 SelectionToolbar
                 // (and its Epic 56 Tooltip-wrapped Clear button) is
                 // reachable on this page. The current scope only needs
