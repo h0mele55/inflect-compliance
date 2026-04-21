@@ -111,3 +111,6 @@ cred-list.txt
 *.heapsnapshot
 *.cpuprofile
 *.pid
+
+# Claude Code runtime state
+.claude/
