@@ -1,5 +1,9 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // linux-musl-openssl-3.0.x → Alpine 3.19+ / node:22-alpine runtime.
+  // native → local dev. Both required for the image to run on any
+  // target without regenerating.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
