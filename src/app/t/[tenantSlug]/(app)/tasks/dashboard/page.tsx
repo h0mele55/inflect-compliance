@@ -145,6 +145,7 @@ export default function TaskDashboardPage() {
                                     <div className="w-2 h-2 rounded-full" style={{ background: STATUS_COLORS[key] }} />
                                     <span className="flex-1 text-content-muted">{label}</span>
                                     <span className="font-mono text-content-emphasis">{count}</span>
+                                    {/* chart-bypass-ok: categorical task-status distribution row; shared DistributionBar primitive is not in the platform yet. */}
                                     <div className="w-16 h-1.5 rounded-full bg-bg-elevated overflow-hidden">
                                         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: STATUS_COLORS[key] }} />
                                     </div>
@@ -166,6 +167,7 @@ export default function TaskDashboardPage() {
                                     <div className="w-2 h-2 rounded-full" style={{ background: SEVERITY_COLORS[key] }} />
                                     <span className="flex-1 text-content-muted">{label}</span>
                                     <span className="font-mono text-content-emphasis">{count}</span>
+                                    {/* chart-bypass-ok: categorical severity distribution row; shared DistributionBar primitive is not in the platform yet. */}
                                     <div className="w-16 h-1.5 rounded-full bg-bg-elevated overflow-hidden">
                                         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: SEVERITY_COLORS[key] }} />
                                     </div>

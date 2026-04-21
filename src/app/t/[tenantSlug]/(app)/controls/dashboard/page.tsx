@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import type { ControlDashboardDTO, ConsistencyCheckDTO } from '@/lib/dto';
 import { AppIcon } from '@/components/icons/AppIcon';
+import { ProgressBar } from '@/components/ui/progress-bar';
 
 const STATUS_COLORS: Record<string, string> = {
     NOT_STARTED: '#94a3b8', IN_PROGRESS: '#38bdf8', IMPLEMENTED: '#34d399', NEEDS_REVIEW: '#fbbf24',
@@ -91,9 +92,13 @@ export default function ControlsDashboard() {
                     <p className="text-xs text-content-subtle uppercase">Implementation Progress</p>
                     <p className="text-3xl font-bold text-emerald-400 mt-1" id="implementation-progress">{data.implementationProgress}%</p>
                     <p className="text-xs text-content-subtle mt-1">{data.implementedCount}/{data.applicableCount} applicable controls</p>
-                    <div className="w-full h-2 bg-bg-elevated rounded-full mt-2 overflow-hidden">
-                        <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${data.implementationProgress}%` }} />
-                    </div>
+                    <ProgressBar
+                        value={data.implementationProgress}
+                        variant={data.implementationProgress >= 80 ? 'success' : data.implementationProgress >= 50 ? 'warning' : 'error'}
+                        size="sm"
+                        aria-label="Control implementation progress"
+                        className="mt-2"
+                    />
                 </div>
                 <div className="glass-card p-4">
                     <p className="text-xs text-content-subtle uppercase">Overdue Tasks</p>
@@ -123,6 +128,7 @@ export default function ControlsDashboard() {
                                     <span className="text-content-muted">{STATUS_LABELS[status] || status}</span>
                                     <span className="text-content-emphasis font-medium">{String(count)}</span>
                                 </div>
+                                {/* chart-bypass-ok: categorical status-distribution row; shared DistributionBar primitive is not in the platform yet. */}
                                 <div className="w-full h-3 bg-bg-elevated rounded-full overflow-hidden">
                                     <div
                                         className="h-full rounded-full transition-all"

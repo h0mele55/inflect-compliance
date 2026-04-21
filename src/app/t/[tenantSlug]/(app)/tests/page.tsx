@@ -92,23 +92,23 @@ export default function TestsRollupPage() {
 
             {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition" onClick={() => setFilter('all')}>
+                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition" onClick={() => setFilter('all')}>
                     <div className="text-2xl font-bold text-[var(--brand-default)]">{plans.length}</div>
                     <div className="text-xs text-content-muted mt-1">Total Plans</div>
                 </div>
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition" onClick={() => setFilter('due')}>
+                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition" onClick={() => setFilter('due')}>
                     <div className={`text-2xl font-bold ${duePlans.length > 0 ? 'text-red-400' : 'text-green-400'}`}>
                         {duePlans.length}
                     </div>
                     <div className="text-xs text-content-muted mt-1">Overdue</div>
                 </div>
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition" onClick={() => setFilter('failed')}>
+                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition" onClick={() => setFilter('failed')}>
                     <div className={`text-2xl font-bold ${failedPlans.length > 0 ? 'text-red-400' : 'text-green-400'}`}>
                         {failedPlans.length}
                     </div>
                     <div className="text-xs text-content-muted mt-1">Last Failed</div>
                 </div>
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition" onClick={() => setFilter('passed')}>
+                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition" onClick={() => setFilter('passed')}>
                     <div className="text-2xl font-bold text-green-400">
                         {plans.filter(p => getLastResult(p) === 'PASS').length}
                     </div>
@@ -196,6 +196,7 @@ export default function TestsRollupPage() {
                         emptyState={filter === 'all' ? 'No test plans found. Create test plans from the Control detail page.' : `No ${filter === 'due' ? 'overdue' : 'failed'} test plans.`}
                         resourceName={(p) => p ? 'test plans' : 'test plan'}
                         data-testid="tests-rollup-table"
+                        className="hover:bg-bg-muted"
                     />
                 );
             })()}

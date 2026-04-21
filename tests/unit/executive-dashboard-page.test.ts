@@ -74,9 +74,9 @@ describe('Dashboard Widget Composition', () => {
         expect(content).toContain('<DonutChart');
     });
 
-    test('uses TrendLine component', () => {
-        expect(content).toContain("from '@/components/ui/TrendLine'");
-        expect(content).toContain('<TrendLine');
+    test('uses TrendCard component (Epic 59 — TimeSeriesChart-backed)', () => {
+        expect(content).toContain("from '@/components/ui/TrendCard'");
+        expect(content).toContain('<TrendCard');
     });
 
     test('uses StatusBreakdown component', () => {

@@ -2,7 +2,9 @@
  * KpiCard — Reusable executive KPI stat card.
  *
  * Renders a headline numeric value with label, optional subtitle,
- * optional delta/trend indicator, and optional icon.
+ * optional delta/trend indicator, optional icon, and optional
+ * inline sparkline (Epic 59 `MiniAreaChart`) so an exec can read
+ * both the current number and the 30-day direction at a glance.
  *
  * Design language:
  *   - glass-card container with hover lift
@@ -19,10 +21,14 @@
  *     icon={ShieldCheck}
  *     gradient="from-emerald-500 to-teal-500"
  *     subtitle="15 of 20 implemented"
+ *     trend={[{ date, value }, ...]}
+ *     trendVariant="success"
  * />
  * ```
  */
 import { type LucideIcon } from 'lucide-react';
+
+import { MiniAreaChart, type MiniAreaChartVariant } from '@/components/ui/mini-area-chart';
 
 // ─── Props ──────────────────────────────────────────────────────────
 
@@ -49,6 +55,12 @@ export interface KpiCardProps {
     className?: string;
     /** Optional test-id */
     id?: string;
+    /** Optional sparkline data — ordered oldest→newest. Renders below the value row when provided. */
+    trend?: ReadonlyArray<{ date: Date; value: number }>;
+    /** Token-backed variant for the sparkline. Defaults to "brand". */
+    trendVariant?: MiniAreaChartVariant;
+    /** Override the sparkline's accessible label. Defaults to `${label} 30-day trend`. */
+    trendAriaLabel?: string;
 }
 
 // ─── Formatters ─────────────────────────────────────────────────────
@@ -81,6 +93,9 @@ export default function KpiCard({
     deltaLabel,
     className = '',
     id,
+    trend,
+    trendVariant = 'brand',
+    trendAriaLabel,
 }: KpiCardProps) {
     const formatted = formatValue(value, format);
     const isEmpty = value === null || value === undefined;
@@ -135,6 +150,17 @@ export default function KpiCard({
             {/* Subtitle */}
             {subtitle && (
                 <p className="text-xs text-content-subtle mt-1">{subtitle}</p>
+            )}
+
+            {/* Sparkline */}
+            {trend && trend.length > 0 && (
+                <div className="mt-2 h-8 w-full" data-kpi-trend>
+                    <MiniAreaChart
+                        data={trend}
+                        variant={trendVariant}
+                        aria-label={trendAriaLabel ?? `${label} 30-day trend`}
+                    />
+                </div>
             )}
         </div>
     );

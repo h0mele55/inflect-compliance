@@ -23,6 +23,7 @@ function BreakdownBar({ data, colors }: { data: Record<string, number>; colors: 
             {Object.entries(data).map(([key, count]) => (
                 <div key={key} className="flex items-center gap-2 text-sm">
                     <span className="w-20 text-content-muted text-xs">{key}</span>
+                    {/* chart-bypass-ok: categorical vendor distribution row; shared DistributionBar primitive is not in the platform yet. */}
                     <div className="flex-1 bg-bg-default rounded h-5 overflow-hidden">
                         <div className={`h-full ${colors[key] || 'bg-blue-500/60'} rounded`}
                             style={{ width: `${(count / total) * 100}%`, minWidth: count > 0 ? '8px' : '0' }} />

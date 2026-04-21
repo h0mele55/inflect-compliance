@@ -20,7 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import KpiCard from '@/components/ui/KpiCard';
 import ProgressCard from '@/components/ui/ProgressCard';
 import DonutChart from '@/components/ui/DonutChart';
-import TrendLine from '@/components/ui/TrendLine';
+import { TrendCard } from '@/components/ui/TrendCard';
 import StatusBreakdown from '@/components/ui/StatusBreakdown';
 import RiskHeatmap from '@/components/ui/RiskHeatmap';
 import ExpiryCalendar from '@/components/ui/ExpiryCalendar';
@@ -76,7 +76,12 @@ export default async function DashboardPage({
             </div>
 
             {/* ─── KPI Grid (6 cards) ─── */}
-            <KpiGrid exec={exec} t={t} />
+            {/* Values render immediately; sparklines stream in via Suspense once
+                the trend snapshot resolves so we never block the numbers on the
+                slower daily-snapshot read. */}
+            <Suspense fallback={<KpiGrid exec={exec} t={t} />}>
+                <KpiGridWithTrends exec={exec} t={t} ctx={ctx} />
+            </Suspense>
 
             {/* ─── Control Coverage + Risk Distribution ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -148,8 +153,15 @@ export default async function DashboardPage({
 
 // ─── KPI Grid ───────────────────────────────────────────────────────
 
+type KpiTrendBundle = {
+    coverage?: ReadonlyArray<{ date: Date; value: number }>;
+    risks?: ReadonlyArray<{ date: Date; value: number }>;
+    evidence?: ReadonlyArray<{ date: Date; value: number }>;
+    findings?: ReadonlyArray<{ date: Date; value: number }>;
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function KpiGrid({ exec, t }: { exec: ExecutiveDashboardPayload; t: (key: string, opts?: any) => string }) {
+function KpiGrid({ exec, t, trends }: { exec: ExecutiveDashboardPayload; t: (key: string, opts?: any) => string; trends?: KpiTrendBundle }) {
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" id="kpi-grid">
             <KpiCard
@@ -160,6 +172,8 @@ function KpiGrid({ exec, t }: { exec: ExecutiveDashboardPayload; t: (key: string
                 icon={ShieldCheck}
                 gradient="from-emerald-500 to-teal-500"
                 subtitle={`${exec.controlCoverage.implemented} of ${exec.controlCoverage.applicable} implemented`}
+                trend={trends?.coverage}
+                trendVariant="success"
             />
             <KpiCard
                 id="kpi-risks"
@@ -168,6 +182,8 @@ function KpiGrid({ exec, t }: { exec: ExecutiveDashboardPayload; t: (key: string
                 icon={AlertTriangle}
                 gradient="from-amber-500 to-orange-500"
                 subtitle={t('highCritical', { count: exec.stats.highRisks })}
+                trend={trends?.risks}
+                trendVariant="warning"
             />
             <KpiCard
                 id="kpi-evidence"
@@ -176,6 +192,8 @@ function KpiGrid({ exec, t }: { exec: ExecutiveDashboardPayload; t: (key: string
                 icon={Paperclip}
                 gradient="from-purple-500 to-pink-500"
                 subtitle={`${exec.evidenceExpiry.overdue} overdue`}
+                trend={trends?.evidence}
+                trendVariant="error"
             />
             <KpiCard
                 id="kpi-tasks"
@@ -199,6 +217,8 @@ function KpiGrid({ exec, t }: { exec: ExecutiveDashboardPayload; t: (key: string
                 value={exec.stats.openFindings}
                 icon={Bug}
                 gradient="from-red-500 to-rose-500"
+                trend={trends?.findings}
+                trendVariant="error"
             />
         </div>
     );
@@ -338,6 +358,40 @@ function ComplianceAlerts({ exec, t }: { exec: ExecutiveDashboardPayload; t: (ke
     );
 }
 
+// ─── KPI Grid with trends (async, Suspense-compatible) ───────────────
+//
+// Wraps the sync KpiGrid with a trend fetch. The parent Suspense
+// fallback renders the sync KpiGrid immediately so values are never
+// gated on the trend read. Trend snapshot failures degrade silently —
+// KpiGrid just renders without sparklines.
+
+async function KpiGridWithTrends({
+    exec,
+    t,
+    ctx,
+}: {
+    exec: ExecutiveDashboardPayload;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    t: (key: string, opts?: any) => string;
+    ctx: Parameters<typeof getComplianceTrends>[0];
+}) {
+    let trends: KpiTrendBundle | undefined;
+    try {
+        const payload = await getComplianceTrends(ctx, 30);
+        if (payload.daysAvailable >= 2) {
+            trends = {
+                coverage: payload.dataPoints.map(d => ({ date: new Date(d.date), value: d.controlCoveragePercent })),
+                risks: payload.dataPoints.map(d => ({ date: new Date(d.date), value: d.risksOpen })),
+                evidence: payload.dataPoints.map(d => ({ date: new Date(d.date), value: d.evidenceOverdue })),
+                findings: payload.dataPoints.map(d => ({ date: new Date(d.date), value: d.findingsOpen })),
+            };
+        }
+    } catch {
+        trends = undefined;
+    }
+    return <KpiGrid exec={exec} t={t} trends={trends} />;
+}
+
 // ─── Trend Section (async, Suspense-compatible) ──────────────────────
 
 async function TrendSection({ ctx }: { ctx: Parameters<typeof getComplianceTrends>[0] }) {
@@ -360,10 +414,10 @@ async function TrendSection({ ctx }: { ctx: Parameters<typeof getComplianceTrend
         );
     }
 
-    const coverageData = trends.dataPoints.map(d => d.controlCoveragePercent);
-    const risksOpenData = trends.dataPoints.map(d => d.risksOpen);
-    const evidenceOverdueData = trends.dataPoints.map(d => d.evidenceOverdue);
-    const findingsData = trends.dataPoints.map(d => d.findingsOpen);
+    const coveragePoints = trends.dataPoints.map(d => ({ date: new Date(d.date), value: d.controlCoveragePercent }));
+    const risksOpenPoints = trends.dataPoints.map(d => ({ date: new Date(d.date), value: d.risksOpen }));
+    const evidenceOverduePoints = trends.dataPoints.map(d => ({ date: new Date(d.date), value: d.evidenceOverdue }));
+    const findingsPoints = trends.dataPoints.map(d => ({ date: new Date(d.date), value: d.findingsOpen }));
 
     return (
         <div className="glass-card p-5" id="trend-section">
@@ -374,58 +428,30 @@ async function TrendSection({ ctx }: { ctx: Parameters<typeof getComplianceTrend
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <TrendCard
                     label="Coverage"
-                    value={coverageData[coverageData.length - 1]}
+                    value={coveragePoints[coveragePoints.length - 1].value}
                     format="%"
-                    data={coverageData}
-                    color="#22c55e"
+                    points={coveragePoints}
+                    colorClassName="text-emerald-500"
                 />
                 <TrendCard
                     label="Open Risks"
-                    value={risksOpenData[risksOpenData.length - 1]}
-                    data={risksOpenData}
-                    color="#f59e0b"
+                    value={risksOpenPoints[risksOpenPoints.length - 1].value}
+                    points={risksOpenPoints}
+                    colorClassName="text-amber-500"
                 />
                 <TrendCard
                     label="Overdue Evidence"
-                    value={evidenceOverdueData[evidenceOverdueData.length - 1]}
-                    data={evidenceOverdueData}
-                    color="#ef4444"
+                    value={evidenceOverduePoints[evidenceOverduePoints.length - 1].value}
+                    points={evidenceOverduePoints}
+                    colorClassName="text-red-500"
                 />
                 <TrendCard
                     label="Open Findings"
-                    value={findingsData[findingsData.length - 1]}
-                    data={findingsData}
-                    color="#a855f7"
+                    value={findingsPoints[findingsPoints.length - 1].value}
+                    points={findingsPoints}
+                    colorClassName="text-purple-500"
                 />
             </div>
-        </div>
-    );
-}
-
-/** Compact trend mini-card: label + current value + sparkline */
-function TrendCard({ label, value, format, data, color }: {
-    label: string;
-    value: number;
-    format?: string;
-    data: number[];
-    color: string;
-}) {
-    return (
-        <div className="space-y-1">
-            <div className="flex items-baseline justify-between">
-                <span className="text-xs text-content-muted">{label}</span>
-                <span className="text-sm font-semibold text-content-emphasis tabular-nums">
-                    {value}{format ?? ''}
-                </span>
-            </div>
-            <TrendLine
-                data={data}
-                color={color}
-                height={48}
-                showArea={true}
-                showEndDot={true}
-                label={`${label} trend`}
-            />
         </div>
     );
 }

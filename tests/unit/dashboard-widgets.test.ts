@@ -22,7 +22,7 @@ describe('Dashboard Widget Exports', () => {
     const widgetFiles = [
         'KpiCard.tsx',
         'DonutChart.tsx',
-        'TrendLine.tsx',
+        'TrendCard.tsx',
         'ProgressCard.tsx',
         'StatusBreakdown.tsx',
     ];
@@ -46,10 +46,10 @@ describe('Dashboard Widget Exports', () => {
         expect(content).toContain('export interface DonutSegment');
     });
 
-    test('TrendLine exports default component and TrendLineProps type', () => {
-        const content = fs.readFileSync(path.join(UI_DIR, 'TrendLine.tsx'), 'utf-8');
-        expect(content).toContain('export default function TrendLine');
-        expect(content).toContain('export interface TrendLineProps');
+    test('TrendCard exports a named component and TrendCardProps type', () => {
+        const content = fs.readFileSync(path.join(UI_DIR, 'TrendCard.tsx'), 'utf-8');
+        expect(content).toContain('export function TrendCard');
+        expect(content).toContain('export interface TrendCardProps');
     });
 
     test('ProgressCard exports default component and ProgressCardProps type', () => {
@@ -82,10 +82,12 @@ describe('Widget Empty State Handling', () => {
         expect(content).toContain('No data');
     });
 
-    test('TrendLine handles insufficient data (< 2 points)', () => {
-        const content = fs.readFileSync(path.join(UI_DIR, 'TrendLine.tsx'), 'utf-8');
-        expect(content).toContain('data.length < 2');
-        expect(content).toContain('No trend data');
+    test('TrendCard handles empty points via the chart emptyState prop', () => {
+        const content = fs.readFileSync(path.join(UI_DIR, 'TrendCard.tsx'), 'utf-8');
+        // TimeSeriesChart already empties-out on data.length === 0 and renders
+        // the caller-provided emptyState, so TrendCard just needs to pass one.
+        expect(content).toContain('emptyState');
+        expect(content).toContain('data-trend-empty');
     });
 
     test('ProgressCard handles max === 0 (no division by zero)', () => {
@@ -105,11 +107,10 @@ describe('Widget Empty State Handling', () => {
         expect(content).toContain('seg.value / total');
     });
 
-    test('TrendLine avoids division by zero for flat data', () => {
-        const content = fs.readFileSync(path.join(UI_DIR, 'TrendLine.tsx'), 'utf-8');
-        // range should have a fallback for flat data
-        expect(content).toMatch(/range\s*=\s*max\s*-\s*min\s*\|\|\s*1/);
-    });
+    // TrendLine's flat-data guard moved into the shared chart layout
+    // helpers (`buildYScale` / `MiniAreaChart`) — covered by
+    // tests/unit/chart-layout-helpers.test.ts and
+    // tests/rendered/micro-visuals.test.tsx.
 });
 
 // ─── Design System Compatibility ───
@@ -123,31 +124,31 @@ describe('Widget Design System Compliance', () => {
         }
     });
 
-    test('DonutChart and TrendLine do NOT use glass-card (embeddable)', () => {
+    test('DonutChart and TrendCard do NOT use glass-card (embeddable)', () => {
         // These are embeddable in other cards — no outer card wrapper
-        for (const file of ['DonutChart.tsx', 'TrendLine.tsx']) {
+        for (const file of ['DonutChart.tsx', 'TrendCard.tsx']) {
             const content = fs.readFileSync(path.join(UI_DIR, file), 'utf-8');
             expect(content).not.toContain('glass-card');
         }
     });
 
-    test('all widgets have accessible aria attributes', () => {
-        for (const file of ['DonutChart.tsx', 'TrendLine.tsx']) {
+    test('chart-embeddable widgets carry an accessible aria-label', () => {
+        for (const file of ['DonutChart.tsx', 'TrendCard.tsx']) {
             const content = fs.readFileSync(path.join(UI_DIR, file), 'utf-8');
             expect(content).toContain('aria-label');
         }
     });
 
-    test('all widgets support className prop for customization', () => {
-        for (const file of ['KpiCard.tsx', 'DonutChart.tsx', 'TrendLine.tsx', 'ProgressCard.tsx', 'StatusBreakdown.tsx']) {
+    test('card-style widgets support className prop for customization', () => {
+        for (const file of ['KpiCard.tsx', 'DonutChart.tsx', 'ProgressCard.tsx', 'StatusBreakdown.tsx']) {
             const content = fs.readFileSync(path.join(UI_DIR, file), 'utf-8');
             expect(content).toContain("className?: string");
             expect(content).toContain("className = ''");
         }
     });
 
-    test('all widgets support id prop for testing', () => {
-        for (const file of ['KpiCard.tsx', 'DonutChart.tsx', 'TrendLine.tsx', 'ProgressCard.tsx', 'StatusBreakdown.tsx']) {
+    test('card-style widgets support id prop for testing', () => {
+        for (const file of ['KpiCard.tsx', 'DonutChart.tsx', 'ProgressCard.tsx', 'StatusBreakdown.tsx']) {
             const content = fs.readFileSync(path.join(UI_DIR, file), 'utf-8');
             expect(content).toContain("id?: string");
         }
@@ -157,9 +158,13 @@ describe('Widget Design System Compliance', () => {
 // ─── Zero External Dependencies ───
 
 describe('Widget Dependency Guard', () => {
-    test('no chart library imports in widget files', () => {
-        const banned = ['recharts', 'chart.js', 'd3', 'nivo', 'victory', 'tremor', 'visx'];
-        for (const file of ['DonutChart.tsx', 'TrendLine.tsx']) {
+    test('no third-party chart libraries leak into zero-dep widgets', () => {
+        // DonutChart is still a zero-dep SVG widget — no chart libs.
+        // TrendCard deliberately consumes the shared Epic 59 chart
+        // platform (`@/components/ui/charts`) which wraps visx; the
+        // boundary for new chart libraries is that shared module.
+        const banned = ['recharts', 'chart.js', 'nivo', 'victory', 'tremor'];
+        for (const file of ['DonutChart.tsx']) {
             const content = fs.readFileSync(path.join(UI_DIR, file), 'utf-8');
             for (const lib of banned) {
                 expect(content).not.toContain(`from '${lib}`);
@@ -168,14 +173,16 @@ describe('Widget Dependency Guard', () => {
         }
     });
 
-    test('KpiCard only imports lucide-react (icon support)', () => {
+    test('KpiCard only imports lucide-react + the MiniAreaChart widget', () => {
         const content = fs.readFileSync(path.join(UI_DIR, 'KpiCard.tsx'), 'utf-8');
         const importLines = content.split('\n').filter(l => l.trim().startsWith('import'));
-        // Only lucide-react is expected as an external import
+        // Allowed externals: lucide-react (icons), MiniAreaChart (Epic 59 sparkline).
+        // Kept tight so new chart/state libraries don't leak in uninvited.
         const externalImports = importLines.filter(l => !l.includes('./') && !l.includes('../'));
-        expect(externalImports.length).toBeLessThanOrEqual(1);
-        if (externalImports.length === 1) {
-            expect(externalImports[0]).toContain('lucide-react');
+        expect(externalImports.length).toBeLessThanOrEqual(2);
+        for (const line of externalImports) {
+            const allowed = line.includes('lucide-react') || line.includes('@/components/ui/mini-area-chart');
+            expect(allowed).toBe(true);
         }
     });
 });
@@ -197,9 +204,9 @@ describe('Widget Prop Contracts', () => {
         expect(content).toContain('color: string');
     });
 
-    test('TrendLine data is a number array', () => {
-        const content = fs.readFileSync(path.join(UI_DIR, 'TrendLine.tsx'), 'utf-8');
-        expect(content).toContain('data: number[]');
+    test('TrendCard points is an ordered {date,value} series', () => {
+        const content = fs.readFileSync(path.join(UI_DIR, 'TrendCard.tsx'), 'utf-8');
+        expect(content).toContain('points: ReadonlyArray<{ date: Date; value: number }>');
     });
 
     test('ProgressCard supports segments for stacked bar', () => {

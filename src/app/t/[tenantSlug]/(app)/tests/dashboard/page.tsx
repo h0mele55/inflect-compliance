@@ -2,6 +2,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { ProgressBar, type ProgressBarVariant } from '@/components/ui/progress-bar';
+import { ProgressCircle } from '@/components/ui/progress-circle';
 
 interface DashboardMetrics {
     periodDays: number;
@@ -33,21 +35,13 @@ interface FrameworkReadiness {
     recentPasses: number;
 }
 
-function ProgressBar({ value, color = 'brand' }: { value: number; color?: string }) {
-    const colorMap: Record<string, string> = {
-        brand: 'bg-[var(--brand-default)]',
-        green: 'bg-green-500',
-        red: 'bg-red-500',
-        amber: 'bg-amber-500',
-    };
-    return (
-        <div className="w-full bg-bg-elevated/50 rounded-full h-2.5">
-            <div
-                className={`h-2.5 rounded-full transition-all duration-700 ${colorMap[color] || 'bg-[var(--brand-default)]'}`}
-                style={{ width: `${Math.min(100, value)}%` }}
-            />
-        </div>
-    );
+// Legacy color prop → Epic 59 ProgressBar variant. Kept as a local
+// helper so the dozens of call sites below stay short and readable.
+function toProgressVariant(color: string): ProgressBarVariant {
+    if (color === 'green') return 'success';
+    if (color === 'red') return 'error';
+    if (color === 'amber') return 'warning';
+    return 'brand';
 }
 
 export default function TestDashboardPage() {
@@ -120,27 +114,41 @@ export default function TestDashboardPage() {
                     {metrics.completedRuns === 0 ? (
                         <p className="text-content-subtle text-sm">No completed runs in this period</p>
                     ) : (
-                        <div className="space-y-3">
+                        <div className="flex gap-6 items-center">
+                            {/* Headline gauge — overall pass rate at a glance */}
+                            <ProgressCircle
+                                progress={metrics.passRate / 100}
+                                label={`${metrics.passRate}%`}
+                                variant={metrics.passRate >= 80 ? 'success' : metrics.passRate >= 50 ? 'warning' : 'error'}
+                                size="md"
+                                aria-label="Overall pass rate"
+                            />
+                            <div className="flex-1 space-y-3">
                             <div>
                                 <div className="flex justify-between text-sm mb-1">
                                     <span className="text-green-400">Pass</span>
                                     <span className="text-content-muted">{metrics.passRuns} ({metrics.passRate}%)</span>
                                 </div>
-                                <ProgressBar value={metrics.passRate} color="green" />
+                                <ProgressBar value={metrics.passRate} variant="success" aria-label="Pass rate" />
                             </div>
                             <div>
                                 <div className="flex justify-between text-sm mb-1">
                                     <span className="text-red-400">Fail</span>
                                     <span className="text-content-muted">{metrics.failRuns} ({metrics.failRate}%)</span>
                                 </div>
-                                <ProgressBar value={metrics.failRate} color="red" />
+                                <ProgressBar value={metrics.failRate} variant="error" aria-label="Fail rate" />
                             </div>
                             <div>
                                 <div className="flex justify-between text-sm mb-1">
                                     <span className="text-amber-400">Inconclusive</span>
                                     <span className="text-content-muted">{metrics.inconclusiveRuns}</span>
                                 </div>
-                                <ProgressBar value={metrics.completedRuns > 0 ? (metrics.inconclusiveRuns / metrics.completedRuns) * 100 : 0} color="amber" />
+                                <ProgressBar
+                                    value={metrics.completedRuns > 0 ? (metrics.inconclusiveRuns / metrics.completedRuns) * 100 : 0}
+                                    variant="warning"
+                                    aria-label="Inconclusive rate"
+                                />
+                            </div>
                             </div>
                         </div>
                     )}
@@ -190,7 +198,11 @@ export default function TestDashboardPage() {
                                             <span className="text-content-muted">Test Plan Coverage</span>
                                             <span className="text-content-emphasis">{fw.testPlanCoverage}%</span>
                                         </div>
-                                        <ProgressBar value={fw.testPlanCoverage} color={fw.testPlanCoverage >= 80 ? 'green' : fw.testPlanCoverage >= 50 ? 'amber' : 'red'} />
+                                        <ProgressBar
+                                            value={fw.testPlanCoverage}
+                                            variant={toProgressVariant(fw.testPlanCoverage >= 80 ? 'green' : fw.testPlanCoverage >= 50 ? 'amber' : 'red')}
+                                            aria-label={`${fw.frameworkName} test plan coverage`}
+                                        />
                                         <p className="text-xs text-content-subtle mt-1">{fw.withTestPlan}/{fw.totalMappedControls} with plans</p>
                                     </div>
                                     <div>
@@ -198,7 +210,11 @@ export default function TestDashboardPage() {
                                             <span className="text-content-muted">Recent Run Coverage (90d)</span>
                                             <span className="text-content-emphasis">{fw.testRunCoverage}%</span>
                                         </div>
-                                        <ProgressBar value={fw.testRunCoverage} color={fw.testRunCoverage >= 80 ? 'green' : fw.testRunCoverage >= 50 ? 'amber' : 'red'} />
+                                        <ProgressBar
+                                            value={fw.testRunCoverage}
+                                            variant={toProgressVariant(fw.testRunCoverage >= 80 ? 'green' : fw.testRunCoverage >= 50 ? 'amber' : 'red')}
+                                            aria-label={`${fw.frameworkName} recent run coverage`}
+                                        />
                                         <p className="text-xs text-content-subtle mt-1">{fw.withRecentRun}/{fw.totalMappedControls} tested</p>
                                     </div>
                                     <div>
@@ -206,7 +222,11 @@ export default function TestDashboardPage() {
                                             <span className="text-content-muted">Pass Rate</span>
                                             <span className="text-content-emphasis">{fw.passRate}%</span>
                                         </div>
-                                        <ProgressBar value={fw.passRate} color={fw.passRate >= 80 ? 'green' : fw.passRate >= 50 ? 'amber' : 'red'} />
+                                        <ProgressBar
+                                            value={fw.passRate}
+                                            variant={toProgressVariant(fw.passRate >= 80 ? 'green' : fw.passRate >= 50 ? 'amber' : 'red')}
+                                            aria-label={`${fw.frameworkName} pass rate`}
+                                        />
                                         <p className="text-xs text-content-subtle mt-1">{fw.recentPasses}/{fw.recentRuns} passed</p>
                                     </div>
                                 </div>

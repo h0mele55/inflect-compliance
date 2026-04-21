@@ -97,3 +97,72 @@ Job definitions are in `src/app-layer/jobs/`. The executor registry is `src/app-
 - **i18n**: UI strings go through `next-intl`. Message files are in `messages/`. Server components use `getTranslations()`, client components use `useTranslations()`.
 - **Path alias**: `@/` maps to `src/`. Always use this alias — never relative paths crossing layer boundaries.
 - **Two `DATABASE_URL` vars**: `DATABASE_URL` points to PgBouncer (transaction-mode, used at runtime). `DIRECT_DATABASE_URL` points directly to Postgres (used for Prisma migrations).
+
+## UI Platform — Epics 51–59
+
+The following epics established shared primitives, guardrail tests, and
+contributor guides. **Always use the platform primitives** — never
+hand-roll a replacement. Each section points to its decision-tree doc.
+
+### Epic 51 — Design Tokens & Theme System
+
+Use semantic token classes (`bg-bg-default`, `text-content-muted`,
+`border-border-subtle`) instead of raw Tailwind color scales
+(`bg-slate-800`, `text-slate-400`). Use `<Button>`, `<StatusBadge>`,
+and `<EmptyState>` components instead of legacy `.btn` / `.badge` CSS
+classes. See `docs/token-cheatsheet.md` and `docs/ui-buttons.md`.
+
+### Epic 52 — DataTable Platform
+
+Every list page must use `<DataTable>` from `@/components/ui/table`.
+Never add raw `<table>` elements in app pages. Use the
+`useListPagination` adapter for cursor-based APIs. See
+`tests/guards/epic52-datatable-ratchet.test.ts`.
+
+### Epic 53 — Enterprise Filter System
+
+Use `FilterToolbar` + `FilterProvider` + `useFilterContext` from
+`@/components/ui/filter/` for list-page filtering. Never build ad-hoc
+`useState` + manual URL sync. See
+`src/components/ui/filter/GUIDE.md` and `docs/filters.md`.
+
+### Epic 54 — Modal & Sheet Strategy
+
+Use `<Modal>` for quick create/edit/confirm flows and `<Sheet>` for
+inspect-and-edit without losing list context. Never hand-roll a
+`fixed inset-0 bg-black/…` overlay. See `docs/modal-sheet-strategy.md`.
+
+### Epic 55 — Combobox & Form Primitives
+
+Use `<Combobox>` for selection lists, `<UserCombobox>` for people
+pickers, `<RadioGroup>` for 2–5 visible choices, and wrap every
+field with `<FormField>`. Never use raw `<select>` or
+`<input className="input">` in app pages. See
+`docs/combobox-form-strategy.md`.
+
+### Epic 56 — Tooltip & Copy Primitives
+
+Use `<Tooltip>` for hover/focus hints, `<InfoTooltip>` for help icons,
+`<CopyButton>` / `<CopyText>` / `useCopyToClipboard` for clipboard.
+Never use raw `navigator.clipboard` or add new `title=` attributes.
+See `docs/tooltip-and-copy-strategy.md`.
+
+### Epic 57 — Keyboard Shortcuts & Command Palette
+
+Register shortcuts via `useKeyboardShortcut` — never
+`document.addEventListener('keydown', …)`. Always supply a
+`description`. See `docs/keyboard-shortcuts.md`.
+
+### Epic 58 — Date Pickers
+
+Use `<DatePicker>` for single dates and `<DateRangePicker>` for
+ranges. Use `formatDate` / `formatDateTime` from `@/lib/format-date`
+for display. Never use `<input type="date">` or raw
+`toLocaleDateString`. See `docs/date-picker.md`.
+
+### Epic 59 — Dashboard Charts
+
+When adding or modifying charts/visuals on any dashboard page,
+always use the shared chart platform. See `docs/charts.md` for the
+decision tree. Never use raw `<svg>`, `<polyline>`, or inline
+`style={{ width: \`\${pct}%\` }}` progress bars.

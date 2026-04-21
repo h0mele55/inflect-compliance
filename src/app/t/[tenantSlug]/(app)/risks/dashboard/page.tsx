@@ -111,6 +111,7 @@ export default function RiskDashboardPage() {
                                         <span className="text-content-default">{status}</span>
                                         <span className="text-content-muted">{count} ({Math.round(count / total * 100)}%)</span>
                                     </div>
+                                    {/* chart-bypass-ok: categorical risk-status distribution row; shared DistributionBar primitive is not in the platform yet. */}
                                     <div className="h-2 bg-bg-default rounded-full overflow-hidden">
                                         <div
                                             className="h-full rounded-full bg-gradient-to-r from-[var(--brand-default)] to-[var(--brand-muted)] transition-all"

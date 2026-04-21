@@ -344,7 +344,7 @@ function RisksPageInner({
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div
-                    className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition"
+                    className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition"
                     onClick={() => filterCtx.clearAll()}
                 >
                     <p className="text-xs text-content-muted uppercase tracking-wider">{t.totalRisks}</p>
@@ -355,7 +355,7 @@ function RisksPageInner({
                     <p className="text-3xl font-bold mt-2 text-amber-400">{avgScore}</p>
                 </div>
                 <div
-                    className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[var(--ring)]/50 transition"
+                    className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition"
                     onClick={() => filterCtx.set('status', 'OPEN')}
                 >
                     <p className="text-xs text-content-muted uppercase tracking-wider">{t.openRisks}</p>

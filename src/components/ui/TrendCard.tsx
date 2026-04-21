@@ -1,0 +1,108 @@
+"use client";
+
+/**
+ * TrendCard — compact KPI trend tile powered by the Epic 59 chart platform.
+ *
+ * Renders a header row (label + current value) above a 48px-tall
+ * interactive time-series sparkline. Composes `<TimeSeriesChart>` +
+ * `<Areas>` with the compact margin preset so the area fill eats
+ * almost the full tile height but still gives tooltip/hover room.
+ *
+ * Designed to be dropped into any dashboard trend row — not just the
+ * executive dashboard. The caller owns the colour-class choice so the
+ * same card can carry brand / success / warning / error semantics
+ * without bespoke forks.
+ *
+ * Example:
+ *
+ *   <TrendCard
+ *       label="Coverage"
+ *       value={75.3}
+ *       format="%"
+ *       points={[{ date, value }, ...]}
+ *       colorClassName="text-emerald-500"
+ *   />
+ */
+
+import {
+    Areas,
+    COMPACT_CHART_MARGIN,
+    TimeSeriesChart,
+    type TimeSeriesDatum,
+} from "@/components/ui/charts";
+import { useMemo } from "react";
+
+export interface TrendCardProps {
+    /** Header label, e.g. "Coverage". */
+    label: string;
+    /** Current (latest) value shown in the header row. */
+    value: number;
+    /** Suffix for the current value, e.g. `%`. */
+    format?: string;
+    /** Ordered oldest→newest series of dated values. */
+    points: ReadonlyArray<{ date: Date; value: number }>;
+    /** Tailwind `text-*` class — drives the area fill/line colour. */
+    colorClassName: string;
+}
+
+type TrendDatum = TimeSeriesDatum<{ value: number }>;
+
+export function TrendCard({
+    label,
+    value,
+    format,
+    points,
+    colorClassName,
+}: TrendCardProps) {
+    const data = useMemo<TrendDatum[]>(
+        () => points.map((p) => ({ date: p.date, values: { value: p.value } })),
+        [points],
+    );
+
+    const series = useMemo(
+        () => [
+            {
+                id: "trend",
+                isActive: true,
+                valueAccessor: (d: TrendDatum) => d.values.value,
+                colorClassName,
+            },
+        ],
+        [colorClassName],
+    );
+
+    const suffix = format ?? "";
+    const ariaLabel = `${label} trend`;
+
+    return (
+        <div className="space-y-1" data-trend-card>
+            <div className="flex items-baseline justify-between">
+                <span className="text-xs text-content-muted">{label}</span>
+                <span className="text-sm font-semibold text-content-emphasis tabular-nums">
+                    {value}
+                    {suffix}
+                </span>
+            </div>
+            <div
+                className="relative h-12 w-full"
+                role="img"
+                aria-label={ariaLabel}
+            >
+                <TimeSeriesChart
+                    data={data}
+                    series={series}
+                    type="area"
+                    margin={COMPACT_CHART_MARGIN}
+                    tooltipContent={(d) =>
+                        `${d.values.value}${suffix} — ${d.date.toLocaleDateString()}`
+                    }
+                    emptyState={
+                        <div className="h-px w-full bg-border-subtle" data-trend-empty />
+                    }
+                >
+                    <Areas showLatestValueCircle />
+                </TimeSeriesChart>
+            </div>
+        </div>
+    );
+}
