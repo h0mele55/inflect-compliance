@@ -4,6 +4,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 
 const SEV_BADGE: Record<string, string> = { LOW: 'badge-info', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
 const STATUS_BADGE: Record<string, string> = { OPEN: 'badge-danger', IN_PROGRESS: 'badge-info', READY_FOR_VERIFICATION: 'badge-warning', CLOSED: 'badge-success' };
@@ -243,7 +249,31 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
                         </div>
                         <div><label className="input-label">{t.owner}</label><input className="input" value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} /></div>
                         <div className="col-span-2"><label className="input-label">{t.description} *</label><textarea className="input" required value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
-                        <div><label className="input-label">{t.dueDate}</label><input type="date" className="input" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))} /></div>
+                        {/* Epic 58 — shared DatePicker. YMD string
+                            state preserved for the create payload. */}
+                        <div>
+                            <label className="input-label" htmlFor="finding-due-date">
+                                {t.dueDate}
+                            </label>
+                            <DatePicker
+                                id="finding-due-date"
+                                className="w-full"
+                                placeholder="Select date"
+                                clearable
+                                align="start"
+                                value={parseYMD(form.dueDate)}
+                                onChange={(next) =>
+                                    setForm((f) => ({
+                                        ...f,
+                                        dueDate: toYMD(next) ?? '',
+                                    }))
+                                }
+                                disabledDays={{
+                                    before: startOfUtcDay(new Date()),
+                                }}
+                                aria-label={t.dueDate}
+                            />
+                        </div>
                     </div>
                     <div className="flex gap-2"><button type="submit" className="btn btn-primary">{t.createFinding}</button><button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary">{t.cancel}</button></div>
                 </form>

@@ -20,6 +20,8 @@
  * ```
  */
 
+import { formatDateCompact } from '@/lib/format-date';
+
 // ─── Props ──────────────────────────────────────────────────────────
 
 export interface ExpiryItem {
@@ -68,9 +70,11 @@ function formatDaysUntil(days: number): string {
     return `${days}d`;
 }
 
+// Epic 58 — delegate to the canonical `formatDateCompact` so the
+// widget's day label ("16 Apr") reads identically to chart axes and
+// mini calendars elsewhere in the app.
 function formatDate(iso: string): string {
-    const d = new Date(iso + 'T00:00:00Z');
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+    return formatDateCompact(iso + 'T00:00:00Z');
 }
 
 // ─── Component ──────────────────────────────────────────────────────

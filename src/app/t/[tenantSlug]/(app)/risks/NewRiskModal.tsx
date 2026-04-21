@@ -45,6 +45,12 @@ import { FormError } from '@/components/ui/form-error';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { InfoTooltip } from '@/components/ui/tooltip';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 import { queryKeys } from '@/lib/queryKeys';
 import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
@@ -537,16 +543,25 @@ export function NewRiskModal({
                             </div>
                         </div>
 
-                        {/* Review date */}
+                        {/* Review date — Epic 58 shared DatePicker.
+                            `form.nextReviewAt` stays a YMD string so the
+                            server payload is unchanged; the picker
+                            bridges to DateValue at the prop edge. */}
                         <FormField label="Next review">
-                            <Input
+                            <DatePicker
                                 id="risk-review-date"
-                                type="date"
                                 className="sm:max-w-xs"
-                                value={form.nextReviewAt}
-                                onChange={(e) =>
-                                    update('nextReviewAt', e.target.value)
+                                placeholder="Select date"
+                                clearable
+                                align="start"
+                                value={parseYMD(form.nextReviewAt)}
+                                onChange={(next) =>
+                                    update('nextReviewAt', toYMD(next) ?? '')
                                 }
+                                disabledDays={{
+                                    before: startOfUtcDay(new Date()),
+                                }}
+                                aria-label="Next review date"
                             />
                         </FormField>
 

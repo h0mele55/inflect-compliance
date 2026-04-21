@@ -1,230 +1,297 @@
 "use client";
 
-import { cn } from "@dub/utils";
-import { Tooltip } from "../tooltip";
-import { addMonths, addYears, format, isSameMonth } from "date-fns";
+/**
+ * Epic 58 — shared Calendar primitive.
+ *
+ * A thin wrapper around `react-day-picker` v9 that applies the
+ * Inflect token palette, a consistent navigation header, and
+ * sensible defaults (single-mode by default, outside days shown
+ * only for single-month layouts). The component is UI-pure — it
+ * never owns selection state; consumers control via `selected` +
+ * `onSelect`, and the wider Single/Range picker wrappers drive
+ * those props.
+ *
+ * Token-backed states:
+ *   - Surface: `bg-bg-default`, border-free (the popover/dialog wraps it).
+ *   - Day hover: `hover:bg-bg-muted` — same affordance as every
+ *     hoverable row across the app (sidebar nav, filter chips).
+ *   - Day focus-visible: `ring-2 ring-ring ring-offset-2` — matches
+ *     `buttonVariants` so keyboard navigation feels native.
+ *   - Selected day: `bg-brand-emphasis text-content-inverted`.
+ *   - Range middle: `bg-brand-subtle text-content-emphasis`.
+ *   - Disabled: muted + line-through, no hover response.
+ *   - Today: semibold with a subtle outline so it reads even when
+ *     another day is selected.
+ *
+ * Accessibility:
+ *   - Month/year navigation buttons each carry an `aria-label` and
+ *     a Tooltip with the same content, disabled when out of range.
+ *   - `aria-live="polite"` on the heading announces month changes
+ *     to screen readers without stealing focus.
+ *   - `react-day-picker` already provides the roving-tabindex day
+ *     grid; we preserve it by not overriding `components.Day`.
+ */
+
+import { cn } from '@dub/utils';
+import { addMonths, addYears, format } from 'date-fns';
 import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
-import { ElementType, HTMLAttributes, forwardRef, useState } from "react";
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
+} from 'lucide-react';
 import {
-  DayPicker,
-  type DayPickerProps,
-  type Matcher,
-} from "react-day-picker";
+    forwardRef,
+    useState,
+    type ElementType,
+    type HTMLAttributes,
+} from 'react';
+import { DayPicker, type DayPickerProps } from 'react-day-picker';
+
+import { Tooltip } from '../tooltip';
+
+// ─── Navigation button (month + year arrows) ──────────────────────────
 
 interface NavigationButtonProps extends HTMLAttributes<HTMLButtonElement> {
-  onClick: () => void;
-  icon: ElementType;
-  disabled?: boolean;
+    onClick: () => void;
+    icon: ElementType;
+    disabled?: boolean;
 }
 
 const NavigationButton = forwardRef<HTMLButtonElement, NavigationButtonProps>(
-  (
-    { onClick, icon: Icon, disabled, ...props }: NavigationButtonProps,
-    forwardedRef,
-  ) => {
-    const label = props["aria-label"];
-    const button = (
-      <button
-        ref={forwardedRef}
-        type="button"
-        disabled={disabled}
-        className={cn(
-          "flex size-7 shrink-0 select-none items-center justify-center rounded border p-1 outline-none transition",
-          "border-neutral-200 text-neutral-600 hover:text-neutral-800",
-          "hover:bg-neutral-50 active:bg-neutral-100",
-          "disabled:pointer-events-none disabled:text-neutral-400",
-        )}
-        onClick={onClick}
-        {...props}
-      >
-        <Icon className="h-full w-full shrink-0" />
-      </button>
-    );
-    // Disabled buttons don't fire pointer events in most browsers, so the
-    // Tooltip never opens — skip wrapping to avoid a mute, no-op trigger.
-    if (!label || disabled) return button;
-    return <Tooltip content={label}>{button}</Tooltip>;
-  },
+    ({ onClick, icon: Icon, disabled, ...props }, forwardedRef) => {
+        const label = props['aria-label'];
+        const button = (
+            <button
+                ref={forwardedRef}
+                type="button"
+                disabled={disabled}
+                className={cn(
+                    'flex size-7 shrink-0 select-none items-center justify-center rounded-md border p-1',
+                    'outline-none transition-colors duration-150',
+                    'border-border-subtle text-content-muted',
+                    'hover:bg-bg-muted hover:text-content-emphasis',
+                    'active:bg-bg-subtle',
+                    'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-default',
+                    'disabled:pointer-events-none disabled:text-content-subtle disabled:opacity-60',
+                )}
+                onClick={onClick}
+                {...props}
+            >
+                <Icon className="h-full w-full shrink-0" aria-hidden="true" />
+            </button>
+        );
+        // Radix Tooltip renders nothing on disabled triggers, so skip
+        // the wrap — the aria-label still describes the button for
+        // assistive tech.
+        if (!label || disabled) return button;
+        return <Tooltip content={label}>{button}</Tooltip>;
+    },
 );
+NavigationButton.displayName = 'Calendar.NavigationButton';
 
-NavigationButton.displayName = "NavigationButton";
+// ─── Calendar ─────────────────────────────────────────────────────────
 
-// ── Calendar Props ──────────────────────────────────────────────────
-
-type CalendarProps = DayPickerProps & {
-  showYearNavigation?: boolean;
+export type CalendarProps = DayPickerProps & {
+    /** Show the double-chevron year-jump buttons next to the month header. */
+    showYearNavigation?: boolean;
 };
 
-// ── Calendar Component (react-day-picker v9) ────────────────────────
-
-function Calendar({
-  mode = "single",
-  weekStartsOn = 0,
-  numberOfMonths = 1,
-  showYearNavigation = false,
-  disabled: disabledDays,
-  locale,
-  className,
-  classNames,
-  startMonth,
-  endMonth,
-  ...props
+export function Calendar({
+    mode = 'single',
+    weekStartsOn = 1,
+    numberOfMonths = 1,
+    showYearNavigation = false,
+    disabled: disabledDays,
+    locale,
+    className,
+    classNames,
+    startMonth,
+    endMonth,
+    ...props
 }: CalendarProps) {
-  const [month, setMonth] = useState<Date>(
-    (props as any).defaultMonth ?? new Date(),
-  );
+    const [month, setMonth] = useState<Date>(
+        (props as { defaultMonth?: Date }).defaultMonth ?? new Date(),
+    );
 
-  const handleMonthChange = (newMonth: Date) => {
-    setMonth(newMonth);
-    (props as any).onMonthChange?.(newMonth);
-  };
+    const handleMonthChange = (nextMonth: Date) => {
+        setMonth(nextMonth);
+        (props as { onMonthChange?: (d: Date) => void }).onMonthChange?.(
+            nextMonth,
+        );
+    };
 
-  const previousMonth = addMonths(month, -1);
-  const nextMonth = addMonths(month, 1);
+    const previousMonth = addMonths(month, -1);
+    const nextMonth = addMonths(month, 1);
+    const canGoBack = !startMonth || previousMonth >= startMonth;
+    const canGoForward = !endMonth || nextMonth <= endMonth;
 
-  const canGoBack = !startMonth || previousMonth >= startMonth;
-  const canGoForward = !endMonth || nextMonth <= endMonth;
+    const goToPreviousYear = () => {
+        const target = addYears(month, -1);
+        if (!startMonth || target.getTime() >= startMonth.getTime()) {
+            handleMonthChange(target);
+        }
+    };
 
-  const goToPreviousYear = () => {
-    const target = addYears(month, -1);
-    if (!startMonth || target.getTime() >= startMonth.getTime()) {
-      handleMonthChange(target);
-    }
-  };
+    const goToNextYear = () => {
+        const target = addYears(month, 1);
+        if (!endMonth || target.getTime() <= endMonth.getTime()) {
+            handleMonthChange(target);
+        }
+    };
 
-  const goToNextYear = () => {
-    const target = addYears(month, 1);
-    if (!endMonth || target.getTime() <= endMonth.getTime()) {
-      handleMonthChange(target);
-    }
-  };
+    return (
+        <DayPicker
+            // react-day-picker v9 types `DayPickerProps` as a
+            // discriminated union over `mode`, so spreading a generic
+            // bag of props + a literal `mode` doesn't satisfy any
+            // single branch. An `any` cast is the idiomatic escape
+            // here (the upstream Dub original used the same).
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            {...(props as any)}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            mode={mode as any}
+            month={month}
+            onMonthChange={handleMonthChange}
+            weekStartsOn={weekStartsOn}
+            numberOfMonths={numberOfMonths}
+            locale={locale}
+            disabled={disabledDays}
+            showOutsideDays={numberOfMonths === 1}
+            className={cn('bg-bg-default text-content-emphasis', className)}
+            startMonth={startMonth}
+            endMonth={endMonth}
+            data-testid="calendar"
+            classNames={{
+                months: 'flex space-y-0',
+                month: 'space-y-4 p-3 w-full',
+                nav: 'gap-1 flex items-center justify-between w-full h-full',
+                month_grid: 'w-full border-separate border-spacing-y-1',
+                weekdays: 'flex',
+                weekday:
+                    'w-9 font-medium text-xs text-center text-content-muted pb-2 uppercase tracking-wider',
+                week: 'w-full flex',
+                day: 'relative p-0 text-center text-content-default focus-within:relative',
+                day_button: cn(
+                    'relative size-10 rounded-md text-sm text-content-default',
+                    'transition-colors duration-100',
+                    'hover:bg-bg-muted hover:text-content-emphasis',
+                    'active:bg-bg-subtle',
+                    'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-default',
+                ),
+                today:
+                    'font-semibold [&_button]:ring-1 [&_button]:ring-inset [&_button]:ring-border-default',
+                selected: cn(
+                    '[&_button]:bg-brand-emphasis [&_button]:text-content-inverted',
+                    '[&_button]:hover:bg-brand-emphasis [&_button]:hover:text-content-inverted',
+                ),
+                disabled:
+                    '[&_button]:text-content-subtle [&_button]:line-through [&_button]:hover:bg-transparent [&_button]:pointer-events-none',
+                outside: 'text-content-subtle',
+                range_middle: cn(
+                    '!rounded-none',
+                    '[&_button]:bg-brand-subtle [&_button]:text-content-emphasis',
+                    '[&_button]:hover:bg-brand-subtle',
+                ),
+                range_start: 'rounded-r-none !rounded-l',
+                range_end: 'rounded-l-none !rounded-r',
+                hidden: 'invisible',
+                ...classNames,
+            }}
+            components={{
+                Chevron: ({ orientation }) => {
+                    const Icon =
+                        orientation === 'left' ? ChevronLeft : ChevronRight;
+                    return <Icon className="h-4 w-4" aria-hidden="true" />;
+                },
+                MonthCaption: ({ calendarMonth }) => {
+                    const displayMonth = calendarMonth.date;
+                    const isFirst = true;
+                    const isLast = numberOfMonths === 1;
+                    const hideNextButton = numberOfMonths > 1 && !isLast;
+                    const hidePreviousButton = numberOfMonths > 1 && !isFirst;
 
-  return (
-    <DayPicker
-      {...(props as any)}
-      mode={mode as any}
-      month={month}
-      onMonthChange={handleMonthChange}
-      weekStartsOn={weekStartsOn}
-      numberOfMonths={numberOfMonths}
-      locale={locale}
-      disabled={disabledDays}
-      showOutsideDays={numberOfMonths === 1}
-      className={className}
-      startMonth={startMonth}
-      endMonth={endMonth}
-      classNames={{
-        months: "flex space-y-0",
-        month: "space-y-4 p-3 w-full",
-        nav: "gap-1 flex items-center rounded-full w-full h-full justify-between p-4",
-        month_grid: "w-full border-separate border-spacing-y-1",
-        weekdays: "flex",
-        weekday: "w-9 font-medium text-xs text-center text-neutral-400 pb-2",
-        week: "w-full flex",
-        day: "relative p-0 text-center focus-within:relative text-neutral-900",
-        day_button: cn(
-          "relative size-10 rounded-md text-sm text-neutral-900",
-          "hover:bg-neutral-100 active:bg-neutral-200 outline outline-offset-2 outline-0 focus-visible:outline-2 outline-blue-500",
-        ),
-        today: "font-semibold",
-        selected:
-          "rounded aria-selected:bg-blue-500 aria-selected:text-white",
-        disabled:
-          "!text-neutral-300 line-through disabled:hover:bg-transparent",
-        outside: "text-neutral-400",
-        range_middle:
-          "!rounded-none aria-selected:!bg-blue-100 aria-selected:!text-blue-900",
-        range_start: "rounded-r-none !rounded-l",
-        range_end: "rounded-l-none !rounded-r",
-        hidden: "invisible",
-        ...classNames,
-      }}
-      components={{
-        Chevron: ({ orientation }) => {
-          const Icon = orientation === "left" ? ChevronLeft : ChevronRight;
-          return <Icon className="h-4 w-4" />;
-        },
-        MonthCaption: ({ calendarMonth }) => {
-          const displayMonth = calendarMonth.date;
-          // For multi-month layouts, determine position
-          const isFirst = true; // In v9, each MonthCaption renders for its own month
-          const isLast = numberOfMonths === 1;
+                    return (
+                        <div
+                            className="flex items-center justify-between"
+                            data-testid="calendar-caption"
+                        >
+                            <div className="flex items-center gap-1">
+                                {showYearNavigation && !hidePreviousButton && (
+                                    <NavigationButton
+                                        disabled={
+                                            !canGoBack ||
+                                            !!(startMonth &&
+                                                addYears(month, -1).getTime() <
+                                                    startMonth.getTime())
+                                        }
+                                        aria-label="Go to previous year"
+                                        data-testid="calendar-prev-year"
+                                        onClick={goToPreviousYear}
+                                        icon={ChevronsLeft}
+                                    />
+                                )}
+                                {!hidePreviousButton && (
+                                    <NavigationButton
+                                        disabled={!canGoBack}
+                                        aria-label="Go to previous month"
+                                        data-testid="calendar-prev-month"
+                                        onClick={() =>
+                                            canGoBack &&
+                                            handleMonthChange(previousMonth)
+                                        }
+                                        icon={ChevronLeft}
+                                    />
+                                )}
+                            </div>
 
-          const hideNextButton = numberOfMonths > 1 && !isLast;
-          const hidePreviousButton = numberOfMonths > 1 && !isFirst;
+                            <div
+                                role="presentation"
+                                aria-live="polite"
+                                data-testid="calendar-heading"
+                                className="text-sm font-semibold capitalize tabular-nums text-content-emphasis"
+                            >
+                                {format(displayMonth, 'LLLL yyy', {
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    locale: locale as any,
+                                })}
+                            </div>
 
-          return (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1">
-                {showYearNavigation && !hidePreviousButton && (
-                  <NavigationButton
-                    disabled={
-                      !canGoBack ||
-                      (startMonth &&
-                        addYears(month, -1).getTime() <
-                          startMonth.getTime())
-                    }
-                    aria-label="Go to previous year"
-                    onClick={goToPreviousYear}
-                    icon={ChevronsLeft}
-                  />
-                )}
-                {!hidePreviousButton && (
-                  <NavigationButton
-                    disabled={!canGoBack}
-                    aria-label="Go to previous month"
-                    onClick={() =>
-                      canGoBack && handleMonthChange(previousMonth)
-                    }
-                    icon={ChevronLeft}
-                  />
-                )}
-              </div>
-
-              <div
-                role="presentation"
-                aria-live="polite"
-                className="text-sm font-medium capitalize tabular-nums text-neutral-900"
-              >
-                {format(displayMonth, "LLLL yyy", { locale: locale as any })}
-              </div>
-
-              <div className="flex items-center gap-1">
-                {!hideNextButton && (
-                  <NavigationButton
-                    disabled={!canGoForward}
-                    aria-label="Go to next month"
-                    onClick={() =>
-                      canGoForward && handleMonthChange(nextMonth)
-                    }
-                    icon={ChevronRight}
-                  />
-                )}
-                {showYearNavigation && !hideNextButton && (
-                  <NavigationButton
-                    disabled={
-                      !canGoForward ||
-                      (endMonth &&
-                        addYears(month, 1).getTime() > endMonth.getTime())
-                    }
-                    aria-label="Go to next year"
-                    onClick={goToNextYear}
-                    icon={ChevronsRight}
-                  />
-                )}
-              </div>
-            </div>
-          );
-        },
-      }}
-      hideNavigation
-    />
-  );
+                            <div className="flex items-center gap-1">
+                                {!hideNextButton && (
+                                    <NavigationButton
+                                        disabled={!canGoForward}
+                                        aria-label="Go to next month"
+                                        data-testid="calendar-next-month"
+                                        onClick={() =>
+                                            canGoForward &&
+                                            handleMonthChange(nextMonth)
+                                        }
+                                        icon={ChevronRight}
+                                    />
+                                )}
+                                {showYearNavigation && !hideNextButton && (
+                                    <NavigationButton
+                                        disabled={
+                                            !canGoForward ||
+                                            !!(endMonth &&
+                                                addYears(month, 1).getTime() >
+                                                    endMonth.getTime())
+                                        }
+                                        aria-label="Go to next year"
+                                        data-testid="calendar-next-year"
+                                        onClick={goToNextYear}
+                                        icon={ChevronsRight}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    );
+                },
+            }}
+            hideNavigation
+        />
+    );
 }
 
-export { Calendar, type CalendarProps, type Matcher };
+Calendar.displayName = 'Calendar';

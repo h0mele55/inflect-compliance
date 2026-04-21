@@ -10,6 +10,12 @@ import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 import { cn } from '@dub/utils';
 
 const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
@@ -310,8 +316,27 @@ export default function RiskDetailPage() {
                                 />
                             </div>
                             <div>
-                                <label className="input-label">Next Review</label>
-                                <input type="date" className="input" value={editForm.nextReviewAt ?? ''} onChange={set('nextReviewAt')} />
+                                <label className="input-label" htmlFor="risk-next-review-inline">Next Review</label>
+                                {/* Epic 58 — shared DatePicker; `editForm.nextReviewAt`
+                                    stays a YMD string for the PATCH payload. */}
+                                <DatePicker
+                                    id="risk-next-review-inline"
+                                    className="w-full"
+                                    placeholder="Pick date"
+                                    clearable
+                                    align="start"
+                                    value={parseYMD(editForm.nextReviewAt ?? '')}
+                                    onChange={(next) =>
+                                        setEditForm((f) => ({
+                                            ...f,
+                                            nextReviewAt: toYMD(next) ?? '',
+                                        }))
+                                    }
+                                    disabledDays={{
+                                        before: startOfUtcDay(new Date()),
+                                    }}
+                                    aria-label="Next review date"
+                                />
                             </div>
                         </div>
                         <div>

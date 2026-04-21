@@ -1,262 +1,316 @@
-import { cn } from "@dub/utils";
+"use client";
+
 import { Group } from "@visx/group";
 import { ParentSize } from "@visx/responsive";
-import { scaleBand, scaleLinear, scaleUtc } from "@visx/scale";
 import { Bar, Circle, Line } from "@visx/shape";
-import { PropsWithChildren, useMemo, useState } from "react";
+import { PropsWithChildren, ReactNode, useMemo, useState } from "react";
+
 import { ChartContext, ChartTooltipContext } from "./chart-context";
+import { ChartTooltipContainer } from "./interaction";
 import {
-  ChartProps,
-  Datum,
-  type ChartContext as ChartContextType,
+    DEFAULT_CHART_MARGIN,
+    buildTimeSeriesXScale,
+    buildYScale,
+    computeYDomain,
+    getDateExtent,
+    resolveChartPadding,
+} from "./layout";
+import {
+    ChartProps,
+    Datum,
+    type ChartContext as ChartContextType,
 } from "./types";
 import { useTooltip } from "./use-tooltip";
 
-type TimeSeriesChartProps<T extends Datum> = PropsWithChildren<ChartProps<T>>;
+/**
+ * Epic 59 — canonical interactive time-series chart.
+ *
+ * One component powers every dashboard trend panel and future
+ * reporting surface. Composes the shared axis / tooltip / layout
+ * primitives so every consumer inherits the same spacing, tick
+ * density, token-backed palette, and hover behaviour.
+ *
+ * Usage:
+ *
+ *   <TimeSeriesChart data={data} series={series}>
+ *       <YAxis showGridLines />
+ *       <Areas />
+ *       <XAxis />
+ *   </TimeSeriesChart>
+ *
+ * Passes through to `<ChartContext.Provider>` + `<ChartTooltipContext.Provider>`
+ * so the children (`<Areas>`, `<Bars>`, `<XAxis>`, `<YAxis>`, or any
+ * caller-provided overlay) can reach the shared state via the hooks
+ * in `./chart-context`.
+ *
+ * No-data handling: when `data` or `series` is empty the chart
+ * renders its `emptyState` instead of a silent zero-height block —
+ * dashboards never show a mystery gap where a chart was supposed to
+ * be.
+ */
+
+interface TimeSeriesChartExtraProps {
+    /**
+     * Content rendered when `data` or `series` is empty. Defaults to
+     * an inline, token-backed copy that matches the broader empty-state
+     * dialect. Pass a `<EmptyState icon={...} title=… />` (from
+     * `src/components/ui/empty-state.tsx`) for page-level emptiness.
+     */
+    emptyState?: ReactNode;
+
+    /** Optional className forwarded to the outer wrapper (positioning / height). */
+    className?: string;
+}
+
+type TimeSeriesChartProps<T extends Datum> = PropsWithChildren<ChartProps<T>> &
+    TimeSeriesChartExtraProps;
+
+const DEFAULT_EMPTY_STATE = (
+    <div
+        data-chart-empty
+        role="status"
+        className="flex h-full w-full items-center justify-center px-6 py-8 text-center text-sm text-content-muted"
+    >
+        No data available for this range.
+    </div>
+);
 
 export function TimeSeriesChart<T extends Datum>(
-  props: TimeSeriesChartProps<T>,
+    props: TimeSeriesChartProps<T>,
 ) {
-  return (
-    <ParentSize className="relative">
-      {({ width, height }) => {
-        return (
-          width > 0 &&
-          height > 0 &&
-          props.data.length > 0 &&
-          props.series.length > 0 && (
-            <TimeSeriesChartInner {...props} width={width} height={height} />
-          )
-        );
-      }}
-    </ParentSize>
-  );
+    const isEmpty = props.data.length === 0 || props.series.length === 0;
+
+    return (
+        <ParentSize className={props.className ?? "relative"}>
+            {({ width, height }) => {
+                if (width <= 0 || height <= 0) return null;
+                if (isEmpty) {
+                    return (
+                        <div
+                            style={{ width, height }}
+                            className="flex items-center justify-center"
+                        >
+                            {props.emptyState ?? DEFAULT_EMPTY_STATE}
+                        </div>
+                    );
+                }
+                return (
+                    <TimeSeriesChartInner
+                        {...props}
+                        width={width}
+                        height={height}
+                    />
+                );
+            }}
+        </ParentSize>
+    );
 }
 
 function TimeSeriesChartInner<T extends Datum>({
-  type = "area",
-  width: outerWidth,
-  height: outerHeight,
-  children,
-  data,
-  series,
-  tooltipContent = (d) => series[0].valueAccessor(d).toString(),
-  tooltipClassName = "",
-  defaultTooltipIndex = null,
-  onHoverDateChange,
-  margin: marginProp = {
-    top: 12,
-    right: 5,
-    bottom: 32,
-    left: 5,
-  },
-  padding: paddingProp,
-}: {
-  width: number;
-  height: number;
-} & TimeSeriesChartProps<T>) {
-  const [leftAxisMargin, setLeftAxisMargin] = useState<number>();
-
-  const margin = {
-    ...marginProp,
-    left: marginProp.left + (leftAxisMargin ?? 0),
-  };
-
-  const padding = paddingProp ?? {
-    top: 0.1,
-    bottom: type === "area" ? 0.1 : 0,
-  };
-
-  const width = outerWidth - margin.left - margin.right;
-  const height = outerHeight - margin.top - margin.bottom;
-
-  const { startDate, endDate } = useMemo(() => {
-    const dates = data.map(({ date }) => date);
-    const times = dates.map((d) => d.getTime());
-
-    return {
-      startDate: dates[times.indexOf(Math.min(...times))],
-      endDate: dates[times.indexOf(Math.max(...times))],
-    };
-  }, [data]);
-
-  const { minY, maxY } = useMemo(() => {
-    const activeSeries = series.filter(({ isActive }) => isActive !== false);
-    const values = data
-      .flatMap((d) =>
-        type === "bar"
-          ? // Sum values for stacked bars
-            activeSeries.reduce((sum, s) => sum + s.valueAccessor(d), 0)
-          : activeSeries.map((s) => s.valueAccessor(d)),
-      )
-      .filter((v): v is number => v != null);
-
-    return {
-      // Start at 0 for bar charts
-      minY: type === "area" ? Math.min(...values) : Math.min(0, ...values),
-      maxY: Math.max(...values),
-    };
-  }, [data, series, type]);
-
-  const { yScale, xScale } = useMemo(() => {
-    const rangeY = maxY - minY;
-    return {
-      yScale: scaleLinear<number>({
-        domain: [
-          minY - rangeY * (padding.bottom ?? 0),
-          maxY + rangeY * (padding.top ?? 0),
-        ],
-        range: [height, 0],
-        nice: true,
-        clamp: true,
-      }),
-      xScale:
-        type === "area"
-          ? scaleUtc<number>({
-              domain: [startDate, endDate],
-              range: [0, width],
-            })
-          : scaleBand({
-              domain: data.map(({ date }) => date),
-              range: [0, width],
-              padding: 0.15,
-              align: 0.5,
-            }),
-    };
-  }, [startDate, endDate, minY, maxY, height, width, data.length, type]);
-
-  const chartContext: ChartContextType<T> = {
-    type,
-    width,
-    height,
+    type = "area",
+    width: outerWidth,
+    height: outerHeight,
+    children,
     data,
     series,
-    startDate,
-    endDate,
-    xScale: xScale as any,
-    yScale,
-    minY,
-    maxY,
-    margin,
-    padding,
-    tooltipContent,
-    tooltipClassName,
-    defaultTooltipIndex,
+    tooltipContent = (d) => series[0].valueAccessor(d).toString(),
+    tooltipClassName = "",
+    defaultTooltipIndex = null,
     onHoverDateChange,
-    leftAxisMargin,
-    setLeftAxisMargin,
-  };
+    margin: marginProp = DEFAULT_CHART_MARGIN,
+    padding: paddingProp,
+}: {
+    width: number;
+    height: number;
+} & TimeSeriesChartProps<T>) {
+    const [leftAxisMargin, setLeftAxisMargin] = useState<number>();
 
-  const tooltipContext = useTooltip({
-    seriesId: series[0].id,
-    chartContext,
-    onHoverDateChange,
-    defaultIndex: defaultTooltipIndex ?? undefined,
-  });
+    const margin = {
+        ...marginProp,
+        left: marginProp.left + (leftAxisMargin ?? 0),
+    };
 
-  const {
-    tooltipData,
-    TooltipWrapper,
-    tooltipLeft,
-    tooltipTop,
-    handleTooltip,
-    hideTooltip,
-    containerRef,
-  } = tooltipContext;
+    const padding = resolveChartPadding(type, paddingProp);
 
-  return (
-    <ChartContext.Provider value={chartContext}>
-      <ChartTooltipContext.Provider value={tooltipContext}>
-        <svg width={outerWidth} height={outerHeight} ref={containerRef}>
-          {children}
-          <Group left={margin.left} top={margin.top}>
-            {/* Tooltip hover line + circle */}
-            {tooltipData &&
-              ("bandwidth" in xScale ? (
-                <>
-                  <Bar
-                    x={
-                      (xScale(tooltipData.date) ?? 0) -
-                      xScale.bandwidth() * xScale.padding()
-                    }
-                    width={xScale.bandwidth() * (1 + xScale.padding() * 2)}
-                    y={0}
-                    height={height}
-                    className="fill-[rgb(var(--content-emphasis))]"
-                    fillOpacity={0.05}
-                  />
-                </>
-              ) : (
-                <>
-                  <Line
-                    x1={xScale(tooltipData.date)}
-                    x2={xScale(tooltipData.date)}
-                    y1={height}
-                    y2={0}
-                    className="stroke-[rgb(var(--content-emphasis))]"
-                    strokeOpacity={0.5}
-                    strokeWidth={1}
-                  />
+    const width = outerWidth - margin.left - margin.right;
+    const height = outerHeight - margin.top - margin.bottom;
 
-                  {series
-                    .filter(({ isActive }) => isActive)
-                    .map((s) => (
-                      <Circle
-                        key={s.id}
-                        cx={xScale(tooltipData.date)}
-                        cy={yScale(s.valueAccessor(tooltipData))}
-                        r={4}
-                        className={s.colorClassName ?? "text-blue-800"}
-                        fill="currentColor"
-                      />
-                    ))}
-                </>
-              ))}
+    const { startDate, endDate } = useMemo(() => getDateExtent(data), [data]);
 
-            {/* Tooltip hover region */}
-            <Bar
-              x={0}
-              y={0}
-              width={width}
-              height={height}
-              onTouchStart={handleTooltip}
-              onTouchMove={handleTooltip}
-              onMouseMove={handleTooltip}
-              onMouseLeave={hideTooltip}
-              fill="transparent"
-            />
-          </Group>
-        </svg>
+    const { minY, maxY } = useMemo(
+        () => computeYDomain({ data, series, type }),
+        [data, series, type],
+    );
 
-        {/* Tooltips */}
-        <div className="pointer-events-none absolute inset-0">
-          {tooltipData && (
-            <TooltipWrapper
-              key={tooltipData.date.toString()}
-              left={(tooltipLeft ?? 0) + margin.left}
-              top={(tooltipTop ?? 0) + margin.top}
-              offsetLeft={
-                "bandwidth" in xScale
-                  ? xScale.bandwidth() * (1 + xScale.padding())
-                  : 8
-              }
-              offsetTop={12}
-              className="absolute"
-              unstyled={true}
-            >
-              <div
-                className={cn(
-                  "border-border-default bg-bg-default pointer-events-none rounded-lg border px-4 py-2 text-base shadow-sm",
-                  tooltipClassName,
-                )}
-              >
-                {tooltipContent?.(tooltipData) ??
-                  series[0].valueAccessor(tooltipData)}
-              </div>
-            </TooltipWrapper>
-          )}
-        </div>
-      </ChartTooltipContext.Provider>
-    </ChartContext.Provider>
-  );
+    const { yScale, xScale } = useMemo(
+        () => ({
+            yScale: buildYScale({ minY, maxY, padding, height }),
+            xScale: buildTimeSeriesXScale({
+                data,
+                startDate,
+                endDate,
+                width,
+                type,
+            }),
+        }),
+        [
+            startDate,
+            endDate,
+            minY,
+            maxY,
+            height,
+            width,
+            data,
+            type,
+            padding.top,
+            padding.bottom,
+        ],
+    );
+
+    const chartContext: ChartContextType<T> = {
+        type,
+        width,
+        height,
+        data,
+        series,
+        startDate,
+        endDate,
+        xScale: xScale as any,
+        yScale,
+        minY,
+        maxY,
+        margin,
+        padding,
+        tooltipContent,
+        tooltipClassName,
+        defaultTooltipIndex,
+        onHoverDateChange,
+        leftAxisMargin,
+        setLeftAxisMargin,
+    };
+
+    const tooltipContext = useTooltip({
+        seriesId: series[0].id,
+        chartContext,
+        onHoverDateChange,
+        defaultIndex: defaultTooltipIndex ?? undefined,
+    });
+
+    const {
+        tooltipData,
+        TooltipWrapper,
+        tooltipLeft,
+        tooltipTop,
+        handleTooltip,
+        hideTooltip,
+        containerRef,
+    } = tooltipContext;
+
+    const isBandScale = "bandwidth" in xScale;
+
+    return (
+        <ChartContext.Provider value={chartContext}>
+            <ChartTooltipContext.Provider value={tooltipContext}>
+                <svg
+                    width={outerWidth}
+                    height={outerHeight}
+                    ref={containerRef}
+                    role="img"
+                    data-chart="time-series"
+                    data-chart-type={type}
+                >
+                    {children}
+                    <Group left={margin.left} top={margin.top}>
+                        {/* Tooltip hover indicator */}
+                        {tooltipData &&
+                            (isBandScale ? (
+                                <Bar
+                                    x={
+                                        (xScale(tooltipData.date) ?? 0) -
+                                        xScale.bandwidth() * xScale.padding()
+                                    }
+                                    width={
+                                        xScale.bandwidth() *
+                                        (1 + xScale.padding() * 2)
+                                    }
+                                    y={0}
+                                    height={height}
+                                    fill="var(--content-emphasis)"
+                                    fillOpacity={0.05}
+                                />
+                            ) : (
+                                <>
+                                    <Line
+                                        x1={xScale(tooltipData.date)}
+                                        x2={xScale(tooltipData.date)}
+                                        y1={height}
+                                        y2={0}
+                                        stroke="var(--content-emphasis)"
+                                        strokeOpacity={0.5}
+                                        strokeWidth={1}
+                                    />
+                                    {series
+                                        .filter(({ isActive }) => isActive)
+                                        .map((s) => (
+                                            <Circle
+                                                key={s.id}
+                                                cx={xScale(tooltipData.date)}
+                                                cy={yScale(
+                                                    s.valueAccessor(tooltipData),
+                                                )}
+                                                r={4}
+                                                className={
+                                                    s.colorClassName ??
+                                                    "text-brand-emphasis"
+                                                }
+                                                fill="currentColor"
+                                            />
+                                        ))}
+                                </>
+                            ))}
+
+                        {/* Tooltip hover capture region */}
+                        <Bar
+                            x={0}
+                            y={0}
+                            width={width}
+                            height={height}
+                            onTouchStart={handleTooltip}
+                            onTouchMove={handleTooltip}
+                            onMouseMove={handleTooltip}
+                            onMouseLeave={hideTooltip}
+                            fill="transparent"
+                        />
+                    </Group>
+                </svg>
+
+                {/* Tooltip surface — positioned by visx, styled by the
+                    shared ChartTooltipContainer so every chart reads
+                    as part of the same system. */}
+                <div className="pointer-events-none absolute inset-0">
+                    {tooltipData && (
+                        <TooltipWrapper
+                            key={tooltipData.date.toString()}
+                            left={(tooltipLeft ?? 0) + margin.left}
+                            top={(tooltipTop ?? 0) + margin.top}
+                            offsetLeft={
+                                isBandScale
+                                    ? xScale.bandwidth() *
+                                      (1 + xScale.padding())
+                                    : 8
+                            }
+                            offsetTop={12}
+                            className="absolute"
+                            unstyled={true}
+                        >
+                            <ChartTooltipContainer className={tooltipClassName}>
+                                {tooltipContent?.(tooltipData) ??
+                                    series[0].valueAccessor(tooltipData)}
+                            </ChartTooltipContainer>
+                        </TooltipWrapper>
+                    )}
+                </div>
+            </ChartTooltipContext.Provider>
+        </ChartContext.Provider>
+    );
 }

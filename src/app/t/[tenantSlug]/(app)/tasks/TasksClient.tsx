@@ -18,6 +18,12 @@ import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildTaskFilters, TASK_FILTER_KEYS } from './filter-defs';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -388,7 +394,24 @@ function TasksPageInner({
                         />
                     )}
                     {bulkAction === 'due' && (
-                        <input type="date" className="input w-full sm:w-40 text-sm" value={bulkValue} onChange={e => setBulkValue(e.target.value)} id="bulk-value-input" />
+                        // Epic 58 — shared DatePicker for the bulk "Set due
+                        // date" action. `bulkValue` stays a YMD string so
+                        // the bulk POST body is unchanged.
+                        <DatePicker
+                            id="bulk-value-input"
+                            className="w-full sm:w-40 text-sm"
+                            placeholder="Due date"
+                            clearable
+                            align="start"
+                            value={parseYMD(bulkValue)}
+                            onChange={(next) =>
+                                setBulkValue(toYMD(next) ?? '')
+                            }
+                            disabledDays={{
+                                before: startOfUtcDay(new Date()),
+                            }}
+                            aria-label="Bulk due date"
+                        />
                     )}
                     <button
                         className="btn btn-primary"

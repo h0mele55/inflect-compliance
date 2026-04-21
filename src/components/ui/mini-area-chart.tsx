@@ -1,3 +1,6 @@
+"use client";
+
+import { cn } from "@dub/utils";
 import { curveNatural } from "@visx/curve";
 import { LinearGradient } from "@visx/gradient";
 import { Group } from "@visx/group";
@@ -7,136 +10,222 @@ import { Area, AreaClosed } from "@visx/shape";
 import { motion } from "motion/react";
 import { useId, useMemo } from "react";
 
-const defaultPadding = { top: 8, right: 2, bottom: 2, left: 2 };
+import type { SparklineData, TimeSeriesPoint } from "@/components/ui/charts";
 
-export type MiniAreaChartProps = {
-  data: { date: Date; value: number }[];
-  curve?: boolean;
-  color?: string;
-  padding?: Partial<typeof defaultPadding>;
+/**
+ * Epic 59 — compact sparkline for KPI cards and summary tiles.
+ *
+ * Renders a small token-backed area chart (no axes, no ticks, no
+ * tooltip) sized to whatever the parent gives it. Designed to sit
+ * inside a KPI card's value row, a table cell's trend column, or a
+ * compact dashboard widget. Handles empty data by rendering a bare
+ * baseline rather than throwing.
+ *
+ * Example:
+ *
+ *   <MiniAreaChart
+ *       data={[
+ *           { date: new Date('2026-04-01'), value: 70 },
+ *           { date: new Date('2026-04-02'), value: 72 },
+ *           ...
+ *       ]}
+ *       variant="success"
+ *       aria-label="Coverage trend — last 30 days"
+ *   />
+ */
+
+export type MiniAreaChartVariant =
+    | "brand"
+    | "success"
+    | "warning"
+    | "error"
+    | "info"
+    | "neutral";
+
+const DEFAULT_PADDING = { top: 6, right: 2, bottom: 2, left: 2 };
+
+interface MiniAreaChartProps {
+    data: SparklineData | TimeSeriesPoint[];
+    /** Status variant — drives the stroke + fill colour token. */
+    variant?: MiniAreaChartVariant;
+    /** Natural-curve smoothing on the line. Defaults to true. */
+    curve?: boolean;
+    /** Padding around the drawable area (in px). */
+    padding?: Partial<typeof DEFAULT_PADDING>;
+    /** Accessible label. Sparklines *must* carry one — the caller owns the meaning. */
+    "aria-label": string;
+    /** Extra classes on the outer wrapper. */
+    className?: string;
+}
+
+// ─── Variant token table ─────────────────────────────────────────────
+
+const VARIANT_TEXT: Record<MiniAreaChartVariant, string> = {
+    brand: "text-brand-emphasis",
+    success: "text-content-success",
+    warning: "text-content-warning",
+    error: "text-content-error",
+    info: "text-content-info",
+    neutral: "text-content-muted",
 };
 
+// ─── Component ───────────────────────────────────────────────────────
+
 export function MiniAreaChart(props: MiniAreaChartProps) {
-  return (
-    <ParentSize className="relative">
-      {({ width, height }) => {
-        return (
-          width > 0 &&
-          height > 0 && <MiniAreaChartInner {...{ width, height, ...props }} />
-        );
-      }}
-    </ParentSize>
-  );
+    return (
+        <ParentSize className={cn("relative", props.className)}>
+            {({ width, height }) => {
+                if (width <= 0 || height <= 0) return null;
+                return <MiniAreaChartInner {...props} width={width} height={height} />;
+            }}
+        </ParentSize>
+    );
 }
 
 function MiniAreaChartInner({
-  width,
-  height,
-  data,
-  curve = true,
-  color,
-  padding: paddingProp,
+    width,
+    height,
+    data,
+    variant = "brand",
+    curve = true,
+    padding: paddingProp,
+    "aria-label": ariaLabel,
 }: MiniAreaChartProps & { width: number; height: number }) {
-  const padding = { ...defaultPadding, ...paddingProp };
+    const padding = { ...DEFAULT_PADDING, ...paddingProp };
+    const id = useId();
+    const innerWidth = Math.max(0, width - padding.left - padding.right);
+    const innerHeight = Math.max(0, height - padding.top - padding.bottom);
 
-  const id = useId();
+    const zeroedData = useMemo(
+        () => data.map(({ date }) => ({ date, value: 0 })),
+        [data],
+    );
 
-  const zeroedData = useMemo(
-    () =>
-      data.map(({ date }) => ({
-        date,
-        value: 0,
-      })),
-    [data],
-  );
+    const { yScale, xScale } = useMemo(() => {
+        if (data.length === 0) {
+            // Hooks must run every render; return stable scales so
+            // downstream code can skip the draw branch safely.
+            return {
+                yScale: scaleLinear<number>({
+                    domain: [0, 1],
+                    range: [innerHeight, 0],
+                }),
+                xScale: scaleUtc<number>({
+                    domain: [new Date(0), new Date(1)],
+                    range: [0, innerWidth],
+                }),
+            };
+        }
+        const values = data.map(({ value }) => value);
+        let minY = values[0];
+        let maxY = values[0];
+        for (const v of values) {
+            if (v < minY) minY = v;
+            if (v > maxY) maxY = v;
+        }
+        // Constant-value data gets a small synthetic range so the
+        // sparkline draws a horizontal line rather than a point.
+        if (minY === maxY) {
+            maxY = minY + 1;
+            minY = minY - 1;
+        }
 
-  const { yScale, xScale } = useMemo(() => {
-    const values = data.map(({ value }) => value);
-    const maxY = Math.max(...values);
+        const dateTimes = data.map(({ date }) => date.getTime());
+        const minDate = new Date(Math.min(...dateTimes));
+        const maxDate = new Date(Math.max(...dateTimes));
 
-    const dateTimes = data.map(({ date }) => date.getTime());
-    const minDate = new Date(Math.min(...dateTimes));
-    const maxDate = new Date(Math.max(...dateTimes));
+        return {
+            yScale: scaleLinear<number>({
+                domain: [minY, maxY],
+                range: [innerHeight, 0],
+                nice: true,
+                clamp: true,
+            }),
+            xScale: scaleUtc<number>({
+                domain: [minDate, maxDate],
+                range: [0, innerWidth],
+            }),
+        };
+    }, [data, innerHeight, innerWidth]);
 
-    return {
-      yScale: scaleLinear<number>({
-        domain: [-2, Math.max(maxY, 2)],
-        range: [height - padding.top - padding.bottom, 0],
-        nice: true,
-        clamp: true,
-      }),
-      xScale: scaleUtc<number>({
-        domain: [minDate, maxDate],
-        range: [0, width - padding.left - padding.right],
-        nice: true,
-      }),
-    };
-  }, [data, height, width]);
+    // Empty data — render a bare baseline rather than an empty SVG.
+    if (data.length === 0) {
+        return (
+            <svg
+                width={width}
+                height={height}
+                role="img"
+                aria-label={ariaLabel}
+                data-mini-chart
+                data-mini-chart-empty
+                className={cn(VARIANT_TEXT[variant])}>
+                <line
+                    x1={padding.left}
+                    x2={width - padding.right}
+                    y1={height / 2}
+                    y2={height / 2}
+                    stroke="var(--border-subtle)"
+                    strokeDasharray="2 3"
+                    strokeWidth={1}
+                />
+            </svg>
+        );
+    }
 
-  return (
-    <svg width={width} height={height} key={data.length}>
-      <defs>
-        <LinearGradient
-          id={`${id}-color-gradient`}
-          from={color || "#7D3AEC"}
-          to={color || "#DA2778"}
-          x1={0}
-          x2={width - padding.left - padding.right}
-          gradientUnits="userSpaceOnUse"
-        />
-        <LinearGradient
-          id={`${id}-mask-gradient`}
-          from="white"
-          to="white"
-          fromOpacity={0.3}
-          toOpacity={0}
-          x1={0}
-          x2={0}
-          y1={0}
-          y2={1}
-        />
-        <mask id={`${id}-mask`} maskContentUnits="objectBoundingBox">
-          <rect width="1" height="1" fill={`url(#${id}-mask-gradient)`} />
-        </mask>
-      </defs>
-      <Group left={padding.left} top={padding.top}>
-        <Area
-          data={data}
-          x={({ date }) => xScale(date)}
-          y={({ value }) => yScale(value) ?? 0}
-          curve={curve ? curveNatural : undefined}
-        >
-          {({ path }) => {
-            return (
-              <motion.path
-                initial={{ d: path(zeroedData) || "", opacity: 0 }}
-                animate={{ d: path(data) || "", opacity: 1 }}
-                strokeWidth={1.5}
-                stroke={`url(#${id}-color-gradient)`}
-              />
-            );
-          }}
-        </Area>
-
-        <AreaClosed
-          data={data}
-          x={({ date }) => xScale(date)}
-          y={({ value }) => yScale(value) ?? 0}
-          yScale={yScale}
-          curve={curve ? curveNatural : undefined}
-        >
-          {({ path }) => {
-            return (
-              <motion.path
-                initial={{ d: path(zeroedData) || "", opacity: 0 }}
-                animate={{ d: path(data) || "", opacity: 1 }}
-                fill={`url(#${id}-color-gradient)`}
-                mask={`url(#${id}-mask)`}
-              />
-            );
-          }}
-        </AreaClosed>
-      </Group>
-    </svg>
-  );
+    return (
+        <svg
+            width={width}
+            height={height}
+            key={data.length}
+            role="img"
+            aria-label={ariaLabel}
+            data-mini-chart
+            className={cn(VARIANT_TEXT[variant])}>
+            <defs>
+                {/* Area fill — currentColor flowing from the variant class. */}
+                <LinearGradient
+                    id={`${id}-fill-gradient`}
+                    from="currentColor"
+                    to="currentColor"
+                    fromOpacity={0.3}
+                    toOpacity={0}
+                    x1={0}
+                    x2={0}
+                    y1={0}
+                    y2={1}
+                />
+            </defs>
+            <Group left={padding.left} top={padding.top}>
+                <AreaClosed
+                    data={data as TimeSeriesPoint[]}
+                    x={({ date }) => xScale(date) ?? 0}
+                    y={({ value }) => yScale(value) ?? 0}
+                    yScale={yScale}
+                    curve={curve ? curveNatural : undefined}>
+                    {({ path }) => (
+                        <motion.path
+                            initial={{ d: path(zeroedData) || "", opacity: 0 }}
+                            animate={{ d: path(data as TimeSeriesPoint[]) || "", opacity: 1 }}
+                            fill={`url(#${id}-fill-gradient)`}
+                        />
+                    )}
+                </AreaClosed>
+                <Area
+                    data={data as TimeSeriesPoint[]}
+                    x={({ date }) => xScale(date) ?? 0}
+                    y={({ value }) => yScale(value) ?? 0}
+                    curve={curve ? curveNatural : undefined}>
+                    {({ path }) => (
+                        <motion.path
+                            initial={{ d: path(zeroedData) || "", opacity: 0 }}
+                            animate={{ d: path(data as TimeSeriesPoint[]) || "", opacity: 1 }}
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                            fill="none"
+                        />
+                    )}
+                </Area>
+            </Group>
+        </svg>
+    );
 }

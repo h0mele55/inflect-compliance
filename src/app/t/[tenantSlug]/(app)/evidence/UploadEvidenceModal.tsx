@@ -39,6 +39,12 @@ import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
 import { FormError } from '@/components/ui/form-error';
 import { InfoTooltip } from '@/components/ui/tooltip';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 import { queryKeys } from '@/lib/queryKeys';
 import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
@@ -344,7 +350,15 @@ export function UploadEvidenceModal({
                                 />
                             </div>
 
-                            {/* Retention date */}
+                            {/* Retention date.
+                              Epic 58 — migrated from the native date
+                              input to the shared DatePicker.
+                              `retentionUntil` stays a YMD string
+                              externally (same serialisation the
+                              retention API expects); the picker
+                              bridges to `DateValue` at the prop edge.
+                              `disabledDays` mirrors the previous
+                              `min=today` constraint. */}
                             <div>
                                 <div className="mb-1 flex items-center gap-1.5">
                                     <label
@@ -359,17 +373,20 @@ export function UploadEvidenceModal({
                                         content="After this date the evidence is archived out of the active set. It stays in the audit log — admins can still recover it."
                                     />
                                 </div>
-                                <input
+                                <DatePicker
                                     id="retention-date-input"
-                                    type="date"
-                                    className="input w-full"
-                                    value={retentionUntil}
-                                    onChange={(e) =>
-                                        setRetentionUntil(e.target.value)
-                                    }
-                                    min={
-                                        new Date().toISOString().split('T')[0]
-                                    }
+                                    className="w-full"
+                                    placeholder="Select date"
+                                    clearable
+                                    align="start"
+                                    value={parseYMD(retentionUntil)}
+                                    onChange={(next) => {
+                                        setRetentionUntil(toYMD(next) ?? '');
+                                    }}
+                                    disabledDays={{
+                                        before: startOfUtcDay(new Date()),
+                                    }}
+                                    aria-label="Retain until"
                                 />
                                 <p className="mt-1 text-xs text-content-muted">
                                     Optional — when this evidence expires.

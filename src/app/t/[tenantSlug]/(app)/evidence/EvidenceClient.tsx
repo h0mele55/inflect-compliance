@@ -12,6 +12,12 @@ import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 // acceptable and the E2E suite becomes deterministic.
 import { UploadEvidenceModal } from './UploadEvidenceModal';
 import { NewEvidenceTextModal } from './NewEvidenceTextModal';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 import {
     ColumnsDropdown,
     DataTable,
@@ -342,12 +348,29 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                         )}
                         {editingRetention === ev.id && (
                             <div className="mt-2 flex gap-1 items-center">
-                                <input
-                                    type="date"
-                                    className="input text-xs py-0.5 px-1 w-32"
-                                    value={editRetentionDate}
-                                    onChange={e => setEditRetentionDate(e.target.value)}
+                                {/*
+                                  Epic 58 — inline retention edit now
+                                  uses the shared DatePicker. The
+                                  surrounding YMD-string state stays
+                                  unchanged so `saveRetention()` keeps
+                                  the existing retention API contract.
+                                */}
+                                <DatePicker
                                     id={`retention-edit-${ev.id}`}
+                                    className="w-36 text-xs"
+                                    placeholder="Pick date"
+                                    clearable
+                                    align="start"
+                                    value={parseYMD(editRetentionDate)}
+                                    onChange={(next) => {
+                                        setEditRetentionDate(
+                                            toYMD(next) ?? '',
+                                        );
+                                    }}
+                                    disabledDays={{
+                                        before: startOfUtcDay(new Date()),
+                                    }}
+                                    aria-label="Retention date"
                                 />
                                 <button onClick={() => saveRetention(ev.id)} className="btn btn-sm btn-primary text-xs py-0.5 px-1.5">Save</button>
                                 <Tooltip content="Cancel edit" shortcut="Esc">

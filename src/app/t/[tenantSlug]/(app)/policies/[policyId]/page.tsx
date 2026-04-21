@@ -5,6 +5,12 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import type { PolicyDetailDTO, PolicyVersionDTO, AuditLogEntry } from '@/lib/dto';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 
 const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral', PUBLISHED: 'badge-success', ARCHIVED: 'badge-warning',
@@ -306,9 +312,34 @@ export default function PolicyDetailPage() {
                                         onChange={e => setReviewDays(e.target.value)} min={1} />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-content-subtle">Next review</label>
-                                    <input type="date" className="input w-36 text-sm" value={nextReview}
-                                        onChange={e => setNextReview(e.target.value)} />
+                                    <label
+                                        className="text-xs text-content-subtle"
+                                        htmlFor="policy-next-review-input"
+                                    >
+                                        Next review
+                                    </label>
+                                    {/*
+                                      Epic 58 — replaces the previous
+                                      native date input with the shared
+                                      DatePicker. `nextReview` keeps its
+                                      YMD-string shape so `saveReview()`
+                                      posts the same payload as before.
+                                    */}
+                                    <DatePicker
+                                        id="policy-next-review-input"
+                                        className="w-44 text-sm"
+                                        placeholder="Pick date"
+                                        clearable
+                                        align="start"
+                                        value={parseYMD(nextReview)}
+                                        onChange={(next) => {
+                                            setNextReview(toYMD(next) ?? '');
+                                        }}
+                                        disabledDays={{
+                                            before: startOfUtcDay(new Date()),
+                                        }}
+                                        aria-label="Next review date"
+                                    />
                                 </div>
                                 <button onClick={saveReview} disabled={savingReview} className="btn btn-xs btn-primary">
                                     {savingReview ? '...' : 'Save'}

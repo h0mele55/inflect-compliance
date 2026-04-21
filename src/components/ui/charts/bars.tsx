@@ -84,7 +84,7 @@ export function Bars({
                       width={barWidth}
                       height={b.height}
                       className={cn(
-                        b.colorClassName ?? "text-blue-700",
+                        b.colorClassName ?? "text-brand-emphasis",
                         b.styles?.barClassName,
                       )}
                       fill={b.styles?.barFill || "currentColor"}

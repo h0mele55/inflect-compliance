@@ -1,8 +1,152 @@
-export * from "./areas";
-export * from "./bars";
-export * from "./chart-context";
-export * from "./funnel-chart";
-export * from "./time-series-chart";
-export * from "./tooltip-sync";
-export * from "./x-axis";
-export * from "./y-axis";
+/**
+ * Epic 59 — chart platform barrel.
+ *
+ * The canonical entry point for every reusable chart primitive in
+ * Inflect. Consumers should import from `@/components/ui/charts`
+ * rather than reaching for individual files — the sub-modules are
+ * implementation details that can be refactored without touching
+ * call sites.
+ *
+ * Public API surface:
+ *
+ *   - **Primitives**   — `Areas`, `Bars`, `XAxis`, `YAxis`
+ *   - **Charts**       — `TimeSeriesChart`, `FunnelChart`
+ *   - **Coordination** — `ChartTooltipSync`, `ChartContext`,
+ *                        `ChartTooltipContext`, `useChartContext`,
+ *                        `useChartTooltipContext`
+ *   - **Types**        — `Datum`, `TimeSeriesDatum`, `Series`,
+ *                        `ChartProps`, plus the `ChartContext` /
+ *                        `ChartTooltipContext` type aliases
+ *
+ * Private to the module (not re-exported):
+ *
+ *   - `./use-tooltip.ts` — internal hook composing `@visx/tooltip`'s
+ *     portal + bounds behaviour.
+ *   - `./utils.ts` — legacy alias for the `getFactors` helper; new
+ *     code should import from `./layout` via the barrel instead.
+ *
+ * Tokens & theming:
+ *   - Chart surfaces should declare colours via the existing design
+ *     tokens (`bg-bg-*`, `text-content-*`, `border-border-*`,
+ *     `bg-brand-*`). Never hardcode hex values in chart call sites.
+ *   - The `Series.colorClassName` prop accepts any Tailwind utility
+ *     — pass a token-backed class there rather than inline styles.
+ *
+ * Non-goals:
+ *   - This module is *not* the home for KPI / progress / donut /
+ *     risk-heatmap widgets (`src/components/ui/KpiCard.tsx`,
+ *     `ProgressCard.tsx`, `DonutChart.tsx`, `RiskHeatmap.tsx`,
+ *     `mini-area-chart.tsx`). Those are compact widgets with their
+ *     own display contract; later Epic 59 prompts may migrate them
+ *     onto these primitives where it helps, but the boundary is
+ *     deliberate: pick this module when you need an interactive
+ *     time-series / funnel; pick the top-level widget when you need
+ *     a static, compact card.
+ */
+
+// ─── Primitives ────────────────────────────────────────────────────────
+
+export * from './areas';
+export * from './bars';
+export * from './x-axis';
+export * from './y-axis';
+
+// ─── Full charts ──────────────────────────────────────────────────────
+
+export * from './time-series-chart';
+export * from './funnel-chart';
+
+// ─── Coordination (context + sync across multiple charts) ─────────────
+
+export * from './chart-context';
+export * from './tooltip-sync';
+
+// ─── Shared scale / layout helpers (Epic 59) ─────────────────────────
+//
+// Pure helpers charts (and non-chart consumers that need to speak the
+// same scale or margin vocabulary) compose. Exported as values + as a
+// namespace so a downstream component can either pick individual
+// helpers or reach for the whole module via an alias import.
+
+export {
+    AXIS_LABEL_FONT_SIZE,
+    COMPACT_CHART_MARGIN,
+    DEFAULT_AREA_Y_PADDING,
+    DEFAULT_BAR_Y_PADDING,
+    DEFAULT_CHART_MARGIN,
+    DEFAULT_Y_AXIS_TICK_AXIS_SPACING,
+    buildTimeSeriesXScale,
+    buildYScale,
+    computeYDomain,
+    formatNumericTick,
+    formatShortDate,
+    getDateExtent,
+    getFactors,
+    pickXAxisTickCount,
+    pickXAxisTickValues,
+    pickYAxisTickCount,
+    resolveChartMargin,
+    resolveChartPadding,
+} from './layout';
+
+// ─── Shared interaction primitives (Epic 59) ─────────────────────────
+//
+// Hover + keyboard state hooks, and token-backed tooltip surface
+// components that every chart consumer should reach for so the
+// dashboard reads as one system rather than a patchwork of tooltip
+// implementations.
+
+export {
+    ChartTooltipContainer,
+    ChartTooltipRow,
+    useChartHover,
+    useChartKeyboardNavigation,
+} from './interaction';
+export type {
+    ChartHoverState,
+    ChartKeyboardNavigationOptions,
+    ChartKeyboardNavigationReturn,
+    ChartTooltipContainerProps,
+    ChartTooltipRowProps,
+} from './interaction';
+
+// ─── Public types ─────────────────────────────────────────────────────
+//
+// Visx-tied primitives the TimeSeriesChart / Funnel primitives consume
+// internally, plus the Epic 59 consumer contracts (point shapes,
+// dimensions, tooltip payloads, progress metrics, KPI metrics, state).
+
+export type {
+    // Visx-tied internals
+    AccessorFn,
+    ChartContext as ChartContextType,
+    ChartProps,
+    ChartTooltipContext as ChartTooltipContextType,
+    Data,
+    Datum,
+    Series,
+    TimeSeriesDatum,
+    // Consumer contracts
+    CategoryPoint,
+    ChartDimensions,
+    ChartMargin,
+    ChartPadding,
+    ChartState,
+    KpiMetric,
+    LabeledSeries,
+    ProgressMetric,
+    ProgressSegment,
+    SparklineData,
+    TimeSeriesPoint,
+    TooltipPayload,
+} from './types';
+
+// ─── Chart-state constructors + narrowing ────────────────────────────
+
+export {
+    chartEmpty,
+    chartError,
+    chartLoading,
+    chartReady,
+    isChartReady,
+} from './types';

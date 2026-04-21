@@ -9,6 +9,12 @@ import { Label } from '@/components/ui/label';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 
 // Epic 55 — vendor status is a two-option choice ("onboarding" vs
 // "active"). RadioGroup is the right primitive: both options are
@@ -209,20 +215,40 @@ export default function CreateVendorPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
+                    {/* Epic 58 — shared DatePickers; form state keeps
+                        the YMD string shape the vendors API expects. */}
                     <FormField label="Next Review Date">
-                        <Input
+                        <DatePicker
                             id="vendor-next-review"
-                            type="date"
-                            value={form.nextReviewAt}
-                            onChange={e => update('nextReviewAt', e.target.value)}
+                            className="w-full"
+                            placeholder="Select date"
+                            clearable
+                            align="start"
+                            value={parseYMD(form.nextReviewAt)}
+                            onChange={(next) =>
+                                update('nextReviewAt', toYMD(next) ?? '')
+                            }
+                            disabledDays={{
+                                before: startOfUtcDay(new Date()),
+                            }}
+                            aria-label="Next review date"
                         />
                     </FormField>
                     <FormField label="Contract Renewal Date">
-                        <Input
+                        <DatePicker
                             id="vendor-contract-renewal"
-                            type="date"
-                            value={form.contractRenewalAt}
-                            onChange={e => update('contractRenewalAt', e.target.value)}
+                            className="w-full"
+                            placeholder="Select date"
+                            clearable
+                            align="start"
+                            value={parseYMD(form.contractRenewalAt)}
+                            onChange={(next) =>
+                                update('contractRenewalAt', toYMD(next) ?? '')
+                            }
+                            disabledDays={{
+                                before: startOfUtcDay(new Date()),
+                            }}
+                            aria-label="Contract renewal date"
                         />
                     </FormField>
                 </div>

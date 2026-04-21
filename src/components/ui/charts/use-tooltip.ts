@@ -173,7 +173,9 @@ export function useTooltip<T extends Datum>({
             ] as Date | undefined);
 
       if (x0 === undefined) {
-        console.log("x0 is undefined", { defaultTooltipData });
+        // Pointer outside the chart's x-domain — fall back to the
+        // default (if one was declared) or hide. No console logging
+        // in the hot path.
         if (defaultTooltipData) visxTooltip.showTooltip(defaultTooltipData);
         else visxTooltip.hideTooltip();
         return;

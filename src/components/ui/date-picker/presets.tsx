@@ -1,124 +1,113 @@
-import { cn } from "@dub/utils";
-import { Command } from "cmdk";
-import { Lock } from "lucide-react";
-import { Tooltip } from "../tooltip";
-import { DatePreset, DateRange, DateRangePreset, Preset } from "./types";
+'use client';
 
-type PresetsProps<TPreset extends Preset, TValue> = {
-  presets: TPreset[];
-  onSelect: (preset: TPreset) => void;
-  currentValue?: TValue;
-  currentPresetId?: string;
-};
+/**
+ * Epic 58 — Presets panel.
+ *
+ * A vertical cmdk list of preset buttons rendered inside the
+ * DateRangePicker / DatePicker popover. Selecting a preset commits
+ * its range/date and closes the popover. Single-key shortcuts
+ * declared by a preset (`preset.shortcut = 'l'`) are surfaced as a
+ * small `<kbd>` chip on the right of the row — consistent with the
+ * chip the Epic 57 filter trigger uses for its `F` hint.
+ *
+ * The panel is intentionally presentation-only. It does NOT fetch
+ * "now" to compare a current value against a preset — the caller
+ * passes `activePresetId` when it knows which preset drove the
+ * current value. This keeps the panel deterministic under SSR and
+ * avoids re-renders every millisecond.
+ */
 
-const Presets = <TPreset extends Preset, TValue>({
-  // Available preset configurations
-  presets,
-  // Event handler when a preset is selected
-  onSelect,
-  // Currently selected preset range value
-  currentValue,
-  // Currently selected preset id
-  currentPresetId,
-}: PresetsProps<TPreset, TValue>) => {
-  const isDateRangePresets = (preset: any): preset is DateRangePreset =>
-    "dateRange" in preset;
+import { cn } from '@dub/utils';
+import { Command } from 'cmdk';
 
-  const isDatePresets = (preset: any): preset is DatePreset => "date" in preset;
+import { Tooltip } from '../tooltip';
+import type { Preset } from './types';
 
-  const compareDates = (date1: Date, date2: Date) =>
-    date1.getDate() === date2.getDate() &&
-    date1.getMonth() === date2.getMonth() &&
-    date1.getFullYear() === date2.getFullYear();
+export interface PresetsProps<TPreset extends Preset> {
+    /** Preset rows to render, in display order. */
+    presets: TPreset[];
+    /** Called when a row is picked (mouse click or keyboard). */
+    onSelect: (preset: TPreset) => void;
+    /** Highlight the row matching this id. */
+    activePresetId?: string;
+    className?: string;
+}
 
-  const compareRanges = (range1: DateRange, range2: DateRange) => {
-    const from1 = range1.from;
-    const from2 = range2.from;
+export function Presets<TPreset extends Preset>({
+    presets,
+    onSelect,
+    activePresetId,
+    className,
+}: PresetsProps<TPreset>) {
+    return (
+        <Command
+            className={cn(
+                'w-full rounded-md focus:outline-none',
+                className,
+            )}
+            tabIndex={0}
+            // cmdk handles the roving tabindex. We render the list as
+            // our own entries so `shouldFilter` default (fuzzy-match on
+            // input typing) stays inert — the preset list has no input.
+            shouldFilter={false}
+            loop
+            data-testid="date-picker-presets"
+        >
+            <Command.List className="flex w-full flex-col gap-0.5 p-1">
+                {presets.map((preset) => {
+                    const isActive = preset.id === activePresetId;
+                    const row = (
+                        <Command.Item
+                            key={preset.id}
+                            value={preset.id}
+                            onSelect={() => onSelect(preset)}
+                            className={cn(
+                                'group flex cursor-pointer items-center justify-between gap-3',
+                                'rounded-md px-2.5 py-1.5 text-sm',
+                                'text-content-default',
+                                'data-[selected=true]:bg-bg-muted data-[selected=true]:text-content-emphasis',
+                                isActive &&
+                                    'bg-bg-subtle font-medium text-content-emphasis',
+                            )}
+                            data-testid={`date-picker-preset-${preset.id}`}
+                            data-active={isActive || undefined}
+                        >
+                            <span className="truncate">{preset.label}</span>
+                            {preset.shortcut && (
+                                <kbd
+                                    aria-hidden="true"
+                                    className={cn(
+                                        'hidden shrink-0 items-center rounded border',
+                                        'border-border-subtle bg-bg-muted px-1.5 py-0.5',
+                                        'text-[10px] font-medium text-content-muted',
+                                        'md:inline-flex',
+                                    )}
+                                >
+                                    {preset.shortcut.toUpperCase()}
+                                </kbd>
+                            )}
+                        </Command.Item>
+                    );
+                    // A preset with `tooltipContent` gets a Tooltip
+                    // wrap. Radix Tooltip's `asChild` composes cleanly
+                    // with cmdk's Command.Item (both pass refs through
+                    // their children).
+                    if (preset.tooltipContent) {
+                        return (
+                            <Tooltip
+                                key={preset.id}
+                                content={preset.tooltipContent}
+                                side="right"
+                            >
+                                {row}
+                            </Tooltip>
+                        );
+                    }
+                    return row;
+                })}
+            </Command.List>
+        </Command>
+    );
+}
 
-    let equalFrom = false;
-
-    if (from1 && from2) {
-      const sameFrom = compareDates(from1, from2);
-
-      if (sameFrom) equalFrom = true;
-    }
-
-    const to1 = range1.to;
-    const to2 = range2.to;
-
-    let equalTo = false;
-
-    if (to1 && to2) {
-      const sameTo = compareDates(to1, to2);
-
-      if (sameTo) equalTo = true;
-    }
-
-    return equalFrom && equalTo;
-  };
-
-  const matchesCurrent = (preset: TPreset) => {
-    if (currentPresetId) {
-      return currentPresetId === preset.id;
-    }
-
-    if (isDateRangePresets(preset)) {
-      const value = currentValue as DateRange | undefined;
-
-      return value && compareRanges(value, preset.dateRange);
-    } else if (isDatePresets(preset)) {
-      const value = currentValue as Date | undefined;
-
-      return value && compareDates(value, preset.date);
-    }
-
-    return false;
-  };
-
-  return (
-    <Command
-      className="w-full rounded ring-neutral-200 ring-offset-2 focus:outline-none"
-      tabIndex={0}
-      autoFocus
-      loop
-    >
-      <Command.List className="[&>*]:flex [&>*]:w-full [&>*]:items-start [&>*]:gap-x-2 [&>*]:gap-y-0.5 [&>*]:sm:flex-col">
-        {presets.map((preset, index) => {
-          return (
-            <Command.Item
-              key={index}
-              disabled={preset.requiresUpgrade}
-              onSelect={() => onSelect(preset)}
-              value={preset.id}
-              className={cn(
-                "group relative flex cursor-pointer items-center justify-between overflow-hidden text-ellipsis whitespace-nowrap rounded border border-neutral-200",
-                "px-2.5 py-1.5 text-left text-sm text-neutral-700 shadow-sm outline-none sm:w-full sm:border-none sm:py-2 sm:shadow-none",
-                "disabled:pointer-events-none disabled:opacity-50",
-                "sm:data-[selected=true]:bg-neutral-100",
-                matchesCurrent(preset) && "font-semibold text-neutral-800",
-              )}
-            >
-              <span>{preset.label}</span>
-              {preset.requiresUpgrade ? (
-                <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-              ) : preset.shortcut ? (
-                <kbd className="text-neutral-4000 hidden rounded bg-neutral-100 px-2 py-0.5 text-xs font-light group-data-[selected=true]:bg-neutral-200 md:block">
-                  {preset.shortcut.toUpperCase()}
-                </kbd>
-              ) : null}
-              {preset.requiresUpgrade && preset.tooltipContent && (
-                <Tooltip side="bottom" content={preset.tooltipContent}>
-                  <div className="absolute inset-0 cursor-not-allowed"></div>
-                </Tooltip>
-              )}
-            </Command.Item>
-          );
-        })}
-      </Command.List>
-    </Command>
-  );
-};
-
-Presets.displayName = "DatePicker.Presets";
-
-export { Presets };
+Presets.displayName = 'DatePicker.Presets';

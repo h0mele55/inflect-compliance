@@ -99,7 +99,14 @@ const jsdomProject = {
             '@tiptap/[^/]+|' +
             'prosemirror-[^/]+|' +
             'linkify-it|markdown-it|orderedmap|' +
-            'w3c-keyname' +
+            'w3c-keyname|' +
+            // Epic 59 — chart platform. visx re-exports d3 modules
+            // that ship as ESM; ts-jest must transform them so any
+            // jsdom test importing `@/components/ui/charts` resolves
+            // its full graph.
+            '@visx/[^/]+|' +
+            'd3-[^/]+|' +
+            'internmap|delaunator|robust-predicates' +
             ')/)',
     ],
 };

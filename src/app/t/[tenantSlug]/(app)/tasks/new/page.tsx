@@ -10,6 +10,12 @@ import { FormError } from '@/components/ui/form-error';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip } from '@/components/ui/tooltip';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
 const TYPE_OPTIONS: ComboboxOption[] = [
@@ -242,12 +248,24 @@ export default function NewTaskPage() {
                     </FormField>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
+                    {/* Epic 58 — shared DatePicker. `form.dueAt` keeps
+                        its YMD-string shape so the POST body matches
+                        the pre-migration contract. */}
                     <FormField label="Due Date">
-                        <Input
+                        <DatePicker
                             id="task-due-input"
-                            type="date"
-                            value={form.dueAt}
-                            onChange={e => update('dueAt', e.target.value)}
+                            className="w-full"
+                            placeholder="Select date"
+                            clearable
+                            align="start"
+                            value={parseYMD(form.dueAt)}
+                            onChange={(next) =>
+                                update('dueAt', toYMD(next) ?? '')
+                            }
+                            disabledDays={{
+                                before: startOfUtcDay(new Date()),
+                            }}
+                            aria-label="Due date"
                         />
                     </FormField>
                     <FormField label="Assignee">

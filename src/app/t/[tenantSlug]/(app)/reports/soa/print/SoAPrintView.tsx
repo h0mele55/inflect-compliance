@@ -1,6 +1,7 @@
 'use client';
 
 import type { SoAReportDTO, SoAEntryDTO } from '@/lib/dto/soa';
+import { formatDate } from '@/lib/format-date';
 
 interface SoAPrintViewProps {
     report: SoAReportDTO;
@@ -15,9 +16,10 @@ interface SoAPrintViewProps {
  */
 export function SoAPrintView({ report, tenantName }: SoAPrintViewProps) {
     const { summary, entries } = report;
-    const generatedDate = new Date(report.generatedAt).toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric',
-    });
+    // Epic 58 — canonical app-wide formatter so the printed SoA's
+    // "Generated on" line reads identically to every other date in
+    // the product ("16 Apr 2026").
+    const generatedDate = formatDate(report.generatedAt);
 
     // Group entries by section
     const sections = [...new Set(entries.map(e => e.section || 'Other'))];

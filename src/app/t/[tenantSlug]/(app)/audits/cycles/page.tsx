@@ -8,6 +8,22 @@ import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { FieldGroup } from '@/components/ui/field-group';
+import { DateRangePicker } from '@/components/ui/date-picker/date-range-picker';
+import { selectDateRangePresets } from '@/components/ui/date-picker/presets-catalogue';
+import type { DateRangeValue } from '@/components/ui/date-picker/types';
+
+// Epic 58 — audit periods are reporting windows. The curated preset
+// subset favours periods auditors actually request ("the most recent
+// completed quarter", "this fiscal year so far") over day-level
+// presets like "Today" that don't map to an audit scope.
+const AUDIT_PERIOD_PRESETS = selectDateRangePresets([
+    'quarter-to-date',
+    'year-to-date',
+    'last-quarter',
+    'last-year',
+    'last-90-days',
+    'last-30-days',
+]);
 
 const FW_META: Record<string, { icon: AppIconName; label: string; color: string }> = {
     ISO27001: { icon: 'shield', label: 'ISO/IEC 27001:2022', color: 'from-indigo-500 to-purple-600' },
@@ -46,6 +62,11 @@ export default function AuditCyclesPage() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ frameworkKey: 'ISO27001', frameworkVersion: '2022', name: '' });
+    // Epic 58 — the period is stored as a nullable DateRangeValue so
+    // half-open ranges ("from X, open-ended") are representable. The
+    // backend accepts both `periodStartAt` / `periodEndAt` as
+    // optional, so we submit whichever side the user has set.
+    const [period, setPeriod] = useState<DateRangeValue>({ from: null, to: null });
 
     useEffect(() => {
         fetch(apiUrl('/audits/cycles'))
@@ -57,10 +78,19 @@ export default function AuditCyclesPage() {
     const create = async (e: React.FormEvent) => {
         e.preventDefault();
         const version = form.frameworkKey === 'NIS2' ? 'EU_2022_2555' : '2022';
+        const body: Record<string, unknown> = {
+            ...form,
+            frameworkVersion: version,
+        };
+        // Submit the audit period only when the user picked one.
+        // Either side may be open-ended; the backend already accepts
+        // both fields as optional and validates them as strings.
+        if (period.from) body.periodStartAt = period.from.toISOString();
+        if (period.to) body.periodEndAt = period.to.toISOString();
         const res = await fetch(apiUrl('/audits/cycles'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...form, frameworkVersion: version }),
+            body: JSON.stringify(body),
         });
         if (res.ok) {
             const cycle = await res.json();
@@ -131,6 +161,30 @@ export default function AuditCyclesPage() {
                             />
                         </FormField>
                     </FieldGroup>
+                    {/*
+                      Epic 58 — Audit period. Optional. The shared
+                      DateRangePicker handles presets (Quarter to date,
+                      Last year, …) + custom ranges in one surface, so
+                      auditors don't need two date inputs or a spreadsheet
+                      to figure out what "Q2 2026" maps to.
+                    */}
+                    <div className="mt-4">
+                        <FormField
+                            label="Audit period"
+                            hint="The reporting window the cycle evidences. Pick a preset for the usual quarterly / annual audits, or choose a custom range on the calendar. Optional — you can set this later."
+                        >
+                            <DateRangePicker
+                                id="cycle-period-range"
+                                className="w-full"
+                                align="start"
+                                placeholder="Select audit period"
+                                value={period}
+                                onChange={setPeriod}
+                                presets={AUDIT_PERIOD_PRESETS}
+                                showYearNavigation
+                            />
+                        </FormField>
+                    </div>
                     <div className="mt-4 flex gap-2">
                         <button type="submit" className="btn btn-primary" id="submit-cycle-btn">Create Cycle</button>
                         <button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary">Cancel</button>

@@ -1,0 +1,109 @@
+/**
+ * Epic 58 — consistency pass: tests for the new range + compact
+ * formatters that round out the canonical date-display API
+ * (`src/lib/format-date.ts`).
+ *
+ * These run under the node Jest project — the formatters are pure
+ * `Intl.DateTimeFormat` wrappers, no DOM needed.
+ */
+
+import {
+    formatDate,
+    formatDateCompact,
+    formatDateRange,
+    formatDateTime,
+} from '@/lib/format-date';
+
+// Canonical helper — builds UTC-midnight Dates for deterministic
+// comparisons, mirrors the `parseYMD` utility in the date-picker
+// foundation. Keeps these tests independent of wall-clock timezones.
+const d = (ymd: string) => new Date(`${ymd}T00:00:00Z`);
+
+describe('formatDateCompact', () => {
+    it('formats as "16 Apr" (no year)', () => {
+        expect(formatDateCompact(d('2026-04-16'))).toBe('16 Apr');
+    });
+
+    it('returns "—" on nullish input by default', () => {
+        expect(formatDateCompact(null)).toBe('—');
+        expect(formatDateCompact(undefined)).toBe('—');
+        expect(formatDateCompact('')).toBe('—');
+    });
+
+    it('accepts a custom fallback', () => {
+        expect(formatDateCompact(null, 'n/a')).toBe('n/a');
+    });
+
+    it('accepts ISO strings and truncates to the UTC day', () => {
+        expect(formatDateCompact('2026-04-16T23:59:59Z')).toBe('16 Apr');
+    });
+});
+
+describe('formatDateRange', () => {
+    it('returns the fallback when both sides are empty', () => {
+        expect(formatDateRange(null, null)).toBe('—');
+        expect(formatDateRange(undefined, undefined, 'n/a')).toBe('n/a');
+    });
+
+    it('renders a same-day range as the single date', () => {
+        expect(formatDateRange(d('2026-04-16'), d('2026-04-16'))).toBe('16 Apr 2026');
+    });
+
+    it('renders a same-month range with one month + year', () => {
+        expect(formatDateRange(d('2026-04-16'), d('2026-04-30'))).toBe('16 – 30 Apr 2026');
+    });
+
+    it('renders a same-year range with one year', () => {
+        expect(formatDateRange(d('2026-04-16'), d('2026-06-30'))).toBe(
+            '16 Apr – 30 Jun 2026',
+        );
+    });
+
+    it('renders a cross-year range with both years (2-digit day, matches the rest of the app)', () => {
+        expect(formatDateRange(d('2025-12-20'), d('2026-01-05'))).toBe(
+            '20 Dec 2025 – 05 Jan 2026',
+        );
+    });
+
+    it('renders a from-only range as "From …"', () => {
+        expect(formatDateRange(d('2026-04-16'), null)).toBe('From 16 Apr 2026');
+    });
+
+    it('renders a to-only range as "Until …"', () => {
+        expect(formatDateRange(null, d('2026-04-30'))).toBe('Until 30 Apr 2026');
+    });
+
+    it('accepts string inputs (mirrors formatDate)', () => {
+        expect(formatDateRange('2026-04-16T08:00Z', '2026-04-30T17:00Z')).toBe(
+            '16 – 30 Apr 2026',
+        );
+    });
+
+    it('swaps to same-day when both strings land on the same UTC day', () => {
+        expect(formatDateRange('2026-04-16T00:00Z', '2026-04-16T23:59Z')).toBe(
+            '16 Apr 2026',
+        );
+    });
+
+    it('passes through the em-dash separator, never a hyphen-minus', () => {
+        const out = formatDateRange(d('2026-04-16'), d('2026-04-30'));
+        expect(out.includes('–')).toBe(true); // U+2013
+        expect(out.includes(' - ')).toBe(false); // avoid hyphen-minus
+    });
+});
+
+describe('consistency — every formatter handles the same invalid-input set', () => {
+    const bad: Array<string | null | undefined> = [null, undefined, '', 'not-a-date'];
+    it.each(bad)('formatDate(%p) → fallback', (v) => {
+        expect(formatDate(v)).toBe('—');
+    });
+    it.each(bad)('formatDateTime(%p) → fallback', (v) => {
+        expect(formatDateTime(v)).toBe('—');
+    });
+    it.each(bad)('formatDateCompact(%p) → fallback', (v) => {
+        expect(formatDateCompact(v)).toBe('—');
+    });
+    it.each(bad)('formatDateRange(%p, %p) → fallback', (v) => {
+        expect(formatDateRange(v, v)).toBe('—');
+    });
+});

@@ -15,6 +15,12 @@ import { Modal } from '@/components/ui/modal';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
 import { CopyText } from '@/components/ui/copy-text';
+import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import {
+    parseYMD,
+    startOfUtcDay,
+    toYMD,
+} from '@/components/ui/date-picker/date-utils';
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 
@@ -941,7 +947,21 @@ export default function ControlDetailPage() {
                         <form onSubmit={createTask} className="glass-card p-4 space-y-3">
                             <input type="text" className="input w-full" placeholder="Task title *" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} required id="task-title-input" />
                             <textarea className="input w-full" rows={2} placeholder="Description (optional)" value={taskDesc} onChange={e => setTaskDesc(e.target.value)} id="task-desc-input" />
-                            <input type="date" className="input" value={taskDue} onChange={e => setTaskDue(e.target.value)} id="task-due-input" />
+                            {/* Epic 58 — shared DatePicker. `taskDue`
+                                keeps its YMD-string shape. */}
+                            <DatePicker
+                                id="task-due-input"
+                                className="w-full"
+                                placeholder="Due date"
+                                clearable
+                                align="start"
+                                value={parseYMD(taskDue)}
+                                onChange={(next) => setTaskDue(toYMD(next) ?? '')}
+                                disabledDays={{
+                                    before: startOfUtcDay(new Date()),
+                                }}
+                                aria-label="Task due date"
+                            />
                             <button type="submit" disabled={savingTask} className="btn btn-primary" id="submit-task-btn">
                                 {savingTask ? 'Creating...' : 'Create'}
                             </button>

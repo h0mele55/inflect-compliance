@@ -11,6 +11,12 @@ import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { InfoTooltip, Tooltip } from '@/components/ui/tooltip';
 import { useCopyToClipboard } from '@/components/ui/hooks';
 import { DataTable, createColumns } from '@/components/ui/table';
+// Epic 58 — route through the canonical app-wide formatter so
+// api-keys reads in the same date dialect (UTC, en-GB, em-dash
+// fallback) as every other page. Previously used a local
+// `toLocaleDateString('en-US', …)` that diverged from the rest of
+// the app.
+import { formatDateTime as formatDate } from '@/lib/format-date';
 import { toast } from 'sonner';
 
 // ─── Types ───
@@ -57,14 +63,6 @@ const EXPIRY_OPTIONS = [
     { label: '1 year', value: '365' },
 ];
 const EXPIRY_CB_OPTIONS: ComboboxOption[] = EXPIRY_OPTIONS.filter(o => o.value).map(o => ({ value: o.value, label: o.label }));
-
-function formatDate(d: string | null): string {
-    if (!d) return '—';
-    return new Date(d).toLocaleDateString('en-US', {
-        year: 'numeric', month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit',
-    });
-}
 
 function isExpired(expiresAt: string | null): boolean {
     if (!expiresAt) return false;

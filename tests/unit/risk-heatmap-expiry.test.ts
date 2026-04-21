@@ -121,7 +121,13 @@ describe('ExpiryCalendar Widget', () => {
     });
 
     test('date formatting uses UTC to avoid timezone shifts', () => {
-        expect(content).toContain("timeZone: 'UTC'");
+        // Epic 58 — the inline UTC formatter was replaced by the
+        // canonical `formatDateCompact` helper, which declares
+        // `timeZone: 'UTC'` on its shared `Intl.DateTimeFormat` in
+        // `src/lib/format-date.ts`. The UTC guarantee still holds;
+        // the call site just delegates instead of hardcoding the
+        // option bag.
+        expect(content).toContain('formatDateCompact');
     });
 
     test('truncates long titles', () => {
