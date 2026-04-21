@@ -92,8 +92,8 @@ export default function KpiCard({
         >
             {/* Header: icon + label */}
             <div className="flex items-center gap-2 mb-2">
-                {Icon && <Icon className="w-4 h-4 text-slate-400" aria-hidden="true" />}
-                <span className="text-xs text-slate-400 uppercase tracking-wide font-medium">
+                {Icon && <Icon className="w-4 h-4 text-content-muted" aria-hidden="true" />}
+                <span className="text-xs text-content-muted uppercase tracking-wide font-medium">
                     {label}
                 </span>
             </div>
@@ -102,7 +102,7 @@ export default function KpiCard({
             <p
                 className={`text-2xl font-bold ${
                     isEmpty
-                        ? 'text-slate-600'
+                        ? 'text-content-subtle'
                         : `bg-gradient-to-r ${gradient} bg-clip-text text-transparent`
                 }`}
             >
@@ -118,7 +118,7 @@ export default function KpiCard({
                                 ? 'text-emerald-400'
                                 : delta < 0
                                   ? 'text-red-400'
-                                  : 'text-slate-500'
+                                  : 'text-content-subtle'
                         }`}
                     >
                         {delta > 0 ? '▲' : delta < 0 ? '▼' : '—'}
@@ -127,14 +127,14 @@ export default function KpiCard({
                         {format === 'percent' ? 'pp' : ''}
                     </span>
                     {deltaLabel && (
-                        <span className="text-xs text-slate-500">{deltaLabel}</span>
+                        <span className="text-xs text-content-subtle">{deltaLabel}</span>
                     )}
                 </div>
             )}
 
             {/* Subtitle */}
             {subtitle && (
-                <p className="text-xs text-slate-500 mt-1">{subtitle}</p>
+                <p className="text-xs text-content-subtle mt-1">{subtitle}</p>
             )}
         </div>
     );

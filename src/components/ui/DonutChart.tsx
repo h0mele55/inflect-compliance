@@ -194,13 +194,13 @@ export default function DonutChart({
             {showLegend && (
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
                     {segments.map((seg) => (
-                        <div key={seg.label} className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <div key={seg.label} className="flex items-center gap-1.5 text-xs text-content-muted">
                             <span
                                 className="w-2.5 h-2.5 rounded-full shrink-0"
                                 style={{ backgroundColor: seg.color }}
                             />
                             <span>{seg.label}</span>
-                            <span className="text-slate-500 tabular-nums">({seg.value})</span>
+                            <span className="text-content-subtle tabular-nums">({seg.value})</span>
                         </div>
                     ))}
                 </div>

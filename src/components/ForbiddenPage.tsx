@@ -26,7 +26,7 @@ export function ForbiddenPage({
                 <ShieldX className="w-8 h-8 text-red-400" />
             </div>
             <h1 className="text-2xl font-bold text-white mb-2" id="forbidden-heading">{title}</h1>
-            <p className="text-slate-400 text-sm max-w-md mb-8">{message}</p>
+            <p className="text-content-muted text-sm max-w-md mb-8">{message}</p>
             <Link
                 href={tenantHref('/dashboard')}
                 className="btn btn-primary"
@@ -57,7 +57,7 @@ export function ServerForbiddenPage({
                 <ShieldX className="w-8 h-8 text-red-400" />
             </div>
             <h1 className="text-2xl font-bold text-white mb-2" id="forbidden-heading">{title}</h1>
-            <p className="text-slate-400 text-sm max-w-md mb-8">{message}</p>
+            <p className="text-content-muted text-sm max-w-md mb-8">{message}</p>
             <a
                 href={`/t/${tenantSlug}/dashboard`}
                 className="btn btn-primary"

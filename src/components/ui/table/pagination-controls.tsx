@@ -78,7 +78,7 @@ export function PaginationControls({
   return (
     <div
       className={cn(
-        "border-slate-700/50 bg-slate-900 text-slate-300",
+        "border-border-subtle bg-bg-default text-content-default",
         "sticky bottom-0 z-10 mx-auto -mt-px flex w-full max-w-full",
         "items-center justify-between rounded-b-[inherit] border-t",
         "px-4 py-3.5 text-sm leading-6",

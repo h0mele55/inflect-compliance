@@ -40,21 +40,21 @@ const tableCellClassName = (
   hasSelectBefore?: boolean,
 ) =>
   cn([
-    "py-2.5 text-left text-sm leading-6 whitespace-nowrap border-slate-700/50 relative",
+    "py-2.5 text-left text-sm leading-6 whitespace-nowrap border-border-subtle relative",
     "border-l border-b",
     columnId === "select" && "w-12 min-w-12 max-w-12 px-0 py-0",
-    columnId === "menu" && "bg-slate-900 border-l-transparent py-0 px-1",
+    columnId === "menu" && "bg-bg-page border-l-transparent py-0 px-1",
     !["select", "menu"].includes(columnId) &&
       (hasSelectBefore ? "pl-1 pr-4" : "px-4"),
-    clickable && "group-hover/row:bg-slate-700/20 transition-colors duration-75",
-    "group-data-[selected=true]/row:bg-brand-600/10",
+    clickable && "group-hover/row:bg-bg-subtle transition-colors duration-75",
+    "group-data-[selected=true]/row:bg-[var(--brand-subtle)]",
   ]);
 
 const resizingClassName = cn([
   "absolute right-0 top-0 h-full w-1 cursor-col-resize select-none touch-none",
-  "bg-slate-600/50",
+  "bg-border-emphasis/50",
   "opacity-0 group-hover/resize:opacity-100 hover:opacity-100",
-  "group-hover/resize:bg-slate-500 hover:bg-slate-400",
+  "group-hover/resize:bg-border-emphasis hover:bg-content-muted",
   "transition-all duration-200",
   "-mr-px",
   "after:absolute after:right-0 after:top-0 after:h-full after:w-4 after:translate-x-1/2",
@@ -172,7 +172,7 @@ export function useTable<T extends any>(
                   title="Select all"
                 >
                   <Checkbox
-                    className="border-slate-500 pointer-events-none size-4 rounded data-[state=checked]:bg-brand-600 data-[state=indeterminate]:bg-brand-600"
+                    className="border-border-emphasis pointer-events-none size-4 rounded data-[state=checked]:bg-[var(--brand-emphasis)] data-[state=indeterminate]:bg-[var(--brand-emphasis)]"
                     checked={
                       table.getIsAllRowsSelected()
                         ? true
@@ -254,7 +254,7 @@ export function useTable<T extends any>(
                     title="Select"
                   >
                     <Checkbox
-                      className="border-slate-500 pointer-events-none size-4 rounded data-[state=checked]:bg-brand-600 data-[state=indeterminate]:bg-brand-600"
+                      className="border-border-emphasis pointer-events-none size-4 rounded data-[state=checked]:bg-[var(--brand-emphasis)] data-[state=indeterminate]:bg-[var(--brand-emphasis)]"
                       checked={row.getIsSelected()}
                     />
                   </div>
@@ -376,7 +376,7 @@ const ResizableTableRow = memo(
                   !!onRowClick,
                   isColumnAfterSelect,
                 ),
-                "text-slate-300 group",
+                "text-content-default group",
                 getCommonPinningClassNames(
                   cell.column,
                   row.index === table.getRowModel().rows.length - 1,
@@ -487,7 +487,7 @@ export function Table<T>({
   return (
     <div
       className={cn(
-        "border-slate-700/50 bg-slate-900 relative z-0 rounded-xl border",
+        "border-border-subtle bg-bg-default relative z-0 rounded-xl border",
         containerClassName,
       )}
     >
@@ -552,7 +552,7 @@ export function Table<T>({
                               false,
                               isColumnAfterSelect,
                             ),
-                            "text-xs font-semibold text-slate-400 uppercase tracking-wider bg-slate-800/50 select-none",
+                            "text-xs font-semibold text-content-muted uppercase tracking-wider bg-bg-subtle select-none",
                             getCommonPinningClassNames(
                               header.column,
                               !table.getRowModel().rows.length,
@@ -720,7 +720,7 @@ export function Table<T>({
                                 !!onRowClick,
                                 isColumnAfterSelect,
                               ),
-                              "text-slate-300 group",
+                              "text-content-default group",
                               getCommonPinningClassNames(
                                 cell.column,
                                 row.index ===
@@ -801,7 +801,7 @@ export function Table<T>({
       ) : (
         <div
           className={cn(
-            "text-slate-400 flex h-96 w-full items-center justify-center text-sm",
+            "text-content-muted flex h-96 w-full items-center justify-center text-sm",
             emptyWrapperClassName,
           )}
         >
@@ -811,7 +811,7 @@ export function Table<T>({
         </div>
       )}
       {pagination && !error && !!data?.length && !!rowCount && (
-        <div className="border-slate-700/50 bg-slate-900 text-slate-300 sticky bottom-0 z-10 mx-auto -mt-px flex w-full max-w-full items-center justify-between rounded-b-[inherit] border-t px-4 py-3.5 text-sm leading-6">
+        <div className="border-border-subtle bg-bg-default text-content-default sticky bottom-0 z-10 mx-auto -mt-px flex w-full max-w-full items-center justify-between rounded-b-[inherit] border-t px-4 py-3.5 text-sm leading-6">
           <div>
             <span className="hidden sm:inline-block">Viewing</span>{" "}
             <span className="font-medium">
@@ -859,7 +859,7 @@ export function Table<T>({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-slate-900/70 absolute inset-0 h-full rounded-xl"
+            className="bg-bg-page/70 absolute inset-0 h-full rounded-xl"
           >
             {/* here we're using min(75%,75vh) to ensure proper placement on full height vs partial height tables */}
             <div className="flex h-[min(75%,75vh)] w-full items-center justify-center">
@@ -878,7 +878,7 @@ const getCommonPinningClassNames = (
 ): string => {
   const isPinned = column.getIsPinned();
   return cn(
-    isPinned && "bg-slate-900 py-0",
+    isPinned && "bg-bg-default py-0",
     isPinned &&
       !isLastRow &&
       "animate-table-pinned-shadow [animation-timeline:scroll(inline)]",

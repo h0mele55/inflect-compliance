@@ -55,14 +55,14 @@ export default function StatusBreakdown({
         <div id={id} className={`glass-card p-5 ${className}`}>
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-300">{label}</h3>
+                <h3 className="text-sm font-semibold text-content-default">{label}</h3>
                 {showTotal && (
-                    <span className="text-xs text-slate-500 tabular-nums">{total} total</span>
+                    <span className="text-xs text-content-subtle tabular-nums">{total} total</span>
                 )}
             </div>
 
             {/* Stacked bar */}
-            <div className="bg-slate-800 rounded-full h-3 overflow-hidden">
+            <div className="bg-bg-subtle rounded-full h-3 overflow-hidden">
                 {total > 0 ? (
                     <div className="flex h-full">
                         {items.map((item) => {
@@ -79,7 +79,7 @@ export default function StatusBreakdown({
                         })}
                     </div>
                 ) : (
-                    <div className="h-full w-full bg-slate-700/50" title="No data" />
+                    <div className="h-full w-full bg-bg-subtle" title="No data" />
                 )}
             </div>
 
@@ -89,9 +89,9 @@ export default function StatusBreakdown({
                     <div key={item.label} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1.5">
                             <span className={`w-2 h-2 rounded-full ${item.color} shrink-0`} />
-                            <span className="text-slate-400">{item.label}</span>
+                            <span className="text-content-muted">{item.label}</span>
                         </div>
-                        <span className="text-slate-300 font-medium tabular-nums">{item.value}</span>
+                        <span className="text-content-default font-medium tabular-nums">{item.value}</span>
                     </div>
                 ))}
             </div>

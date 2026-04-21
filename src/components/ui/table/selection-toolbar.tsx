@@ -76,12 +76,12 @@ export const BatchActionButton = forwardRef<
     type="button"
     className={cn(
       "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-800",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--ring-offset-background)]",
       "disabled:pointer-events-none disabled:opacity-40",
       variant === "default" &&
-        "bg-slate-700 text-slate-200 hover:bg-slate-600 active:bg-slate-500",
+        "bg-bg-elevated text-content-emphasis hover:bg-bg-muted active:bg-bg-subtle border border-border-subtle",
       variant === "danger" &&
-        "bg-red-900/60 text-red-200 hover:bg-red-800/80 active:bg-red-700/80",
+        "bg-bg-error text-content-error hover:bg-bg-error/80 active:bg-bg-error/60",
       className,
     )}
     {...props}
@@ -168,7 +168,7 @@ export function SelectionToolbar<T>({
   return (
     <div
       className={cn(
-        "border-slate-700/50 w-full border-b bg-slate-800",
+        "border-border-subtle w-full border-b bg-bg-elevated",
         "transition-opacity duration-100",
         selectedCount > 0
           ? "pointer-events-auto opacity-100"
@@ -209,7 +209,7 @@ export function SelectionToolbar<T>({
               }
             >
               <Checkbox
-                className="border-slate-500 pointer-events-none size-4 rounded data-[state=checked]:bg-brand-600 data-[state=indeterminate]:bg-brand-600"
+                className="border-border-emphasis pointer-events-none size-4 rounded data-[state=checked]:bg-[var(--brand-emphasis)] data-[state=indeterminate]:bg-[var(--brand-emphasis)]"
                 checked={
                   table.getIsAllRowsSelected()
                     ? true
@@ -226,7 +226,7 @@ export function SelectionToolbar<T>({
         <div className="flex min-w-0 items-center gap-2.5 pl-1">
           <span
             className={cn(
-              "text-slate-200 text-sm font-medium tabular-nums transition-transform duration-150",
+              "text-content-emphasis text-sm font-medium tabular-nums transition-transform duration-150",
               selectedCount > 0 ? "translate-x-0" : "-translate-x-1",
             )}
           >
@@ -236,7 +236,7 @@ export function SelectionToolbar<T>({
           {/* Separator between count and actions */}
           <div
             className={cn(
-              "bg-slate-600 h-4 w-px transition-opacity duration-150",
+              "bg-border-emphasis h-4 w-px transition-opacity duration-150",
               selectedCount > 0 ? "opacity-100" : "opacity-0",
             )}
           />
@@ -246,8 +246,8 @@ export function SelectionToolbar<T>({
           <button
             type="button"
             className={cn(
-              "text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded px-1",
+              "text-content-muted hover:text-content-emphasis text-xs font-medium transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded px-1",
             )}
             onClick={(e) => {
               e.stopPropagation();

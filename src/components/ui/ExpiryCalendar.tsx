@@ -57,7 +57,7 @@ function urgencyConfig(u: Urgency) {
         case 'overdue':  return { color: 'text-red-400', bg: 'bg-red-500/20', badge: 'bg-red-500/30 text-red-300', label: 'Overdue' };
         case 'urgent':   return { color: 'text-amber-400', bg: 'bg-amber-500/20', badge: 'bg-amber-500/30 text-amber-300', label: 'This Week' };
         case 'upcoming': return { color: 'text-yellow-400', bg: 'bg-yellow-500/20', badge: 'bg-yellow-500/30 text-yellow-300', label: 'Next Week' };
-        case 'normal':   return { color: 'text-slate-400', bg: 'bg-slate-700/30', badge: 'bg-slate-600/30 text-slate-300', label: 'This Month' };
+        case 'normal':   return { color: 'text-content-muted', bg: 'bg-bg-subtle', badge: 'bg-bg-subtle text-content-default', label: 'This Month' };
     }
 }
 
@@ -84,8 +84,8 @@ export default function ExpiryCalendar({
     if (!items || items.length === 0) {
         return (
             <div id={id} className={`glass-card p-5 ${className}`}>
-                <h3 className="text-sm font-semibold text-slate-300 mb-3">Evidence Expiry</h3>
-                <p className="text-xs text-slate-500">No upcoming evidence expirations.</p>
+                <h3 className="text-sm font-semibold text-content-default mb-3">Evidence Expiry</h3>
+                <p className="text-xs text-content-subtle">No upcoming evidence expirations.</p>
             </div>
         );
     }
@@ -104,8 +104,8 @@ export default function ExpiryCalendar({
     return (
         <div id={id} className={`glass-card p-5 ${className}`}>
             <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-300">Evidence Expiry</h3>
-                <span className="text-xs text-slate-500 tabular-nums">{items.length} item{items.length !== 1 ? 's' : ''}</span>
+                <h3 className="text-sm font-semibold text-content-default">Evidence Expiry</h3>
+                <span className="text-xs text-content-subtle tabular-nums">{items.length} item{items.length !== 1 ? 's' : ''}</span>
             </div>
 
             <div className="space-y-3 max-h-[280px] overflow-y-auto">
@@ -137,10 +137,10 @@ export default function ExpiryCalendar({
                                             title={`${item.title} — due ${item.nextReviewDate} (${formatDaysUntil(item.daysUntil)})`}
                                         >
                                             <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                <span className="text-xs text-slate-300 truncate">{item.title}</span>
+                                                <span className="text-xs text-content-default truncate">{item.title}</span>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0">
-                                                <span className="text-[10px] text-slate-500">{formatDate(item.nextReviewDate)}</span>
+                                                <span className="text-[10px] text-content-subtle">{formatDate(item.nextReviewDate)}</span>
                                                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${itemConfig.badge} tabular-nums`}>
                                                     {formatDaysUntil(item.daysUntil)}
                                                 </span>

@@ -33,11 +33,11 @@ export default function LinkedTasksPanel({ apiBase, entityType, entityId, tenant
     }, [apiBase, entityType, entityId]);
 
     if (loading) {
-        return <div className="text-slate-500 text-sm animate-pulse py-4 text-center">Loading linked tasks…</div>;
+        return <div className="text-content-subtle text-sm animate-pulse py-4 text-center">Loading linked tasks…</div>;
     }
 
     if (tasks.length === 0) {
-        return <p className="text-slate-500 text-sm text-center py-4">No linked tasks</p>;
+        return <p className="text-content-subtle text-sm text-center py-4">No linked tasks</p>;
     }
 
     return (
@@ -46,17 +46,17 @@ export default function LinkedTasksPanel({ apiBase, entityType, entityId, tenant
                 <Link
                     key={task.id}
                     href={tenantHref(`/tasks/${task.id}`)}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-700/30 transition text-sm"
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-bg-elevated/30 transition text-sm"
                     id={`linked-task-${task.id}`}
                 >
-                    {task.key && <span className="font-mono text-xs text-slate-500 w-16 truncate">{task.key}</span>}
+                    {task.key && <span className="font-mono text-xs text-content-subtle w-16 truncate">{task.key}</span>}
                     <span className="flex-1 text-white truncate">{task.title}</span>
                     <span className={`badge ${TASK_STATUS_BADGE[task.status] || 'badge-neutral'} text-xs`}>{task.status}</span>
                     {task.severity && (
                         <span className={`badge ${SEVERITY_BADGE[task.severity] || 'badge-neutral'} text-xs`}>{task.severity}</span>
                     )}
                     {task.dueAt && (
-                        <span className={`text-xs ${new Date(task.dueAt) < new Date() ? 'text-red-400' : 'text-slate-400'}`}>
+                        <span className={`text-xs ${new Date(task.dueAt) < new Date() ? 'text-red-400' : 'text-content-muted'}`}>
                             {formatDate(task.dueAt)}
                         </span>
                     )}

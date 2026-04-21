@@ -68,7 +68,7 @@ export function TableEmptyState({
     return (
       <div
         className={cn(
-          "text-slate-400 flex h-96 w-full items-center justify-center text-sm",
+          "text-content-muted flex h-96 w-full items-center justify-center text-sm",
           className,
         )}
         data-testid="table-empty-state"
@@ -88,19 +88,19 @@ export function TableEmptyState({
     >
       {/* Icon */}
       {icon && (
-        <div className="text-slate-500 mb-1">
+        <div className="text-content-subtle mb-1">
           {icon}
         </div>
       )}
 
       {/* Title */}
-      <h3 className="text-slate-300 text-sm font-medium">
+      <h3 className="text-content-default text-sm font-medium">
         {title ?? "No items found"}
       </h3>
 
       {/* Description */}
       {description && (
-        <p className="text-slate-500 max-w-sm text-sm">
+        <p className="text-content-subtle max-w-sm text-sm">
           {description}
         </p>
       )}
@@ -112,10 +112,10 @@ export function TableEmptyState({
           onClick={action.onClick}
           className={cn(
             "mt-2 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-background)]",
             action.variant === "primary"
-              ? "bg-brand-600 text-white hover:bg-brand-500 active:bg-brand-700"
-              : "bg-slate-700 text-slate-200 hover:bg-slate-600 active:bg-slate-500",
+              ? "bg-[var(--brand-emphasis)] text-content-inverted hover:bg-[var(--brand-default)] active:bg-[var(--brand-emphasis)]"
+              : "bg-bg-elevated text-content-emphasis hover:bg-bg-muted active:bg-bg-subtle border border-border-subtle",
           )}
         >
           {action.label}

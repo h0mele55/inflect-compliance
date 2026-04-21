@@ -60,7 +60,7 @@ export default function TrendLine({
         return (
             <div
                 id={id}
-                className={`flex items-center justify-center text-xs text-slate-500 ${className}`}
+                className={`flex items-center justify-center text-xs text-content-subtle ${className}`}
                 style={{ width, height }}
             >
                 {data?.length === 1 ? `${data[0]}` : 'No trend data'}

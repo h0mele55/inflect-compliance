@@ -56,7 +56,7 @@ export function AppShell({ user, appName, children }: AppShellProps) {
     return (
         <div className="min-h-screen flex">
             {/* Desktop sidebar — hidden on mobile, visible on md+ */}
-            <aside className="hidden md:flex w-56 bg-slate-900/50 border-r border-slate-700/50 flex-col flex-shrink-0">
+            <aside className="hidden md:flex w-56 bg-bg-default border-r border-border-subtle flex-col flex-shrink-0">
                 <SidebarContent user={user} onLogout={handleLogout} />
             </aside>
 
@@ -68,10 +68,10 @@ export function AppShell({ user, appName, children }: AppShellProps) {
             {/* Main content */}
             <main className="flex-1 overflow-auto min-w-0">
                 {/* Mobile top bar — visible on <md only */}
-                <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-2 bg-slate-900/80 backdrop-blur-sm border-b border-slate-700/50">
+                <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-2 bg-bg-page/80 backdrop-blur-sm border-b border-border-subtle">
                     <button
                         type="button"
-                        className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors"
+                        className="p-2 rounded-lg text-content-muted hover:text-content-emphasis hover:bg-bg-muted transition-colors"
                         onClick={() => setDrawerOpen(true)}
                         aria-label="Open navigation menu"
                         data-testid="nav-toggle"
@@ -79,10 +79,10 @@ export function AppShell({ user, appName, children }: AppShellProps) {
                         <Menu className="w-5 h-5" />
                     </button>
                     <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center">
-                            <span className="text-white text-[10px] font-bold">IC</span>
+                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[var(--brand-emphasis)] to-[var(--brand-default)] flex items-center justify-center">
+                            <span className="text-content-inverted text-[10px] font-bold">IC</span>
                         </div>
-                        <span className="text-sm font-semibold text-white">{appName}</span>
+                        <span className="text-sm font-semibold text-content-emphasis">{appName}</span>
                     </div>
                     <div className="ml-auto">
                         <ThemeToggle id="theme-toggle-mobile" />

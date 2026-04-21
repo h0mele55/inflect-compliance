@@ -1,0 +1,163 @@
+/**
+ * Epic 57 — static contract checks for the keyboard shortcut system.
+ *
+ * These are grep-based regression guardrails that fire on every CI
+ * run. They exist to keep Epic 57 durable — specifically to prevent:
+ *
+ *   1. New `document.addEventListener('keydown', …)` or
+ *      `window.addEventListener('keydown', …)` listeners sneaking
+ *      into application code and competing with the shared registry.
+ *
+ *   2. New `useKeyboardShortcut()` call sites missing a
+ *      `description: '…'` option. Without a description the command
+ *      palette renders the shortcut as "(no description)", which is
+ *      the wrong signal — every palette-surfaced binding must be
+ *      human-readable.
+ *
+ * The canonical source (the hook itself) is exempt because it owns
+ * the one listener the entire system funnels through.
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+const ROOT = path.resolve(__dirname, '../..');
+const SRC = path.join(ROOT, 'src');
+
+/** Files that legitimately install keyboard listeners or define the hook. */
+const ALLOWED_KEYDOWN_LISTENER_FILES = new Set<string>([
+    // The shared hook is the single place a window listener is installed.
+    path.join(SRC, 'lib/hooks/use-keyboard-shortcut.tsx'),
+]);
+
+function walk(dir: string, acc: string[] = []): string[] {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            if (entry.name === 'node_modules' || entry.name === '.next') continue;
+            walk(full, acc);
+        } else if (/\.(tsx?|jsx?)$/.test(entry.name)) {
+            acc.push(full);
+        }
+    }
+    return acc;
+}
+
+const KEYDOWN_LISTENER_RE =
+    /\b(?:document|window)\s*\.\s*addEventListener\s*\(\s*['"]keydown['"]/g;
+
+/**
+ * Matches a `useKeyboardShortcut(...)` invocation and captures the
+ * argument list up to the matching close paren (works for nested
+ * braces / parens inside the args).
+ */
+function findKeyboardShortcutCalls(src: string): string[] {
+    const calls: string[] = [];
+    const starts: number[] = [];
+    const needle = /useKeyboardShortcut\s*\(/g;
+    let m: RegExpExecArray | null;
+    while ((m = needle.exec(src)) !== null) {
+        starts.push(m.index + m[0].length);
+    }
+    for (const start of starts) {
+        let depth = 1;
+        let i = start;
+        while (i < src.length && depth > 0) {
+            const ch = src[i];
+            if (ch === '(') depth++;
+            else if (ch === ')') depth--;
+            if (depth === 0) break;
+            i++;
+        }
+        calls.push(src.slice(start, i));
+    }
+    return calls;
+}
+
+describe('Keyboard shortcut conventions', () => {
+    const allFiles = walk(SRC);
+
+    it('no raw document/window keydown listeners outside the shared hook', () => {
+        const violations: { file: string; snippet: string }[] = [];
+        for (const file of allFiles) {
+            if (ALLOWED_KEYDOWN_LISTENER_FILES.has(file)) continue;
+            const src = fs.readFileSync(file, 'utf-8');
+            const match = src.match(KEYDOWN_LISTENER_RE);
+            if (match) {
+                for (const snippet of match) {
+                    violations.push({
+                        file: path.relative(ROOT, file),
+                        snippet,
+                    });
+                }
+            }
+        }
+        if (violations.length > 0) {
+            const report = violations
+                .map((v) => `  ${v.file} — ${v.snippet}`)
+                .join('\n');
+            fail(
+                `Found ${violations.length} raw keydown listener(s) outside ` +
+                    `the shared registry. Use useKeyboardShortcut() from ` +
+                    `@/lib/hooks/use-keyboard-shortcut instead:\n${report}`,
+            );
+        }
+    });
+
+    it('every useKeyboardShortcut call site passes a `description`', () => {
+        const violations: { file: string; call: string }[] = [];
+
+        for (const file of allFiles) {
+            // Skip the hook itself (it defines the API) and the shim
+            // that re-exports it — neither has call sites of its own.
+            if (
+                file.endsWith('lib/hooks/use-keyboard-shortcut.tsx') ||
+                file.endsWith('components/ui/hooks/use-keyboard-shortcut.tsx') ||
+                file.endsWith('keyboard-shortcut-internals.ts')
+            ) {
+                continue;
+            }
+
+            const src = fs.readFileSync(file, 'utf-8');
+            if (!src.includes('useKeyboardShortcut(')) continue;
+
+            for (const call of findKeyboardShortcutCalls(src)) {
+                if (!/\bdescription\s*:/.test(call)) {
+                    // Trim the call for the report.
+                    const trimmed = call
+                        .replace(/\s+/g, ' ')
+                        .slice(0, 160);
+                    violations.push({
+                        file: path.relative(ROOT, file),
+                        call: trimmed,
+                    });
+                }
+            }
+        }
+
+        if (violations.length > 0) {
+            const report = violations
+                .map((v) => `  ${v.file}\n    → ${v.call}`)
+                .join('\n');
+            fail(
+                `Found ${violations.length} useKeyboardShortcut call(s) ` +
+                    `missing a description. Every binding must be labelled ` +
+                    `so the command palette can surface it:\n${report}`,
+            );
+        }
+    });
+
+    it('the contributor guide ships with the canonical code', () => {
+        // If someone renames / deletes the doc, the breadcrumb in the
+        // hook JSDoc and the palette README become broken links.
+        const docPath = path.join(ROOT, 'docs/keyboard-shortcuts.md');
+        expect(fs.existsSync(docPath)).toBe(true);
+
+        const doc = fs.readFileSync(docPath, 'utf-8');
+        // Canonical sections the hook + palette rely on.
+        expect(doc).toMatch(/## TL;DR/i);
+        expect(doc).toMatch(/## Priority tiers/i);
+        expect(doc).toMatch(/## Scope rules/i);
+        expect(doc).toMatch(/## When NOT to add a shortcut/i);
+    });
+});

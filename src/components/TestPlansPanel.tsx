@@ -101,12 +101,12 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
         return new Date(d) < new Date();
     };
 
-    if (loading) return <div className="animate-pulse text-slate-500 text-sm py-4">Loading test plans...</div>;
+    if (loading) return <div className="animate-pulse text-content-subtle text-sm py-4">Loading test plans...</div>;
 
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-300">Test Plans</h3>
+                <h3 className="text-sm font-semibold text-content-default">Test Plans</h3>
                 {permissions.canWrite && (
                     <button
                         className="btn btn-primary btn-sm"
@@ -121,7 +121,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
             {showForm && (
                 <div className="glass-card p-4 space-y-3 animate-fadeIn">
                     <div>
-                        <label className="text-xs text-slate-400 block mb-1">Plan Name *</label>
+                        <label className="text-xs text-content-muted block mb-1">Plan Name *</label>
                         <input
                             className="input w-full"
                             value={name}
@@ -132,7 +132,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-xs text-slate-400 block mb-1">Frequency</label>
+                            <label className="text-xs text-content-muted block mb-1">Frequency</label>
                             <select className="input w-full" value={frequency} onChange={e => setFrequency(e.target.value)} id="test-plan-frequency-select">
                                 {Object.entries(FREQ_LABELS).map(([v, l]) => (
                                     <option key={v} value={v}>{l}</option>
@@ -140,7 +140,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs text-slate-400 block mb-1">Method</label>
+                            <label className="text-xs text-content-muted block mb-1">Method</label>
                             <select className="input w-full" value={method} onChange={e => setMethod(e.target.value)} id="test-plan-method-select">
                                 <option value="MANUAL">Manual</option>
                                 <option value="AUTOMATED">Automated</option>
@@ -154,7 +154,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
             )}
 
             {plans.length === 0 && !showForm && (
-                <div className="text-sm text-slate-500 py-4">No test plans configured for this control.</div>
+                <div className="text-sm text-content-subtle py-4">No test plans configured for this control.</div>
             )}
 
             {plans.length > 0 && (
@@ -162,7 +162,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                     {plans.map(plan => {
                         const lastRun = getLastRun(plan);
                         return (
-                            <div key={plan.id} className="py-3 flex items-center justify-between group hover:bg-slate-800/30 px-2 rounded transition">
+                            <div key={plan.id} className="py-3 flex items-center justify-between group hover:bg-bg-default/30 px-2 rounded transition">
                                 <div className="flex-1 min-w-0">
                                     <Link
                                         href={tenantHref(`/controls/${controlId}/tests/${plan.id}`)}
@@ -175,21 +175,21 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                                         <span className={`badge badge-xs ${STATUS_BADGE[plan.status] || 'badge-neutral'}`}>
                                             {plan.status}
                                         </span>
-                                        <span className="text-xs text-slate-500">{FREQ_LABELS[plan.frequency] || plan.frequency}</span>
-                                        <span className="text-xs text-slate-500">•</span>
-                                        <span className="text-xs text-slate-500">{plan.method}</span>
+                                        <span className="text-xs text-content-subtle">{FREQ_LABELS[plan.frequency] || plan.frequency}</span>
+                                        <span className="text-xs text-content-subtle">•</span>
+                                        <span className="text-xs text-content-subtle">{plan.method}</span>
                                         {plan.nextDueAt && (
                                             <>
-                                                <span className="text-xs text-slate-500">•</span>
-                                                <span className={`text-xs ${isOverdue(plan.nextDueAt) ? 'text-red-400 font-semibold' : 'text-slate-400'}`}>
+                                                <span className="text-xs text-content-subtle">•</span>
+                                                <span className={`text-xs ${isOverdue(plan.nextDueAt) ? 'text-red-400 font-semibold' : 'text-content-muted'}`}>
                                                     Due: {formatDate(plan.nextDueAt)}
                                                 </span>
                                             </>
                                         )}
                                         {plan.owner && (
                                             <>
-                                                <span className="text-xs text-slate-500">•</span>
-                                                <span className="text-xs text-slate-400">{plan.owner.name || plan.owner.email}</span>
+                                                <span className="text-xs text-content-subtle">•</span>
+                                                <span className="text-xs text-content-muted">{plan.owner.name || plan.owner.email}</span>
                                             </>
                                         )}
                                     </div>
@@ -200,7 +200,7 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                                             {lastRun.result}
                                         </span>
                                     )}
-                                    <span className="text-xs text-slate-500">
+                                    <span className="text-xs text-content-subtle">
                                         {plan._count?.runs ?? 0} runs
                                     </span>
                                     {permissions.canWrite && plan.status === 'ACTIVE' && (

@@ -85,8 +85,8 @@ export function EditColumnsButton<T>({
                   key={column.id}
                   className={cn(
                     "flex cursor-pointer select-none items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-1.5",
-                    "text-slate-300 hover:text-slate-100",
-                    "data-[selected=true]:bg-slate-700",
+                    "text-content-default hover:text-content-emphasis",
+                    "data-[selected=true]:bg-bg-muted",
                   )}
                   onSelect={() => column.toggleVisibility()}
                   data-testid={`column-toggle-${column.id}`}
@@ -95,8 +95,8 @@ export function EditColumnsButton<T>({
                     className={cn(
                       "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                       column.getIsVisible()
-                        ? "border-brand-500 bg-brand-600 text-white"
-                        : "border-slate-500 bg-transparent",
+                        ? "border-[var(--brand-default)] bg-[var(--brand-emphasis)] text-content-inverted"
+                        : "border-border-emphasis bg-transparent",
                     )}
                   >
                     {column.getIsVisible() && (
@@ -122,12 +122,12 @@ export function EditColumnsButton<T>({
               {/* Reset to defaults */}
               {onReset && someHidden && (
                 <>
-                  <div className="bg-slate-700/50 my-1 h-px" />
+                  <div className="bg-border-subtle my-1 h-px" />
                   <Command.Item
                     className={cn(
                       "flex cursor-pointer select-none items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-1.5",
-                      "text-slate-400 hover:text-slate-200",
-                      "data-[selected=true]:bg-slate-700",
+                      "text-content-muted hover:text-content-emphasis",
+                      "data-[selected=true]:bg-bg-muted",
                     )}
                     onSelect={() => {
                       onReset();

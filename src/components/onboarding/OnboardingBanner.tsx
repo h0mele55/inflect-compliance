@@ -22,7 +22,7 @@ export default function OnboardingBanner() {
                 </div>
                 <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-white">Complete your setup</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Finish the onboarding wizard to configure your compliance workspace.</p>
+                    <p className="text-xs text-content-muted mt-0.5">Finish the onboarding wizard to configure your compliance workspace.</p>
                 </div>
                 <Link href={tenantHref('/onboarding')} className="btn btn-primary btn-sm flex-shrink-0" data-testid="onboarding-cta">
                     <Sparkles className="w-3.5 h-3.5" /> Continue Setup

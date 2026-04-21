@@ -142,6 +142,10 @@ const DateRangePickerInner = ({
     }`;
   }, [range, locale]);
 
+  // Epic 57 — only fire preset shortcuts while the date-range
+  // popover is open. Without this gate, pressing a preset key (e.g.
+  // "l") anywhere on a page that mounts a DateRangePicker would
+  // trigger the preset globally.
   useKeyboardShortcut(
     (presets
       ?.filter((preset) => preset.shortcut)
@@ -149,6 +153,12 @@ const DateRangePickerInner = ({
     (e: KeyboardEvent) => {
       const preset = presets?.find((preset) => preset.shortcut === e.key);
       if (preset) onPresetSelected(preset);
+    },
+    {
+      enabled: open,
+      scope: 'overlay',
+      priority: 5,
+      description: 'Apply date-range preset',
     },
   );
 

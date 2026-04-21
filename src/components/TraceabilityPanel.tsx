@@ -217,8 +217,8 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
         unlinkMutation.mutate({ type, linkedId });
     };
 
-    if (loading) return <div className="p-6 text-center text-slate-500 animate-pulse">Loading traceability...</div>;
-    if (!data) return <div className="p-6 text-center text-slate-500">Failed to load traceability data</div>;
+    if (loading) return <div className="p-6 text-center text-content-subtle animate-pulse">Loading traceability...</div>;
+    if (!data) return <div className="p-6 text-center text-content-subtle">Failed to load traceability data</div>;
 
     const risks = data.risks || [];
     const controls = data.controls || [];
@@ -258,7 +258,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                     )}
                     <div className="glass-card overflow-hidden">
                         {risks.length === 0 ? (
-                            <div className="p-6 text-center text-slate-500 text-sm" id="no-risks">No risks linked</div>
+                            <div className="p-6 text-center text-content-subtle text-sm" id="no-risks">No risks linked</div>
                         ) : (
                             <table className="data-table" id="linked-risks-table">
                                 <thead><tr><th>Risk</th><th>Status</th><th>Score</th><th>Rationale</th>{canWrite && <th>Actions</th>}</tr></thead>
@@ -268,10 +268,10 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                         const r = l.risk;
                                         return (
                                             <tr key={l.id} className={l.id?.startsWith('temp:') ? 'opacity-50 animate-pulse' : ''}>
-                                                <td className="text-sm text-slate-300">{r?.title || '—'}</td>
+                                                <td className="text-sm text-content-default">{r?.title || '—'}</td>
                                                 <td><span className={`badge ${RISK_STATUS_BADGE[r?.status] || 'badge-neutral'} text-xs`}>{r?.status || '—'}</span></td>
                                                 <td className="text-sm text-white font-medium">{r?.score ?? '—'}</td>
-                                                <td className="text-xs text-slate-400">{l.rationale || '—'}</td>
+                                                <td className="text-xs text-content-muted">{l.rationale || '—'}</td>
                                                 {canWrite && (
                                                     <td>
                                                         <Tooltip content="Unlink risk">
@@ -316,7 +316,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                     )}
                     <div className="glass-card overflow-hidden">
                         {controls.length === 0 ? (
-                            <div className="p-6 text-center text-slate-500 text-sm" id="no-controls">No controls linked</div>
+                            <div className="p-6 text-center text-content-subtle text-sm" id="no-controls">No controls linked</div>
                         ) : (
                             <table className="data-table" id="linked-controls-table">
                                 <thead><tr><th>Code</th><th>Name</th><th>Status</th><th>Rationale</th>{canWrite && <th>Actions</th>}</tr></thead>
@@ -327,9 +327,9 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                         return (
                                             <tr key={l.id} className={l.id?.startsWith('temp:') ? 'opacity-50 animate-pulse' : ''}>
                                                 <td className="font-mono text-xs text-brand-300">{c?.code || '—'}</td>
-                                                <td className="text-sm text-slate-300">{c?.name || '—'}</td>
+                                                <td className="text-sm text-content-default">{c?.name || '—'}</td>
                                                 <td><span className="badge badge-info text-xs">{c?.status || '—'}</span></td>
-                                                <td className="text-xs text-slate-400">{l.rationale || '—'}</td>
+                                                <td className="text-xs text-content-muted">{l.rationale || '—'}</td>
                                                 {canWrite && (
                                                     <td>
                                                         <Tooltip content="Unlink control">
@@ -374,7 +374,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                     )}
                     <div className="glass-card overflow-hidden">
                         {assets.length === 0 ? (
-                            <div className="p-6 text-center text-slate-500 text-sm" id="no-assets">No assets linked</div>
+                            <div className="p-6 text-center text-content-subtle text-sm" id="no-assets">No assets linked</div>
                         ) : (
                             <table className="data-table" id="linked-assets-table">
                                 <thead><tr><th>Name</th><th>Type</th><th>Criticality</th><th>Rationale</th>{canWrite && <th>Actions</th>}</tr></thead>
@@ -384,10 +384,10 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                         const a = l.asset;
                                         return (
                                             <tr key={l.id} className={l.id?.startsWith('temp:') ? 'opacity-50 animate-pulse' : ''}>
-                                                <td className="text-sm text-slate-300">{a?.name || '—'}</td>
+                                                <td className="text-sm text-content-default">{a?.name || '—'}</td>
                                                 <td className="text-xs"><span className="badge badge-info">{a?.type || '—'}</span></td>
                                                 <td className="text-xs">{a?.criticality ? <span className={`badge ${a.criticality === 'HIGH' ? 'badge-danger' : a.criticality === 'MEDIUM' ? 'badge-warning' : 'badge-neutral'}`}>{a.criticality}</span> : '—'}</td>
-                                                <td className="text-xs text-slate-400">{l.rationale || '—'}</td>
+                                                <td className="text-xs text-content-muted">{l.rationale || '—'}</td>
                                                 {canWrite && (
                                                     <td>
                                                         <Tooltip content="Unlink asset">

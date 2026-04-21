@@ -63,11 +63,11 @@ export default function ProgressCard({
 
     return (
         <div id={id} className={`glass-card p-5 ${className}`}>
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">{label}</h3>
+            <h3 className="text-sm font-semibold text-content-default mb-3">{label}</h3>
 
             {/* Main progress bar */}
             <div className="flex items-center gap-3">
-                <div className="flex-1 bg-slate-800 rounded-full h-3 overflow-hidden">
+                <div className="flex-1 bg-bg-subtle rounded-full h-3 overflow-hidden">
                     {segments && segments.length > 0 ? (
                         // Stacked segments
                         <div className="flex h-full">
@@ -91,7 +91,7 @@ export default function ProgressCard({
                         />
                     )}
                 </div>
-                <span className="text-sm font-medium text-slate-300 tabular-nums min-w-[3.5rem] text-right">
+                <span className="text-sm font-medium text-content-default tabular-nums min-w-[3.5rem] text-right">
                     {displayPercent}%
                 </span>
             </div>
@@ -100,10 +100,10 @@ export default function ProgressCard({
             {segments && segments.length > 0 && (
                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
                     {segments.map((seg) => (
-                        <div key={seg.label} className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <div key={seg.label} className="flex items-center gap-1.5 text-xs text-content-muted">
                             <span className={`w-2 h-2 rounded-full ${seg.color}`} />
                             <span>{seg.label}</span>
-                            <span className="text-slate-500 tabular-nums">({seg.value})</span>
+                            <span className="text-content-subtle tabular-nums">({seg.value})</span>
                         </div>
                     ))}
                 </div>
@@ -111,7 +111,7 @@ export default function ProgressCard({
 
             {/* Footer */}
             {footer && (
-                <div className="mt-3 text-xs text-slate-400">{footer}</div>
+                <div className="mt-3 text-xs text-content-muted">{footer}</div>
             )}
         </div>
     );

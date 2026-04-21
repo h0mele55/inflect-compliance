@@ -45,12 +45,12 @@ export interface RiskHeatmapProps {
 // ─── Color Logic ────────────────────────────────────────────────────
 
 function getCellColor(likelihood: number, impact: number, count: number): string {
-    if (count === 0) return 'bg-slate-800/40';
+    if (count === 0) return 'bg-bg-subtle';
     const score = likelihood * impact;
     if (score >= 15) return 'bg-red-500/80 text-white';
     if (score >= 10) return 'bg-orange-500/70 text-white';
-    if (score >= 5)  return 'bg-amber-500/60 text-slate-900';
-    return 'bg-emerald-500/50 text-slate-900';
+    if (score >= 5)  return 'bg-amber-500/60 text-content-emphasis';
+    return 'bg-emerald-500/50 text-content-emphasis';
 }
 
 function getScoreLabel(score: number): string {
@@ -80,8 +80,8 @@ export default function RiskHeatmap({
     if (totalRisks === 0) {
         return (
             <div id={id} className={`glass-card p-5 ${className}`}>
-                <h3 className="text-sm font-semibold text-slate-300 mb-3">Risk Heatmap</h3>
-                <p className="text-xs text-slate-500">No risks registered yet.</p>
+                <h3 className="text-sm font-semibold text-content-default mb-3">Risk Heatmap</h3>
+                <p className="text-xs text-content-subtle">No risks registered yet.</p>
             </div>
         );
     }
@@ -93,14 +93,14 @@ export default function RiskHeatmap({
     return (
         <div id={id} className={`glass-card p-5 ${className}`}>
             <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-300">Risk Heatmap</h3>
-                <span className="text-xs text-slate-500 tabular-nums">{totalRisks} risks</span>
+                <h3 className="text-sm font-semibold text-content-default">Risk Heatmap</h3>
+                <span className="text-xs text-content-subtle tabular-nums">{totalRisks} risks</span>
             </div>
 
             <div className="flex gap-2">
                 {/* Y-axis label */}
                 <div className="flex flex-col items-center justify-center -mr-1">
-                    <span className="text-[10px] text-slate-500 [writing-mode:vertical-lr] rotate-180 tracking-widest uppercase">
+                    <span className="text-[10px] text-content-subtle [writing-mode:vertical-lr] rotate-180 tracking-widest uppercase">
                         Likelihood
                     </span>
                 </div>
@@ -119,7 +119,7 @@ export default function RiskHeatmap({
                                 {/* Row label */}
                                 <div
                                     key={`label-${likelihood}`}
-                                    className="flex items-center justify-center text-[10px] text-slate-500 tabular-nums"
+                                    className="flex items-center justify-center text-[10px] text-content-subtle tabular-nums"
                                 >
                                     {likelihood}
                                 </div>
@@ -152,7 +152,7 @@ export default function RiskHeatmap({
                         {cols.map((impact) => (
                             <div
                                 key={`col-${impact}`}
-                                className="flex items-center justify-center text-[10px] text-slate-500 tabular-nums"
+                                className="flex items-center justify-center text-[10px] text-content-subtle tabular-nums"
                             >
                                 {impact}
                             </div>
@@ -161,7 +161,7 @@ export default function RiskHeatmap({
 
                     {/* X-axis title */}
                     <div className="text-center mt-1">
-                        <span className="text-[10px] text-slate-500 uppercase tracking-widest">
+                        <span className="text-[10px] text-content-subtle uppercase tracking-widest">
                             Impact
                         </span>
                     </div>
@@ -176,7 +176,7 @@ export default function RiskHeatmap({
                     { label: 'High', color: 'bg-orange-500/70' },
                     { label: 'Critical', color: 'bg-red-500/80' },
                 ].map((item) => (
-                    <div key={item.label} className="flex items-center gap-1 text-[10px] text-slate-400">
+                    <div key={item.label} className="flex items-center gap-1 text-[10px] text-content-muted">
                         <span className={`w-2.5 h-2.5 rounded-sm ${item.color}`} />
                         <span>{item.label}</span>
                     </div>

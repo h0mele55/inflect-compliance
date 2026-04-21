@@ -2,7 +2,7 @@
  * Reusable skeleton loading primitives for the dark-themed UI.
  *
  * ─── Design Tokens ───
- * Background:    bg-slate-700/60       (dark glass-card theme)
+ * Background:    bg-bg-subtle       (dark glass-card theme)
  * Animation:     animate-pulse         (CSS pulse, no custom keyframes)
  * Border radius: rounded (4px)         for blocks/inputs
  *                rounded-full (9999px) for pills/avatars
@@ -26,7 +26,7 @@ interface SkeletonProps {
 export function Skeleton({ className = '' }: SkeletonProps) {
     return (
         <div
-            className={`animate-pulse rounded bg-slate-700/60 ${className}`}
+            className={`animate-pulse rounded bg-bg-subtle ${className}`}
             aria-hidden="true"
         />
     );
@@ -291,7 +291,7 @@ export function SkeletonDetailTabs({ tabCount = 4 }: { tabCount?: number }) {
             </div>
 
             {/* Tab bar */}
-            <div className="flex gap-1 border-b border-slate-700/50 pb-0.5">
+            <div className="flex gap-1 border-b border-border-subtle pb-0.5">
                 {Array.from({ length: tabCount }).map((_, i) => (
                     <Skeleton key={i} className={`h-8 ${i === 0 ? 'w-24' : 'w-20'} rounded-t`} />
                 ))}

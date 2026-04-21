@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTenantContext, useTenantHref, usePermissions } from '@/lib/tenant-context-provider';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { useKeyboardShortcut } from '@/lib/hooks/use-keyboard-shortcut';
 import {
     X,
     LayoutDashboard,
@@ -124,7 +125,7 @@ function NavSection({ title, children }: NavSectionProps) {
     return (
         <div className="nav-section">
             {title && (
-                <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                <p className="px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-widest text-content-subtle">
                     {title}
                 </p>
             )}
@@ -150,12 +151,12 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
     return (
         <div className="flex flex-col h-full">
             {/* Logo */}
-            <div className="p-4 border-b border-slate-700/50">
+            <div className="p-4 border-b border-border-subtle">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                        <span className="text-white text-sm font-bold">IC</span>
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--brand-emphasis)] to-[var(--brand-default)] flex items-center justify-center flex-shrink-0">
+                        <span className="text-content-inverted text-sm font-bold">IC</span>
                     </div>
-                    <span className="text-sm font-semibold text-white truncate">{tc('appName')}</span>
+                    <span className="text-sm font-semibold text-content-emphasis truncate">{tc('appName')}</span>
                 </div>
             </div>
 
@@ -179,12 +180,12 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
             </nav>
 
             {/* User */}
-            <div className="p-3 border-t border-slate-700/50">
+            <div className="p-3 border-t border-border-subtle">
                 <div className="mb-2 flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-300 truncate">{user.name}</p>
-                        <p className="text-xs text-slate-500 truncate">{tenant.tenantName}</p>
-                        <p className="text-xs text-brand-400">{tenant.role}</p>
+                        <p className="text-xs font-medium text-content-default truncate">{user.name}</p>
+                        <p className="text-xs text-content-muted truncate">{tenant.tenantName}</p>
+                        <p className="text-xs text-[var(--brand-default)]">{tenant.role}</p>
                     </div>
                     <ThemeToggle id="theme-toggle-desktop" />
                 </div>
@@ -218,15 +219,25 @@ export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pathname]);
 
-    // Close on Escape
-    useEffect(() => {
-        if (!open) return;
-        const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-        };
-        document.addEventListener('keydown', handler);
-        return () => document.removeEventListener('keydown', handler);
-    }, [open, onClose]);
+    // Close on Escape — routed through the shared shortcut system so
+    // it respects precedence against any other Escape binding that
+    // might happen to be active, and so a contributor grepping for
+    // shortcut sources finds it via `useKeyboardShortcut` like every
+    // other binding in the app.
+    //
+    // `scope: 'overlay'` + priority 5 means:
+    //   - Fires only while the drawer is mounted (via the
+    //     `data-sheet-overlay` marker on the backdrop below).
+    //   - Beats selection-clear (priority 2) and filter-clear
+    //     (priority 1) if both are somehow simultaneously active.
+    //   - Loses to any modal stacking above the drawer (those
+    //     override via Radix's native Escape inside their portal).
+    useKeyboardShortcut('Escape', onClose, {
+        enabled: open,
+        scope: 'overlay',
+        priority: 5,
+        description: 'Close navigation drawer',
+    });
 
     // Lock body scroll when open
     useEffect(() => {
@@ -240,7 +251,11 @@ export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
 
     return (
         <>
-            {/* Backdrop */}
+            {/* Backdrop.
+                `data-sheet-overlay` is picked up by the shortcut
+                registry's overlay selector, so while the drawer is
+                open any `scope: 'global'` shortcut (filter clear,
+                selection clear, etc.) stands down automatically. */}
             <div
                 className={`
                     fixed inset-0 z-40 bg-black/60 backdrop-blur-sm
@@ -250,12 +265,13 @@ export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
                 onClick={onClose}
                 aria-hidden="true"
                 data-testid="nav-drawer-backdrop"
+                data-sheet-overlay={open ? 'true' : undefined}
             />
 
             {/* Drawer */}
             <div
                 className={`
-                    fixed inset-y-0 left-0 z-50 w-64 bg-slate-900/95 border-r border-slate-700/50
+                    fixed inset-y-0 left-0 z-50 w-64 bg-bg-default border-r border-border-subtle
                     transform transition-transform duration-300 ease-in-out
                     ${open ? 'translate-x-0' : '-translate-x-full'}
                 `}
@@ -268,7 +284,7 @@ export function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
                 {/* Close button — 44px touch target */}
                 <button
                     type="button"
-                    className="absolute top-3 right-3 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
+                    className="absolute top-3 right-3 p-2 rounded-lg text-content-muted hover:text-content-emphasis hover:bg-bg-muted transition-colors"
                     onClick={onClose}
                     aria-label="Close navigation"
                     data-testid="nav-drawer-close"
