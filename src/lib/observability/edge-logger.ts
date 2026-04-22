@@ -37,6 +37,19 @@ function emit(level: EdgeLogLevel, msg: string, fields?: EdgeLogFields): void {
 
     const json = JSON.stringify(entry);
 
+    // Suppress emission in the Jest `node` test environment by default.
+    // Middleware-invoking integration tests (auth-ratelimit, auth-routes)
+    // otherwise flood stderr with pino-shaped JSON for every blocked
+    // request. A specific test can opt back in by setting
+    // `EDGE_LOGGER_IN_TEST=1` — observability-foundation.test.ts does
+    // exactly that when asserting the console shape.
+    if (
+        process.env.NODE_ENV === 'test' &&
+        process.env.EDGE_LOGGER_IN_TEST !== '1'
+    ) {
+        return;
+    }
+
     switch (level) {
         case 'error':
             console.error(json); // eslint-disable-line no-console

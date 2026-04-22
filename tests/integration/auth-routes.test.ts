@@ -61,9 +61,9 @@ describe('Auth Routes Integration', () => {
             }
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
-        if (!serverAvailable) {
-            console.warn(`[test:integration] Server at ${BASE_URL} not reachable — auth route tests will be skipped`);
-        }
+        // When the server isn't reachable, each `itLive` below emits
+        // its own `[skipped] <name>` line via console.log — the
+        // single suite-level warn is redundant noise.
     }, 60000);
 
     // Helper: skip test if server not available

@@ -18,6 +18,7 @@
 
 import { cn } from "@dub/utils";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import {
   ButtonHTMLAttributes,
   HTMLAttributes,
@@ -91,6 +92,16 @@ function PopoverRoot({
               }
             }}
           >
+            {/* Vaul's Drawer wraps Radix Dialog under the hood, which
+                requires a Title + Description for screen readers.
+                Popover contents are diverse (filter menus, date pickers,
+                action lists) so we ship a visually-hidden default pair
+                — content-specific titles still win via Drawer.Title
+                inside the `content` slot. */}
+            <VisuallyHidden.Root>
+              <Drawer.Title>Menu</Drawer.Title>
+              <Drawer.Description>Popover content</Drawer.Description>
+            </VisuallyHidden.Root>
             <div className="sticky top-0 z-20 flex w-full items-center justify-center rounded-t-[10px] bg-inherit">
               <div className="bg-border-default my-3 h-1 w-12 rounded-full" />
             </div>

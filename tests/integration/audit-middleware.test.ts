@@ -135,15 +135,15 @@ describeFn('Audit Middleware — Integration Tests', () => {
 
     afterAll(async () => {
         // Use raw SQL for cleanup to bypass any middleware (soft-delete, audit).
+        // Best-effort — subsequent runs use randomised `testRunId` so
+        // stragglers don't cross-contaminate; surfacing the error via
+        // console.warn just pollutes CI output without telling anyone
+        // anything actionable.
         if (tenantId) {
-            try {
-                await rawPrisma.$executeRawUnsafe(`DELETE FROM "AuditLog" WHERE "tenantId" = $1`, tenantId);
-                await rawPrisma.$executeRawUnsafe(`DELETE FROM "Risk" WHERE "tenantId" = $1`, tenantId);
-                await rawPrisma.$executeRawUnsafe(`DELETE FROM "Tenant" WHERE "id" = $1`, tenantId);
-                if (userId) await rawPrisma.$executeRawUnsafe(`DELETE FROM "User" WHERE "id" = $1`, userId);
-            } catch (e) {
-                console.warn('[audit-middleware] cleanup error:', e);
-            }
+            await rawPrisma.$executeRawUnsafe(`DELETE FROM "AuditLog" WHERE "tenantId" = $1`, tenantId).catch(() => {});
+            await rawPrisma.$executeRawUnsafe(`DELETE FROM "Risk" WHERE "tenantId" = $1`, tenantId).catch(() => {});
+            await rawPrisma.$executeRawUnsafe(`DELETE FROM "Tenant" WHERE "id" = $1`, tenantId).catch(() => {});
+            if (userId) await rawPrisma.$executeRawUnsafe(`DELETE FROM "User" WHERE "id" = $1`, userId).catch(() => {});
         }
         await rawPrisma.$disconnect().catch(() => {});
         await appPrisma.$disconnect().catch(() => {});

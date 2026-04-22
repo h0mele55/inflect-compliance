@@ -41,16 +41,10 @@ describe('no-untyped-api-response guard', () => {
             }
         }
 
-        // For now this is a warning — log but don't fail
-        // Once all routes are typed, change to fail()
-        if (warnings.length > 0) {
-            console.warn(
-                `Found ${warnings.length} NextResponse.json() calls without type parameter:\n` +
-                warnings.slice(0, 10).join('\n') +
-                (warnings.length > 10 ? `\n... and ${warnings.length - 10} more` : '')
-            );
-        }
-        // Soft assertion: just ensure count doesn't grow beyond current baseline
+        // Soft assertion: just ensure count doesn't grow beyond current
+        // baseline. The surfacing-by-console.warn step was removed
+        // because it pollutes CI output; the `toBeLessThanOrEqual`
+        // below is the actual gate.
         // Bumped for Epic 7: AV webhook + storage routes
         // Bumped for Epic 12/13: SCIM provisioning + integration framework routes
         // Bumped for Epic 21: API key management routes

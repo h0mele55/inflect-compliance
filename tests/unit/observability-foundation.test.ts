@@ -151,6 +151,23 @@ describe('structured logger', () => {
 // ─── Test 3: Edge logger compiles and is usable ────────────────────────
 
 describe('edge logger', () => {
+    // edge-logger is silent in NODE_ENV=test by default (otherwise every
+    // middleware-invoking integration test floods stderr with pino JSON).
+    // These tests specifically assert the console-shape contract, so opt
+    // back in for the duration of the suite.
+    let savedEdgeLoggerInTest: string | undefined;
+    beforeAll(() => {
+        savedEdgeLoggerInTest = process.env.EDGE_LOGGER_IN_TEST;
+        process.env.EDGE_LOGGER_IN_TEST = '1';
+    });
+    afterAll(() => {
+        if (savedEdgeLoggerInTest === undefined) {
+            delete process.env.EDGE_LOGGER_IN_TEST;
+        } else {
+            process.env.EDGE_LOGGER_IN_TEST = savedEdgeLoggerInTest;
+        }
+    });
+
     it('should export edgeLogger with info/warn/error/debug methods', () => {
         const { edgeLogger } = require('../../src/lib/observability/edge-logger');
 
