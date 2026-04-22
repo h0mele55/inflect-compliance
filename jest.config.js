@@ -29,10 +29,18 @@ const nodeProject = {
     preset: 'ts-jest',
     testEnvironment: 'node',
     setupFiles: ['<rootDir>/jest.setup.js'],
-    // Shared shims for the handful of node-project tests that opt into
-    // jsdom via per-file `@jest-environment jsdom` directives. Safe to
-    // load in pure-node tests too (shims feature-detect `window`).
-    setupFilesAfterEnv: ['<rootDir>/tests/setup/jsdom-shims.ts'],
+    // - `jsdom-shims.ts` covers the handful of node-project tests that
+    //   opt into jsdom via per-file `@jest-environment jsdom`
+    //   directives. Safe to load in pure-node tests too (feature-
+    //   detects `window`).
+    // - `disconnect-after-suite.ts` registers a global `afterAll` that
+    //   closes the `prismaTestClient()` singleton. Without it Jest
+    //   workers exit via forceExit (see the "failed to exit
+    //   gracefully" warning).
+    setupFilesAfterEnv: [
+        '<rootDir>/tests/setup/jsdom-shims.ts',
+        '<rootDir>/tests/setup/disconnect-after-suite.ts',
+    ],
     globalSetup: '<rootDir>/tests/setup/globalSetup.ts',
     globalTeardown: '<rootDir>/tests/setup/teardown.ts',
     moduleNameMapper: {
