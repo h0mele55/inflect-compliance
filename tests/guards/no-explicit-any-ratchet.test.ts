@@ -1,0 +1,118 @@
+/**
+ * `any` usage ratchet.
+ *
+ * The codebase has a large pre-existing `any` migration debt (1200+
+ * occurrences across API routes, usecases, services). Making
+ * `@typescript-eslint/no-explicit-any` an `error` meant CI was red
+ * for weeks; ESLint can't gradually rollout a rule. Downgrading to
+ * `warn` puts lint back in the green but loses the "no new any"
+ * pressure.
+ *
+ * This guard bridges the gap. Counts `any` patterns across `src/`
+ * (SAME regexes as `scripts/count-any.js`) and caps them at the
+ * current floor. New code that introduces `: any`, `<any>`,
+ * `useState<any>`, `as any`, or `@ts-ignore` pushes the total up,
+ * which fails this test. Caps only go DOWN — as types get added,
+ * lower the cap.
+ *
+ * Same ratchet pattern as `tests/guardrails/raw-color-ratchet.test.ts`
+ * (Epic 51 — raw Tailwind colours) and `tests/guards/epic60-ratchet.test.ts`
+ * (Epic 60 — inline patterns).
+ *
+ * To lower the cap after a cleanup sweep:
+ *   1. Run `node scripts/count-any.js` to see the new total.
+ *   2. Update the `CAPS` below to match, never higher.
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+const SRC_DIR = path.resolve(__dirname, '../../src');
+
+interface Pattern {
+    label: string;
+    regex: RegExp;
+}
+
+const PATTERNS: Pattern[] = [
+    { label: ': any', regex: /:\s*any\b/g },
+    { label: '<any>', regex: /<any>/g },
+    { label: 'useState<any>', regex: /useState<any>/g },
+    { label: 'as any', regex: /as\s+any\b/g },
+    { label: '// @ts-ignore', regex: /\/\/\s*@ts-ignore/g },
+];
+
+/**
+ * Per-pattern cap. Current floor — can only go down when code is
+ * migrated to real types. Raising these values requires a team
+ * decision and a commit-message rationale.
+ */
+const CAPS: Record<string, number> = {
+    ': any': 495,
+    '<any>': 496,
+    'useState<any>': 26,
+    'as any': 277,
+    '// @ts-ignore': 2,
+};
+
+function walk(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            if (entry.name === 'node_modules' || entry.name === '.next') continue;
+            out.push(...walk(full));
+        } else if (/\.(ts|tsx)$/.test(entry.name)) {
+            out.push(full);
+        }
+    }
+    return out;
+}
+
+function countAll(): Record<string, number> {
+    const totals: Record<string, number> = {};
+    for (const { label } of PATTERNS) totals[label] = 0;
+
+    for (const file of walk(SRC_DIR)) {
+        const content = fs.readFileSync(file, 'utf-8');
+        for (const { label, regex } of PATTERNS) {
+            regex.lastIndex = 0;
+            const matches = content.match(regex);
+            totals[label] += matches ? matches.length : 0;
+        }
+    }
+    return totals;
+}
+
+describe('`any` usage ratchet', () => {
+    const totals = countAll();
+
+    test.each(PATTERNS.map((p) => p.label))('%s stays within cap', (label) => {
+        const cap = CAPS[label];
+        const actual = totals[label];
+        if (actual > cap) {
+            throw new Error(
+                `Pattern "${label}" count rose to ${actual} (cap ${cap}). ` +
+                    `Recent commits introduced new \`any\` usage in src/**. ` +
+                    `Replace with real types, or narrow the cast (\`unknown\` + ` +
+                    `type guard, generic parameter, \`ReturnType<typeof …>\`, etc.). ` +
+                    `If the addition is deliberate (e.g. untyped third-party API), ` +
+                    `annotate with \`// eslint-disable-next-line\` AND bump the ` +
+                    `cap in this file with a committed justification.`,
+            );
+        }
+        expect(actual).toBeLessThanOrEqual(cap);
+    });
+
+    it('total stays within sum of per-pattern caps', () => {
+        const total = Object.values(totals).reduce((a, b) => a + b, 0);
+        const capTotal = Object.values(CAPS).reduce((a, b) => a + b, 0);
+        if (total > capTotal) {
+            // Covered by per-pattern tests; this is the readable roll-up.
+            throw new Error(
+                `Total \`any\` usages: ${total} (cap sum ${capTotal}).`,
+            );
+        }
+        expect(total).toBeLessThanOrEqual(capTotal);
+    });
+});
