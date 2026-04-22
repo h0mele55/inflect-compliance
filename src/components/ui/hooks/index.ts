@@ -1,13 +1,27 @@
-export { useColumnVisibility } from "./use-column-visibility";
-export { useCopyToClipboard } from "./use-copy-to-clipboard";
-export { useEnterSubmit } from "./use-enter-submit";
-export { useInViewport } from "./use-in-viewport";
-export { useInputFocused } from "./use-input-focused";
-export { useIntersectionObserver } from "./use-intersection-observer";
-export { useKeyboardShortcut } from "./use-keyboard-shortcut";
+/**
+ * Shared UI utility hooks — Epic 60's canonical home.
+ *
+ * **Import convention:** every consumer should import from the barrel
+ * (`@/components/ui/hooks`) rather than the per-file paths below. The
+ * file layout is an implementation detail that can reshuffle without
+ * touching call sites.
+ *
+ * See `./README.md` for the full architecture — category manifest,
+ * SSR-safety conventions, naming rules, how this directory relates to
+ * `src/lib/hooks/` (data-fetching / domain hooks, a separate home).
+ *
+ * The barrel is verified against every `use-*.ts(x)` file in this
+ * directory by `tests/guards/ui-hooks-barrel.test.ts` — adding a hook
+ * without a barrel export fails CI.
+ */
+
+// ─── Persistence ──────────────────────────────────────────────────────
 export { useLocalStorage } from "./use-local-storage";
+
+// ─── Viewport / observer ──────────────────────────────────────────────
+export { useInViewport } from "./use-in-viewport";
+export { useIntersectionObserver } from "./use-intersection-observer";
 export { useMediaQuery } from "./use-media-query";
-export { useOptimisticUpdate } from "./use-optimistic-update";
 export { useResizeObserver } from "./use-resize-observer";
 export {
     useResponsivePresentation,
@@ -16,5 +30,27 @@ export {
     type UseResponsivePresentation,
     type UseResponsivePresentationOptions,
 } from "./use-responsive-presentation";
-export { useScrollProgress } from "./use-scroll-progress";
+
+// ─── Scroll ───────────────────────────────────────────────────────────
 export { useScroll } from "./use-scroll";
+export { useScrollProgress } from "./use-scroll-progress";
+
+// ─── Optimistic UI ────────────────────────────────────────────────────
+export { useOptimisticUpdate } from "./use-optimistic-update";
+
+// ─── Submit / input / keyboard ────────────────────────────────────────
+export { useEnterSubmit } from "./use-enter-submit";
+export { useInputFocused } from "./use-input-focused";
+export { useKeyboardShortcut } from "./use-keyboard-shortcut";
+
+// ─── Dense-table ergonomics ───────────────────────────────────────────
+export { useColumnVisibility } from "./use-column-visibility";
+
+// ─── Clipboard / copy ─────────────────────────────────────────────────
+export {
+    useCopyToClipboard,
+    type UseCopyToClipboardOptions,
+    type UseCopyToClipboardResult,
+    type CopyOptions,
+    type CopyFn,
+} from "./use-copy-to-clipboard";
