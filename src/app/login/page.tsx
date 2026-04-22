@@ -44,28 +44,25 @@ function LoginForm() {
 
     useEffect(() => {
         let cancelled = false;
-        // Operator override: setting NEXT_PUBLIC_AUTH_CREDENTIALS_UI_DISABLED=1
-        // in the deploy env forces the email/password form off regardless of
-        // whether the server has the Credentials provider registered. The
-        // backend stays functional (API routes, tests, server actions can
-        // still call it); only the public login page hides the controls.
-        const uiDisabled =
-            process.env.NEXT_PUBLIC_AUTH_CREDENTIALS_UI_DISABLED === '1';
-        if (uiDisabled) {
-            setCredentialsEnabled(false);
-            return;
-        }
-        getProviders()
-            .then((providers) => {
-                if (cancelled) return;
-                setCredentialsEnabled(!!providers?.credentials);
-            })
-            .catch(() => {
-                // If the discovery call fails (e.g. network blip), default
-                // to hiding the form rather than showing a control that's
-                // about to 404 against a missing provider.
-                if (!cancelled) setCredentialsEnabled(false);
-            });
+        // Resolve in parallel: (1) which providers the server has
+        // registered, and (2) the runtime UI-config flag. The flag is
+        // served by /api/auth/ui-config so an operator can flip
+        // `AUTH_CREDENTIALS_UI_HIDDEN=1` in the VM's .env and recreate
+        // the container — no rebuild. When the flag is on the form
+        // stays hidden regardless of provider registration.
+        Promise.all([
+            getProviders().catch(() => null),
+            fetch('/api/auth/ui-config')
+                .then((r) => (r.ok ? r.json() : null))
+                .catch(() => null),
+        ]).then(([providers, uiConfig]) => {
+            if (cancelled) return;
+            if (uiConfig?.credentialsFormHidden === true) {
+                setCredentialsEnabled(false);
+                return;
+            }
+            setCredentialsEnabled(!!providers?.credentials);
+        });
         return () => {
             cancelled = true;
         };

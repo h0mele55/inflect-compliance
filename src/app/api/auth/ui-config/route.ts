@@ -1,0 +1,30 @@
+/**
+ * GET /api/auth/ui-config
+ *
+ * Returns the small set of auth-related flags the login page needs to
+ * decide which controls to render. Client fetches this on mount.
+ *
+ * Why a runtime endpoint rather than a `NEXT_PUBLIC_*` env var:
+ * `NEXT_PUBLIC_*` values are inlined at `next build` time — toggling
+ * one requires a rebuild + image push + rollout. A tiny server route
+ * reads `process.env` at request time, so an operator flips the flag
+ * via the VM's `.env.prod` + `docker compose up -d --force-recreate`.
+ *
+ * No secrets leak here; the endpoint exposes only the flags the
+ * browser would otherwise have to learn at build time.
+ */
+
+import { NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(): Promise<NextResponse> {
+    return NextResponse.json({
+        // When set, the public login page hides the email/password
+        // form even if the Credentials provider is registered server-
+        // side. Keeps prod OAuth-only at the UI layer while leaving
+        // the backend available for API / tests / future admin tooling.
+        credentialsFormHidden:
+            process.env.AUTH_CREDENTIALS_UI_HIDDEN === '1',
+    });
+}
