@@ -33,13 +33,19 @@ test.describe('Epic 54 — Create Control modal', () => {
     test('clicking + New Control opens the modal without navigating away', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls`);
-        await page.waitForSelector('#new-control-btn', { timeout: 15000 });
+        // Wait for the new-control-btn to be hydrated — without the
+        // networkidle gate the click can race the React event-handler
+        // attach in `next dev` and be dropped, leaving the modal closed.
+        // Same defensive pattern as the other tests in this describe.
+        const newBtn = page.locator('#new-control-btn');
+        await newBtn.waitFor({ state: 'visible', timeout: 15_000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
         const listUrl = page.url();
 
-        await page.click('#new-control-btn');
+        await newBtn.click();
 
         // Modal form fields become visible — no /controls/new navigation.
-        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 30_000 });
+        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 60_000 });
         expect(page.url()).toBe(listUrl);
 
         // Close the modal so downstream serial-mode tests start with a
@@ -54,9 +60,11 @@ test.describe('Epic 54 — Create Control modal', () => {
         // Reload to shake off any Radix overlay state left over from
         // the previous test in this serial describe block.
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('#new-control-btn', { timeout: 15000 });
-        await page.click('#new-control-btn');
-        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 30_000 });
+        const newBtn = page.locator('#new-control-btn');
+        await newBtn.waitFor({ state: 'visible', timeout: 15_000 });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await newBtn.click();
+        await expect(page.locator('#control-name-input')).toBeVisible({ timeout: 60_000 });
 
         await page.click('#new-control-cancel-btn');
 

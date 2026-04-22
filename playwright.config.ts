@@ -11,7 +11,19 @@ export default defineConfig({
     timeout: 180_000,
     fullyParallel: false,
     forbidOnly: isCI,
-    retries: isCI ? 2 : 0,
+    // CI builds and runs against `next start` (production mode) — a fresh
+    // pre-compiled server that handles the full serial suite cleanly, so
+    // 2 retries are just belt-and-braces for remote-infra hiccups.
+    //
+    // Local runs hit `next dev` (see `webServer.command` below) which JIT-
+    // compiles routes and leaks memory over long sessions. The 30-ish spec
+    // serial suite is long enough (~35 min) that the dev server starts
+    // degrading near the end — symptoms are intermittent ECONNREFUSED /
+    // 30-60s selector timeouts on pages that render fine in isolation.
+    // 1 retry converts those transient server-pressure flakes into a
+    // self-healing run without masking deterministic regressions (a real
+    // bug will fail both the original attempt and the retry).
+    retries: isCI ? 2 : 1,
     workers: 1,
     reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
     use: {

@@ -30,6 +30,7 @@ import {
     TimeSeriesChart,
     type TimeSeriesDatum,
 } from "@/components/ui/charts";
+import { formatDate } from "@/lib/format-date";
 import { useMemo } from "react";
 
 export interface TrendCardProps {
@@ -94,7 +95,7 @@ export function TrendCard({
                     type="area"
                     margin={COMPACT_CHART_MARGIN}
                     tooltipContent={(d) =>
-                        `${d.values.value}${suffix} — ${d.date.toLocaleDateString()}`
+                        `${d.values.value}${suffix} — ${formatDate(d.date)}`
                     }
                     emptyState={
                         <div className="h-px w-full bg-border-subtle" data-trend-empty />
