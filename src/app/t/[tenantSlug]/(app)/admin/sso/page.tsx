@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { Shield, CheckCircle, XCircle, AlertTriangle, ExternalLink, Trash2, Save, Eye, EyeOff } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/tooltip';
+import { ToggleGroup } from '@/components/ui/toggle-group';
 
 interface SsoProvider {
     id: string;
@@ -258,22 +259,19 @@ export default function SsoAdminPage() {
                 </p>
             </div>
 
-            {/* Protocol tabs */}
-            <div className="flex gap-2 items-center">
-                <button
-                    onClick={() => setTab('OIDC')}
-                    className={`btn ${tab === 'OIDC' ? 'btn-primary' : 'btn-secondary'}`}
-                    id="sso-tab-oidc"
-                >
-                    OIDC
-                </button>
-                <button
-                    onClick={() => setTab('SAML')}
-                    className={`btn ${tab === 'SAML' ? 'btn-primary' : 'btn-secondary'}`}
-                    id="sso-tab-saml"
-                >
-                    SAML 2.0
-                </button>
+            {/* Protocol tabs — Epic 60 ToggleGroup. `id` on each option
+                preserves `#sso-tab-oidc` / `#sso-tab-saml` DOM anchors
+                for any future E2E selector use. */}
+            <div className="flex items-center gap-2">
+                <ToggleGroup
+                    ariaLabel="SSO protocol"
+                    options={[
+                        { value: 'OIDC', label: 'OIDC', id: 'sso-tab-oidc' },
+                        { value: 'SAML', label: 'SAML 2.0', id: 'sso-tab-saml' },
+                    ]}
+                    selected={tab}
+                    selectAction={(v) => setTab(v as 'OIDC' | 'SAML')}
+                />
                 <div className="ml-auto">
                     <StatusBadge />
                 </div>

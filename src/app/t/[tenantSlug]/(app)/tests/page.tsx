@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { ToggleGroup } from '@/components/ui/toggle-group';
 
 interface TestPlanSummary {
     id: string;
@@ -116,18 +117,19 @@ export default function TestsRollupPage() {
                 </div>
             </div>
 
-            {/* Filter Toggle */}
-            <div className="flex gap-2">
-                {(['all', 'due', 'failed'] as const).map(f => (
-                    <button
-                        key={f}
-                        className={`btn btn-xs ${filter === f ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => setFilter(f)}
-                    >
-                        {f === 'all' ? 'All' : f === 'due' ? 'Overdue' : 'Failed'}
-                    </button>
-                ))}
-            </div>
+            {/* Filter Toggle — Epic 60: ToggleGroup size="sm" for a
+                compact radiogroup with keyboard arrow nav. */}
+            <ToggleGroup
+                size="sm"
+                ariaLabel="Test plan filter"
+                options={[
+                    { value: 'all', label: 'All' },
+                    { value: 'due', label: 'Overdue' },
+                    { value: 'failed', label: 'Failed' },
+                ]}
+                selected={filter}
+                selectAction={(v) => setFilter(v as 'all' | 'due' | 'failed')}
+            />
 
             {/* Plans Table */}
             {(() => {

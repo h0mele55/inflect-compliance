@@ -16,6 +16,7 @@ import {
     startOfUtcDay,
     toYMD,
 } from '@/components/ui/date-picker/date-utils';
+import { NumberStepper } from '@/components/ui/number-stepper';
 import { cn } from '@dub/utils';
 
 const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
@@ -188,8 +189,6 @@ export default function RiskDetailPage() {
 
     const set = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
         setEditForm(f => ({ ...f, [field]: e.target.value }));
-    const setNum = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-        setEditForm(f => ({ ...f, [field]: Number(e.target.value) }));
 
     if (loading) {
         return (
@@ -288,13 +287,32 @@ export default function RiskDetailPage() {
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-4">
+                            {/* Epic 60 — NumberStepper replaces raw number inputs
+                                on the ISO 27005 1..5 likelihood/impact scale.
+                                Matches the Assets CIA fields for consistency. */}
                             <div>
-                                <label className="input-label">Likelihood</label>
-                                <input type="number" min={1} max={5} className="input" value={editForm.likelihood ?? 3} onChange={setNum('likelihood')} />
+                                <label className="input-label" htmlFor="risk-likelihood">Likelihood</label>
+                                <NumberStepper
+                                    id="risk-likelihood"
+                                    size="sm"
+                                    ariaLabel="Likelihood (1–5)"
+                                    min={1}
+                                    max={5}
+                                    value={editForm.likelihood ?? 3}
+                                    onChange={(v) => setEditForm(f => ({ ...f, likelihood: v }))}
+                                />
                             </div>
                             <div>
-                                <label className="input-label">Impact</label>
-                                <input type="number" min={1} max={5} className="input" value={editForm.impact ?? 3} onChange={setNum('impact')} />
+                                <label className="input-label" htmlFor="risk-impact">Impact</label>
+                                <NumberStepper
+                                    id="risk-impact"
+                                    size="sm"
+                                    ariaLabel="Impact (1–5)"
+                                    min={1}
+                                    max={5}
+                                    value={editForm.impact ?? 3}
+                                    onChange={(v) => setEditForm(f => ({ ...f, impact: v }))}
+                                />
                             </div>
                             <div>
                                 <label className="input-label">Score</label>

@@ -132,7 +132,7 @@ architecture. The bar is "would a future engineer need the context?"
 
 Existing examples: `docs/implementation-notes/2026-04-22-*.md`.
 
-## UI Platform — Epics 51–59
+## UI Platform — Epics 51–60
 
 The following epics established shared primitives, guardrail tests, and
 contributor guides. **Always use the platform primitives** — never
@@ -200,3 +200,15 @@ When adding or modifying charts/visuals on any dashboard page,
 always use the shared chart platform. See `docs/charts.md` for the
 decision tree. Never use raw `<svg>`, `<polyline>`, or inline
 `style={{ width: \`\${pct}%\` }}` progress bars.
+
+### Epic 60 — Shared Hooks & Polish Primitives
+
+Import shared hooks from `@/components/ui/hooks` (barrel): `useLocalStorage`,
+`useOptimisticUpdate`, `useEnterSubmit`, `useInputFocused`, `useScroll`,
+`useScrollProgress`, `useInViewport`, etc. Use the polish primitives
+`<Accordion>`, `<TabSelect>`, `<ToggleGroup>`, `<Slider>`,
+`<NumberStepper>` for dense interaction areas. Never hand-roll a tab
+bar, segmented filter row, `localStorage` cache, Enter-submit handler,
+or `<input type="number">` stepper — reach for the shared primitive. See
+`docs/epic-60-shared-hooks-and-polish.md` and the ratchet
+`tests/guards/epic60-ratchet.test.ts`.

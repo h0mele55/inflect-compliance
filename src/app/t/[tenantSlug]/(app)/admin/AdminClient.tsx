@@ -3,6 +3,7 @@ import { formatDateTime } from '@/lib/format-date';
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { ToggleGroup } from '@/components/ui/toggle-group';
 
 interface AdminClientProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,10 +78,16 @@ export function AdminClient({ auditLog, tenantSlug, translations: t }: AdminClie
 
     return (
         <>
-            <div className="flex gap-2">
-                <button onClick={() => setTab('log')} className={`btn ${tab === 'log' ? 'btn-primary' : 'btn-secondary'}`}>{t.auditLog}</button>
-                <button onClick={() => setTab('templates')} className={`btn ${tab === 'templates' ? 'btn-primary' : 'btn-secondary'}`}>{t.policyTemplates}</button>
-            </div>
+            {/* Epic 60 — ToggleGroup replaces the hand-rolled tab bar. */}
+            <ToggleGroup
+                ariaLabel="Admin view"
+                options={[
+                    { value: 'log', label: t.auditLog },
+                    { value: 'templates', label: t.policyTemplates },
+                ]}
+                selected={tab}
+                selectAction={(v) => setTab(v as 'log' | 'templates')}
+            />
 
             {tab === 'log' ? (
                 <DataTable

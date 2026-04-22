@@ -6,6 +6,7 @@ import { RequirePermission } from '@/components/require-permission';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import type { SoAReportDTO } from '@/lib/dto/soa';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { ToggleGroup } from '@/components/ui/toggle-group';
 
 interface ControlOption {
     id: string;
@@ -115,10 +116,18 @@ export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, 
                 </RequirePermission>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-                <button onClick={() => setTab('soa')} className={`btn ${tab === 'soa' ? 'btn-primary' : 'btn-secondary'}`} id="soa-tab-btn">{t.soa}</button>
-                <button onClick={() => setTab('risk')} className={`btn ${tab === 'risk' ? 'btn-primary' : 'btn-secondary'}`} id="risk-tab-btn">{t.riskRegister}</button>
-            </div>
+            {/* Epic 60 — ToggleGroup with `id` on each option to
+                preserve `#soa-tab-btn` / `#risk-tab-btn` E2E selectors
+                used by tests/e2e/reporting.spec.ts. */}
+            <ToggleGroup
+                ariaLabel="Report"
+                options={[
+                    { value: 'soa', label: t.soa, id: 'soa-tab-btn' },
+                    { value: 'risk', label: t.riskRegister, id: 'risk-tab-btn' },
+                ]}
+                selected={tab}
+                selectAction={(v) => setTab(v as 'soa' | 'risk')}
+            />
 
             {tab === 'soa' ? (
                 <SoAClient

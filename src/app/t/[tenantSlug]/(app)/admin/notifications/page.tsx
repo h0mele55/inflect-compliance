@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
+import { ToggleGroup } from '@/components/ui/toggle-group';
 
 interface NotificationSettings {
     enabled: boolean;
@@ -106,14 +107,16 @@ export default function NotificationSettingsPage() {
                 </div>
             </div>
 
-            <div className="flex gap-2">
-                <button onClick={() => setTab('settings')} className={`btn ${tab === 'settings' ? 'btn-primary' : 'btn-secondary'}`}>
-                    Settings
-                </button>
-                <button onClick={() => setTab('stats')} className={`btn ${tab === 'stats' ? 'btn-primary' : 'btn-secondary'}`}>
-                    Send Stats
-                </button>
-            </div>
+            {/* Epic 60 — ToggleGroup replaces hand-rolled tab bar. */}
+            <ToggleGroup
+                ariaLabel="Notification admin view"
+                options={[
+                    { value: 'settings', label: 'Settings' },
+                    { value: 'stats', label: 'Send Stats' },
+                ]}
+                selected={tab}
+                selectAction={(v) => setTab(v as 'settings' | 'stats')}
+            />
 
             {tab === 'settings' ? (
                 <div className="glass-card p-6 space-y-5">

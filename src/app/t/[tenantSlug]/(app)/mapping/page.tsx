@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
+import { ToggleGroup } from '@/components/ui/toggle-group';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function MappingPage() {
@@ -23,10 +24,17 @@ export default function MappingPage() {
                 <p className="text-content-muted text-sm">{t('subtitle')}</p>
             </div>
 
-            <div className="flex gap-2">
-                <button onClick={() => setTab('soc2')} className={`btn ${tab === 'soc2' ? 'btn-primary' : 'btn-secondary'}`}>{t('soc2')}</button>
-                <button onClick={() => setTab('nis2')} className={`btn ${tab === 'nis2' ? 'btn-primary' : 'btn-secondary'}`}>{t('nis2')}</button>
-            </div>
+            {/* Epic 60 — ToggleGroup replaces raw btn-primary/btn-secondary
+                toggle, giving us radiogroup ARIA + keyboard arrow nav. */}
+            <ToggleGroup
+                ariaLabel="Framework"
+                options={[
+                    { value: 'soc2', label: t('soc2') },
+                    { value: 'nis2', label: t('nis2') },
+                ]}
+                selected={tab}
+                selectAction={(v) => setTab(v as 'soc2' | 'nis2')}
+            />
 
             <div className="space-y-3">
                 {items.map((item: any) => (
