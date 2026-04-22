@@ -284,10 +284,15 @@ export function withRateLimit<Args extends unknown[]>(
  *
  *   - `RATE_LIMIT_ENABLED=0` — explicit operator override for the
  *     whole process.
+ *   - `AUTH_TEST_MODE=1` — Playwright / e2e webserver runs with this
+ *     set. Next.js dev mode reasserts `NODE_ENV=development` at
+ *     startup even when we launched it with `NODE_ENV=test`, so we
+ *     can't rely on NODE_ENV alone for the e2e-server bypass.
+ *   - `NEXT_TEST_MODE=1` — same shape, belt-and-braces.
  *   - `NODE_ENV=test` AND not explicitly opted-in (`RATE_LIMIT_ENABLED=1`)
- *     — integration and unit suites hit mutation endpoints in tight
- *     loops; a specific test can opt back in per-process when it needs
- *     to exercise the limiter itself (Epic A.2/A.3 suites do this).
+ *     — Jest suites hit mutation endpoints in tight loops; a specific
+ *     test can opt back in per-process to exercise the limiter itself
+ *     (Epic A.2/A.3 suites do this).
  *
  * Read via `process.env` directly (not through `src/env.ts`) so tests
  * can flip the toggle mid-process via env mutation. The validated `env`
@@ -296,6 +301,8 @@ export function withRateLimit<Args extends unknown[]>(
  */
 export function isRateLimitBypassed(): boolean {
     if (process.env.RATE_LIMIT_ENABLED === '0') return true;
+    if (process.env.AUTH_TEST_MODE === '1') return true;
+    if (process.env.NEXT_TEST_MODE === '1') return true;
     if (
         process.env.NODE_ENV === 'test' &&
         process.env.RATE_LIMIT_ENABLED !== '1'
