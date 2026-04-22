@@ -115,6 +115,59 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         error: '/login',
     },
     providers,
+    events: {
+        /**
+         * Auto-onboard new OAuth users into a default tenant so they land
+         * on a usable dashboard instead of bouncing back to /login.
+         *
+         * Current bootstrap policy: every new user joins the oldest
+         * tenant (ORDER BY createdAt ASC) as EDITOR. This matches the
+         * "single test tenant" stance on the prod VM while we're still
+         * shaking things out — every invited colleague lands in the
+         * same place, can poke around, and an ADMIN can promote them
+         * if they need write access beyond EDITOR.
+         *
+         * Future: replace with an invitation-token flow (user must
+         * present a valid invite to join) before opening the deployment
+         * to untrusted email addresses. As written, ANY Google account
+         * on the internet can self-join.
+         */
+        async createUser({ user }) {
+            if (!user.id) return;
+            try {
+                const tenant = await prisma.tenant.findFirst({
+                    orderBy: { createdAt: 'asc' },
+                });
+                if (!tenant) {
+                    edgeLogger.warn('New user created but no tenant exists to auto-join', {
+                        component: 'auth',
+                        userId: user.id,
+                    });
+                    return;
+                }
+                await prisma.tenantMembership.upsert({
+                    where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } },
+                    update: {},
+                    create: {
+                        tenantId: tenant.id,
+                        userId: user.id,
+                        role: 'EDITOR',
+                        status: 'ACTIVE',
+                    },
+                });
+            } catch (err) {
+                edgeLogger.error('Failed to auto-onboard new OAuth user', {
+                    component: 'auth',
+                    userId: user.id,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+                // Swallow — letting the sign-in succeed with no membership
+                // is better than throwing and breaking the auth callback.
+                // User will bounce to /login on first nav, surface is no
+                // worse than the pre-fix state.
+            }
+        },
+    },
     callbacks: {
         /**
          * signIn callback: link OAuth user to existing tenant user by email.
