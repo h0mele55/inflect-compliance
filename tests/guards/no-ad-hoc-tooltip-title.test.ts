@@ -17,9 +17,21 @@
  * ratchet caps the count of genuine HTML `title=` usages inside
  * `src/app/` so migrations can only go DOWN.
  *
- * React-prop `title=` on components (`<Modal title=…>`, `<Sheet.Header>`,
- * `<Card>`, `<FieldGroup>`, `<NavSection>`, `<TableEmptyState>`,
- * `<Tooltip>`, `<InfoTooltip>`, …) is a semantic prop and ignored.
+ * ─── Component-prop `title=` is explicitly out of scope ───
+ *
+ * React-prop `title=` on components — `<Modal title=…>`, `<Sheet title=…>`,
+ * `<Modal.Header title=…>`, `<Sheet.Header title=…>`, `<Card>`,
+ * `<FieldGroup>`, `<NavSection>`, `<TableEmptyState>`, `<Tooltip title=…>`,
+ * `<InfoTooltip>`, … — is a semantic prop that renders visible header
+ * text or a styled bold heading. It is NOT a tooltip attribute.
+ *
+ * The detector below filters those out by the enclosing tag's name:
+ *   - lowercase first char AND no dot → HTML element → count it
+ *   - uppercase first char OR contains a dot → component → ignore
+ *
+ * If a code audit ever reports `<Modal title=…>` or `<Tooltip title=…>`
+ * as a "raw tooltip-title usage", that audit is miscategorising — the
+ * correct behaviour is what this ratchet already does.
  */
 
 import * as fs from 'fs';
@@ -68,12 +80,19 @@ function countHtmlTitleAttrs(src: string, file: string): Array<{ line: number; t
     while ((match = re.exec(src)) !== null) {
         const pos = match.index;
 
-        // Skip matches inside a block comment or JSDoc — the strategy
-        // doc examples use `title=…` inside `/** … */` comments.
+        // Skip matches inside a comment line. Two cases:
+        //   (1) JSDoc / block comment continuation: leading `*` after trim
+        //   (2) Line comment starting the row: leading `//` after trim
+        // NOTE: we only skip when the comment marker STARTS the line's
+        // prefix — not when it appears anywhere. An earlier version used
+        // `.includes('//')` and caused a latent false-negative: a line
+        // like `<a href="https://example.com" title="External">` would
+        // be skipped because the URL's `//` sat in the prefix. The
+        // tighter check catches real comments without leaking on URLs.
         const lineStart = src.lastIndexOf('\n', pos) + 1;
-        const lineSoFar = src.slice(lineStart, pos);
-        if (lineSoFar.trimStart().startsWith('*')) continue;
-        if (lineSoFar.includes('//')) continue;
+        const trimmedPrefix = src.slice(lineStart, pos).trimStart();
+        if (trimmedPrefix.startsWith('*')) continue;
+        if (trimmedPrefix.startsWith('//')) continue;
 
         // Walk back to find the opening `<Name` for this attribute's tag.
         // Stop on the first unmatched `<` before the position.

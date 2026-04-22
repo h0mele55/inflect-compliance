@@ -20,6 +20,14 @@ ENV SKIP_ENV_VALIDATION=1
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npx next build
 
+# Prune dev dependencies before the runner stage copies node_modules.
+# Without this, the runtime image carries ts-jest, semantic-release,
+# playwright, and friends — including their transitive CVEs (e.g.
+# handlebars@4.7.8 via ts-jest) — which Trivy then reports as
+# production vulnerabilities even though the runtime never executes
+# those modules.
+RUN npm prune --omit=dev --legacy-peer-deps
+
 # ─── Stage 3: Runner ──────────────────────────────────────
 FROM node:22-alpine AS runner
 WORKDIR /app

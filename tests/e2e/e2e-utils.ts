@@ -113,8 +113,13 @@ export async function loginAndGetTenant(
     // Wait for the dev server to be ready — first navigation may trigger JIT compilation
     await safeGoto(page, '/login', { timeout: 90_000 });
 
-    // Wait for the form to be visible
-    const emailInput = page.locator('input[type="email"][name="email"]');
+    // Scope every form-control lookup to the primary credentials form so
+    // the resend-verification form rendered below it (separate email +
+    // submit button) doesn't trigger Playwright strict-mode violations.
+    // The `#credentials-form` anchor lives on the login page's primary
+    // <form>. See src/app/login/page.tsx.
+    const credentialsForm = page.locator('#credentials-form');
+    const emailInput = credentialsForm.locator('input[type="email"][name="email"]');
     await emailInput.waitFor({ state: 'visible', timeout: 60000 });
 
     // Wait for React hydration — ensure onSubmit is attached before interacting.
@@ -131,7 +136,7 @@ export async function loginAndGetTenant(
     for (let attempt = 1; attempt <= LOGIN_ATTEMPTS; attempt++) {
         if (attempt > 1) {
             await safeGoto(page, '/login', { timeout: 60_000 });
-            await page.locator('input[type="email"][name="email"]').waitFor({ state: 'visible', timeout: 30000 });
+            await credentialsForm.locator('input[type="email"][name="email"]').waitFor({ state: 'visible', timeout: 30000 });
             await page.waitForFunction(() => {
                 const form = document.querySelector('form');
                 return form && Object.keys(form).some(k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber'));
@@ -140,8 +145,8 @@ export async function loginAndGetTenant(
 
         await emailInput.click();
         await emailInput.fill(user.email);
-        await page.locator('input[type="password"]').fill(user.password);
-        await page.locator('button[type="submit"]').click();
+        await credentialsForm.locator('input[type="password"]').fill(user.password);
+        await credentialsForm.locator('button[type="submit"]').click();
 
         const navigated = await page.waitForURL(/\/t\/[^/]+\/dashboard/, { waitUntil: 'domcontentloaded', timeout: 30000 })
             .then(() => true)

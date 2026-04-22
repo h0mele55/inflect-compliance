@@ -250,7 +250,14 @@ function LoginForm() {
                             </div>
 
                             {/* Credentials Form */}
-                            <form onSubmit={handleCredentialsSubmit} method="post" action="#" className="space-y-4">
+                            {/* id="credentials-form" lets E2E scope its
+                                selectors inside this form so the resend-
+                                verification form below (which has its own
+                                email + submit button) doesn't collide with
+                                `input[type="email"]` / `button[type="submit"]`
+                                lookups. Don't drop this id without updating
+                                tests/e2e/e2e-utils.ts. */}
+                            <form id="credentials-form" onSubmit={handleCredentialsSubmit} method="post" action="#" className="space-y-4">
                                 {mode === 'register' && (
                                     <>
                                         <div>

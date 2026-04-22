@@ -170,6 +170,33 @@ You *may* keep the native HTML `title` attribute for these cases, and only these
 
 Anywhere else, reach for `<Tooltip>`. The `title=` ratchet (`tests/guards/no-ad-hoc-tooltip-title.test.ts`) caps the count and fails CI if it grows beyond the documented baseline.
 
+### `title=` as a component prop is NOT the same thing
+
+Several shared primitives expose a `title` prop that renders visible header text or styled bold heading. **These are semantic component props, not HTML tooltip attributes.** The ratchet explicitly ignores them (filters by lowercase tag name + no dot in the tag, i.e. components like `<Modal>` and `<Modal.Header>` are out of scope).
+
+Legit component-prop usages you will see in code — keep these:
+
+```tsx
+// Modal / Sheet header — renders the visible dialog title bar.
+<Modal title="Edit Control" description="Update the control's metadata.">
+<Modal.Header title="Edit Control" description="…" />
+
+// Shared Tooltip's own `title` prop — bold heading rendered above `content`.
+<Tooltip title="SLA Breached" content={slaLabel}>
+    <span className="badge badge-danger">SLA</span>
+</Tooltip>
+```
+
+What the ratchet actually flags is a lowercase-tag HTML attribute:
+
+```tsx
+// ❌ raw HTML title attribute on a DOM element — this is what the ratchet catches
+<button title="Delete row" onClick={…}>
+<span  title="Custom role">…</span>
+```
+
+If a future code audit surfaces a "raw `title=` usage" list, cross-check the enclosing tag: uppercase / dotted → component prop (valid); lowercase → real HTML attribute (migrate).
+
 ---
 
 ## When NOT to add any micro-interaction

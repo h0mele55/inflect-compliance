@@ -33,8 +33,8 @@ async function doLogin(page: Page) {
     const emailInput = page.locator('input[type="email"][name="email"]');
     await emailInput.click();
     await emailInput.fill(TEST_USER.email);
-    await page.fill('input[type="password"]', TEST_USER.password);
-    await page.click('button[type="submit"]');
+    await page.fill('#credentials-form input[type="password"]', TEST_USER.password);
+    await page.click('#credentials-form button[type="submit"]');
     // The app redirects /dashboard → /t/{slug}/dashboard
     await page.waitForURL(/dashboard/, { waitUntil: 'domcontentloaded', timeout: 60000 });
 }
@@ -49,7 +49,7 @@ test.describe('Authentication Flow', () => {
 
         // Should see email/password form
         await expect(page.locator('input[type="email"][name="email"]')).toBeVisible();
-        await expect(page.locator('input[type="password"]')).toBeVisible();
+        await expect(page.locator('#credentials-form input[type="password"]')).toBeVisible();
     });
 
     test('credentials login → redirect to dashboard', async ({ page }) => {

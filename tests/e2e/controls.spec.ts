@@ -148,8 +148,8 @@ test.describe('Controls Center', () => {
         await page.goto('/login');
         await page.waitForSelector('input[type="email"][name="email"]', { timeout: 60000 });
         await page.fill('input[type="email"][name="email"]', 'viewer@acme.com');
-        await page.fill('input[type="password"]', 'password123');
-        await page.click('button[type="submit"]');
+        await page.fill('#credentials-form input[type="password"]', 'password123');
+        await page.click('#credentials-form button[type="submit"]');
         await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 30000 });
         const url = new URL(page.url());
         const match = url.pathname.match(/^\/t\/([^/]+)\//);
