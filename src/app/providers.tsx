@@ -9,6 +9,7 @@ import {
     CommandPaletteProvider,
 } from '@/components/command-palette';
 import { KeyboardShortcutProvider } from '@/lib/hooks/use-keyboard-shortcut';
+import { ShortcutHelpOverlay } from '@/components/app-shell/shortcut-help-overlay';
 import { registerFormTelemetrySink } from '@/lib/telemetry/form-telemetry';
 
 /**
@@ -63,6 +64,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
                         <FormTelemetrySink />
                         {children}
                         <CommandPalette />
+                        {/*
+                         * Epic 57 — `?` pops a live listing of every
+                         * registered shortcut. Mounted once at the shell so
+                         * the registry is the single source of truth and
+                         * shortcuts registered deeper in the tree appear
+                         * automatically.
+                         */}
+                        <ShortcutHelpOverlay />
                         {/*
                          * Global toast host. CopyButton / CopyText and the
                          * optimistic-update hook emit into this Toaster;

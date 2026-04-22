@@ -41,7 +41,7 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import {
     useRegisteredShortcuts,
@@ -180,10 +180,41 @@ export function CommandPalette() {
 
     const showShortcuts = query.trim().length === 0;
 
+    // Registry-derived lookup: palette command `label` → first
+    // registered shortcut key whose description matches exactly. The
+    // registry stays the single source of truth for the binding; this
+    // map is metadata for render only, so the keycap is NEVER wrong
+    // about what actually fires.
+    const shortcutsByDescription = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const s of shortcuts) {
+            if (!s.description) continue;
+            if (s.keys.length === 0) continue;
+            if (!map.has(s.description)) map.set(s.description, s.keys[0]);
+        }
+        return map;
+    }, [shortcuts]);
+    const shortcutFor = useCallback(
+        (label: string): string | undefined =>
+            shortcutsByDescription.get(label),
+        [shortcutsByDescription],
+    );
+
     // The palette's own `mod+k` binding shouldn't clutter the list —
     // it's the invocation affordance, not a first-class command.
+    // Also fold out any shortcut whose description matches a palette
+    // command we're already rendering inline (we display its keycap
+    // on the action row itself — listing it again in the shortcut
+    // group would be noise).
+    const allCommandLabels = useMemo(
+        () => new Set(allCommands.map((c) => c.label)),
+        [allCommands],
+    );
     const listedShortcuts = shortcuts.filter(
-        (s) => s.description && s.description !== 'Open command palette',
+        (s) =>
+            s.description &&
+            s.description !== 'Open command palette' &&
+            !allCommandLabels.has(s.description),
     );
 
     const handleSelect = (href: string) => {
@@ -322,6 +353,7 @@ export function CommandPalette() {
                                     testIdPrefix="nav"
                                     onNavigate={handleSelect}
                                     onAction={handleAction}
+                                    shortcutFor={shortcutFor}
                                 />
                             )}
 
@@ -332,6 +364,7 @@ export function CommandPalette() {
                                     testIdPrefix="action"
                                     onNavigate={handleSelect}
                                     onAction={handleAction}
+                                    shortcutFor={shortcutFor}
                                 />
                             )}
 
@@ -376,12 +409,22 @@ function CommandGroup({
     testIdPrefix,
     onNavigate,
     onAction,
+    shortcutFor,
 }: {
     heading: string;
     items: PaletteCommand[];
     testIdPrefix: string;
     onNavigate: (href: string) => void;
     onAction: (perform: () => void) => void;
+    /**
+     * Resolves a palette command's `label` → the first registered
+     * shortcut key that advertises the same description, or
+     * `undefined` if nothing is registered. Lets palette rows display
+     * their keyboard affordance without duplicating the binding:
+     * the registry remains the authoritative source, and the palette
+     * only surfaces what's there.
+     */
+    shortcutFor: (label: string) => string | undefined;
 }) {
     return (
         <Command.Group
@@ -398,6 +441,7 @@ function CommandGroup({
         >
             {items.map((c) => {
                 const Icon = c.icon;
+                const shortcutKey = shortcutFor(c.label);
                 return (
                     <Command.Item
                         key={c.id}
@@ -419,6 +463,14 @@ function CommandGroup({
                             className="size-4 shrink-0 text-content-muted"
                         />
                         <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                        {shortcutKey && (
+                            <span
+                                className="flex shrink-0 items-center"
+                                data-testid={`command-palette-${testIdPrefix}-${c.id}-shortcut`}
+                            >
+                                {renderShortcut(shortcutKey)}
+                            </span>
+                        )}
                     </Command.Item>
                 );
             })}
