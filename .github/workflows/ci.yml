@@ -574,7 +574,7 @@ jobs:
       # ── Trivy scan: BLOCKING on critical and high CVEs ──
       # No continue-on-error — this is a merge gate.
       - name: "Gate: Trivy vulnerability scan (critical+high)"
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: "inflect-compliance:ci-${{ github.sha }}"
           format: "table"
@@ -588,7 +588,7 @@ jobs:
       # ── SARIF upload for GitHub Security tab (informational) ──
       - name: "Trivy SARIF report (all severities)"
         if: always()
-        uses: aquasecurity/trivy-action@v0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: "inflect-compliance:ci-${{ github.sha }}"
           format: "sarif"

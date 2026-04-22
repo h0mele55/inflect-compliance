@@ -16,7 +16,7 @@ const TEST_USER = {
  */
 async function gotoLoginReady(page: Page) {
     await safeGoto(page, '/login');
-    await page.waitForSelector('input[type="email"]', { timeout: 60000 });
+    await page.waitForSelector('input[type="email"][name="email"]', { timeout: 60000 });
 }
 
 async function doLogin(page: Page) {
@@ -30,7 +30,7 @@ async function doLogin(page: Page) {
         return form && Object.keys(form).some(k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber'));
     }, { timeout: 30000 });
 
-    const emailInput = page.locator('input[type="email"]');
+    const emailInput = page.locator('input[type="email"][name="email"]');
     await emailInput.click();
     await emailInput.fill(TEST_USER.email);
     await page.fill('input[type="password"]', TEST_USER.password);
@@ -48,7 +48,7 @@ test.describe('Authentication Flow', () => {
         await expect(page.getByText('Continue with Microsoft')).toBeVisible();
 
         // Should see email/password form
-        await expect(page.locator('input[type="email"]')).toBeVisible();
+        await expect(page.locator('input[type="email"][name="email"]')).toBeVisible();
         await expect(page.locator('input[type="password"]')).toBeVisible();
     });
 

@@ -134,8 +134,8 @@ test.describe('Control Toggle Pills', () => {
     test('reader user sees non-interactive pills', async ({ page }) => {
         // Login as reader
         await page.goto('/login');
-        await page.waitForSelector('input[type="email"]', { timeout: 60000 });
-        await page.fill('input[type="email"]', 'viewer@acme.com');
+        await page.waitForSelector('input[type="email"][name="email"]', { timeout: 60000 });
+        await page.fill('input[type="email"][name="email"]', 'viewer@acme.com');
         await page.fill('input[type="password"]', 'password123');
         await page.click('button[type="submit"]');
         await page.waitForURL(/\/t\/[^/]+\/dashboard/, { timeout: 60000 });

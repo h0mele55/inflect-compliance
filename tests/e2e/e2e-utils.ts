@@ -114,7 +114,7 @@ export async function loginAndGetTenant(
     await safeGoto(page, '/login', { timeout: 90_000 });
 
     // Wait for the form to be visible
-    const emailInput = page.locator('input[type="email"]');
+    const emailInput = page.locator('input[type="email"][name="email"]');
     await emailInput.waitFor({ state: 'visible', timeout: 60000 });
 
     // Wait for React hydration — ensure onSubmit is attached before interacting.
@@ -131,7 +131,7 @@ export async function loginAndGetTenant(
     for (let attempt = 1; attempt <= LOGIN_ATTEMPTS; attempt++) {
         if (attempt > 1) {
             await safeGoto(page, '/login', { timeout: 60_000 });
-            await page.locator('input[type="email"]').waitFor({ state: 'visible', timeout: 30000 });
+            await page.locator('input[type="email"][name="email"]').waitFor({ state: 'visible', timeout: 30000 });
             await page.waitForFunction(() => {
                 const form = document.querySelector('form');
                 return form && Object.keys(form).some(k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber'));

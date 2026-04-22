@@ -17,7 +17,7 @@ test.describe('Audit Readiness', () => {
         // Retry loop: Next.js dev server may need several attempts to compile on cold start
         for (let attempt = 0; attempt < 5; attempt++) {
             await safeGoto(page, '/login').catch(() => null);
-            const emailInput = page.locator('input[type="email"]');
+            const emailInput = page.locator('input[type="email"][name="email"]');
             if (await emailInput.isVisible({ timeout: 10000 }).catch(() => false)) break;
             await page.waitForTimeout(5000);
         }
