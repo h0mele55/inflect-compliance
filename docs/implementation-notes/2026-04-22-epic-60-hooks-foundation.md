@@ -1,6 +1,6 @@
 # 2026-04-22 — Epic 60 utility-hook foundation
 
-**Commit:** _(pending — will stamp on commit)_
+**Commit:** `2763903 feat(epic-60): establish utility-hook foundation — README + guarded barrel`
 
 Epic 60's scope is a reusable utility-hook + UI-polish layer. This
 prompt is the FOUNDATION — directory structure, barrel, conventions,
