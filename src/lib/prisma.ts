@@ -216,6 +216,12 @@ if (typeof (globalThis as any).EdgeRuntime === 'undefined' && !globalForPrisma.p
     //   1. PII encryption — populates *Encrypted/*Hash columns on write, decrypts on read
     //   2. Soft-delete — transforms delete → update before audit sees it
     //   3. Audit — logs the final transformed operation
+    //
+    // NOTE: the Epic A.1 RLS tripwire (`installRlsTripwire`) is
+    // installed separately from `src/instrumentation.ts` to avoid a
+    // circular module-load between `prisma.ts` ↔ `db/rls-middleware.ts`.
+    // Both touch the same singleton client; order between audit and
+    // tripwire doesn't matter because the tripwire only observes.
     prisma.$use(piiEncryptionMiddleware);
     registerSoftDeleteMiddleware(prisma);
     registerAuditMiddleware(prisma);

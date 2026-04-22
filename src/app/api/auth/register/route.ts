@@ -14,6 +14,8 @@ import prisma from '@/lib/prisma';
 import { signToken } from '@/lib/auth';
 import { issueEmailVerification } from '@/lib/auth/email-verification';
 import { hashPassword, validatePasswordPolicy } from '@/lib/auth/passwords';
+import { checkPasswordAgainstHIBP } from '@/lib/security/password-check';
+import { createTenantWithDek } from '@/lib/security/tenant-key-manager';
 import { withValidatedBody } from '@/lib/validation/route';
 import { AuthActionSchema } from '@/lib/schemas';
 import { env } from '@/env';
@@ -59,6 +61,20 @@ async function handleRegister(body: any) {
         );
     }
 
+    // Breached-password screening (Epic A.3). Fails open on network
+    // errors — a HIBP outage must not brick signup. The function never
+    // logs the password or its hash.
+    const hibp = await checkPasswordAgainstHIBP(password);
+    if (hibp.breached) {
+        return NextResponse.json<any>(
+            {
+                error:
+                    'This password appears in known data breaches. Please choose a different password.',
+            },
+            { status: 400 },
+        );
+    }
+
     const email = String(rawEmail).trim().toLowerCase();
 
     // Check if email already used
@@ -67,10 +83,12 @@ async function handleRegister(body: any) {
         return NextResponse.json<any>({ error: 'Email already registered' }, { status: 409 });
     }
 
-    // Create tenant
+    // Create tenant (Epic B.2: with a wrapped per-tenant DEK primed
+    // into the manager's cache — no unwrap round-trip on first use).
     const slug = String(orgName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now().toString(36);
-    const tenant = await prisma.tenant.create({
-        data: { name: orgName, slug },
+    const tenant = await createTenantWithDek({
+        name: orgName,
+        slug,
     });
 
     // Create user (no role/tenantId — membership is sole authority)

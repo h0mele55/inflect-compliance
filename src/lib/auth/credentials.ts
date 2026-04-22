@@ -68,6 +68,41 @@ import {
     recordLoginFailure,
     recordLoginSuccess,
 } from './security-events';
+import {
+    evaluateProgressiveRateLimit,
+    recordProgressiveFailure,
+    resetProgressiveFailures,
+    LOGIN_PROGRESSIVE_POLICY,
+} from '@/lib/security/rate-limit';
+
+/**
+ * Sleep for `ms` milliseconds. Used to apply the progressive
+ * delay from {@link LOGIN_PROGRESSIVE_POLICY} before the expensive
+ * bcrypt verify. `unref` is not needed — the timer runs to
+ * completion inside the auth request.
+ */
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * SHA-256 hex of the lowercased email for use as a
+ * progressive-rate-limit key. Mirrors `hashIdentifier` in
+ * `credential-rate-limit.ts` so an attacker scraping the in-memory
+ * store can't enumerate registered emails.
+ */
+async function progressiveKeyFor(email: string): Promise<string> {
+    const normalised = email.trim().toLowerCase();
+    const encoder = new TextEncoder();
+    const buf = await crypto.subtle.digest(
+        'SHA-256',
+        encoder.encode(normalised),
+    );
+    const hex = Array.from(new Uint8Array(buf))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+    return `login-progressive:${hex}`;
+}
 
 // ── Public contract ────────────────────────────────────────────────────
 
@@ -137,6 +172,12 @@ export async function authenticateWithPassword(
     // NextAuth-endpoint layer and catch volumetric abuse from a single
     // source; this gate catches credential-stuffing where the attacker
     // rotates IPs but targets one account.
+    //
+    // Two layers run together:
+    //   1. Upstash sliding-window (existing) — cross-instance, 5/15min.
+    //   2. Progressive delay + lockout (Epic A.3) — in-memory, tier-based:
+    //        3 fails → 5s, 5 fails → 30s, 10 fails → 15min lockout.
+    // Both must pass. Either layer can short-circuit with rate_limited.
     const rl = await checkCredentialsAttempt(email);
     if (!rl.ok) {
         // Audit + operational log. If we know who the account belongs to
@@ -157,6 +198,48 @@ export async function authenticateWithPassword(
             reason: 'rate_limited',
             retryAfterSeconds: rl.retryAfterSeconds,
         };
+    }
+
+    // Progressive check. Skipped in the same test scenarios the
+    // Upstash check skips — keep the two in lockstep.
+    const progressiveKey = await progressiveKeyFor(email).catch(() => null);
+    const runProgressive =
+        progressiveKey !== null &&
+        env.AUTH_TEST_MODE !== '1' &&
+        env.RATE_LIMIT_ENABLED !== '0';
+    if (runProgressive && progressiveKey) {
+        const decision = evaluateProgressiveRateLimit(
+            progressiveKey,
+            LOGIN_PROGRESSIVE_POLICY,
+        );
+        if (!decision.allowed) {
+            const maybeUser = await prisma.user
+                .findUnique({ where: { email }, select: { id: true } })
+                .catch(() => null);
+            await recordLoginFailure({
+                email,
+                userId: maybeUser?.id ?? null,
+                method: 'credentials',
+                reason: 'rate_limited',
+                requestId,
+            });
+            // Burn a bcrypt-equivalent time window before returning so
+            // the attacker's stopwatch can't distinguish lockout from a
+            // real verify.
+            await dummyVerify(password);
+            return {
+                ok: false,
+                reason: 'rate_limited',
+                retryAfterSeconds: decision.retryAfterSeconds,
+            };
+        }
+        // Apply the progressive delay BEFORE the verify so the
+        // attacker's wall clock feels it. Legitimate users also
+        // feel it past tier thresholds — intentional; the typo-
+        // allowance is the free attempts below tier 1.
+        if (decision.delayMs > 0) {
+            await sleep(decision.delayMs);
+        }
     }
 
     let user: {
@@ -197,6 +280,9 @@ export async function authenticateWithPassword(
         // bcrypt time against the dummy hash so the attacker's stopwatch
         // can't tell the difference.
         await dummyVerify(password);
+        if (runProgressive && progressiveKey) {
+            recordProgressiveFailure(progressiveKey, LOGIN_PROGRESSIVE_POLICY);
+        }
         await recordLoginFailure({
             email,
             userId: user?.id ?? null,
@@ -212,6 +298,9 @@ export async function authenticateWithPassword(
 
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
+        if (runProgressive && progressiveKey) {
+            recordProgressiveFailure(progressiveKey, LOGIN_PROGRESSIVE_POLICY);
+        }
         await recordLoginFailure({
             email,
             userId: user.id,
@@ -260,6 +349,9 @@ export async function authenticateWithPassword(
     // time they come back. Best-effort; Upstash sliding-window ages
     // naturally even if this no-ops.
     await resetCredentialsBackoff(email).catch(() => undefined);
+    if (progressiveKey) {
+        resetProgressiveFailures(progressiveKey);
+    }
 
     await recordLoginSuccess({
         email: user.email,

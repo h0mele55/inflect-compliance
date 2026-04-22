@@ -124,6 +124,18 @@ export function clearAllRateLimits(): void {
 }
 
 // ─── Preset Configurations ──────────────────────────────────────────
+//
+// Each preset encodes a policy choice. The numbers are not arbitrary —
+// they balance user ergonomics against abuse resistance. Sizing rule
+// of thumb:
+//
+//   sensitive auth flow   → small window, small budget, lockout
+//   normal mutation       → per-minute window, moderate budget
+//   highly privileged op  → hour window, tiny budget
+//
+// When you add a new preset, document the threat model in the JSDoc
+// and prefer tighter-than-you-think limits — the middleware returns
+// a clean 429 + Retry-After, not an opaque error.
 
 /** MFA verify: 5 attempts per 15 minutes, 5 min lockout after exhaustion */
 export const MFA_VERIFY_LIMIT: RateLimitConfig = {
@@ -137,3 +149,250 @@ export const MFA_ENROLL_VERIFY_LIMIT: RateLimitConfig = {
     maxAttempts: 10,
     windowMs: 15 * 60 * 1000,
 };
+
+/**
+ * Login (credentials / SSO callback / password reset):
+ *   10 attempts per 15 minutes, 15 min lockout after exhaustion.
+ *
+ * Threat model: online password brute-force. The lockout doubles as
+ * a back-pressure signal — an attacker spraying credentials across
+ * thousands of accounts gets degraded throughput per IP even when
+ * they rotate usernames, because the middleware keys by IP+userId
+ * when available but falls back to IP alone for pre-authentication.
+ */
+export const LOGIN_LIMIT: RateLimitConfig = {
+    maxAttempts: 10,
+    windowMs: 15 * 60 * 1000,
+    lockoutMs: 15 * 60 * 1000,
+};
+
+/**
+ * General mutation API: 60 requests per minute per (IP, userId).
+ *
+ * Threat model: a compromised credential or a runaway client making
+ * thousands of writes per second. The limit is intentionally
+ * generous — normal interactive use doesn't come close (a user
+ * filling a detail form might submit 2-3 writes per minute). Scripts
+ * and tests that need higher throughput should use an API key with
+ * a dedicated rate plan (future work), not share the interactive
+ * budget.
+ */
+export const API_MUTATION_LIMIT: RateLimitConfig = {
+    maxAttempts: 60,
+    windowMs: 60 * 1000,
+};
+
+/**
+ * API key creation: 5 per hour per (tenant, creator user).
+ *
+ * Threat model: post-compromise lateral movement. A user with a
+ * stolen session could mint persistent API keys; tight limits slow
+ * that chain and leave a denser audit trail. Legitimate churn (a
+ * user rotating a handful of keys) is comfortably under 5/hr.
+ */
+export const API_KEY_CREATE_LIMIT: RateLimitConfig = {
+    maxAttempts: 5,
+    windowMs: 60 * 60 * 1000,
+    lockoutMs: 60 * 60 * 1000,
+};
+
+/**
+ * Passwordless / magic-link email dispatch: 5 per hour per IP.
+ *
+ * Threat model: email bomb abuse (attacker pointing the "send link"
+ * endpoint at a victim email). This preset is explicitly IP-only
+ * even when the endpoint receives a target email — the rate applies
+ * to senders, not recipients.
+ */
+export const EMAIL_DISPATCH_LIMIT: RateLimitConfig = {
+    maxAttempts: 5,
+    windowMs: 60 * 60 * 1000,
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// Progressive rate limit — Epic A.3 auth brute-force protection
+// ═══════════════════════════════════════════════════════════════════
+//
+// The simple `RateLimitConfig` above is "N attempts per window,
+// optional lockout" — a single threshold. Epic A.3 needs graduated
+// *punishment*: each failed attempt past a threshold costs the
+// attacker more wall-clock time, culminating in a hard lockout.
+//
+// The primitive is shared (not login-specific) so future flows
+// (second-factor, recovery codes) can reuse it with their own policy.
+
+export interface ProgressiveRateLimitTier {
+    /** Apply this delay when cumulative failures >= this count. */
+    atFailures: number;
+    /** Milliseconds to delay the CURRENT attempt before verifying. */
+    delayMs: number;
+}
+
+export interface ProgressiveRateLimitPolicy {
+    /**
+     * Tiers sorted ascending by `atFailures`. The highest-matching
+     * tier's `delayMs` is applied; tiers do not sum. Failures below
+     * the first tier's threshold incur no delay.
+     */
+    tiers: readonly ProgressiveRateLimitTier[];
+    /** Failure count that flips the account into lockout. */
+    lockoutAtFailures: number;
+    /** Duration of the lockout once triggered. */
+    lockoutMs: number;
+    /**
+     * Rolling window over which failures accumulate. A single entry
+     * older than `windowMs` stops contributing to the count. Sized
+     * generously — lockouts are meant to feel real, not rotate out.
+     */
+    windowMs: number;
+}
+
+/**
+ * Epic A.3 login policy.
+ *
+ *   attempts 1-2  → no delay (typo allowance)
+ *   attempts 3-4  → 5s delay (mild friction)
+ *   attempts 5-9  → 30s delay (significant friction)
+ *   attempt 10+   → 15 min lockout (attack territory)
+ *
+ * Window is 1 hour: a legitimate user who typed their password
+ * wrong ten times in a day isn't locked out in perpetuity; an
+ * attacker who managed to sustain 10 failures/hour stays locked
+ * for the full window.
+ */
+export const LOGIN_PROGRESSIVE_POLICY: ProgressiveRateLimitPolicy = {
+    tiers: [
+        { atFailures: 3, delayMs: 5_000 },
+        { atFailures: 5, delayMs: 30_000 },
+    ],
+    lockoutAtFailures: 10,
+    lockoutMs: 15 * 60 * 1000,
+    windowMs: 60 * 60 * 1000,
+};
+
+export interface ProgressiveRateLimitDecision {
+    /**
+     * `false` when the identifier is in lockout and no further
+     * verify should be attempted. The caller returns 429/"too many
+     * requests" to the client.
+     */
+    allowed: boolean;
+    /**
+     * Delay (ms) the caller SHOULD sleep before proceeding with the
+     * expensive verify. `0` when under the first tier. The caller
+     * is responsible for actually sleeping — this function returns
+     * synchronously so it can be used inside timing-sensitive
+     * branches (e.g. a dummyVerify needs to happen even on lockout).
+     */
+    delayMs: number;
+    /**
+     * Only populated when `allowed === false`. Seconds until the
+     * lockout expires (always ≥ 1).
+     */
+    retryAfterSeconds: number;
+    /** Failures currently counted against this identifier. */
+    failureCount: number;
+}
+
+function pickDelayMs(
+    count: number,
+    tiers: readonly ProgressiveRateLimitTier[],
+): number {
+    let delay = 0;
+    for (const tier of tiers) {
+        if (count >= tier.atFailures) delay = tier.delayMs;
+    }
+    return delay;
+}
+
+/**
+ * Evaluate the current state WITHOUT recording a new attempt. Call
+ * this BEFORE verifying the password so the caller knows how long
+ * to delay (and whether to short-circuit with a lockout response).
+ *
+ * Reuses the same sliding-window store the other rate-limit functions
+ * in this file already use — one process-wide Map, cleanup timer
+ * already running.
+ */
+export function evaluateProgressiveRateLimit(
+    key: string,
+    policy: ProgressiveRateLimitPolicy,
+): ProgressiveRateLimitDecision {
+    startCleanup(policy.windowMs);
+
+    const now = Date.now();
+    const entry = store.get(key) || { timestamps: [] };
+
+    // Expire stale failures out of the count but keep the entry
+    // stored; caller may be about to write a new failure.
+    const windowStart = now - policy.windowMs;
+    entry.timestamps = entry.timestamps.filter((t) => t > windowStart);
+    store.set(key, entry);
+
+    const failureCount = entry.timestamps.length;
+
+    if (failureCount >= policy.lockoutAtFailures) {
+        const lastFailure = entry.timestamps[entry.timestamps.length - 1];
+        const lockoutEnd = lastFailure + policy.lockoutMs;
+        if (now < lockoutEnd) {
+            return {
+                allowed: false,
+                delayMs: 0,
+                retryAfterSeconds: Math.max(
+                    1,
+                    Math.ceil((lockoutEnd - now) / 1000),
+                ),
+                failureCount,
+            };
+        }
+        // Lockout expired — counter resets. The attempt proceeds
+        // with zero delay; a legitimate user who came back after
+        // the lockout should not immediately eat another 30s.
+        entry.timestamps = [];
+        store.set(key, entry);
+        return {
+            allowed: true,
+            delayMs: 0,
+            retryAfterSeconds: 0,
+            failureCount: 0,
+        };
+    }
+
+    return {
+        allowed: true,
+        delayMs: pickDelayMs(failureCount, policy.tiers),
+        retryAfterSeconds: 0,
+        failureCount,
+    };
+}
+
+/**
+ * Record a failure for this identifier. Call AFTER a verify has
+ * returned `false`. Returns the post-increment decision so the
+ * caller can surface the new lockout state to logging / audit.
+ */
+export function recordProgressiveFailure(
+    key: string,
+    policy: ProgressiveRateLimitPolicy,
+): ProgressiveRateLimitDecision {
+    startCleanup(policy.windowMs);
+    const now = Date.now();
+    const entry = store.get(key) || { timestamps: [] };
+    // Trim the window before writing so the count we return is
+    // current.
+    const windowStart = now - policy.windowMs;
+    entry.timestamps = entry.timestamps.filter((t) => t > windowStart);
+    entry.timestamps.push(now);
+    store.set(key, entry);
+
+    return evaluateProgressiveRateLimit(key, policy);
+}
+
+/**
+ * Clear the failure list. Call after a SUCCESSFUL verify so a
+ * legitimate user who typo'd a few times isn't still throttled on
+ * the next login.
+ */
+export function resetProgressiveFailures(key: string): void {
+    store.delete(key);
+}

@@ -6,6 +6,12 @@ import { getTracer } from '@/lib/observability/tracing';
 import { recordRequestMetrics, recordRequestError } from '@/lib/observability/metrics';
 import { captureError } from '@/lib/observability/sentry';
 import { SpanStatusCode } from '@opentelemetry/api';
+import {
+    enforceRateLimit,
+    API_MUTATION_LIMIT,
+    type RateLimitScope,
+} from '@/lib/security/rate-limit-middleware';
+import type { RateLimitConfig } from '@/lib/security/rate-limit';
 
 // Depending on the Node.js / Edge runtime version, crypto.randomUUID() is natively available globally.
 // If it fails (e.g. extremely old runtimes), fallback to a simple Math.random() based ID.
@@ -18,22 +24,93 @@ function generateRequestId(): string {
 
 
 
+// ─── Rate-limit options for the shared wrapper ───────────────────────
+//
+// Mutation methods (POST/PUT/DELETE/PATCH) are rate-limited by default
+// using API_MUTATION_LIMIT. Routes that need a stricter or looser
+// policy pass an options object; routes that need to opt out entirely
+// (webhook receivers, health checks — almost always already not using
+// this wrapper anyway) pass `rateLimit: false`.
+
+const MUTATION_METHODS = new Set(['POST', 'PUT', 'DELETE', 'PATCH']);
+
+export interface ApiWrapperOptions {
+    /**
+     * Rate-limit policy for this route.
+     *   - omitted          → default API_MUTATION_LIMIT on mutation methods
+     *   - `false`          → skip rate limiting entirely for this route
+     *   - `{ ... }`        → custom config/scope/userId resolver
+     */
+    rateLimit?: false | {
+        config?: RateLimitConfig;
+        scope?: string;
+        getUserId?: (
+            req: NextRequest,
+        ) => string | null | undefined | Promise<string | null | undefined>;
+    };
+}
+
+/**
+ * True when the current process should bypass default rate limiting.
+ *
+ *   - `RATE_LIMIT_ENABLED === '0'` — explicit override (mirrors the
+ *     envvar that `authRateLimit.ts` already honours).
+ *   - `NODE_ENV === 'test'` AND `RATE_LIMIT_ENABLED !== '1'` — tests
+ *     bypass by default to protect ~200 integration tests that
+ *     repeatedly hit mutation endpoints. A specific test that wants
+ *     to exercise the limiter can set `RATE_LIMIT_ENABLED=1` for
+ *     that process.
+ */
+function isRateLimitBypassed(): boolean {
+    if (process.env.RATE_LIMIT_ENABLED === '0') return true;
+    if (process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== '1') {
+        return true;
+    }
+    return false;
+}
+
+async function resolveRateLimitScope(
+    req: NextRequest,
+    options: ApiWrapperOptions['rateLimit'],
+): Promise<RateLimitScope | null> {
+    if (options === false) return null;
+    if (!MUTATION_METHODS.has(req.method)) return null;
+    if (isRateLimitBypassed()) return null;
+
+    const config = options?.config ?? API_MUTATION_LIMIT;
+    const scope = options?.scope ?? 'api-mutation';
+    let userId: string | null | undefined;
+    if (options?.getUserId) {
+        try {
+            userId = await options.getUserId(req);
+        } catch {
+            userId = null;
+        }
+    }
+    return { scope, config, userId: userId ?? null };
+}
+
 /**
  * High-Order Wrapper for all app/api routes.
- * 
+ *
  * Catch all throws (ZodError, AppError, primitive errors) and shapes them
  * into standardized ApiErrorResponse JSON payloads.
- * 
+ *
  * Also provides:
  * - x-request-id for correlation tracking
  * - Observability request context (AsyncLocalStorage)
  * - Structured request lifecycle logs (start/end/error) via Pino
  * - OpenTelemetry root span (api.request) with HTTP attributes
  * - Request metrics (count, duration, errors)
+ * - **Rate limiting (Epic A.2):** POST/PUT/DELETE/PATCH default to
+ *   API_MUTATION_LIMIT. Pass `{ rateLimit: { config, scope } }` for
+ *   stricter presets (LOGIN_LIMIT, API_KEY_CREATE_LIMIT), or
+ *   `{ rateLimit: false }` to opt out.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function withApiErrorHandling<Context = any>(
-    handler: (req: NextRequest, ctx: Context) => Promise<NextResponse | Response> | NextResponse | Response
+    handler: (req: NextRequest, ctx: Context) => Promise<NextResponse | Response> | NextResponse | Response,
+    options: ApiWrapperOptions = {},
 ) {
     return async (req: NextRequest, ctx: Context): Promise<NextResponse | Response> => {
         const requestId = req.headers.get('x-request-id') || generateRequestId();
@@ -60,6 +137,39 @@ export function withApiErrorHandling<Context = any>(
                     logger.info('request started', { component: 'api', method });
 
                     try {
+                        // ── Rate-limit check (Epic A.2) ──
+                        const rateScope = await resolveRateLimitScope(req, options.rateLimit);
+                        if (rateScope) {
+                            const { response: rateBlocked } = enforceRateLimit(
+                                req,
+                                rateScope,
+                            );
+                            if (rateBlocked) {
+                                const durationMs = Math.round(
+                                    performance.now() - startTime,
+                                );
+                                span.setAttributes({
+                                    'http.status_code': 429,
+                                    'rate_limit.scope': rateScope.scope,
+                                });
+                                span.setStatus({ code: SpanStatusCode.OK });
+                                recordRequestMetrics({
+                                    method,
+                                    route,
+                                    status: 429,
+                                    durationMs,
+                                });
+                                logger.warn('request rate-limited', {
+                                    component: 'api',
+                                    method,
+                                    scope: rateScope.scope,
+                                    durationMs,
+                                });
+                                rateBlocked.headers.set('x-request-id', requestId);
+                                return rateBlocked;
+                            }
+                        }
+
                         // Execute the original handler
                         const response = await handler(req, ctx);
 
