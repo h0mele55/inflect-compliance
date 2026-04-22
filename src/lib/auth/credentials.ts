@@ -55,11 +55,19 @@
 import prisma from '@/lib/prisma';
 import { env } from '@/env';
 import {
+    checkCredentialsAttempt,
+    resetCredentialsBackoff,
+} from './credential-rate-limit';
+import {
     dummyVerify,
     hashPassword,
     needsRehash,
     verifyPassword,
 } from './passwords';
+import {
+    recordLoginFailure,
+    recordLoginSuccess,
+} from './security-events';
 
 // ── Public contract ────────────────────────────────────────────────────
 
@@ -67,7 +75,9 @@ export type AuthFailureReason =
     /** Unknown email, no password set, or wrong password — all collapse here. */
     | 'credentials_invalid'
     /** Email-verification is required and the account has not completed it. */
-    | 'email_not_verified';
+    | 'email_not_verified'
+    /** Per-identifier attempt count exceeded. Surfaces retryAfterSeconds. */
+    | 'rate_limited';
 
 export type AuthResult =
     | {
@@ -76,11 +86,19 @@ export type AuthResult =
           email: string;
           name: string | null;
       }
-    | { ok: false; reason: AuthFailureReason };
+    | {
+          ok: false;
+          reason: AuthFailureReason;
+          /** Only populated when reason === 'rate_limited'. */
+          retryAfterSeconds?: number;
+      };
 
 export interface AuthenticateInput {
     email: string;
     password: string;
+    /** Request id for log correlation. Optional so call sites (NextAuth
+     *  Credentials.authorize) that don't have it don't have to fabricate one. */
+    requestId?: string;
 }
 
 // ── Chokepoint ─────────────────────────────────────────────────────────
@@ -104,12 +122,41 @@ export async function authenticateWithPassword(
 ): Promise<AuthResult> {
     const email = (input.email ?? '').trim().toLowerCase();
     const password = input.password ?? '';
+    const requestId = input.requestId;
 
     // Empty input — fast path that still burns bcrypt time so an attacker
     // can't distinguish empty-input early-return from real verify latency.
     if (!email || !password) {
         await dummyVerify(password);
         return { ok: false, reason: 'credentials_invalid' };
+    }
+
+    // Per-identifier rate-limit gate. Runs BEFORE bcrypt so an attacker
+    // hammering one account doesn't get to keep spending CPU. Per-IP
+    // limits live in `src/lib/rate-limit/authRateLimit.ts` at the
+    // NextAuth-endpoint layer and catch volumetric abuse from a single
+    // source; this gate catches credential-stuffing where the attacker
+    // rotates IPs but targets one account.
+    const rl = await checkCredentialsAttempt(email);
+    if (!rl.ok) {
+        // Audit + operational log. If we know who the account belongs to
+        // we attribute to their tenant; otherwise logger-only (see
+        // security-events.ts for the branching).
+        const maybeUser = await prisma.user
+            .findUnique({ where: { email }, select: { id: true } })
+            .catch(() => null);
+        await recordLoginFailure({
+            email,
+            userId: maybeUser?.id ?? null,
+            method: 'credentials',
+            reason: 'rate_limited',
+            requestId,
+        });
+        return {
+            ok: false,
+            reason: 'rate_limited',
+            retryAfterSeconds: rl.retryAfterSeconds,
+        };
     }
 
     let user: {
@@ -135,6 +182,13 @@ export async function authenticateWithPassword(
         // the API boundary. The caller's observability wrapper will log
         // the real reason if it matters.
         await dummyVerify(password);
+        await recordLoginFailure({
+            email,
+            userId: null,
+            method: 'credentials',
+            reason: 'credentials_invalid',
+            requestId,
+        });
         return { ok: false, reason: 'credentials_invalid' };
     }
 
@@ -143,19 +197,44 @@ export async function authenticateWithPassword(
         // bcrypt time against the dummy hash so the attacker's stopwatch
         // can't tell the difference.
         await dummyVerify(password);
+        await recordLoginFailure({
+            email,
+            userId: user?.id ?? null,
+            method: 'credentials',
+            // Separate reason so operational logs can distinguish enumerated
+            // emails from legitimate-user-wrong-password. NEVER surfaced to
+            // the client — the caller collapses every failure to one string.
+            reason: user ? 'credentials_invalid' : 'unknown_email',
+            requestId,
+        });
         return { ok: false, reason: 'credentials_invalid' };
     }
 
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
+        await recordLoginFailure({
+            email,
+            userId: user.id,
+            method: 'credentials',
+            reason: 'credentials_invalid',
+            requestId,
+        });
         return { ok: false, reason: 'credentials_invalid' };
     }
 
     // ── Post-verify gates ──
-    // Email verification: off by default. When the env flag flips on,
-    // accounts with a null `emailVerified` can't sign in via credentials —
-    // they're funnelled into the verify-your-email flow (later prompt).
+    // Email verification: off by default. When AUTH_REQUIRE_EMAIL_VERIFICATION
+    // flips on, accounts with a null `emailVerified` get a distinct reason
+    // code so the UI can funnel them into the "check your inbox" flow
+    // instead of showing a generic "bad credentials" message.
     if (env.AUTH_REQUIRE_EMAIL_VERIFICATION === '1' && !user.emailVerified) {
+        await recordLoginFailure({
+            email,
+            userId: user.id,
+            method: 'credentials',
+            reason: 'email_not_verified',
+            requestId,
+        });
         return { ok: false, reason: 'email_not_verified' };
     }
 
@@ -175,6 +254,19 @@ export async function authenticateWithPassword(
             // Swallow — rehash is best-effort housekeeping, not a gate.
         }
     }
+
+    // Successful auth: clear the per-email rate-limit counter so a user
+    // who typo'd 3 times then got it right isn't locked out the next
+    // time they come back. Best-effort; Upstash sliding-window ages
+    // naturally even if this no-ops.
+    await resetCredentialsBackoff(email).catch(() => undefined);
+
+    await recordLoginSuccess({
+        email: user.email,
+        userId: user.id,
+        method: 'credentials',
+        requestId,
+    });
 
     return {
         ok: true,

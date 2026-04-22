@@ -46,12 +46,44 @@ jest.mock('@/env', () => ({
     }),
 }));
 
+// Rate-limit + security-events: stubbed wholesale so the chokepoint's
+// integration with them is exercised in their own dedicated test files.
+// The ok/not-ok knob is a jest.fn so specific test cases can flip it.
+const mockCheckCredentialsAttempt = jest.fn(async () => ({ ok: true as const }));
+const mockResetCredentialsBackoff = jest.fn(async () => undefined);
+jest.mock('@/lib/auth/credential-rate-limit', () => ({
+    __esModule: true,
+    checkCredentialsAttempt: (...a: unknown[]) => mockCheckCredentialsAttempt(...a),
+    resetCredentialsBackoff: (...a: unknown[]) => mockResetCredentialsBackoff(...a),
+}));
+
+const mockRecordLoginSuccess = jest.fn(async () => undefined);
+const mockRecordLoginFailure = jest.fn(async () => undefined);
+jest.mock('@/lib/auth/security-events', () => ({
+    __esModule: true,
+    recordLoginSuccess: (...a: unknown[]) => mockRecordLoginSuccess(...a),
+    recordLoginFailure: (...a: unknown[]) => mockRecordLoginFailure(...a),
+    hashEmailForLog: (s: string) => s,
+    AUTH_ACTIONS: {},
+}));
+
 import { authenticateWithPassword } from '@/lib/auth/credentials';
 import { BCRYPT_COST } from '@/lib/auth/passwords';
 
 beforeEach(() => {
     mockFindUnique.mockReset();
     mockUpdate.mockReset();
+    // Reset + reinstall async-returning defaults. mockReset() wipes the
+    // implementation, so without these the next call returns undefined
+    // and `.catch(...)` inside the chokepoint throws.
+    mockCheckCredentialsAttempt.mockReset();
+    mockCheckCredentialsAttempt.mockResolvedValue({ ok: true });
+    mockResetCredentialsBackoff.mockReset();
+    mockResetCredentialsBackoff.mockResolvedValue(undefined);
+    mockRecordLoginSuccess.mockReset();
+    mockRecordLoginSuccess.mockResolvedValue(undefined);
+    mockRecordLoginFailure.mockReset();
+    mockRecordLoginFailure.mockResolvedValue(undefined);
     mockEnv.AUTH_REQUIRE_EMAIL_VERIFICATION = undefined;
 });
 
@@ -249,5 +281,135 @@ describe('authenticateWithPassword — rehash on verify', () => {
         // Caller already proved knowledge of the password — housekeeping
         // failure must not invalidate that.
         expect(result.ok).toBe(true);
+    });
+});
+
+// ── Rate limit + audit integration ─────────────────────────────────────
+
+describe('authenticateWithPassword — rate limiting', () => {
+    it('short-circuits with rate_limited before bcrypt when the gate trips', async () => {
+        mockCheckCredentialsAttempt.mockResolvedValue({ ok: false, retryAfterSeconds: 120 });
+        mockFindUnique.mockResolvedValue(null); // only hit for the audit attribution lookup
+
+        const result = await authenticateWithPassword({
+            email: 'alice@example.com',
+            password: 'any',
+        });
+
+        expect(result).toEqual({
+            ok: false,
+            reason: 'rate_limited',
+            retryAfterSeconds: 120,
+        });
+        // Audit / security-event hook fires with the rate_limited reason
+        expect(mockRecordLoginFailure).toHaveBeenCalledTimes(1);
+        expect(mockRecordLoginFailure.mock.calls[0][0]).toEqual(
+            expect.objectContaining({ reason: 'rate_limited' }),
+        );
+        // Login-success hook did NOT fire
+        expect(mockRecordLoginSuccess).not.toHaveBeenCalled();
+    });
+
+    it('calls resetCredentialsBackoff on successful auth', async () => {
+        const u = await makeUser();
+        mockFindUnique.mockResolvedValue(u);
+
+        await authenticateWithPassword({ email: u.email, password: u._plaintext });
+
+        expect(mockResetCredentialsBackoff).toHaveBeenCalledTimes(1);
+        expect(mockResetCredentialsBackoff.mock.calls[0][0]).toBe(u.email);
+    });
+
+    it('does NOT reset the backoff counter on a failed auth', async () => {
+        const u = await makeUser();
+        mockFindUnique.mockResolvedValue(u);
+
+        await authenticateWithPassword({ email: u.email, password: 'wrong' });
+
+        expect(mockResetCredentialsBackoff).not.toHaveBeenCalled();
+    });
+});
+
+describe('authenticateWithPassword — security-event emission', () => {
+    it('fires recordLoginSuccess with userId + method on success', async () => {
+        const u = await makeUser();
+        mockFindUnique.mockResolvedValue(u);
+
+        await authenticateWithPassword({
+            email: u.email,
+            password: u._plaintext,
+            requestId: 'req-1',
+        });
+
+        expect(mockRecordLoginSuccess).toHaveBeenCalledTimes(1);
+        expect(mockRecordLoginSuccess.mock.calls[0][0]).toEqual(
+            expect.objectContaining({
+                email: u.email,
+                userId: u.id,
+                method: 'credentials',
+                requestId: 'req-1',
+            }),
+        );
+    });
+
+    it('fires recordLoginFailure with reason=unknown_email for unknown address', async () => {
+        mockFindUnique.mockResolvedValue(null);
+
+        await authenticateWithPassword({ email: 'nobody@example.com', password: 'x' });
+
+        expect(mockRecordLoginFailure).toHaveBeenCalledTimes(1);
+        expect(mockRecordLoginFailure.mock.calls[0][0]).toEqual(
+            expect.objectContaining({
+                reason: 'unknown_email',
+                userId: null,
+            }),
+        );
+    });
+
+    it('fires recordLoginFailure with reason=credentials_invalid for wrong password', async () => {
+        const u = await makeUser();
+        mockFindUnique.mockResolvedValue(u);
+
+        await authenticateWithPassword({ email: u.email, password: 'WRONG' });
+
+        expect(mockRecordLoginFailure).toHaveBeenCalledTimes(1);
+        expect(mockRecordLoginFailure.mock.calls[0][0]).toEqual(
+            expect.objectContaining({
+                reason: 'credentials_invalid',
+                userId: u.id,
+            }),
+        );
+    });
+
+    it('fires recordLoginFailure with reason=email_not_verified when gate is on', async () => {
+        mockEnv.AUTH_REQUIRE_EMAIL_VERIFICATION = '1';
+        const u = await makeUser({ emailVerified: null });
+        mockFindUnique.mockResolvedValue(u);
+
+        await authenticateWithPassword({ email: u.email, password: u._plaintext });
+
+        expect(mockRecordLoginFailure).toHaveBeenCalledTimes(1);
+        expect(mockRecordLoginFailure.mock.calls[0][0]).toEqual(
+            expect.objectContaining({
+                reason: 'email_not_verified',
+                userId: u.id,
+            }),
+        );
+    });
+
+    it('never logs the plaintext password in any security event payload', async () => {
+        const u = await makeUser();
+        mockFindUnique.mockResolvedValue(u);
+
+        await authenticateWithPassword({ email: u.email, password: u._plaintext });
+
+        const allCalls = [
+            ...mockRecordLoginSuccess.mock.calls,
+            ...mockRecordLoginFailure.mock.calls,
+        ];
+        for (const [payload] of allCalls) {
+            const serialised = JSON.stringify(payload);
+            expect(serialised).not.toContain(u._plaintext);
+        }
     });
 });
