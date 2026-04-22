@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { handlers } from '@/auth';
 import {
     enforceRateLimit,
+    isRateLimitBypassed,
     LOGIN_LIMIT,
 } from '@/lib/security/rate-limit-middleware';
 
@@ -30,15 +31,7 @@ export const { GET } = handlers;
  * the rest of the rate-limited API surface.
  */
 export async function POST(req: NextRequest) {
-    // Bypass in test mode — ~200 auth-flow tests would otherwise trip
-    // the 10/15min limit. A specific test that wants to exercise the
-    // limiter can set RATE_LIMIT_ENABLED=1.
-    const bypass =
-        process.env.RATE_LIMIT_ENABLED === '0' ||
-        (process.env.NODE_ENV === 'test' &&
-            process.env.RATE_LIMIT_ENABLED !== '1');
-
-    if (!bypass) {
+    if (!isRateLimitBypassed()) {
         const { response } = enforceRateLimit(req, {
             scope: 'login',
             config: LOGIN_LIMIT,

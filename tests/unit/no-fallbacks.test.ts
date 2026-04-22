@@ -55,6 +55,13 @@ describe('Static Analysis: No process.env fallbacks', () => {
             // without a rebuild/rollout (NEXT_PUBLIC_* inlines at build
             // time). See the docblock in the file.
             if (file.endsWith('ui-config/route.ts')) continue;
+            // Rate-limit bypass predicate reads RATE_LIMIT_ENABLED /
+            // NODE_ENV at request time so tests can flip the bypass
+            // per-test via env mutation (used by the Epic A.2/A.3
+            // suites and the Epic B end-to-end). Reading through the
+            // cached env.ts snapshot would freeze the value at import
+            // time and break those flows.
+            if (file.endsWith('rate-limit-middleware.ts')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 

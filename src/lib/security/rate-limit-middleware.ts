@@ -277,6 +277,34 @@ export function withRateLimit<Args extends unknown[]>(
     };
 }
 
+// ─── Bypass predicate ────────────────────────────────────────────────
+
+/**
+ * True when the current process should skip rate limiting.
+ *
+ *   - `RATE_LIMIT_ENABLED=0` — explicit operator override for the
+ *     whole process.
+ *   - `NODE_ENV=test` AND not explicitly opted-in (`RATE_LIMIT_ENABLED=1`)
+ *     — integration and unit suites hit mutation endpoints in tight
+ *     loops; a specific test can opt back in per-process when it needs
+ *     to exercise the limiter itself (Epic A.2/A.3 suites do this).
+ *
+ * Read via `process.env` directly (not through `src/env.ts`) so tests
+ * can flip the toggle mid-process via env mutation. The validated `env`
+ * snapshot is captured at first import and wouldn't pick up per-test
+ * flips.
+ */
+export function isRateLimitBypassed(): boolean {
+    if (process.env.RATE_LIMIT_ENABLED === '0') return true;
+    if (
+        process.env.NODE_ENV === 'test' &&
+        process.env.RATE_LIMIT_ENABLED !== '1'
+    ) {
+        return true;
+    }
+    return false;
+}
+
 // ─── Re-exports ──────────────────────────────────────────────────────
 //
 // Convenience re-exports so callers can import everything they need

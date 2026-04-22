@@ -130,6 +130,15 @@ describe('Dynamic require() usage is minimized', () => {
         'app-layer/libraries/framework-provider.ts': ['@/data/frameworks', '@/data/clauses'],
         'app-layer/usecases/evidence-maintenance.ts': ['@/lib/audit/audit-writer'],
         'app/api/readyz/route.ts': ['@/lib/redis'],
+        // Epic A.1 — `rls-middleware` is imported by `lib/prisma.ts` to
+        // install the tripwire at startup; the prisma reference must be
+        // lazy to avoid a TDZ cycle.
+        'lib/db/rls-middleware.ts': ['@/lib/prisma'],
+        // Epic B.2 — the encryption middleware resolves a per-tenant
+        // DEK on every query; the key-manager module is lazy-required
+        // so the middleware module evaluates without the key-manager
+        // graph, mirroring the rls-middleware pattern.
+        'lib/db/encryption-middleware.ts': ['@/lib/security/tenant-key-manager'],
     };
 
     it('no unexpected require() in src/ files', async () => {

@@ -25,6 +25,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { enqueue, getQueue } from '@/app-layer/jobs/queue';
 import { API_KEY_CREATE_LIMIT } from '@/lib/security/rate-limit-middleware';
 import { logEvent } from '@/app-layer/events/audit';
+import { prisma } from '@/lib/prisma';
 
 // ─── POST — initiate rotation ──────────────────────────────────────
 
@@ -41,18 +42,13 @@ export const POST = withApiErrorHandling(
         // Operationally-visible audit entry — the attribution row
         // an auditor or compliance officer looks at when reviewing
         // who touched the keys and when.
-        await logEvent(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            {} as any,
-            ctx,
-            {
-                action: 'KEY_ROTATION_INITIATED',
-                entityType: 'TenantKey',
-                entityId: ctx.tenantId,
-                details: `Key rotation initiated by admin user ${ctx.userId}`,
-                metadata: { jobId: job.id },
-            },
-        );
+        await logEvent(prisma, ctx, {
+            action: 'KEY_ROTATION_INITIATED',
+            entityType: 'TenantKey',
+            entityId: ctx.tenantId,
+            details: `Key rotation initiated by admin user ${ctx.userId}`,
+            metadata: { jobId: job.id },
+        });
 
         return NextResponse.json(
             {
@@ -105,8 +101,7 @@ export const GET = withApiErrorHandling(
 
         // Defensive — in the extraordinarily unlikely event someone
         // reuses a job id from a different tenant, we don't leak it.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const payload = job.data as any;
+        const payload = job.data as { tenantId?: string } | undefined;
         if (payload?.tenantId && payload.tenantId !== ctx.tenantId) {
             return NextResponse.json(
                 {

@@ -145,8 +145,11 @@ describe('Regression: Import hygiene', () => {
     test('route handlers import from app-layer, not lib/prisma directly', () => {
         const routeDir = path.join(SRC_ROOT, 'app/api/t');
         if (!fs.existsSync(routeDir)) return;
-        // audit-log/coverage uses prisma for cross-entity coverage metrics
-        const ROUTE_ALLOWLIST = ['audit-log', 'scim'];
+        // audit-log/coverage uses prisma for cross-entity coverage metrics.
+        // key-rotation passes the prisma client through to `logEvent` so
+        // the audit row lands on the same transaction the BullMQ job
+        // will later use (Epic B.3 — admin-initiated tenant key rotation).
+        const ROUTE_ALLOWLIST = ['audit-log', 'scim', 'key-rotation'];
         const routes = walk(routeDir, ['.ts']).filter(f =>
             f.endsWith('route.ts') && !ROUTE_ALLOWLIST.some(a => f.includes(a))
         );

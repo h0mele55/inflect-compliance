@@ -8,6 +8,7 @@ import { captureError } from '@/lib/observability/sentry';
 import { SpanStatusCode } from '@opentelemetry/api';
 import {
     enforceRateLimit,
+    isRateLimitBypassed,
     API_MUTATION_LIMIT,
     type RateLimitScope,
 } from '@/lib/security/rate-limit-middleware';
@@ -48,25 +49,6 @@ export interface ApiWrapperOptions {
             req: NextRequest,
         ) => string | null | undefined | Promise<string | null | undefined>;
     };
-}
-
-/**
- * True when the current process should bypass default rate limiting.
- *
- *   - `RATE_LIMIT_ENABLED === '0'` — explicit override (mirrors the
- *     envvar that `authRateLimit.ts` already honours).
- *   - `NODE_ENV === 'test'` AND `RATE_LIMIT_ENABLED !== '1'` — tests
- *     bypass by default to protect ~200 integration tests that
- *     repeatedly hit mutation endpoints. A specific test that wants
- *     to exercise the limiter can set `RATE_LIMIT_ENABLED=1` for
- *     that process.
- */
-function isRateLimitBypassed(): boolean {
-    if (process.env.RATE_LIMIT_ENABLED === '0') return true;
-    if (process.env.NODE_ENV === 'test' && process.env.RATE_LIMIT_ENABLED !== '1') {
-        return true;
-    }
-    return false;
 }
 
 async function resolveRateLimitScope(

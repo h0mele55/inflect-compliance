@@ -26,7 +26,10 @@ import { prismaTestClient } from '../helpers/db';
 import { PrismaClient } from '@prisma/client';
 
 import { setEmailProvider, StubEmailProvider } from '@/lib/mailer';
-import { authenticateWithPassword } from '@/lib/auth/credentials';
+import {
+    authenticateWithPassword,
+    __resetProgressiveForTests,
+} from '@/lib/auth/credentials';
 import {
     __resetCredentialsRateLimitForTests,
     CREDENTIALS_RATE_LIMIT,
@@ -90,6 +93,12 @@ describeFn('Credentials path — end-to-end', () => {
 
     beforeEach(async () => {
         __resetCredentialsRateLimitForTests();
+        // Epic A.3 added a second, independent progressive counter
+        // (5s/30s delays + 15-min lockout keyed on SHA-256(email)).
+        // Without this reset its state stacks across tests and the
+        // rate-limit test burns minutes of delay before hitting the
+        // 30s jest timeout.
+        await __resetProgressiveForTests(email);
         // Each scenario starts from a known state — no pending tokens,
         // email-verification gate OFF unless the scenario explicitly
         // enables it, no existing audit rows tied to the test user.
@@ -186,14 +195,25 @@ describeFn('Credentials path — end-to-end', () => {
     // Each bcrypt verify at BCRYPT_COST=12 is ~300ms, so N+2 attempts
     // blows past jest's default 5s timeout. Bump per-test.
     it(`rate-limits after ${CREDENTIALS_RATE_LIMIT.maxAttempts} attempts and resets on success`, async () => {
-        // Burn the bucket with wrong-password attempts
+        // Burn the bucket with wrong-password attempts. Reset the
+        // Epic A.3 progressive counter between attempts so its
+        // 5s/30s delays don't stack across iterations — we're
+        // testing the CREDENTIALS_RATE_LIMIT bucket here, which is a
+        // separate mechanism, and there's a dedicated
+        // `auth-brute-force.test.ts` suite covering the progressive
+        // ladder end-to-end.
         for (let i = 0; i < CREDENTIALS_RATE_LIMIT.maxAttempts; i++) {
+            await __resetProgressiveForTests(email);
             const r = await authenticateWithPassword({
                 email,
                 password: `wrong-${i}`,
             });
             expect(r).toEqual({ ok: false, reason: 'credentials_invalid' });
         }
+        // Last progressive reset before the rate-limit-gated attempt
+        // so the failure surfaces as `rate_limited`, not a delayed
+        // `credentials_invalid`.
+        await __resetProgressiveForTests(email);
         // Next attempt is gated by rate limit, not by the password check —
         // correct password would pass if it got there, but it doesn't.
         const blocked = await authenticateWithPassword({ email, password });

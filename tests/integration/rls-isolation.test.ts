@@ -88,19 +88,25 @@ const TENANT_SCOPED_TABLES_WITH_TENANT_ID: string[] = [
 
 // Tables that use USING(true) because they lack tenantId — tracked for audit.
 // These MUST gain tenantId in a future migration.
-const DEFERRED_USING_TRUE_TABLES: string[] = [
+//
+// Epic A.1 upgraded every table previously in this bucket to an
+// EXISTS-based policy (see EXISTS_POLICY_TABLES below); this list is
+// intentionally empty. Keep the bucket + its test so a future addition
+// that can't reach EXISTS-isolation yet is still explicitly tracked.
+const DEFERRED_USING_TRUE_TABLES: string[] = [];
+
+// Tables that use EXISTS-based RLS policies (no tenantId column, but proper
+// tenant isolation via subquery against parent tenant-scoped tables).
+const EXISTS_POLICY_TABLES: string[] = [
+    'PolicyControlLink',
+    // Epic A.1 — promoted from DEFERRED_USING_TRUE_TABLES. Each uses an
+    // EXISTS subquery against its tenant-scoped parent row:
     'PolicyApproval',
     'PolicyAcknowledgement',
     'EvidenceReview',
     'FindingEvidence',
     'AuditChecklistItem',
     'AuditorPackAccess',
-];
-
-// Tables that use EXISTS-based RLS policies (no tenantId column, but proper
-// tenant isolation via subquery against parent tenant-scoped tables).
-const EXISTS_POLICY_TABLES: string[] = [
-    'PolicyControlLink',
 ];
 
 describeFn('Postgres RLS Tenant Isolation', () => {

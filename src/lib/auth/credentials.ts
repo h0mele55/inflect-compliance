@@ -367,3 +367,17 @@ export async function authenticateWithPassword(
         name: user.name,
     };
 }
+
+/**
+ * Test-only helper: clears the Epic A.3 progressive-failure counter
+ * for a given email. Sibling to `__resetCredentialsRateLimitForTests`
+ * from `credential-rate-limit.ts`, but for the second, independent
+ * counter added by brute-force hardening. Tests that exercise the
+ * CREDENTIALS_RATE_LIMIT bucket must also reset this one, otherwise
+ * the per-failure delays (5s / 30s / 15min-lockout) stack on top of
+ * the rate-limit attempts and blow past jest timeouts.
+ */
+export async function __resetProgressiveForTests(email: string): Promise<void> {
+    const key = await progressiveKeyFor(email);
+    resetProgressiveFailures(key);
+}

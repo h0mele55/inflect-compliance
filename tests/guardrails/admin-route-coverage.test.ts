@@ -34,6 +34,7 @@ const ADMIN_ONLY_ROUTES = [
     'admin/roles/[roleId]/route.ts',
     'admin/api-keys/route.ts',
     'admin/api-keys/[keyId]/route.ts',
+    'admin/key-rotation/route.ts',
 
     // Billing routes (admin-only)
     'billing/checkout/route.ts',
