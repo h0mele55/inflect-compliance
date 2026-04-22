@@ -98,6 +98,56 @@ providers.push(
     }),
 );
 
+/**
+ * Join the user to the oldest active tenant as EDITOR if they have no
+ * membership yet. Idempotent — the upsert is a no-op when membership
+ * already exists. Swallows errors so auth callbacks never fail-close
+ * over a housekeeping blip; the worst case is the user bounces to
+ * /login with tenantId=null, which is no worse than the pre-fix state.
+ *
+ * Lives at module scope (not inside the NextAuth config object) so
+ * both the account-linking branch and the plain auto-onboard branch
+ * of the signIn callback can call it.
+ */
+async function ensureDefaultTenantMembership(userId: string): Promise<void> {
+    try {
+        const existing = await prisma.tenantMembership.findFirst({
+            where: { userId, status: 'ACTIVE' },
+            select: { id: true },
+        });
+        if (existing) return; // already a member of at least one tenant
+
+        const tenant = await prisma.tenant.findFirst({
+            orderBy: { createdAt: 'asc' },
+            select: { id: true },
+        });
+        if (!tenant) {
+            edgeLogger.warn('signIn: no tenant exists to auto-join', {
+                component: 'auth',
+                userId,
+            });
+            return;
+        }
+
+        await prisma.tenantMembership.upsert({
+            where: { tenantId_userId: { tenantId: tenant.id, userId } },
+            update: {},
+            create: {
+                tenantId: tenant.id,
+                userId,
+                role: 'EDITOR',
+                status: 'ACTIVE',
+            },
+        });
+    } catch (err) {
+        edgeLogger.error('signIn: ensureDefaultTenantMembership failed', {
+            component: 'auth',
+            userId,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
     adapter: PrismaAdapter(prisma) as NextAuthConfig['adapter'],
     session: { strategy: 'jwt' },
@@ -106,74 +156,46 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         error: '/login',
     },
     providers,
-    events: {
-        /**
-         * Auto-onboard new OAuth users into a default tenant so they land
-         * on a usable dashboard instead of bouncing back to /login.
-         *
-         * Current bootstrap policy: every new user joins the oldest
-         * tenant (ORDER BY createdAt ASC) as EDITOR. This matches the
-         * "single test tenant" stance on the prod VM while we're still
-         * shaking things out — every invited colleague lands in the
-         * same place, can poke around, and an ADMIN can promote them
-         * if they need write access beyond EDITOR.
-         *
-         * Future: replace with an invitation-token flow (user must
-         * present a valid invite to join) before opening the deployment
-         * to untrusted email addresses. As written, ANY Google account
-         * on the internet can self-join.
-         */
-        async createUser({ user }) {
-            if (!user.id) return;
-            try {
-                const tenant = await prisma.tenant.findFirst({
-                    orderBy: { createdAt: 'asc' },
-                });
-                if (!tenant) {
-                    edgeLogger.warn('New user created but no tenant exists to auto-join', {
-                        component: 'auth',
-                        userId: user.id,
-                    });
-                    return;
-                }
-                await prisma.tenantMembership.upsert({
-                    where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } },
-                    update: {},
-                    create: {
-                        tenantId: tenant.id,
-                        userId: user.id,
-                        role: 'EDITOR',
-                        status: 'ACTIVE',
-                    },
-                });
-            } catch (err) {
-                edgeLogger.error('Failed to auto-onboard new OAuth user', {
-                    component: 'auth',
-                    userId: user.id,
-                    error: err instanceof Error ? err.message : String(err),
-                });
-                // Swallow — letting the sign-in succeed with no membership
-                // is better than throwing and breaking the auth callback.
-                // User will bounce to /login on first nav, surface is no
-                // worse than the pre-fix state.
-            }
-        },
-    },
     callbacks: {
         /**
-         * signIn callback: link OAuth user to existing tenant user by email.
+         * signIn callback — runs on EVERY sign-in attempt (not just the
+         * first). Does two things:
+         *
+         *   1. Account linking: if the OAuth email already matches a
+         *      User row created by a different provider, link the new
+         *      OAuth `Account` to the existing User rather than
+         *      creating a duplicate.
+         *
+         *   2. Auto-onboard / self-heal: ensure the user has at least
+         *      one ACTIVE `TenantMembership`. If not, join them to the
+         *      oldest tenant as EDITOR. Idempotent via upsert.
+         *
+         * The auto-onboard moved out of `events.createUser` (where it
+         * used to live) because that hook only fires on first User
+         * creation. Orphan users whose User row got created during a
+         * deploy window before auto-onboarding shipped would stay
+         * orphaned forever — signing in, creating a session with
+         * `tenantId=null`, and bouncing back to /login. Running the
+         * check on every sign-in gives us self-healing: orphans are
+         * repaired on their next login, brand-new users are onboarded
+         * on their first.
+         *
+         * Current bootstrap policy: oldest tenant, EDITOR role,
+         * ACTIVE status. Matches the "single test tenant" stance on
+         * the prod VM while invitation tokens aren't built yet. As
+         * written, ANY successful OAuth sign-in (Google/Microsoft)
+         * self-joins that tenant.
          */
         async signIn({ user, account }) {
-            if (!account || account.provider === 'credentials') return true;
+            if (!account) return true;
 
-            // Find existing user by email and link them
-            if (user.email) {
+            // ── 1. Account linking for OAuth (not credentials) ──
+            if (account.provider !== 'credentials' && user.email) {
                 const existingUser = await prisma.user.findUnique({
                     where: { email: user.email },
                 });
 
                 if (existingUser && user.id !== existingUser.id) {
-                    // User exists — check if this provider already linked
                     const existingAccount = await prisma.account.findUnique({
                         where: {
                             provider_providerAccountId: {
@@ -184,7 +206,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     });
 
                     if (!existingAccount) {
-                        // Link this OAuth provider to the existing user
                         await prisma.account.create({
                             data: {
                                 userId: existingUser.id,
@@ -201,10 +222,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                             },
                         });
                     }
+                    // Fall through to the membership check below — we
+                    // want to onboard the EXISTING user, not the OAuth-
+                    // payload user.id. Use existingUser.id for that.
+                    await ensureDefaultTenantMembership(existingUser.id);
                     return true;
                 }
             }
 
+            // ── 2. Auto-onboard / self-heal ──
+            if (user.id) {
+                await ensureDefaultTenantMembership(user.id);
+            }
             return true;
         },
 

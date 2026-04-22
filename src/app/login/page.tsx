@@ -44,6 +44,17 @@ function LoginForm() {
 
     useEffect(() => {
         let cancelled = false;
+        // Operator override: setting NEXT_PUBLIC_AUTH_CREDENTIALS_UI_DISABLED=1
+        // in the deploy env forces the email/password form off regardless of
+        // whether the server has the Credentials provider registered. The
+        // backend stays functional (API routes, tests, server actions can
+        // still call it); only the public login page hides the controls.
+        const uiDisabled =
+            process.env.NEXT_PUBLIC_AUTH_CREDENTIALS_UI_DISABLED === '1';
+        if (uiDisabled) {
+            setCredentialsEnabled(false);
+            return;
+        }
         getProviders()
             .then((providers) => {
                 if (cancelled) return;
