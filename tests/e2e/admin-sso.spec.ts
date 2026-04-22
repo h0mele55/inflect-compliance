@@ -39,9 +39,13 @@ test.describe('Admin SSO Configuration', () => {
         // Page header — wait up to 60s for first cold-compile
         await expect(page.getByRole('heading', { name: /SSO & Identity/i })).toBeVisible({ timeout: 60000 });
 
-        // Protocol tabs — only render after loading=false (API response received)
-        await expect(page.getByRole('button', { name: 'OIDC' })).toBeVisible({ timeout: 30000 });
-        await expect(page.getByRole('button', { name: /SAML/i })).toBeVisible({ timeout: 10000 });
+        // Protocol tabs — only render after loading=false (API response received).
+        // Epic 60 migrated this toggle to <ToggleGroup> which exposes
+        // role="radio" inside a role="radiogroup" (not role="button").
+        // Target by the stable ids preserved on each option (see
+        // src/app/t/[tenantSlug]/(app)/admin/sso/page.tsx).
+        await expect(page.locator('#sso-tab-oidc')).toBeVisible({ timeout: 30000 });
+        await expect(page.locator('#sso-tab-saml')).toBeVisible({ timeout: 10000 });
 
         // Save button
         await expect(page.getByRole('button', { name: /Save Configuration/i })).toBeVisible({ timeout: 10000 });
@@ -52,9 +56,9 @@ test.describe('Admin SSO Configuration', () => {
 
         await safeGoto(page, `/t/${tenantSlug}/admin/sso`, { waitUntil: 'domcontentloaded' });
         await page.waitForLoadState('networkidle').catch(() => {});
-        await expect(page.getByRole('button', { name: /SAML/i })).toBeVisible({ timeout: 30000 });
+        await expect(page.locator('#sso-tab-saml')).toBeVisible({ timeout: 30000 });
 
-        await page.getByRole('button', { name: /SAML/i }).click();
+        await page.locator('#sso-tab-saml').click();
 
         // SAML-specific heading should appear
         await expect(page.getByRole('heading', { name: /SAML/i })).toBeVisible({ timeout: 5000 });
