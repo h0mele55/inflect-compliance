@@ -29,6 +29,10 @@ const nodeProject = {
     preset: 'ts-jest',
     testEnvironment: 'node',
     setupFiles: ['<rootDir>/jest.setup.js'],
+    // Shared shims for the handful of node-project tests that opt into
+    // jsdom via per-file `@jest-environment jsdom` directives. Safe to
+    // load in pure-node tests too (shims feature-detect `window`).
+    setupFilesAfterEnv: ['<rootDir>/tests/setup/jsdom-shims.ts'],
     globalSetup: '<rootDir>/tests/setup/globalSetup.ts',
     globalTeardown: '<rootDir>/tests/setup/teardown.ts',
     moduleNameMapper: {

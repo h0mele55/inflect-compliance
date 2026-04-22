@@ -12,6 +12,7 @@
  *     Vaul's scroll observer) don't throw in jsdom.
  */
 
+import '../setup/jsdom-shims';
 import '@testing-library/jest-dom';
 import { cleanup } from '@testing-library/react';
 import { toHaveNoViolations } from 'jest-axe';
@@ -89,14 +90,6 @@ if (
     !Element.prototype.scrollIntoView
 ) {
     Element.prototype.scrollIntoView = jest.fn();
-}
-
-// window.scrollTo — motion-dom's keyframe resolver probes it during
-// `measureAllKeyframes` on animation-frame ticks. jsdom ships a stub
-// that throws "Not implemented", which surfaces as a console.error
-// noise storm in any test that renders a <motion.*> component.
-if (typeof window !== 'undefined') {
-    window.scrollTo = jest.fn() as unknown as typeof window.scrollTo;
 }
 
 // Element.hasPointerCapture — Radix relies on it.
