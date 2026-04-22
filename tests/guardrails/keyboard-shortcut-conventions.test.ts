@@ -47,29 +47,95 @@ const KEYDOWN_LISTENER_RE =
     /\b(?:document|window)\s*\.\s*addEventListener\s*\(\s*['"]keydown['"]/g;
 
 /**
+ * Strip line comments (slash-slash) and block comments (slash-star)
+ * out of a source string so downstream regex scanning doesn't match
+ * text inside JSDoc / inline commentary. Example docblocks
+ * legitimately mention `useKeyboardShortcut('?')` as prose, which
+ * the naive scanner below would otherwise flag as a description-
+ * less real call.
+ *
+ * The stripper is character-by-character and ignores comment tokens
+ * that appear inside a quoted string — a real call site can carry
+ * a slash-slash inside a string literal and we don't want to eat
+ * the closing quote.
+ */
+function stripComments(src: string): string {
+    const out: string[] = [];
+    let i = 0;
+    const len = src.length;
+    while (i < len) {
+        const ch = src[i];
+        const next = src[i + 1];
+        // Line comment
+        if (ch === '/' && next === '/') {
+            while (i < len && src[i] !== '\n') i++;
+            continue;
+        }
+        // Block comment
+        if (ch === '/' && next === '*') {
+            i += 2;
+            while (i < len && !(src[i] === '*' && src[i + 1] === '/')) i++;
+            i += 2;
+            continue;
+        }
+        // String literals — skip past the closing quote so embedded
+        // `//` or `/*` inside strings isn't eaten.
+        if (ch === '"' || ch === "'" || ch === '`') {
+            const quote = ch;
+            out.push(ch);
+            i++;
+            while (i < len && src[i] !== quote) {
+                if (src[i] === '\\') {
+                    out.push(src[i]);
+                    i++;
+                    if (i < len) {
+                        out.push(src[i]);
+                        i++;
+                    }
+                    continue;
+                }
+                out.push(src[i]);
+                i++;
+            }
+            if (i < len) {
+                out.push(src[i]);
+                i++;
+            }
+            continue;
+        }
+        out.push(ch);
+        i++;
+    }
+    return out.join('');
+}
+
+/**
  * Matches a `useKeyboardShortcut(...)` invocation and captures the
  * argument list up to the matching close paren (works for nested
- * braces / parens inside the args).
+ * braces / parens inside the args). Runs on comment-stripped source
+ * so JSDoc references to `useKeyboardShortcut('?')` don't register
+ * as real call sites.
  */
 function findKeyboardShortcutCalls(src: string): string[] {
+    const code = stripComments(src);
     const calls: string[] = [];
     const starts: number[] = [];
     const needle = /useKeyboardShortcut\s*\(/g;
     let m: RegExpExecArray | null;
-    while ((m = needle.exec(src)) !== null) {
+    while ((m = needle.exec(code)) !== null) {
         starts.push(m.index + m[0].length);
     }
     for (const start of starts) {
         let depth = 1;
         let i = start;
-        while (i < src.length && depth > 0) {
-            const ch = src[i];
+        while (i < code.length && depth > 0) {
+            const ch = code[i];
             if (ch === '(') depth++;
             else if (ch === ')') depth--;
             if (depth === 0) break;
             i++;
         }
-        calls.push(src.slice(start, i));
+        calls.push(code.slice(start, i));
     }
     return calls;
 }

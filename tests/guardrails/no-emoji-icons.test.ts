@@ -22,6 +22,13 @@ const SCAN_DIRS = [
 /** Files to exclude from scanning (e.g. code comments in non-UI files). */
 const EXCLUDED_FILES = new Set([
     'prisma.ts', // Has ⚠️ in a developer code comment, not UI
+    // Epic 57 — the shortcut help overlay pretty-prints modifier keys
+    // to their standard Unicode glyphs (⌘ ⇧ ⌥ ↑↓←→). These are
+    // keyboard notation, not emoji-as-icon. `⌥` (U+2325) happens to
+    // fall in the regex's Misc-Technical bucket, but its role here is
+    // strictly typographic — Mac users expect the glyph next to
+    // "Alt/Option" affordances, not the word "Alt".
+    'shortcut-help-overlay.tsx',
 ]);
 
 /**
