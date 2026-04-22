@@ -1,7 +1,5 @@
 import NextAuth from 'next-auth';
 import type { NextAuthConfig } from 'next-auth';
-import Google from 'next-auth/providers/google';
-import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id';
 import Credentials from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import prisma from '@/lib/prisma';
@@ -9,7 +7,7 @@ import { authenticateWithPassword } from '@/lib/auth/credentials';
 import { isTokenExpired, refreshAccessToken } from '@/lib/auth/refresh';
 import type { Role } from '@prisma/client';
 
-import { env } from '@/env';
+import authConfig from './auth.config';
 import { edgeLogger } from '@/lib/observability/edge-logger';
 
 // Note: AUTH_SECRET is required at runtime. Auth.js v5 will
@@ -33,30 +31,12 @@ declare module 'next-auth' {
     }
 }
 
-// Build providers list
-const providers: NextAuthConfig['providers'] = [
-    Google({
-        clientId: env.GOOGLE_CLIENT_ID,
-        clientSecret: env.GOOGLE_CLIENT_SECRET,
-        authorization: {
-            params: {
-                access_type: 'offline',
-                prompt: 'consent',
-                scope: 'openid email profile',
-            },
-        },
-    }),
-    MicrosoftEntraID({
-        clientId: env.MICROSOFT_CLIENT_ID,
-        clientSecret: env.MICROSOFT_CLIENT_SECRET,
-        issuer: `https://login.microsoftonline.com/${env.MICROSOFT_TENANT_ID}/v2.0`,
-        authorization: {
-            params: {
-                scope: 'openid email profile offline_access',
-            },
-        },
-    }),
-];
+// Providers list starts with the edge-safe OAuth providers from
+// auth.config.ts and extends with the Node-only Credentials provider.
+// The edge config can't carry Credentials because authenticateWithPassword
+// transitively imports node:crypto (via security-events.ts hashing) and
+// Prisma — neither of which is resolvable in the Edge Runtime.
+const providers: NextAuthConfig['providers'] = [...authConfig.providers];
 
 // Credentials provider — production-grade email+password auth.
 //
@@ -155,12 +135,8 @@ async function ensureDefaultTenantMembership(userId: string): Promise<void> {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+    ...authConfig,
     adapter: PrismaAdapter(prisma) as NextAuthConfig['adapter'],
-    session: { strategy: 'jwt' },
-    pages: {
-        signIn: '/login',
-        error: '/login',
-    },
     providers,
     callbacks: {
         /**
@@ -453,20 +429,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 session.user.mfaPending = (token.mfaPending as boolean) ?? false;
             }
             return session;
-        },
-    },
-    cookies: {
-        sessionToken: {
-            name:
-                env.NODE_ENV === 'production' && env.AUTH_TEST_MODE !== '1'
-                    ? '__Secure-authjs.session-token'
-                    : 'authjs.session-token',
-            options: {
-                httpOnly: true,
-                sameSite: 'lax' as const,
-                path: '/',
-                secure: env.NODE_ENV === 'production' && env.AUTH_TEST_MODE !== '1',
-            },
         },
     },
 });

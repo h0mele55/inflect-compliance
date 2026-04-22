@@ -1,5 +1,12 @@
-import { auth } from '@/auth';
+import NextAuth from 'next-auth';
+import authConfig from '@/auth.config';
 import { NextResponse } from 'next/server';
+
+// Edge-safe `auth()` wrapper. Instantiated from the edge-only config
+// so middleware's webpack bundle never transitively pulls Prisma,
+// bcrypt, or node:crypto (which don't resolve in the Edge Runtime).
+// See src/auth.config.ts for the full rationale.
+const { auth } = NextAuth(authConfig);
 import { checkAuthRateLimit } from '@/lib/rate-limit/authRateLimit';
 import { env } from '@/env';
 import {

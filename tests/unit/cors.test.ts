@@ -1,18 +1,29 @@
 import { NextRequest } from 'next/server';
-import middleware from '../../src/middleware';
 
 // Mock the checkAuthRateLimit to just pass
 jest.mock('../../src/lib/rate-limit/authRateLimit', () => ({
     checkAuthRateLimit: jest.fn().mockResolvedValue({ ok: true })
 }));
 
-// Mock NextAuth middleware wrapper to just return NextResponse.next()
-jest.mock('../../src/auth', () => ({
-    auth: () => jest.fn().mockImplementation((req) => {
-        // Return null to signify passing through to NextResponse.next()
-        return null;
-    })
+// Mock next-auth itself so we don't load the ESM module. Middleware
+// instantiates `auth()` from authConfig via `NextAuth(authConfig)` at
+// module scope — this mock replaces that boot-time wiring with a
+// pass-through that lets the middleware's body run normally.
+jest.mock('next-auth', () => ({
+    __esModule: true,
+    default: jest.fn(() => ({
+        auth: (handler: (req: unknown) => unknown) => handler,
+    })),
 }));
+
+// The edge auth config imports @/env — for the CORS-only unit test
+// we don't need real OAuth provider wiring.
+jest.mock('../../src/auth.config', () => ({
+    __esModule: true,
+    default: { providers: [], session: { strategy: 'jwt' }, pages: {} },
+}));
+
+import middleware from '../../src/middleware';
 
 describe('CORS Middleware Logic', () => {
     let originalCorsEnv: string | undefined;
