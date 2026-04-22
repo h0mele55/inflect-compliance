@@ -17,7 +17,10 @@ async function main() {
         { email: 'auditor@acme.com', name: 'Auditor User', role: 'AUDITOR' as const },
     ];
 
-    const passwordHash = await bcrypt.hash('password123', 10);
+    // Match the prod BCRYPT_COST (see src/lib/auth/passwords.ts). Keeping
+    // the seed cost in lockstep avoids a rehash-on-verify storm the first
+    // time a test user logs in after a fresh seed.
+    const passwordHash = await bcrypt.hash('password123', 12);
 
     for (const u of users) {
         // Create or find user

@@ -43,6 +43,11 @@ export const env = createEnv({
         RATE_LIMIT_ENABLED: z.enum(["0", "1"]).optional(),
         RATE_LIMIT_MODE: z.enum(["upstash", "memory"]).default("upstash"),
         AUTH_TEST_MODE: z.enum(["0", "1"]).optional(),
+        // When "1", the Credentials provider rejects sign-ins whose User row
+        // has `emailVerified = null`. See src/lib/auth/credentials.ts. Default
+        // is OFF so existing deployments behave unchanged until verification
+        // flow ships.
+        AUTH_REQUIRE_EMAIL_VERIFICATION: z.enum(["0", "1"]).optional(),
         UPSTASH_REDIS_REST_URL: z.string().url().optional(),
         UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
 
@@ -127,6 +132,7 @@ export const env = createEnv({
         RATE_LIMIT_ENABLED: process.env.RATE_LIMIT_ENABLED,
         RATE_LIMIT_MODE: process.env.RATE_LIMIT_MODE,
         AUTH_TEST_MODE: process.env.AUTH_TEST_MODE,
+        AUTH_REQUIRE_EMAIL_VERIFICATION: process.env.AUTH_REQUIRE_EMAIL_VERIFICATION,
         UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
         UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
 

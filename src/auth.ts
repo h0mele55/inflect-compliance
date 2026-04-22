@@ -5,9 +5,9 @@ import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id';
 import Credentials from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import prisma from '@/lib/prisma';
+import { authenticateWithPassword } from '@/lib/auth/credentials';
 import { isTokenExpired, refreshAccessToken } from '@/lib/auth/refresh';
 import type { Role } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 import { env } from '@/env';
 import { edgeLogger } from '@/lib/observability/edge-logger';
@@ -58,54 +58,45 @@ const providers: NextAuthConfig['providers'] = [
     }),
 ];
 
-// Credentials provider — enabled in test and dev, gated off in production
-if (
-    env.AUTH_TEST_MODE === '1' ||
-    env.NODE_ENV !== 'production'
-) {
-    providers.push(
-        Credentials({
-            id: 'credentials',
-            name: 'Test Credentials',
-            credentials: {
-                email: { label: 'Email', type: 'email' },
-                password: { label: 'Password', type: 'password' },
-            },
-            async authorize(credentials) {
-                if (!credentials?.email || !credentials?.password) {
-                    return null;
-                }
-
-                const email = credentials.email as string;
-                const password = credentials.password as string;
-
-                let user;
-                try {
-                    user = await prisma.user.findUnique({
-                        where: { email },
-                    });
-                } catch {
-                    return null;
-                }
-
-                if (!user || !user.passwordHash) {
-                    return null;
-                }
-
-                const valid = await bcrypt.compare(password, user.passwordHash);
-                if (!valid) {
-                    return null;
-                }
-
-                return {
-                    id: user.id,
-                    email: user.email,
-                    name: user.name,
-                };
-            },
-        })
-    );
-}
+// Credentials provider — production-grade email+password auth.
+//
+// Previously gated behind `AUTH_TEST_MODE === '1' || NODE_ENV !== 'production'`
+// on the grounds that the inline bcrypt.compare + no-enumeration-protection
+// implementation wasn't safe to face the internet. The production path now
+// lives in `src/lib/auth/credentials.ts` (account-enumeration-safe, timing-
+// equalised, email-verification-gate-ready, silent-rehash-on-verify) so the
+// provider is always registered. Whether the login UI shows the email/
+// password *form* is a separate orthogonal decision — the login page calls
+// `getProviders()` and renders conditionally (see src/app/login/page.tsx).
+providers.push(
+    Credentials({
+        id: 'credentials',
+        name: 'Email and password',
+        credentials: {
+            email: { label: 'Email', type: 'email' },
+            password: { label: 'Password', type: 'password' },
+        },
+        async authorize(credentials) {
+            const result = await authenticateWithPassword({
+                email: (credentials?.email as string | undefined) ?? '',
+                password: (credentials?.password as string | undefined) ?? '',
+            });
+            // NextAuth surfaces any non-null return as a successful sign-in
+            // and dispatches the `signIn` + `jwt` callbacks. Returning null
+            // collapses every failure reason into the same client-facing
+            // `CredentialsSignin` error — which is exactly the account-
+            // enumeration-safe shape we want. Callers that need the typed
+            // reason (for audit logging, rate-limit reasons) should invoke
+            // authenticateWithPassword directly rather than signIn.
+            if (!result.ok) return null;
+            return {
+                id: result.userId,
+                email: result.email,
+                name: result.name,
+            };
+        },
+    }),
+);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
     adapter: PrismaAdapter(prisma) as NextAuthConfig['adapter'],

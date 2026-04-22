@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { hashPassword, verifyPassword, signToken } from '@/lib/auth';
+import { signToken } from '@/lib/auth';
+import { authenticateWithPassword } from '@/lib/auth/credentials';
+import { hashPassword } from '@/lib/auth/passwords';
 import { withValidatedBody } from '@/lib/validation/route';
 import { AuthActionSchema } from '@/lib/schemas';
 import { env } from '@/env';
@@ -91,34 +93,33 @@ async function handleLogin(body: any) {
         return NextResponse.json<any>({ error: 'Missing credentials' }, { status: 400 });
     }
 
-    const user = await prisma.user.findFirst({
-        where: { email },
-        include: {
-            tenantMemberships: {
-                where: { status: 'ACTIVE' },
-                orderBy: { createdAt: 'asc' },
-                take: 1,
-                include: { tenant: true },
-            },
-        },
-    });
-
-    if (!user || !user.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
+    // Production-grade credential verification — account-enumeration-safe,
+    // timing-equalised, future-proofed for email-verification gating and
+    // silent rehash-on-verify. See src/lib/auth/credentials.ts.
+    const auth = await authenticateWithPassword({ email, password });
+    if (!auth.ok) {
+        // Collapse every failure reason to the same response shape so this
+        // endpoint doesn't leak anything the NextAuth path doesn't also leak.
         return NextResponse.json<any>({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // Resolve tenant and role from membership (sole authority)
-    const membership = user.tenantMemberships[0];
+    // Resolve tenant + role after successful authentication (cheap lookup,
+    // not on the hot path for failed attempts).
+    const membership = await prisma.tenantMembership.findFirst({
+        where: { userId: auth.userId, status: 'ACTIVE' },
+        orderBy: { createdAt: 'asc' },
+        include: { tenant: true },
+    });
 
     const token = signToken({
-        userId: user.id,
+        userId: auth.userId,
         tenantId: membership?.tenantId ?? '',
-        email: user.email,
+        email: auth.email,
         role: membership?.role ?? 'READER',
     });
 
     const response = NextResponse.json<any>({
-        user: { id: user.id, email: user.email, name: user.name, role: membership?.role ?? 'READER' },
+        user: { id: auth.userId, email: auth.email, name: auth.name, role: membership?.role ?? 'READER' },
         tenant: membership?.tenant ? { id: membership.tenant.id, name: membership.tenant.name } : null,
     });
 
