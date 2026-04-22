@@ -1,24 +1,66 @@
 /**
- * format-date.ts — Canonical Date Formatting Utilities
+ * format-date.ts — Canonical Date Formatting Utilities (Epic 58)
  *
- * All dates rendered in the UI MUST go through these helpers.
+ * Every date rendered in the UI, emitted from a server route, or
+ * written to a PDF MUST go through these helpers. This is the
+ * single-source-of-truth date-formatting surface; there is no
+ * second canonical module.
  *
  * WHY THIS EXISTS
  * ───────────────
- * React SSR hydration mismatches occur when the server locale differs from
- * the browser locale. For example, a Windows server configured to Bulgarian
- * renders dates as "16.04.2026 г., 11:04:57 ч." while the browser renders
- * "4/16/2026, 11:04:57 AM" — causing a React hydration warning and a flash
- * of incorrect content.
+ * React SSR hydration mismatches occur when the server locale differs
+ * from the browser locale. For example, a Windows server configured
+ * to Bulgarian renders dates as "16.04.2026 г., 11:04:57 ч." while
+ * the browser renders "4/16/2026, 11:04:57 AM" — causing a React
+ * hydration warning and a flash of incorrect content. Server-side
+ * PDFs suffer the same drift across deploy regions.
  *
  * FIX
  * ───
- * Hardcode locale to 'en-GB' and timezone to 'UTC' so server and client
- * always produce identical output regardless of OS or browser settings.
+ * Hardcode locale to `en-GB` and timezone to `UTC` on every
+ * Intl.DateTimeFormat instance in this file so server and client
+ * always produce identical output regardless of OS or browser
+ * settings.
+ *
+ * PICK-A-HELPER DECISION TREE
+ * ───────────────────────────
+ *   formatDate         → "16 Apr 2026"                       (default — tables, detail chrome, filter pills)
+ *   formatDateTime     → "16 Apr 2026, 08:00"                 (activity rows, audit events, modal detail)
+ *   formatDateTimeLong → "Thursday, 16 April 2026 at 08:00:45" (PDF metadata, audit receipts — weekday + seconds)
+ *   formatDateShort    → "16/04/2026"                         (compact headers, dense tables)
+ *   formatDateLong     → "16 April 2026"                      (formal docs, legal-style layouts)
+ *   formatDateCompact  → "16 Apr"                             (chart axes, mini-calendars — year is context)
+ *   formatDateRange    → adaptive (see the function's docblock) (all range chrome — pickers, filters, legends)
+ *
+ * WHAT YOU MUST NOT DO
+ * ────────────────────
+ *   - Call `.toLocaleDateString()` / `.toLocaleString()` /
+ *     `.toLocaleTimeString()` on a Date in app or component code —
+ *     the date-display-consistency ratchet catches this in CI.
+ *   - Use `new Date(…).toISOString().split('T')[0]` for YMD — that's
+ *     a timezone foot-gun. Use `toYMD(date)` from
+ *     `@/components/ui/date-picker/date-utils` instead.
+ *   - Build a range string with a literal ` - ` or ` – ` separator —
+ *     call `formatDateRange(from, to)` so endpoints adapt to same-
+ *     month / same-year / different-years semantics.
+ *   - Add a SECOND canonical formatter module. If a new variant is
+ *     genuinely needed, extend this file — don't stand up a parallel
+ *     surface. The dub-utils-era helpers `formatDateSmart`,
+ *     `formatDateTimeSmart`, `timeAgo`, `formatPeriod`, `parseDateTime`,
+ *     `getDateTimeLocal`, `getDaysDifference`, `getFirstAndLastDay`
+ *     were removed on 2026-04-22; don't resurrect them.
  *
  * USAGE
  * ─────
- *   import { formatDate, formatDateTime, formatDateShort } from '@/lib/format-date';
+ *   import {
+ *     formatDate,
+ *     formatDateTime,
+ *     formatDateTimeLong,
+ *     formatDateShort,
+ *     formatDateLong,
+ *     formatDateCompact,
+ *     formatDateRange,
+ *   } from '@/lib/format-date';
  *
  *   formatDate('2026-04-16T08:00:00Z')     // → "16 Apr 2026"
  *   formatDateTime('2026-04-16T08:00:00Z') // → "16 Apr 2026, 08:00"
@@ -90,6 +132,37 @@ export function formatDateTime(
 ): string {
     const d = toDate(value);
     return d ? DATETIME_FMT.format(d) : fallback;
+}
+
+// Richer form for audit-quality timestamps (PDF metadata page,
+// evidence-pack receipts): weekday + long month + seconds so the
+// exact moment is preserved for downstream forensics. Locked to the
+// same `en-GB` + `UTC` calendar as every other helper here so server
+// and client produce identical strings regardless of host timezone.
+const DATETIME_LONG_FMT = new Intl.DateTimeFormat(LOCALE, {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZone: 'UTC',
+});
+
+/**
+ * Format a date + time in long, audit-quality form —
+ * "Thursday, 16 April 2026, 08:00:45". Use for PDF metadata pages,
+ * evidence receipts, or any surface where the exact moment is
+ * legally / operationally load-bearing. Returns the fallback string
+ * (default `'—'`) for null/invalid inputs.
+ */
+export function formatDateTimeLong(
+    value: string | Date | null | undefined,
+    fallback = '—',
+): string {
+    const d = toDate(value);
+    return d ? DATETIME_LONG_FMT.format(d) : fallback;
 }
 
 /**

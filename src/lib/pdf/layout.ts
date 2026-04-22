@@ -5,6 +5,7 @@
  */
 import type { ReportMeta, DataSourceNote } from './types';
 import { BRAND, MARGINS, PAGE_WIDTH, PAGE_HEIGHT, CONTENT_WIDTH } from './pdfKitFactory';
+import { formatDateTime, formatDateTimeLong, formatDateShort } from '@/lib/format-date';
 
 // ─── Cover Page ───
 
@@ -25,9 +26,14 @@ export function addCoverPage(doc: PDFKit.PDFDocument, meta: ReportMeta): void {
             .text(meta.reportSubtitle, MARGINS.left, 145, { width: CONTENT_WIDTH });
     }
 
-    // Date + framework
+    // Date + framework. Epic 58 — route the "Generated:" timestamp
+    // through the canonical formatter so the cover page matches the
+    // rest of the app (en-GB, UTC). Previously used an inline
+    // `toLocaleDateString` that followed the server's host timezone —
+    // an evidence PDF could show "10:00" while the app UI of the
+    // same moment showed "12:00" if the server ran in CET.
     doc.fontSize(10).fillColor(BRAND.slateLight)
-        .text(`Generated: ${new Date(meta.generatedAt).toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, MARGINS.left, 200);
+        .text(`Generated: ${formatDateTime(meta.generatedAt)}`, MARGINS.left, 200);
 
     if (meta.framework) {
         doc.text(`Framework: ${meta.framework}`, MARGINS.left, 216);
@@ -71,11 +77,15 @@ export function addMetadataPage(doc: PDFKit.PDFDocument, meta: ReportMeta, dataS
     doc.font('Helvetica');
     doc.y = lineY + 16;
 
-    // Key-value pairs
+    // Key-value pairs. Epic 58 — audit-quality timestamp through the
+    // canonical formatter (en-GB + UTC + weekday + seconds). The
+    // previous inline `toLocaleString` silently followed the host's
+    // timezone, which meant the same PDF could produce different
+    // audit timestamps depending on which region the build ran in.
     const kvPairs: [string, string][] = [
         ['Organization', meta.tenantName],
         ['Report Title', meta.reportTitle],
-        ['Generated At', new Date(meta.generatedAt).toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'medium' })],
+        ['Generated At', formatDateTimeLong(meta.generatedAt)],
     ];
     if (meta.framework) kvPairs.push(['Framework', meta.framework]);
     if (meta.watermark && meta.watermark !== 'NONE') kvPairs.push(['Status', meta.watermark]);
@@ -127,8 +137,11 @@ export function addHeader(doc: PDFKit.PDFDocument, meta: ReportMeta): void {
     const titleWidth = doc.widthOfString(meta.reportTitle, { fontSize: 7 } as PDFKit.Mixins.TextOptions);
     doc.text(meta.reportTitle, (PAGE_WIDTH - titleWidth) / 2, y, { width: 300, lineBreak: false, align: 'center' });
 
-    // Right: date
-    const dateStr = new Date(meta.generatedAt).toLocaleDateString('en-GB');
+    // Right: date. Epic 58 — canonical `formatDateShort` returns the
+    // same "DD/MM/YYYY" the inline call produced, but locked to UTC
+    // so the header is stable across server regions and matches the
+    // cover/metadata timestamps that Epic 58 also canonicalised.
+    const dateStr = formatDateShort(meta.generatedAt);
     doc.text(dateStr, PAGE_WIDTH - MARGINS.right - 100, y, { width: 100, align: 'right', lineBreak: false });
 
     // Bottom line

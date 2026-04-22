@@ -301,12 +301,27 @@ describe('getFactors', () => {
 });
 
 describe('formatters', () => {
-    it('formatShortDate renders "Mon DD"', () => {
-        const s = formatShortDate(new Date('2026-04-16T00:00:00Z'));
-        // Depending on TZ, the day may be 15 or 16 — assert the shape, not
-        // the exact day (getDate-dependent behaviour is covered by the
-        // date-formatter consistency guardrail).
-        expect(s).toMatch(/^[A-Z][a-z]{2} \d{1,2}$/);
+    it('formatShortDate renders canonical "DD Mon" (day-month, UTC)', () => {
+        // Epic 58 — formatShortDate now delegates to
+        // `formatDateCompact` from `@/lib/format-date`. That helper
+        // is locked to en-GB + UTC, so the result is deterministic
+        // regardless of host timezone: "16 Apr", not the previous
+        // "Apr 16" in en-US + host-local TZ.
+        expect(formatShortDate(new Date('2026-04-16T00:00:00Z'))).toBe('16 Apr');
+        // Day-month order; short month name; no year.
+        expect(formatShortDate(new Date('2026-12-01T12:00:00Z'))).toBe('1 Dec');
+    });
+
+    it('formatShortDate is timezone-stable for SSR parity', () => {
+        // Two inputs at the same UTC instant render identically no
+        // matter what TZ the host interprets them in. The inline
+        // `toLocaleDateString('en-US', …)` this function used to
+        // call was host-TZ-sensitive, which produced different
+        // labels on server vs. client across a UTC-midnight boundary.
+        const earlyMorningUTC = new Date('2026-04-16T01:00:00Z');
+        const lateEveningUTC = new Date('2026-04-16T23:00:00Z');
+        expect(formatShortDate(earlyMorningUTC)).toBe('16 Apr');
+        expect(formatShortDate(lateEveningUTC)).toBe('16 Apr');
     });
 
     it('formatNumericTick renders `value.toString()`', () => {

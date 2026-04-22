@@ -19,6 +19,8 @@
 
 import { scaleBand, scaleLinear, scaleUtc } from '@visx/scale';
 
+import { formatDateCompact } from '@/lib/format-date';
+
 import type {
     ChartMargin,
     ChartPadding,
@@ -302,16 +304,21 @@ export function pickXAxisTickValues<T extends Datum>(
 // ─── Default formatters ──────────────────────────────────────────────
 
 /**
- * Default x-axis tick formatter — "Apr 16". Matches the compact date
- * dialect used across dashboard surfaces. Charts that need the
- * app-wide long format should pass their own `tickFormat` via the
- * usual locale formatter.
+ * Default x-axis tick formatter — "16 Apr". Delegates to the canonical
+ * `formatDateCompact` from `@/lib/format-date` so every calendar
+ * surface in the app — chart axes, filter pills, range-picker
+ * triggers — shares the same `en-GB` + `UTC` calendar. Charts that
+ * need the long app-wide form ("16 Apr 2026") should pass their own
+ * `tickFormat` built from `formatDate`.
+ *
+ * Migrated from an inline `toLocaleDateString('en-US', …)` that
+ * produced "Apr 16" with the host timezone. The swap fixes a latent
+ * SSR-hydration mismatch (server + browser may disagree on "today"
+ * when rendered across a UTC midnight boundary) and unifies axis
+ * labels with the rest of the app chrome.
  */
 export function formatShortDate(date: Date): string {
-    return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-    });
+    return formatDateCompact(date);
 }
 
 /** Default y-axis tick formatter — `value.toString()`. */
