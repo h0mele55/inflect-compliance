@@ -1,7 +1,7 @@
 'use client';
-import { useState, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { getProviders, signIn } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 
 function extractErrorMessage(value: unknown, fallback: string): string {
@@ -25,6 +25,29 @@ function LoginForm() {
     const [orgName, setOrgName] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    // `null` = still resolving the provider list (nothing credentials-shaped
+    // renders yet). `false` = server is OAuth-only, hide the form + divider
+    // + register toggle. `true` = credentials is registered (dev, or prod
+    // with AUTH_TEST_MODE=1), show the form.
+    const [credentialsEnabled, setCredentialsEnabled] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        getProviders()
+            .then((providers) => {
+                if (cancelled) return;
+                setCredentialsEnabled(!!providers?.credentials);
+            })
+            .catch(() => {
+                // If the discovery call fails (e.g. network blip), default
+                // to hiding the form rather than showing a control that's
+                // about to 404 against a missing provider.
+                if (!cancelled) setCredentialsEnabled(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const handleCredentialsSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -151,50 +174,54 @@ function LoginForm() {
                         </button>
                     </div>
 
-                    {/* Divider */}
-                    <div className="relative mb-6">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-slate-700/50" />
-                        </div>
-                        <div className="relative flex justify-center text-xs">
-                            <span className="px-2 bg-slate-900 text-slate-500">or continue with email</span>
-                        </div>
-                    </div>
+                    {credentialsEnabled && (
+                        <>
+                            {/* Divider */}
+                            <div className="relative mb-6">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-slate-700/50" />
+                                </div>
+                                <div className="relative flex justify-center text-xs">
+                                    <span className="px-2 bg-slate-900 text-slate-500">or continue with email</span>
+                                </div>
+                            </div>
 
-                    {/* Credentials Form */}
-                    <form onSubmit={handleCredentialsSubmit} method="post" action="#" className="space-y-4">
-                        {mode === 'register' && (
-                            <>
+                            {/* Credentials Form */}
+                            <form onSubmit={handleCredentialsSubmit} method="post" action="#" className="space-y-4">
+                                {mode === 'register' && (
+                                    <>
+                                        <div>
+                                            <label className="input-label">{t('name')}</label>
+                                            <input className="input" name="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder={t('namePlaceholder')} />
+                                        </div>
+                                        <div>
+                                            <label className="input-label">{t('orgName')}</label>
+                                            <input className="input" name="orgName" value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder={t('orgPlaceholder')} />
+                                        </div>
+                                    </>
+                                )}
                                 <div>
-                                    <label className="input-label">{t('name')}</label>
-                                    <input className="input" name="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder={t('namePlaceholder')} />
+                                    <label className="input-label">{t('email')}</label>
+                                    <input className="input" type="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder={t('emailPlaceholder')} />
                                 </div>
                                 <div>
-                                    <label className="input-label">{t('orgName')}</label>
-                                    <input className="input" name="orgName" value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder={t('orgPlaceholder')} />
+                                    <label className="input-label">{t('password')}</label>
+                                    <input className="input" type="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder={t('passwordPlaceholder')} minLength={6} />
                                 </div>
-                            </>
-                        )}
-                        <div>
-                            <label className="input-label">{t('email')}</label>
-                            <input className="input" type="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder={t('emailPlaceholder')} />
-                        </div>
-                        <div>
-                            <label className="input-label">{t('password')}</label>
-                            <input className="input" type="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder={t('passwordPlaceholder')} minLength={6} />
-                        </div>
-                        <button type="submit" disabled={loading} className="btn btn-primary w-full py-2.5">
-                            {loading ? t('pleaseWait') : mode === 'login' ? t('submitLogin') : t('submitRegister')}
-                        </button>
-                    </form>
+                                <button type="submit" disabled={loading} className="btn btn-primary w-full py-2.5">
+                                    {loading ? t('pleaseWait') : mode === 'login' ? t('submitLogin') : t('submitRegister')}
+                                </button>
+                            </form>
 
-                    <div className="mt-6 text-center text-sm text-slate-400">
-                        {mode === 'login' ? (
-                            <span>{t('noAccount')} <button onClick={() => setMode('register')} className="text-brand-400 hover:text-brand-300">{t('registerLink')}</button></span>
-                        ) : (
-                            <span>{t('hasAccount')} <button onClick={() => setMode('login')} className="text-brand-400 hover:text-brand-300">{t('signInLink')}</button></span>
-                        )}
-                    </div>
+                            <div className="mt-6 text-center text-sm text-slate-400">
+                                {mode === 'login' ? (
+                                    <span>{t('noAccount')} <button onClick={() => setMode('register')} className="text-brand-400 hover:text-brand-300">{t('registerLink')}</button></span>
+                                ) : (
+                                    <span>{t('hasAccount')} <button onClick={() => setMode('login')} className="text-brand-400 hover:text-brand-300">{t('signInLink')}</button></span>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>
