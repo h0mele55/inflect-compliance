@@ -191,6 +191,62 @@ export interface ComplianceDigestPayload {
     trendDays?: number;
 }
 
+/**
+ * Epic B.3 — Master-KEK rotation, per-tenant scope.
+ *
+ * Enqueued by the tenant admin API after an operator has staged
+ * `DATA_ENCRYPTION_KEY_PREVIOUS` alongside the new
+ * `DATA_ENCRYPTION_KEY`. The job:
+ *   1. Re-wraps the tenant's `encryptedDek` under the primary KEK.
+ *   2. Re-encrypts every v1 ciphertext belonging to this tenant
+ *      under the primary KEK.
+ *
+ * Idempotent — the dual-KEK fallback transparently decrypts whatever
+ * state the row is in, so a re-run after a crash continues from
+ * wherever the last batch stopped.
+ */
+export interface KeyRotationPayload {
+    tenantId: string;
+    /** User who initiated — attribution on audit-log entries. */
+    initiatedByUserId: string;
+    /** Upstream request id for log correlation. */
+    requestId?: string;
+}
+
+/**
+ * Automation event dispatch — one job per emitted domain event.
+ *
+ * The bus stamps `tenantId` and `emittedAt` on the event; the
+ * dispatcher serializes the event through this payload to Redis.
+ * Dates are ISO strings because BullMQ payloads are JSON-only.
+ *
+ * The worker (see `jobs/automation-event-dispatch.ts`):
+ *   1. Loads enabled rules for `event.tenantId + event.event`.
+ *   2. For each rule whose filter matches `event.data`, inserts a
+ *      PENDING `AutomationExecution` row. The unique
+ *      (tenantId, idempotencyKey) index is the dedupe lock — retries
+ *      that compute the same key collide and the runner skips.
+ *   3. Advances each claimed execution through RUNNING →
+ *      SUCCEEDED / FAILED. Action handlers are out of scope for
+ *      Epic 60 foundation; the outcome records what *would* have
+ *      fired so the next epic can plug handlers in.
+ */
+export interface AutomationEventDispatchPayload {
+    /** Required for tenant-safe rule lookup and RLS set_config. */
+    tenantId: string;
+    event: {
+        event: string;
+        tenantId: string;
+        entityType: string;
+        entityId: string;
+        actorUserId: string | null;
+        /** ISO string — bus Date serialized for Redis. */
+        emittedAt: string;
+        stableKey?: string;
+        data: Record<string, unknown>;
+    };
+}
+
 /** Webhook-driven sync pull */
 export interface SyncPullPayload {
     ctx: {
@@ -244,6 +300,8 @@ export interface JobPayloadMap {
     'sync-pull': SyncPullPayload;
     'compliance-snapshot': ComplianceSnapshotPayload;
     'compliance-digest': ComplianceDigestPayload;
+    'automation-event-dispatch': AutomationEventDispatchPayload;
+    'key-rotation': KeyRotationPayload;
 }
 
 /** Union of all valid job names */
@@ -336,6 +394,27 @@ export const JOB_DEFAULTS: Record<JobName, {
     'compliance-digest': {
         attempts: 2,
         backoff: { type: 'exponential', delay: 15000 },
+        removeOnComplete: 100,
+        removeOnFail: 500,
+    },
+    'automation-event-dispatch': {
+        // Fire-and-forget per event: a failed dispatch tries a couple
+        // of times (transient DB/Redis blips) before landing on the
+        // dead-letter list. Aggressive removeOnComplete keeps the
+        // queue from filling up under event-heavy tenants.
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+        removeOnComplete: 1000,
+        removeOnFail: 2000,
+    },
+    'key-rotation': {
+        // Do NOT auto-retry: a partial rotation needs operator review.
+        // The job is idempotent, so the operator can re-enqueue after
+        // investigating; we'd rather they see "this one failed" in the
+        // completed-with-errors state than have the queue silently
+        // retry and potentially compound the problem.
+        attempts: 1,
+        backoff: { type: 'fixed', delay: 0 },
         removeOnComplete: 100,
         removeOnFail: 500,
     },

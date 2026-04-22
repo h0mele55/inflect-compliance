@@ -12,7 +12,8 @@ pick the right primitive before writing new chart JSX.
 | A **time-series** someone will hover/scrub/compare | `TimeSeriesChart` + `Areas`/`Bars` + `XAxis`/`YAxis` | `@/components/ui/charts` |
 | A **sparkline** inside a KPI tile / table cell (no tooltip, no axes) | `MiniAreaChart` | `@/components/ui/mini-area-chart` |
 | A **dashboard trend tile** (label + current value + hoverable sparkline) | `TrendCard` | `@/components/ui/TrendCard` |
-| A **horizontal progress metric** (one or many, stacked rows) | `ProgressBar` | `@/components/ui/progress-bar` |
+| A **single-value progress** metric (one bar, advances toward a max) | `ProgressBar` | `@/components/ui/progress-bar` |
+| A **categorical distribution** of rows sharing a total (status / severity / coverage breakdown) | `StatusBreakdown` | `@/components/ui/status-breakdown` |
 | A **headline gauge** (single percentage that deserves its own real estate) | `ProgressCircle` | `@/components/ui/progress-circle` |
 | A **segmented % bar with a legend** (e.g. control coverage breakdown) | `ProgressCard` | `@/components/ui/ProgressCard` |
 | A **percent-share donut** | `DonutChart` | `@/components/ui/DonutChart` |
@@ -177,15 +178,116 @@ If you have a real need the platform doesn't cover, extend the
 platform: add a new primitive under `src/components/ui/charts/` and
 re-export it from `src/components/ui/charts/index.ts`.
 
+## ProgressBar vs. StatusBreakdown — the one decision everyone confuses
+
+Both render percentage-shaped visuals, but they mean different things.
+Get the choice wrong and the UI misleads the user about what's being
+measured.
+
+### `ProgressBar` (single value toward a max)
+
+One bar. One value. One goal. Use it when you're saying:
+
+> "We are 73% of the way to some target."
+
+Examples: framework coverage ("73% of requirements mapped"), audit
+readiness score, file-upload progress, retention SLO attainment.
+
+```tsx
+<ProgressBar
+    value={coveragePercent}
+    size="md"
+    variant={coveragePercent === 100 ? 'success' : 'brand'}
+    aria-label="Framework coverage"
+/>
+```
+
+### `StatusBreakdown` (categorical distribution sharing a total)
+
+Several rows. Several values. A shared denominator. Use it when you're
+saying:
+
+> "Of 16 tasks, 12 are Active, 3 Pending, 1 Offboarding."
+
+Examples: task status breakdown, vendor severity distribution, risk
+status rollup. The row-level bar represents that row's **share of the
+total**, not its progress toward a goal.
+
+```tsx
+<StatusBreakdown
+    ariaLabel="Tasks by status"
+    items={[
+        { label: 'Active',  value: 12, variant: 'success' },
+        { label: 'Pending', value: 3,  variant: 'warning' },
+        { label: 'Offboarding', value: 1, variant: 'neutral' },
+    ]}
+/>
+```
+
+### Smell test
+
+- Does each row add to the total? → `StatusBreakdown`.
+- Is there one value and a target (even if the target is 100%)? →
+  `ProgressBar`.
+- Are you tempted to render multiple `<ProgressBar value=…>` in a
+  stack? Stop — that's `<StatusBreakdown>`.
+- Are you tempted to render `<StatusBreakdown>` with a single row?
+  Stop — that's `<ProgressBar>`.
+
+## Anti-patterns — do not revive
+
+The `dashboard-chart-bypass` guard (`tests/guardrails/dashboard-chart-bypass.test.ts`)
+scans every `(app)/**/*.tsx` and fails CI on any of the following
+patterns. Don't try to work around it — the guard exists because each
+of these was the specific drift Epic 59 had to migrate away from.
+
+- `style={{ width: `${pct}%` }}` on a raw `<div>` — use `ProgressBar`
+  (single) or `StatusBreakdown` (multi-segment) instead.
+- A raw `<polyline>` / `<svg>` sparkline — use `MiniAreaChart` or
+  `TrendCard`.
+- An import of `@/components/ui/TrendLine` — that file was deleted;
+  the replacement is `TrendCard` or `MiniAreaChart`.
+- A hand-picked hex colour (`#22c55e`, `#38bdf8`, …) for chart /
+  progress fill — use a semantic variant (`success`, `warning`,
+  `error`, `info`, `brand`, `neutral`) so re-theming under Epic 51
+  light-mode works.
+
+If you genuinely need an escape hatch for a categorical visual the
+shared platform can't serve, annotate the line with `//
+chart-bypass-ok: <one-sentence justification>` and note the missing
+primitive on the platform backlog. The suppression tag is documented
+at the top of the guard file. It was at 0 active users after the
+StatusBreakdown rollout; keep it that way.
+
+## New primitives — when to add one
+
+Before opening a new file with `<svg>` / inline widths in a dashboard
+or detail page, check:
+
+1. Does the TL;DR decision table cover this case? If yes, use that
+   primitive.
+2. Is the same pattern appearing in ≥3 places across the app? If
+   yes, propose a new primitive + a ratchet to prevent regression.
+3. Is this a one-off requiring bespoke shape / interaction? Push
+   back — it's almost always the sign of a missing table row in the
+   decision tree, not a legitimate exception.
+
+The shared platform started with two primitives and grew to a dozen
+by converging every dashboard on the same set. Future growth follows
+the same path: new primitive + guard entry + doc row.
+
 ## Where to look first
 
 - Barrel: `src/components/ui/charts/index.ts`
 - Canonical chart: `src/components/ui/charts/time-series-chart.tsx`
 - Shared layout helpers: `src/components/ui/charts/layout.ts`
 - Public types: `src/components/ui/charts/types.ts`
+- Single-value progress: `src/components/ui/progress-bar.tsx`
+- Multi-segment breakdown: `src/components/ui/status-breakdown.tsx`
 - Guidance tests: `tests/unit/chart-layout-helpers.test.ts`,
   `tests/rendered/time-series-chart.test.tsx`,
   `tests/rendered/micro-visuals.test.tsx`,
   `tests/rendered/trend-card.test.tsx`,
   `tests/rendered/kpi-card-trend.test.tsx`,
+  `tests/rendered/status-breakdown.test.tsx`,
   `tests/guardrails/dashboard-chart-bypass.test.ts`.

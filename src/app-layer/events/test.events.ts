@@ -1,9 +1,14 @@
 /**
  * Control Test audit event emitters.
+ *
+ * Each function writes an audit-log entry and publishes a matching
+ * automation-bus event so rule dispatchers can react without the
+ * usecase knowing either consumer exists.
  */
 import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { logEvent } from './audit';
+import { emitAutomationEvent } from '../automation';
 
 // ─── Test Plan Events ───
 
@@ -14,6 +19,13 @@ export async function emitTestPlanCreated(db: PrismaTx, ctx: RequestContext, pla
         entityId: plan.id,
         details: `Created test plan "${plan.name}" for control ${plan.controlId}`,
     });
+    await emitAutomationEvent(ctx, {
+        event: 'TEST_PLAN_CREATED',
+        entityType: 'ControlTestPlan',
+        entityId: plan.id,
+        actorUserId: ctx.userId,
+        data: { name: plan.name, controlId: plan.controlId },
+    });
 }
 
 export async function emitTestPlanUpdated(db: PrismaTx, ctx: RequestContext, planId: string, changes: Record<string, unknown>) {
@@ -22,6 +34,13 @@ export async function emitTestPlanUpdated(db: PrismaTx, ctx: RequestContext, pla
         entityType: 'ControlTestPlan',
         entityId: planId,
         details: `Updated test plan fields: ${Object.keys(changes).join(', ')}`,
+    });
+    await emitAutomationEvent(ctx, {
+        event: 'TEST_PLAN_UPDATED',
+        entityType: 'ControlTestPlan',
+        entityId: planId,
+        actorUserId: ctx.userId,
+        data: { changedFields: Object.keys(changes) },
     });
 }
 
@@ -32,6 +51,13 @@ export async function emitTestPlanStatusChanged(db: PrismaTx, ctx: RequestContex
         entityType: 'ControlTestPlan',
         entityId: planId,
         details: `Test plan status changed from ${oldStatus} to ${newStatus}`,
+    });
+    await emitAutomationEvent(ctx, {
+        event: action,
+        entityType: 'ControlTestPlan',
+        entityId: planId,
+        actorUserId: ctx.userId,
+        data: { fromStatus: oldStatus, toStatus: newStatus },
     });
 }
 
@@ -44,6 +70,13 @@ export async function emitTestRunCreated(db: PrismaTx, ctx: RequestContext, run:
         entityId: run.id,
         details: `Created test run for plan ${run.testPlanId}`,
     });
+    await emitAutomationEvent(ctx, {
+        event: 'TEST_RUN_CREATED',
+        entityType: 'ControlTestRun',
+        entityId: run.id,
+        actorUserId: ctx.userId,
+        data: { testPlanId: run.testPlanId },
+    });
 }
 
 export async function emitTestRunCompleted(db: PrismaTx, ctx: RequestContext, run: { id: string; result: string; testPlanId: string }) {
@@ -54,6 +87,13 @@ export async function emitTestRunCompleted(db: PrismaTx, ctx: RequestContext, ru
         details: `Test run completed with result: ${run.result}`,
         metadata: { result: run.result, testPlanId: run.testPlanId },
     });
+    await emitAutomationEvent(ctx, {
+        event: 'TEST_RUN_COMPLETED',
+        entityType: 'ControlTestRun',
+        entityId: run.id,
+        actorUserId: ctx.userId,
+        data: { testPlanId: run.testPlanId, result: run.result },
+    });
 }
 
 export async function emitTestRunFailed(db: PrismaTx, ctx: RequestContext, run: { id: string; findingSummary?: string | null }) {
@@ -62,6 +102,13 @@ export async function emitTestRunFailed(db: PrismaTx, ctx: RequestContext, run: 
         entityType: 'ControlTestRun',
         entityId: run.id,
         details: `Test run FAILED${run.findingSummary ? `: ${run.findingSummary}` : ''}`,
+    });
+    await emitAutomationEvent(ctx, {
+        event: 'TEST_RUN_FAILED',
+        entityType: 'ControlTestRun',
+        entityId: run.id,
+        actorUserId: ctx.userId,
+        data: { findingSummary: run.findingSummary ?? null },
     });
 }
 
@@ -74,6 +121,13 @@ export async function emitTestEvidenceLinked(db: PrismaTx, ctx: RequestContext, 
         entityId: link.id,
         details: `${link.kind} evidence linked to test run ${link.testRunId}`,
     });
+    await emitAutomationEvent(ctx, {
+        event: 'TEST_EVIDENCE_LINKED',
+        entityType: 'ControlTestEvidenceLink',
+        entityId: link.id,
+        actorUserId: ctx.userId,
+        data: { testRunId: link.testRunId, kind: link.kind },
+    });
 }
 
 export async function emitTestEvidenceUnlinked(db: PrismaTx, ctx: RequestContext, linkId: string, testRunId: string) {
@@ -82,5 +136,12 @@ export async function emitTestEvidenceUnlinked(db: PrismaTx, ctx: RequestContext
         entityType: 'ControlTestEvidenceLink',
         entityId: linkId,
         details: `Evidence unlinked from test run ${testRunId}`,
+    });
+    await emitAutomationEvent(ctx, {
+        event: 'TEST_EVIDENCE_UNLINKED',
+        entityType: 'ControlTestEvidenceLink',
+        entityId: linkId,
+        actorUserId: ctx.userId,
+        data: { testRunId },
     });
 }

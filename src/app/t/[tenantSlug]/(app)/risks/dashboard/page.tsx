@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { StatusBreakdown } from '@/components/ui/status-breakdown';
 
 type Risk = {
     id: string;
@@ -98,30 +99,27 @@ export default function RiskDashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Status Breakdown */}
+                {/* Status Breakdown — Epic 59: StatusBreakdown primitive. */}
                 <div className="glass-card p-5">
                     <h2 className="font-semibold mb-4">{t('statusBreakdown')}</h2>
-                    {total === 0 ? (
-                        <p className="text-content-subtle text-sm">{t('noRisksYet')}</p>
-                    ) : (
-                        <div className="space-y-3">
-                            {Object.entries(statusCounts).sort(([, a], [, b]) => b - a).map(([status, count]) => (
-                                <div key={status}>
-                                    <div className="flex justify-between text-sm mb-1">
-                                        <span className="text-content-default">{status}</span>
-                                        <span className="text-content-muted">{count} ({Math.round(count / total * 100)}%)</span>
-                                    </div>
-                                    {/* chart-bypass-ok: categorical risk-status distribution row; shared DistributionBar primitive is not in the platform yet. */}
-                                    <div className="h-2 bg-bg-default rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full bg-gradient-to-r from-[var(--brand-default)] to-[var(--brand-muted)] transition-all"
-                                            style={{ width: `${(count / total) * 100}%` }}
-                                        />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    <StatusBreakdown
+                        ariaLabel="Risk status breakdown"
+                        total={total}
+                        showPercent
+                        emptyState={
+                            <p className="text-content-subtle text-sm">
+                                {t('noRisksYet')}
+                            </p>
+                        }
+                        items={Object.entries(statusCounts)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([status, count]) => ({
+                                id: status,
+                                label: status,
+                                value: count,
+                                variant: 'brand' as const,
+                            }))}
+                    />
                 </div>
 
                 {/* Heatmap */}

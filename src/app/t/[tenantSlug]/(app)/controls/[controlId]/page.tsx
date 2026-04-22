@@ -15,6 +15,7 @@ import { Modal } from '@/components/ui/modal';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
 import { CopyText } from '@/components/ui/copy-text';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { DatePicker } from '@/components/ui/date-picker/date-picker';
 import {
     parseYMD,
@@ -1050,9 +1051,16 @@ export default function ControlDetailPage() {
                                 <div className="text-red-400 text-sm bg-red-900/20 rounded px-3 py-2">{fileUploadError}</div>
                             )}
                             {fileUploading && (
-                                <div className="w-full bg-bg-elevated rounded-full h-2">
-                                    <div className="bg-[var(--brand-default)] h-2 rounded-full transition-all" style={{ width: '60%' }} />
-                                </div>
+                                // Epic 59 — ProgressBar primitive. The actual
+                                // upload is XHR-bounded so we show a stable
+                                // 60% "working" signal; the ARIA value stays
+                                // correct for AT consumers.
+                                <ProgressBar
+                                    value={60}
+                                    size="md"
+                                    variant="brand"
+                                    aria-label="Uploading evidence file"
+                                />
                             )}
                             <button type="submit" disabled={fileUploading || !fileToUpload} className="btn btn-primary" id="submit-control-upload">
                                 {fileUploading ? 'Uploading...' : 'Upload'}

@@ -69,6 +69,23 @@ function createWorkerConnection(): Redis {
 
 log.info({ queueName: QUEUE_NAME, redisUrl: REDIS_URL.replace(/\/\/.*@/, '//***@') }, 'starting worker');
 
+// Wire the automation bus to BullMQ so any domain event emitted from
+// inside a job (e.g. a usecase running inside a scheduled sweep)
+// fans back into the dispatch queue. Safe to call before executors
+// register — the bus accepts a dispatcher at any point.
+(async () => {
+    const { installAutomationBusDispatcher } = await import(
+        '../src/app-layer/automation/bus-bootstrap'
+    );
+    const { installRlsTripwire } = await import(
+        '../src/lib/db/rls-middleware'
+    );
+    const { prisma } = await import('../src/lib/prisma');
+    installAutomationBusDispatcher();
+    installRlsTripwire(prisma);
+    log.info('automation bus dispatcher + RLS tripwire installed');
+})();
+
 const connection = createWorkerConnection();
 
 const worker = new Worker(

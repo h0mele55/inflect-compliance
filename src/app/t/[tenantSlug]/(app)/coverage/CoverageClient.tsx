@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { ShieldCheck, AlertTriangle, Cpu, Flame, ArrowLeft } from 'lucide-react';
 import DonutChart from '@/components/ui/DonutChart';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { ProgressBar } from '@/components/ui/progress-bar';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -360,7 +361,10 @@ function CoverageBar({
     detail: string;
 }) {
     const color = pctColor(pct);
-    const bgClass = pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500';
+    // Epic 59 — pick ProgressBar variant by the same score bands the
+    // inline Tailwind class list used. Light-mode compatible via
+    // token-backed variant colours.
+    const variant = pct >= 80 ? 'success' : pct >= 50 ? 'warning' : 'error';
 
     return (
         <div>
@@ -371,12 +375,12 @@ function CoverageBar({
                     <span className="text-xs font-semibold" style={{ color }}>{pct}%</span>
                 </div>
             </div>
-            <div className="h-2 bg-bg-default rounded-full overflow-hidden">
-                <div
-                    className={`h-full rounded-full transition-all duration-700 ${bgClass}`}
-                    style={{ width: `${Math.min(pct, 100)}%` }}
-                />
-            </div>
+            <ProgressBar
+                value={Math.min(pct, 100)}
+                size="md"
+                variant={variant}
+                aria-label={`${label} coverage`}
+            />
         </div>
     );
 }

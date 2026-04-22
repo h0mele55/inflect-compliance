@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { ToggleGroup } from '@/components/ui/toggle-group';
+import { ProgressBar } from '@/components/ui/progress-bar';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function MappingPage() {
@@ -50,8 +51,20 @@ export default function MappingPage() {
                         </div>
                         <p className="text-xs text-content-muted mb-3">{item.description}</p>
                         <div className="flex items-center gap-3">
-                            <div className="flex-1 bg-bg-default rounded-full h-2 overflow-hidden">
-                                <div className="h-full bg-gradient-to-r from-[var(--brand-default)] to-emerald-500 rounded-full transition-all" style={{ width: `${item.coverage}%` }} />
+                            <div className="flex-1">
+                                {/* Epic 59 ProgressBar primitive. */}
+                                <ProgressBar
+                                    value={item.coverage}
+                                    size="md"
+                                    variant={
+                                        item.coverage >= 80
+                                            ? 'success'
+                                            : item.coverage >= 50
+                                                ? 'warning'
+                                                : 'error'
+                                    }
+                                    aria-label={`${item.name} coverage`}
+                                />
                             </div>
                             <span className="text-xs text-content-subtle">{t('controls', { implemented: item.implementedCount, total: item.controlCount })}</span>
                         </div>

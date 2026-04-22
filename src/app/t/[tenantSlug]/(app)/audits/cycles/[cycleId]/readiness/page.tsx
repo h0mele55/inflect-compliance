@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
+import { ProgressBar } from '@/components/ui/progress-bar';
 
 function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
     const r = (size - 8) / 2;
@@ -151,16 +152,22 @@ export default function CycleReadinessPage() {
 }
 
 function BreakdownBar({ label, score, detail, weight }: { label: string; score: number; detail: string; weight: number }) {
-    const color = score >= 80 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-500' : 'bg-red-500';
+    // Epic 59 ProgressBar primitive. Variant picks the token-backed
+    // colour by score band — light-mode compatible (replaces the
+    // earlier hardcoded emerald/amber/red Tailwind classes).
+    const variant = score >= 80 ? 'success' : score >= 50 ? 'warning' : 'error';
     return (
         <div>
             <div className="flex items-center justify-between text-xs mb-1">
                 <span className="text-content-default">{label} ({Math.round(weight * 100)}%)</span>
                 <span className="text-content-muted">{score}%</span>
             </div>
-            <div className="h-2 bg-bg-elevated/50 rounded-full overflow-hidden">
-                <div className={`h-full ${color} rounded-full transition-all duration-1000`} style={{ width: `${score}%` }} />
-            </div>
+            <ProgressBar
+                value={score}
+                size="md"
+                variant={variant}
+                aria-label={`${label} readiness score`}
+            />
             <p className="text-xs text-content-subtle mt-0.5">{detail}</p>
         </div>
     );

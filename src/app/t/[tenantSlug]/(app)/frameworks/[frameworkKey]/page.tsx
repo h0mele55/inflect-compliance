@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { RequirePermission } from '@/components/require-permission';
+import { ProgressBar } from '@/components/ui/progress-bar';
 
 type Tab = 'requirements' | 'packs' | 'coverage';
 
@@ -239,12 +240,12 @@ export default function FrameworkDetailPage() {
                                 {coverage.coveragePercent}%
                             </span>
                         </div>
-                        <div className="w-full h-3 rounded-full bg-bg-elevated/50 overflow-hidden">
-                            <div
-                                className={`h-full rounded-full transition-all duration-1000 ${coverage.coveragePercent === 100 ? 'bg-emerald-500' : 'bg-[var(--brand-default)]'}`}
-                                style={{ width: `${coverage.coveragePercent}%` }}
-                            />
-                        </div>
+                        <ProgressBar
+                            value={coverage.coveragePercent}
+                            size="lg"
+                            variant={coverage.coveragePercent === 100 ? 'success' : 'brand'}
+                            aria-label="Framework coverage"
+                        />
                     </div>
 
                     {/* Section breakdown */}
@@ -258,12 +259,18 @@ export default function FrameworkDetailPage() {
                                             <span className="text-content-default">{s.section}</span>
                                             <span className="text-content-muted">{s.mapped}/{s.total} ({s.coveragePercent}%)</span>
                                         </div>
-                                        <div className="w-full h-1.5 rounded-full bg-bg-elevated/50 overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full ${s.coveragePercent === 100 ? 'bg-emerald-500' : s.coveragePercent > 0 ? 'bg-[var(--brand-default)]' : 'bg-border-emphasis'}`}
-                                                style={{ width: `${s.coveragePercent}%` }}
-                                            />
-                                        </div>
+                                        <ProgressBar
+                                            value={s.coveragePercent}
+                                            size="sm"
+                                            variant={
+                                                s.coveragePercent === 100
+                                                    ? 'success'
+                                                    : s.coveragePercent > 0
+                                                        ? 'brand'
+                                                        : 'neutral'
+                                            }
+                                            aria-label={`${s.section} coverage`}
+                                        />
                                     </div>
                                 ))}
                             </div>

@@ -5,12 +5,23 @@ import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-c
 import type { ControlDashboardDTO, ConsistencyCheckDTO } from '@/lib/dto';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { ProgressBar } from '@/components/ui/progress-bar';
+import {
+    StatusBreakdown,
+    type StatusBreakdownVariant,
+} from '@/components/ui/status-breakdown';
 
-const STATUS_COLORS: Record<string, string> = {
-    NOT_STARTED: '#94a3b8', IN_PROGRESS: '#38bdf8', IMPLEMENTED: '#34d399', NEEDS_REVIEW: '#fbbf24',
-};
 const STATUS_LABELS: Record<string, string> = {
     NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress', IMPLEMENTED: 'Implemented', NEEDS_REVIEW: 'Needs Review',
+};
+// Map control status onto semantic StatusBreakdown variants so the
+// distribution bar re-themes cleanly under Epic 51 light-mode. Drops
+// the hand-picked hex palette (#94a3b8/#38bdf8/#34d399/#fbbf24) the
+// inline bar used.
+const STATUS_VARIANT: Record<string, StatusBreakdownVariant> = {
+    NOT_STARTED: 'neutral',
+    IN_PROGRESS: 'info',
+    IMPLEMENTED: 'success',
+    NEEDS_REVIEW: 'warning',
 };
 
 export default function ControlsDashboard() {
@@ -63,8 +74,6 @@ export default function ControlsDashboard() {
             <div className="p-12 text-center text-red-400">Failed to load dashboard.</div>
         </div>
     );
-
-    const maxStatus = Math.max(...Object.values(data.statusDistribution || {}).map(Number), 1);
 
     return (
         <div className="space-y-6 animate-fadeIn">
@@ -121,25 +130,27 @@ export default function ControlsDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="glass-card p-5">
                     <h3 className="text-sm font-semibold text-content-default mb-4">Status Distribution</h3>
-                    <div className="space-y-3" id="status-distribution">
-                        {Object.entries(data.statusDistribution || {}).map(([status, count]) => (
-                            <div key={status}>
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-content-muted">{STATUS_LABELS[status] || status}</span>
-                                    <span className="text-content-emphasis font-medium">{String(count)}</span>
-                                </div>
-                                {/* chart-bypass-ok: categorical status-distribution row; shared DistributionBar primitive is not in the platform yet. */}
-                                <div className="w-full h-3 bg-bg-elevated rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full transition-all"
-                                        style={{
-                                            width: `${(Number(count) / maxStatus) * 100}%`,
-                                            backgroundColor: STATUS_COLORS[status] || '#64748b',
-                                        }}
-                                    />
-                                </div>
-                            </div>
-                        ))}
+                    {/* Epic 59 — StatusBreakdown primitive. Bar widths are
+                        proportional to the row's share of `total`
+                        (maxStatus in the local scope was the previous
+                        denominator; totalling the counts gives the same
+                        share for "max == sum" — i.e. a one-hot winner
+                        fills the track, everyone else scales down). */}
+                    <div id="status-distribution">
+                        <StatusBreakdown
+                            ariaLabel="Control status distribution"
+                            showDot={false}
+                            size="md"
+                            items={Object.entries(
+                                data.statusDistribution || {},
+                            ).map(([status, count]) => ({
+                                id: status,
+                                label: STATUS_LABELS[status] || status,
+                                value: Number(count),
+                                variant:
+                                    STATUS_VARIANT[status] ?? 'neutral',
+                            }))}
+                        />
                     </div>
                 </div>
                 <div className="glass-card p-5">

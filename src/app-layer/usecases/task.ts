@@ -2,6 +2,7 @@ import { RequestContext } from '../types';
 import { WorkItemRepository, TaskLinkRepository, TaskCommentRepository, TaskWatcherRepository, TaskFilters, TaskListParams } from '../repositories/WorkItemRepository';
 import { assertCanReadTasks, assertCanWriteTasks, assertCanCommentOnTasks } from '../policies/task.policies';
 import { logEvent } from '../events/audit';
+import { emitAutomationEvent } from '../automation';
 import { enqueueEmail } from '../notifications/enqueue';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
@@ -116,6 +117,23 @@ export async function createTask(ctx: RequestContext, input: {
             metadata: { type: input.type, severity: input.severity, priority: input.priority },
         });
 
+        await emitAutomationEvent(ctx, {
+            event: 'TASK_CREATED',
+            entityType: 'Task',
+            entityId: task.id,
+            actorUserId: ctx.userId,
+            stableKey: task.id,
+            data: {
+                key: task.key,
+                title: task.title,
+                type: task.type,
+                severity: task.severity,
+                priority: task.priority,
+                assigneeUserId: task.assigneeUserId,
+                controlId: task.controlId,
+            },
+        });
+
         // Enqueue email to assignee if set
         if (input.assigneeUserId) {
             await enqueueTaskAssignedNotification(db, ctx, task.id, task.title, task.key, input.type || 'TASK', input.assigneeUserId);
@@ -162,10 +180,13 @@ export async function updateTask(ctx: RequestContext, taskId: string, patch: {
 export async function setTaskStatus(ctx: RequestContext, taskId: string, status: string, resolution?: string | null) {
     assertCanWriteTasks(ctx);
     return runInTenantContext(ctx, async (db) => {
-        // If resolving, validate type-specific relevance rules
+        // Pre-fetch once so we can both validate + capture fromStatus
+        // for the automation event.
+        const existing = await WorkItemRepository.getById(db, ctx, taskId);
+        if (!existing) throw notFound('Task not found');
+        const fromStatus = existing.status;
+
         if (['RESOLVED', 'CLOSED'].includes(status)) {
-            const existing = await WorkItemRepository.getById(db, ctx, taskId);
-            if (!existing) throw notFound('Task not found');
             await validateTypeRelevance(db, ctx, taskId, existing.type as TaskType, existing.controlId);
         }
 
@@ -178,6 +199,18 @@ export async function setTaskStatus(ctx: RequestContext, taskId: string, status:
             details: `Status changed to ${status}`,
             detailsJson: { category: 'status_change', entityName: 'Task', fromStatus: null, toStatus: 'TASK_STATUS_CHANGED' },
             metadata: { status, resolution },
+        });
+        await emitAutomationEvent(ctx, {
+            event: 'TASK_STATUS_CHANGED',
+            entityType: 'Task',
+            entityId: taskId,
+            actorUserId: ctx.userId,
+            stableKey: `${taskId}:${fromStatus}:${status}`,
+            data: {
+                fromStatus,
+                toStatus: status,
+                resolution: resolution ?? null,
+            },
         });
         return task;
     });

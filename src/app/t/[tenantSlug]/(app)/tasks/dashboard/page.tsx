@@ -7,17 +7,41 @@ import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { User, Link2, AlertOctagon } from 'lucide-react';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
+import {
+    StatusBreakdown,
+    type StatusBreakdownVariant,
+} from '@/components/ui/status-breakdown';
 
 const STATUS_LABELS: Record<string, string> = {
     OPEN: 'Open', TRIAGED: 'Triaged', IN_PROGRESS: 'In Progress',
     BLOCKED: 'Blocked', RESOLVED: 'Resolved', CLOSED: 'Closed', CANCELED: 'Canceled',
 };
-const STATUS_COLORS: Record<string, string> = {
-    OPEN: '#94a3b8', TRIAGED: '#60a5fa', IN_PROGRESS: '#38bdf8',
-    BLOCKED: '#ef4444', RESOLVED: '#22c55e', CLOSED: '#64748b', CANCELED: '#64748b',
+// Epic 59 — map task status + severity onto semantic StatusBreakdown
+// variants. Drops the hand-tuned hex palette that the inline bars
+// were using, in exchange for tokens that re-theme correctly under
+// Epic 51's light-mode toggle.
+const STATUS_VARIANT: Record<string, StatusBreakdownVariant> = {
+    OPEN: 'neutral',
+    TRIAGED: 'info',
+    IN_PROGRESS: 'info',
+    BLOCKED: 'error',
+    RESOLVED: 'success',
+    CLOSED: 'neutral',
+    CANCELED: 'neutral',
 };
 const SEVERITY_LABELS: Record<string, string> = { INFO: 'Info', LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High', CRITICAL: 'Critical' };
-const SEVERITY_COLORS: Record<string, string> = { INFO: '#94a3b8', LOW: '#22d3ee', MEDIUM: '#f59e0b', HIGH: '#f97316', CRITICAL: '#ef4444' };
+const SEVERITY_VARIANT: Record<string, StatusBreakdownVariant> = {
+    INFO: 'neutral',
+    LOW: 'info',
+    MEDIUM: 'warning',
+    HIGH: 'warning',
+    CRITICAL: 'error',
+};
+// STATUS_COLORS / SEVERITY_COLORS deleted — the inline bars that used
+// them migrated to <StatusBreakdown> + semantic variants above. The
+// only remaining dot indicators in this file also moved through
+// <StatusBreakdown>'s `showDot` prop, so the hex palette is no
+// longer referenced anywhere.
 const TYPE_LABELS: Record<string, string> = {
     AUDIT_FINDING: 'Audit Finding', CONTROL_GAP: 'Control Gap',
     INCIDENT: 'Incident', IMPROVEMENT: 'Improvement', TASK: 'Task',
@@ -133,48 +157,42 @@ export default function TaskDashboardPage() {
 
             {/* Breakdown + Trend */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* By Status */}
+                {/* By Status — Epic 59: StatusBreakdown primitive. */}
                 <div className="glass-card p-4">
                     <h3 className="text-sm font-semibold mb-3 text-content-default">By Status</h3>
-                    <div className="space-y-2">
-                        {Object.entries(STATUS_LABELS).map(([key, label]) => {
-                            const count = metrics.byStatus[key] || 0;
-                            const pct = metrics.total ? Math.round((count / metrics.total) * 100) : 0;
-                            return (
-                                <div key={key} className="flex items-center gap-2 text-xs">
-                                    <div className="w-2 h-2 rounded-full" style={{ background: STATUS_COLORS[key] }} />
-                                    <span className="flex-1 text-content-muted">{label}</span>
-                                    <span className="font-mono text-content-emphasis">{count}</span>
-                                    {/* chart-bypass-ok: categorical task-status distribution row; shared DistributionBar primitive is not in the platform yet. */}
-                                    <div className="w-16 h-1.5 rounded-full bg-bg-elevated overflow-hidden">
-                                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: STATUS_COLORS[key] }} />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <StatusBreakdown
+                        ariaLabel="Tasks by status"
+                        total={metrics.total}
+                        size="sm"
+                        items={Object.entries(STATUS_LABELS).map(([key, label]) => ({
+                            id: key,
+                            label,
+                            value: metrics.byStatus[key] || 0,
+                            // These are hand-tuned task-status hex palette
+                            // values, not semantic variants — pass through
+                            // as a styled dot+bar via an inline style in
+                            // the renderer below would reintroduce raw
+                            // style={{}}; instead project them onto the
+                            // nearest semantic variant.
+                            variant: STATUS_VARIANT[key] ?? 'neutral',
+                        }))}
+                    />
                 </div>
 
-                {/* By Severity */}
+                {/* By Severity — Epic 59: StatusBreakdown primitive. */}
                 <div className="glass-card p-4">
                     <h3 className="text-sm font-semibold mb-3 text-content-default">By Severity</h3>
-                    <div className="space-y-2">
-                        {Object.entries(SEVERITY_LABELS).map(([key, label]) => {
-                            const count = metrics.bySeverity[key] || 0;
-                            const pct = metrics.total ? Math.round((count / metrics.total) * 100) : 0;
-                            return (
-                                <div key={key} className="flex items-center gap-2 text-xs">
-                                    <div className="w-2 h-2 rounded-full" style={{ background: SEVERITY_COLORS[key] }} />
-                                    <span className="flex-1 text-content-muted">{label}</span>
-                                    <span className="font-mono text-content-emphasis">{count}</span>
-                                    {/* chart-bypass-ok: categorical severity distribution row; shared DistributionBar primitive is not in the platform yet. */}
-                                    <div className="w-16 h-1.5 rounded-full bg-bg-elevated overflow-hidden">
-                                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: SEVERITY_COLORS[key] }} />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    <StatusBreakdown
+                        ariaLabel="Tasks by severity"
+                        total={metrics.total}
+                        size="sm"
+                        items={Object.entries(SEVERITY_LABELS).map(([key, label]) => ({
+                            id: key,
+                            label,
+                            value: metrics.bySeverity[key] || 0,
+                            variant: SEVERITY_VARIANT[key] ?? 'neutral',
+                        }))}
+                    />
                 </div>
 
                 {/* 30-Day Trend */}

@@ -1,14 +1,22 @@
 /**
- * Epic 59 — dashboard chart-bypass guardrail.
+ * Epic 59 — chart / progress bypass guardrail.
  *
- * When a dashboard page renders a sparkline or progress visual, it
- * must use the shared chart platform (`@/components/ui/charts`,
- * `@/components/ui/TrendCard`, `@/components/ui/progress-bar`,
- * `@/components/ui/progress-circle`, `@/components/ui/mini-area-chart`).
+ * When an app-layer page renders a sparkline, progress visual, or
+ * multi-segment distribution, it must use the shared chart platform:
+ *   `@/components/ui/charts`
+ *   `@/components/ui/TrendCard`
+ *   `@/components/ui/progress-bar`        (single-value progress)
+ *   `@/components/ui/progress-circle`     (ring progress)
+ *   `@/components/ui/status-breakdown`    (multi-segment distribution)
+ *   `@/components/ui/mini-area-chart`
  *
- * This guard scans every `(app)/**\/dashboard/page.tsx` for the
- * specific bypass patterns that Epic 59 migrated away from. New
- * contributors adding a raw SVG polyline, an inline
+ * This guard scans every tenant-scoped `(app)/**\/*.tsx` file — not
+ * just `/dashboard/page.tsx`. Scope was broadened on 2026-04-22
+ * after the `<StatusBreakdown>` rollout closed the remaining inline
+ * bars on detail pages (frameworks, risks, audits, controls,
+ * mapping, coverage) — dashboards were never the only hotspot.
+ *
+ * New contributors adding a raw SVG polyline, an inline
  * `style={{ width: `${pct}%` }}` progress bar, or an import of the
  * removed `TrendLine` will fail here with a pointer to
  * `docs/charts.md`.
@@ -20,21 +28,26 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const DASHBOARDS_ROOT = path.resolve(
+const APP_ROOT = path.resolve(
     __dirname,
     '../../src/app/t/[tenantSlug]/(app)',
 );
 
-function collectDashboardPages(): string[] {
-    const pages: string[] = [];
-    for (const entry of fs.readdirSync(DASHBOARDS_ROOT, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue;
-        const direct = path.join(DASHBOARDS_ROOT, entry.name, 'dashboard', 'page.tsx');
-        if (fs.existsSync(direct)) pages.push(direct);
+function walk(dir: string, acc: string[]): string[] {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            if (entry.name === 'node_modules' || entry.name === '.next') continue;
+            walk(full, acc);
+        } else if (entry.isFile() && entry.name.endsWith('.tsx')) {
+            acc.push(full);
+        }
     }
-    const top = path.join(DASHBOARDS_ROOT, 'dashboard', 'page.tsx');
-    if (fs.existsSync(top)) pages.push(top);
-    return pages;
+    return acc;
+}
+
+function collectTenantAppPages(): string[] {
+    return walk(APP_ROOT, []);
 }
 
 interface Violation {
@@ -105,7 +118,8 @@ function scanFile(file: string): Violation[] {
             if (isSuppressed(lines, i)) return;
             violations.push({
                 file,
-                pattern: 'inline style={{ width: `${…}%` }} (use ProgressBar)',
+                pattern:
+                    'inline style={{ width: `${…}%` }} (use ProgressBar for single-value, StatusBreakdown for multi-segment)',
                 snippet: line.trim().slice(0, 120),
             });
         }
@@ -114,19 +128,23 @@ function scanFile(file: string): Violation[] {
     return violations;
 }
 
-describe('Epic 59 — dashboard chart-bypass guard', () => {
-    const pages = collectDashboardPages();
+describe('Epic 59 — chart / progress bypass guard', () => {
+    const pages = collectTenantAppPages();
 
-    it('discovers every (app)/*/dashboard/page.tsx', () => {
-        // Sanity check on the discovery itself so the guard doesn't
-        // silently pass by finding zero files after a path refactor.
-        expect(pages.length).toBeGreaterThanOrEqual(4);
+    it('discovers the tenant-scoped (app) tree', () => {
+        // Sanity: the discovery must see a substantial chunk of the
+        // migrated surface. Before 2026-04-22 this was ~5 dashboards;
+        // post-broadening the scope covers every tenant-scoped .tsx
+        // so the floor is much higher. If a future refactor moves
+        // the tree, this trips early instead of silently passing
+        // with zero files.
+        expect(pages.length).toBeGreaterThanOrEqual(50);
         for (const p of pages) {
             expect(fs.existsSync(p)).toBe(true);
         }
     });
 
-    it('no dashboard page bypasses the shared chart platform', () => {
+    it('no page bypasses the shared chart / progress platform', () => {
         const all: Violation[] = [];
         for (const p of pages) {
             all.push(...scanFile(p));
@@ -138,7 +156,12 @@ describe('Epic 59 — dashboard chart-bypass guard', () => {
             );
             throw new Error(
                 [
-                    'Dashboard chart-bypass detected. See docs/charts.md for the decision tree:',
+                    'Chart / progress bypass detected. See docs/charts.md for the decision tree:',
+                    '  • single-value     → <ProgressBar>',
+                    '  • multi-segment    → <StatusBreakdown>',
+                    '  • sparkline        → <MiniAreaChart> / <TrendCard>',
+                    '  • ring             → <ProgressCircle>',
+                    '  • time series      → <TimeSeriesChart>',
                     '',
                     ...lines,
                 ].join('\n'),

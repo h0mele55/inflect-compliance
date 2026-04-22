@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { StatusBreakdown, type StatusBreakdownItem } from '@/components/ui/status-breakdown';
 
 const CRIT_BADGE: Record<string, string> = { LOW: 'badge-neutral', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
 
@@ -16,23 +17,20 @@ function MetricCard({ label, value, badge, href }: { label: string; value: numbe
 }
 
 function BreakdownBar({ data, colors }: { data: Record<string, number>; colors: Record<string, string> }) {
-    const total = Object.values(data).reduce((s, v) => s + v, 0);
-    if (total === 0) return <div className="text-sm text-content-subtle">No data</div>;
-    return (
-        <div className="space-y-2">
-            {Object.entries(data).map(([key, count]) => (
-                <div key={key} className="flex items-center gap-2 text-sm">
-                    <span className="w-20 text-content-muted text-xs">{key}</span>
-                    {/* chart-bypass-ok: categorical vendor distribution row; shared DistributionBar primitive is not in the platform yet. */}
-                    <div className="flex-1 bg-bg-default rounded h-5 overflow-hidden">
-                        <div className={`h-full ${colors[key] || 'bg-blue-500/60'} rounded`}
-                            style={{ width: `${(count / total) * 100}%`, minWidth: count > 0 ? '8px' : '0' }} />
-                    </div>
-                    <span className="w-8 text-right text-content-default font-mono text-xs">{count}</span>
-                </div>
-            ))}
-        </div>
+    // Epic 59 — hand-rolled per-row distribution bar replaced with the
+    // shared `<StatusBreakdown>`. Preserves the legacy category-
+    // specific colour palette via `colorClass` since these are
+    // historically-branded vendor-risk / vendor-status colours, not
+    // semantic variants.
+    const items: StatusBreakdownItem[] = Object.entries(data).map(
+        ([key, value]) => ({
+            id: key,
+            label: key,
+            value,
+            colorClass: colors[key] ?? 'bg-blue-500/60',
+        }),
     );
+    return <StatusBreakdown items={items} size="sm" showDot={false} />;
 }
 
 const CRIT_COLORS: Record<string, string> = {

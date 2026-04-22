@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTenantCtx } from '@/app-layer/context';
 import { listFrameworks, computeCoverage } from '@/app-layer/usecases/framework';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import {
     ShieldCheck,
     Flag,
@@ -94,7 +95,7 @@ export default async function FrameworksPage({
                                 <span>{fw._count?.packs || 0} pack{(fw._count?.packs || 0) !== 1 ? 's' : ''}</span>
                             </div>
 
-                            {/* Coverage bar */}
+                            {/* Coverage bar — Epic 59 ProgressBar primitive. */}
                             {cov && (
                                 <div className="mt-3" id={`fw-coverage-${fw.key}`}>
                                     <div className="flex items-center justify-between text-xs mb-1">
@@ -103,13 +104,18 @@ export default async function FrameworksPage({
                                             {coveragePercent}%
                                         </span>
                                     </div>
-                                    <div className="w-full h-1.5 rounded-full bg-bg-elevated/50 overflow-hidden">
-                                        <div
-                                            className={`h-full rounded-full transition-all duration-500 ${coveragePercent === 100 ? 'bg-emerald-500' : coveragePercent > 0 ? 'bg-[var(--brand-default)]' : 'bg-border-emphasis'
-                                                }`}
-                                            style={{ width: `${coveragePercent}%` }}
-                                        />
-                                    </div>
+                                    <ProgressBar
+                                        value={coveragePercent}
+                                        size="sm"
+                                        variant={
+                                            coveragePercent === 100
+                                                ? 'success'
+                                                : coveragePercent > 0
+                                                    ? 'brand'
+                                                    : 'neutral'
+                                        }
+                                        aria-label={`${fw.name} coverage`}
+                                    />
                                     <div className="flex items-center gap-2 text-xs mt-1 text-content-subtle">
                                         <span>{cov.mapped}/{cov.total} mapped</span>
                                     </div>

@@ -438,3 +438,63 @@ executorRegistry.register('compliance-digest', async (payload) => {
     return result;
 });
 
+// ── key-rotation (Epic B.3) ──────────────────────────────────────────
+
+executorRegistry.register('key-rotation', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runKeyRotation } = await import('./key-rotation');
+    const r = await runKeyRotation({
+        tenantId: payload.tenantId,
+        initiatedByUserId: payload.initiatedByUserId,
+        requestId: payload.requestId,
+    });
+    return makeResult(
+        'key-rotation',
+        startedAt,
+        startMs,
+        r.totalScanned,
+        r.totalRewritten,
+        0,
+        {
+            tenantId: r.tenantId,
+            dekRewrapped: r.dekRewrapped,
+            dekRewrapError: r.dekRewrapError,
+            perField: r.perField,
+            totalErrors: r.totalErrors,
+            jobRunId: r.jobRunId,
+        },
+    );
+});
+
+// ── automation-event-dispatch ────────────────────────────────────────
+//
+// One job invocation per domain event. Loads matching rules, evaluates
+// filters, claims an AutomationExecution row per match, advances to
+// SUCCEEDED/FAILED. See `automation-event-dispatch.ts` for the full
+// flow + scope boundaries.
+
+executorRegistry.register('automation-event-dispatch', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runAutomationEventDispatch } = await import(
+        './automation-event-dispatch'
+    );
+    const r = await runAutomationEventDispatch(payload);
+    return makeResult(
+        'automation-event-dispatch',
+        startedAt,
+        startMs,
+        r.rulesConsidered,
+        r.executionsCreated,
+        r.executionsSkippedDuplicate + r.executionsSkippedFilter,
+        {
+            tenantId: r.tenantId,
+            event: r.event,
+            rulesMatched: r.rulesMatched,
+            executionsFailed: r.executionsFailed,
+            jobRunId: r.jobRunId,
+        }
+    );
+});
+

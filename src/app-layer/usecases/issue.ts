@@ -7,6 +7,7 @@ import { WorkItemRepository, TaskLinkRepository, TaskCommentRepository, TaskWatc
 import { EvidenceBundleRepository } from '../repositories/EvidenceBundleRepository';
 import { assertCanReadIssues, assertCanCreateIssue, assertCanUpdateIssue, assertCanAssignIssue, assertCanResolveIssue, assertCanComment, assertCanManageLinks, assertCanManageBundles, assertCanFreeze } from '../policies/issue.policies';
 import { logEvent } from '../events/audit';
+import { emitAutomationEvent } from '../automation';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound } from '@/lib/errors/types';
 import { TERMINAL_WORK_ITEM_STATUSES } from '../domain/work-item-status';
@@ -53,6 +54,20 @@ export async function createIssue(ctx: RequestContext, input: {
             detailsJson: { category: 'entity_lifecycle', entityName: 'Issue', operation: 'created', summary: 'ISSUE_CREATED' },
             metadata: { type: input.type, severity: input.severity, priority: input.priority },
         });
+        await emitAutomationEvent(ctx, {
+            event: 'ISSUE_CREATED',
+            entityType: 'Issue',
+            entityId: issue.id,
+            actorUserId: ctx.userId,
+            stableKey: issue.id,
+            data: {
+                key: issue.key,
+                title: issue.title,
+                severity: issue.severity,
+                status: issue.status,
+                assigneeUserId: issue.assigneeUserId,
+            },
+        });
         return issue;
     });
 }
@@ -87,6 +102,12 @@ export async function updateIssue(ctx: RequestContext, issueId: string, patch: {
 export async function setIssueStatus(ctx: RequestContext, issueId: string, status: string, resolution?: string | null) {
     assertCanResolveIssue(ctx);
     return runInTenantContext(ctx, async (db) => {
+        // Capture fromStatus before the mutation so the automation
+        // event payload reflects the transition, not just the new state.
+        const existing = await WorkItemRepository.getById(db, ctx, issueId);
+        if (!existing) throw notFound('Issue not found');
+        const fromStatus = existing.status;
+
         const issue = await WorkItemRepository.setStatus(db, ctx, issueId, status, resolution);
         if (!issue) throw notFound('Issue not found');
         await logEvent(db, ctx, {
@@ -96,6 +117,14 @@ export async function setIssueStatus(ctx: RequestContext, issueId: string, statu
             details: `Status changed to ${status}`,
             detailsJson: { category: 'status_change', entityName: 'Issue', fromStatus: null, toStatus: 'ISSUE_STATUS_CHANGED' },
             metadata: { status, resolution },
+        });
+        await emitAutomationEvent(ctx, {
+            event: 'ISSUE_STATUS_CHANGED',
+            entityType: 'Issue',
+            entityId: issueId,
+            actorUserId: ctx.userId,
+            stableKey: `${issueId}:${fromStatus}:${status}`,
+            data: { fromStatus, toStatus: status },
         });
         return issue;
     });

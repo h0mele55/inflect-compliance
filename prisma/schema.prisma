@@ -24,6 +24,14 @@ model Tenant {
   exclusions                String?
   reminderDaysBefore        Int                          @default(14)
   maxRiskScale              Int                          @default(5)
+  /// Epic B.2 — wrapped per-tenant Data Encryption Key.
+  /// Shape: the existing `encryptField()` envelope (`v1:base64(...)`),
+  /// wrapping a 32-byte random DEK. See `src/lib/security/tenant-keys.ts`.
+  /// Nullable so existing tenants continue working until the backfill
+  /// script lands. The runtime integration phase may treat `NULL` as
+  /// "use the global KEK directly" (current behaviour) or generate a
+  /// DEK lazily on first use.
+  encryptedDek              String?
   createdAt                 DateTime                     @default(now())
   updatedAt                 DateTime                     @updatedAt
   assets                    Asset[]
@@ -90,6 +98,8 @@ model Tenant {
   customRoles               TenantCustomRole[]
   apiKeys                   TenantApiKey[]
   complianceSnapshots       ComplianceSnapshot[]
+  automationRules           AutomationRule[]
+  automationExecutions      AutomationExecution[]
 }
 
 model TenantOnboarding {
@@ -2503,4 +2513,145 @@ model ComplianceSnapshot {
   @@unique([tenantId, snapshotDate])
   @@index([tenantId, snapshotDate])
   @@index([tenantId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  Epic 60 — Automation Data Model & Domain Events (foundation)
+//
+//  Persistence foundation for the event-driven automation layer.
+//  Two append-only concerns:
+//
+//    AutomationRule      — a persisted rule definition (trigger event +
+//                          filter + action config). Tenant-owned,
+//                          soft-deletable, versionable via updatedAt.
+//    AutomationExecution — one attempt at running a rule against a
+//                          matching event. Append-only history: the
+//                          source of truth for what actually ran, what
+//                          it did, and whether it failed.
+//
+//  Designed to outlast the eventual builder UI / DSL. Action payloads
+//  live in a Json column so new action types add without a schema
+//  migration — the `actionType` enum can grow when a genuinely new
+//  class of side-effect lands (webhook, SCIM push, etc.).
+// ═══════════════════════════════════════════════════════════════════════
+
+model AutomationRule {
+  id                 String                   @id @default(cuid())
+  tenantId           String
+  name               String
+  description        String?
+  /// The event name this rule subscribes to. Free-form string so new
+  /// events can be emitted without a migration; the canonical catalog
+  /// lives at src/app-layer/automation/events.ts so typos are caught
+  /// at the producer side, not here.
+  triggerEvent       String
+  /// Optional filter expression (e.g. `{ severity: "CRITICAL" }`).
+  /// Evaluated by the dispatcher against the event payload before any
+  /// action fires. `null` means "match every event of this type".
+  triggerFilterJson  Json?
+  actionType         AutomationActionType
+  /// Action-specific config. Shape depends on `actionType`:
+  ///   NOTIFY_USER       → { userIds: string[], message: string }
+  ///   CREATE_TASK       → { title, severity, assigneeUserId? }
+  ///   UPDATE_STATUS     → { entityType, field, toStatus }
+  ///   WEBHOOK           → { url, method, headers?, secretRef? }
+  actionConfigJson   Json
+  status             AutomationRuleStatus     @default(DRAFT)
+  /// Higher priority runs first when multiple rules match the same
+  /// event. Ties broken by `createdAt`.
+  priority           Int                      @default(0)
+  /// Cheap dashboard counters. Incremented by the dispatcher; never
+  /// the source of truth (AutomationExecution is).
+  executionCount     Int                      @default(0)
+  lastTriggeredAt    DateTime?
+  createdByUserId    String?
+  updatedByUserId    String?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  /// Soft-delete. Archived rules stop firing but their execution
+  /// history survives for audit.
+  deletedAt          DateTime?
+
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id])
+  executions         AutomationExecution[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, triggerEvent])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, triggerEvent, status])
+}
+
+model AutomationExecution {
+  id                 String                       @id @default(cuid())
+  tenantId           String
+  ruleId             String
+  /// Denormalised copy of the rule's trigger event at fire time so
+  /// the event-feed index below stays single-column and the row is
+  /// still readable if the rule is later archived.
+  triggerEvent       String
+  /// Snapshot of the event payload that matched. Kept verbatim for
+  /// replay + audit — the shape depends on the event producer.
+  triggerPayloadJson Json
+  status             AutomationExecutionStatus    @default(PENDING)
+  /// Action output (e.g. created task ids, notified user ids, webhook
+  /// response code). Shape mirrors the rule's `actionType`.
+  outcomeJson        Json?
+  errorMessage       String?
+  errorStack         String?
+  durationMs         Int?
+  /// Correlation to the observability job-run span so ops can trace a
+  /// specific execution in logs / traces / metrics.
+  jobRunId           String?
+  /// What caused the fire. `event` for normal event-bus dispatch,
+  /// `manual` for admin-triggered replay, `schedule` for cron
+  /// re-evaluation of pending rules.
+  triggeredBy        String                       @default("event")
+  /// Deduplication handle. The dispatcher computes this from
+  /// (ruleId, event, stable identifier in payload) so a retried
+  /// event never double-fires an action. Unique per tenant when set.
+  idempotencyKey     String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime                     @default(now())
+
+  tenant             Tenant                       @relation(fields: [tenantId], references: [id])
+  rule               AutomationRule               @relation(fields: [ruleId], references: [id])
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId])
+  @@index([tenantId, ruleId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([ruleId, createdAt])
+  @@index([triggerEvent, createdAt])
+  @@index([jobRunId])
+}
+
+enum AutomationRuleStatus {
+  DRAFT
+  ENABLED
+  DISABLED
+  ARCHIVED
+}
+
+enum AutomationExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+/// Closed enum of supported side-effect classes. Extend via migration
+/// when a genuinely new class of side-effect lands — not for every new
+/// webhook target or notifier. The per-action payload in
+/// `AutomationRule.actionConfigJson` absorbs config variants within
+/// a class without schema churn.
+enum AutomationActionType {
+  NOTIFY_USER
+  CREATE_TASK
+  UPDATE_STATUS
+  WEBHOOK
 }
