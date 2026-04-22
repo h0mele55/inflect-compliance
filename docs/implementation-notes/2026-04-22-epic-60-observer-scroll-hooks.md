@@ -1,6 +1,6 @@
 # 2026-04-22 — Epic 60 viewport/observer/scroll hook cluster
 
-**Commit:** _(pending — will stamp on commit)_
+**Commit:** `5a38b80 feat(epic-60): harden viewport/observer/scroll hook cluster`
 
 Second pass on Epic 60: harden the five browser-observation hooks
 (`useIntersectionObserver`, `useInViewport`, `useResizeObserver`,
