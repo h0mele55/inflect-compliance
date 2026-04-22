@@ -25,8 +25,8 @@ belongs here.
 | Persistence | Browser-local state survival across reloads | `useLocalStorage` |
 | Viewport / observer | Reading / reacting to element geometry and media queries | `useInViewport`, `useIntersectionObserver`, `useResizeObserver`, `useMediaQuery`, `useResponsivePresentation` |
 | Scroll | Reading / reacting to scroll position and progress | `useScroll`, `useScrollProgress` |
-| Optimistic UI | Local state that reflects a pending mutation with rollback | `useOptimisticUpdate` |
-| Submit / input / keyboard | Form-friendly keyboard behaviour | `useEnterSubmit`, `useInputFocused`, `useKeyboardShortcut` (shim over `@/lib/hooks/use-keyboard-shortcut`) |
+| Optimistic UI | Framework-agnostic local overlay on a committed value, with rollback on failure | `useOptimisticUpdate` |
+| Submit / input / keyboard | Form-friendly keyboard behaviour: Enter-to-submit with multiline/IME safety (`useEnterSubmit`), editable-focus signal mirroring Epic 57 (`useInputFocused`), shortcut registration via the shared Epic 57 registry (`useKeyboardShortcut` shim) | `useEnterSubmit`, `useInputFocused`, `useKeyboardShortcut` |
 | Dense-table ergonomics | Table-state utilities broad enough to escape the table module | `useColumnVisibility` |
 | Clipboard / copy | Clipboard writing with success/failure state | `useCopyToClipboard` |
 

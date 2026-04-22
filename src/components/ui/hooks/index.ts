@@ -16,7 +16,10 @@
  */
 
 // ─── Persistence ──────────────────────────────────────────────────────
-export { useLocalStorage } from "./use-local-storage";
+export {
+    useLocalStorage,
+    type UseLocalStorageOptions,
+} from "./use-local-storage";
 
 // ─── Viewport / observer ──────────────────────────────────────────────
 export { useInViewport } from "./use-in-viewport";
@@ -36,10 +39,19 @@ export { useScroll } from "./use-scroll";
 export { useScrollProgress } from "./use-scroll-progress";
 
 // ─── Optimistic UI ────────────────────────────────────────────────────
-export { useOptimisticUpdate } from "./use-optimistic-update";
+export {
+    useOptimisticUpdate,
+    type UseOptimisticUpdateOptions,
+    type UseOptimisticUpdateResult,
+} from "./use-optimistic-update";
 
 // ─── Submit / input / keyboard ────────────────────────────────────────
-export { useEnterSubmit } from "./use-enter-submit";
+export {
+    useEnterSubmit,
+    type EnterSubmitModifierPolicy,
+    type UseEnterSubmitOptions,
+    type UseEnterSubmitResult,
+} from "./use-enter-submit";
 export { useInputFocused } from "./use-input-focused";
 export { useKeyboardShortcut } from "./use-keyboard-shortcut";
 
