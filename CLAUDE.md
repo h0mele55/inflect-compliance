@@ -55,7 +55,80 @@ Every usecase and repository receives a `RequestContext` (defined in `src/app-la
 
 ### Multi-Tenant Isolation
 
-**Every** database query in `src/app-layer/repositories/` must include an explicit `tenantId` filter. There is no database-level RLS — isolation is purely enforced at the application layer. Guard tests in `tests/unit/tenant-isolation-structural.test.ts` enforce this.
+Two layers, both load-bearing:
+
+1. **PostgreSQL Row-Level Security** (Epic A.1). Every tenant-scoped
+   table has `tenant_isolation` + `superuser_bypass` policies and
+   `FORCE ROW LEVEL SECURITY`. Tenant context is bound per-transaction
+   via `runInTenantContext` from `@/lib/db/rls-middleware`. The DB
+   returns zero rows if the context is unset on an `app_user`
+   session — isolation is architecturally impossible to bypass by
+   accident. **See `docs/rls-tenant-isolation.md`** for the full guide
+   including the bypass model, the policy shapes for nullable /
+   ownership-chained tables, and how to add a new tenant-scoped model.
+
+2. **Application-layer `tenantId` filters** — every repository query
+   also filters by `tenantId`. Defence in depth; makes error messages
+   clear when the app is working correctly.
+
+Guard tests: `tests/guardrails/rls-coverage.test.ts` (DB-backed — CI
+fails if a tenant table is missing RLS) and
+`tests/unit/tenant-isolation-structural.test.ts` (code-pattern scanner).
+
+### API Rate Limiting (Epic A.2)
+
+Every route wrapped with `withApiErrorHandling` gets
+`API_MUTATION_LIMIT` (60/min) on POST/PUT/DELETE/PATCH by default.
+Stricter presets (`LOGIN_LIMIT`, `API_KEY_CREATE_LIMIT`,
+`EMAIL_DISPATCH_LIMIT`) are applied via `{ rateLimit: { config, scope } }`
+options on specific routes. Reads are never rate-limited by this
+layer. 429 responses carry `Retry-After` + `X-RateLimit-*` +
+`x-request-id`. Bypass via `RATE_LIMIT_ENABLED=0` env or inside tests
+(automatic). All presets live in `src/lib/security/rate-limit.ts`;
+the wrapper is `src/lib/security/rate-limit-middleware.ts`.
+
+### Auth Brute-Force Protection (Epic A.3)
+
+`authenticateWithPassword` applies `LOGIN_PROGRESSIVE_POLICY`:
+3 failures → 5s delay, 5 → 30s, 10 → 15-min lockout. Timing is
+equalised via `dummyVerify` so lockout is indistinguishable from
+wrong-password. Signup rejects known-breached passwords via
+`checkPasswordAgainstHIBP` (k-anonymity, fail-open on HIBP outage).
+Password change / reset routes do not exist yet; when they land,
+wire HIBP the same way.
+
+**See `docs/epic-a-security.md`** for the unified operator runbook
+(verification commands, rollback procedure, observability signals)
+and `docs/rls-tenant-isolation.md` for the RLS deep dive.
+
+### Field Encryption (Epic B)
+
+Business-content fields (Finding.description, Risk.treatmentNotes,
+PolicyVersion.contentText, TaskComment.body, …) are encrypted at
+rest by a Prisma `$use` middleware. The manifest lives in
+`src/lib/security/encrypted-fields.ts`; **never** add or remove
+encrypted columns outside it. Add a model here ⇒ its manifest
+fields encrypt on every write and decrypt on every read
+transparently.
+
+Key hierarchy: `DATA_ENCRYPTION_KEY` (master KEK) wraps a per-tenant
+DEK on `Tenant.encryptedDek`. New tenants get a DEK at creation via
+`createTenantWithDek` (from `src/lib/security/tenant-key-manager.ts`);
+existing tenants get one via `scripts/generate-tenant-deks.ts`.
+Ciphertexts carry `v1:` (global KEK, legacy) or `v2:` (per-tenant
+DEK) envelope — the middleware dispatches per-value on read.
+
+Master-KEK rotation: set `DATA_ENCRYPTION_KEY_PREVIOUS` alongside
+the new primary. `decryptField` falls back transparently. Admins
+trigger per-tenant rotation via
+`POST /api/t/{slug}/admin/key-rotation`, which enqueues the
+background job in `src/app-layer/jobs/key-rotation.ts`. When every
+tenant reports zero `v1:` rows under the old key, remove
+`DATA_ENCRYPTION_KEY_PREVIOUS` from env.
+
+**See `docs/epic-b-encryption.md`** for deployment order,
+rotation runbook, observability signals, rollback procedure, and
+the full test coverage map.
 
 ### RBAC & Permissions
 
@@ -212,3 +285,16 @@ bar, segmented filter row, `localStorage` cache, Enter-submit handler,
 or `<input type="number">` stepper — reach for the shared primitive. See
 `docs/epic-60-shared-hooks-and-polish.md` and the ratchet
 `tests/guards/epic60-ratchet.test.ts`.
+
+### Epic 60 — Automation Events & Dispatch (backend)
+
+The event-driven backbone the rule-builder epic will stand on.
+Import everything from `@/app-layer/automation` (single barrel).
+Emit via `emitAutomationEvent(ctx, input)` — never construct
+`AutomationExecution` rows directly from a usecase. When adding a
+new event: add to `events.ts`, add the typed variant to
+`event-contracts.ts`, emit from the usecase (or audit emitter), and
+write a wiring test. Action handlers, rule-builder UI, and filter
+DSL evolution all plug into clearly-marked seams — don't bypass
+them. See `docs/automation-events.md` for the full contributor
+guide and the decision-tree for extensions.

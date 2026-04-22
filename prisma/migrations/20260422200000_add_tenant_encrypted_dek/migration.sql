@@ -1,0 +1,39 @@
+-- ═══════════════════════════════════════════════════════════════════
+-- Epic B.2 — Per-tenant Data Encryption Key (DEK) storage
+-- ═══════════════════════════════════════════════════════════════════
+--
+-- Adds `encryptedDek` to the Tenant table. The column holds a
+-- wrapped per-tenant 256-bit DEK, in the same envelope format that
+-- `encryptField()` produces (`v1:base64(iv∥ciphertext∥tag)`).
+--
+-- Key hierarchy:
+--
+--   DATA_ENCRYPTION_KEY env var  (master secret material)
+--          │
+--          ▼  HKDF-SHA256 (existing `getEncryptionKey()`)
+--   global KEK (256-bit, cached in process)
+--          │
+--          │  AES-256-GCM wrap of base64(DEK bytes)
+--          ▼
+--   Tenant.encryptedDek        ← THIS COLUMN (row-per-tenant)
+--          │
+--          ▼  unwrap at request time (future runtime integration)
+--   per-tenant DEK (32 bytes)
+--          │
+--          │  AES-256-GCM
+--          ▼
+--   encrypted field values on every tenant-scoped row
+--
+-- Nullable: existing tenants survive this migration with
+-- `encryptedDek = NULL`. A backfill script generates + wraps DEKs for
+-- those rows in a follow-up operator task. The runtime integration
+-- phase treats NULL as "use the global KEK directly" (current
+-- behaviour) OR generates the DEK lazily on first write.
+--
+-- Rotation-ready: the `v1:` prefix inside the wrapped payload
+-- reserves space for future algorithm / master-key-version bumps
+-- (`v2:...`). Rotating the master key re-wraps only the per-tenant
+-- DEKs (one row per tenant) — the tenant's field ciphertexts stay
+-- untouched because they are encrypted by the DEK, not the master.
+
+ALTER TABLE "Tenant" ADD COLUMN "encryptedDek" TEXT;

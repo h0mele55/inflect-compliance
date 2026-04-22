@@ -72,6 +72,12 @@ export const env = createEnv({
 
         // Data Protection (Epic 8)
         DATA_ENCRYPTION_KEY: z.string().min(32, "DATA_ENCRYPTION_KEY must be at least 32 characters").optional(),
+        // Epic B.3 — master KEK rotation. When set, the old key is used
+        // as a decrypt fallback for any ciphertext the new primary KEK
+        // can't read. Encryption always uses DATA_ENCRYPTION_KEY
+        // (primary). Remove this var ONCE the rotation job reports zero
+        // remaining v1 rows under the previous key.
+        DATA_ENCRYPTION_KEY_PREVIOUS: z.string().min(32).optional(),
 
         // Security / CORS
         CORS_ALLOWED_ORIGINS: z.string().default(""),
@@ -153,6 +159,7 @@ export const env = createEnv({
         CLAMAV_HOST: process.env.CLAMAV_HOST,
 
         DATA_ENCRYPTION_KEY: process.env.DATA_ENCRYPTION_KEY,
+        DATA_ENCRYPTION_KEY_PREVIOUS: process.env.DATA_ENCRYPTION_KEY_PREVIOUS,
 
         CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS,
         SMTP_HOST: process.env.SMTP_HOST,

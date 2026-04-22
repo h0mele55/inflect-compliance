@@ -27,7 +27,27 @@ import { logger } from '@/lib/observability/logger';
 const ALGORITHM = 'aes-256-gcm' as const;
 const IV_LENGTH = 12;        // 96-bit IV (GCM recommendation)
 const AUTH_TAG_LENGTH = 16;  // 128-bit auth tag
-const VERSION_PREFIX = 'v1:';
+const KEY_LENGTH = 32;       // AES-256
+
+/**
+ * Envelope versions.
+ *
+ *   v1 — ciphertext under the **global KEK** (HKDF-derived from
+ *        DATA_ENCRYPTION_KEY). Produced by `encryptField()` — the
+ *        Epic B.1 baseline.
+ *
+ *   v2 — ciphertext under a **per-tenant DEK** (Epic B.2). Produced
+ *        by `encryptWithKey(dek, plaintext)` and consumed by
+ *        `decryptWithKey(dek, ciphertext)`. The middleware emits v2
+ *        when a tenant context is available on the request and
+ *        falls back to v1 otherwise, so a gradual rollout works
+ *        without any big-bang re-encrypt.
+ */
+const VERSION_PREFIX_V1 = 'v1:';
+const VERSION_PREFIX_V2 = 'v2:';
+// Kept for backwards compatibility with callers that import the
+// private constant (internal tests). The public behaviour is unchanged.
+const VERSION_PREFIX = VERSION_PREFIX_V1;
 
 // HKDF info strings — distinct per purpose to ensure key separation
 const ENCRYPT_INFO = 'inflect-data-encryption';
@@ -100,6 +120,53 @@ function getEncryptionKey(): Buffer {
     return _cachedEncryptKey;
 }
 
+// ─── Epic B.3 — previous-KEK for rotation ────────────────────────────
+//
+// During a master-key rotation, the operator sets
+// `DATA_ENCRYPTION_KEY_PREVIOUS` to the outgoing key material alongside
+// the new primary `DATA_ENCRYPTION_KEY`. Writes always use the new
+// primary; reads try the new primary first and fall back to the
+// previous on an AES-GCM auth failure. The rotation job
+// (`src/app-layer/jobs/key-rotation.ts`) walks every v1 ciphertext and
+// re-encrypts it under the new primary, eventually making the previous
+// key retirable.
+//
+// Cached separately from the primary so a rotation-complete state
+// (primary alone, previous unset) naturally evicts the old key from
+// memory on next access.
+
+let _cachedPreviousEncryptKey: Buffer | null = null;
+let _lastPreviousKeySource: string | null | undefined = undefined;
+
+function getPreviousRawKey(): string | null {
+    const key = process.env.DATA_ENCRYPTION_KEY_PREVIOUS;
+    if (!key || key.length < 32) return null;
+    return key;
+}
+
+/**
+ * The previous-generation encryption key, if rotation is in flight.
+ * Returns null when no previous key is configured — the `decryptField`
+ * fallback branch is skipped and decrypt behaves exactly as in B.1.
+ */
+function getPreviousEncryptionKey(): Buffer | null {
+    const raw = getPreviousRawKey();
+    if (raw === null) {
+        // Rotation either hasn't started or just finished — clear the
+        // cached key so the next rotation generation starts from a
+        // clean slate.
+        _cachedPreviousEncryptKey = null;
+        _lastPreviousKeySource = null;
+        return null;
+    }
+    if (_cachedPreviousEncryptKey && _lastPreviousKeySource === raw) {
+        return _cachedPreviousEncryptKey;
+    }
+    _cachedPreviousEncryptKey = deriveKey(raw, ENCRYPT_INFO);
+    _lastPreviousKeySource = raw;
+    return _cachedPreviousEncryptKey;
+}
+
 /**
  * Gets the HMAC key for deterministic lookup hashes.
  */
@@ -149,11 +216,47 @@ export function encryptField(plaintext: string): string {
 }
 
 /**
+ * Decrypts a v1 ciphertext blob (iv ∥ ct ∥ tag) with the given key.
+ * The version prefix has already been stripped by the caller.
+ * Throws on AES-GCM auth failure or structural corruption.
+ */
+function decryptV1Payload(key: Buffer, payload: string): string {
+    const combined = Buffer.from(payload, 'base64');
+    if (combined.length < IV_LENGTH + AUTH_TAG_LENGTH) {
+        throw new Error('decryptField: ciphertext too short (truncated?)');
+    }
+    const iv = combined.subarray(0, IV_LENGTH);
+    const tag = combined.subarray(combined.length - AUTH_TAG_LENGTH);
+    const encrypted = combined.subarray(
+        IV_LENGTH,
+        combined.length - AUTH_TAG_LENGTH,
+    );
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, {
+        authTagLength: AUTH_TAG_LENGTH,
+    });
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([
+        decipher.update(encrypted),
+        decipher.final(),
+    ]);
+    return decrypted.toString('utf8');
+}
+
+/**
  * Decrypts an encrypted field back to plaintext.
+ *
+ * Epic B.3 dual-KEK behaviour: tries the primary KEK first. On
+ * AES-GCM auth failure, if `DATA_ENCRYPTION_KEY_PREVIOUS` is
+ * configured, retries with the previous KEK. This lets in-flight
+ * rotation read ciphertext written under either key without
+ * downtime. The original primary-key error is re-thrown if both
+ * attempts fail, so corruption/tamper cases still surface clearly.
  *
  * @param ciphertext - Versioned ciphertext from encryptField()
  * @returns Decrypted plaintext string
- * @throws Error if ciphertext is tampered, truncated, or uses unknown version
+ * @throws Error if ciphertext is tampered, truncated, uses unknown
+ *         version, OR neither the primary nor the previous KEK can
+ *         decrypt it.
  *
  * @example
  * const email = decryptField(record.emailEncrypted);
@@ -166,28 +269,27 @@ export function decryptField(ciphertext: string): string {
     }
 
     const payload = ciphertext.slice(VERSION_PREFIX.length);
-    const combined = Buffer.from(payload, 'base64');
 
-    if (combined.length < IV_LENGTH + AUTH_TAG_LENGTH) {
-        throw new Error('decryptField: ciphertext too short (truncated?)');
+    // Primary KEK first. If the auth tag matches, we're done —
+    // overwhelmingly the common case.
+    try {
+        return decryptV1Payload(getEncryptionKey(), payload);
+    } catch (primaryErr) {
+        // Fall back to previous KEK during rotation. A missing
+        // previous key means we're not in rotation; rethrow the
+        // primary failure unchanged so the caller sees "tampered /
+        // corrupt / key mismatch" with the same shape as before.
+        const previous = getPreviousEncryptionKey();
+        if (!previous) throw primaryErr;
+        try {
+            return decryptV1Payload(previous, payload);
+        } catch {
+            // Both keys rejected. Surface the primary error (the
+            // caller's mental model is "my current key doesn't fit");
+            // ops sees both failures via structured logs upstream.
+            throw primaryErr;
+        }
     }
-
-    const iv = combined.subarray(0, IV_LENGTH);
-    const tag = combined.subarray(combined.length - AUTH_TAG_LENGTH);
-    const encrypted = combined.subarray(IV_LENGTH, combined.length - AUTH_TAG_LENGTH);
-
-    const key = getEncryptionKey();
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, {
-        authTagLength: AUTH_TAG_LENGTH,
-    });
-    decipher.setAuthTag(tag);
-
-    const decrypted = Buffer.concat([
-        decipher.update(encrypted),
-        decipher.final(),
-    ]);
-
-    return decrypted.toString('utf8');
 }
 
 /**
@@ -220,11 +322,131 @@ export function hashForLookup(value: string): string {
 }
 
 /**
- * Checks whether a string looks like an encrypted field (has version prefix).
- * Useful during migration to detect already-encrypted values.
+ * Checks whether a string looks like an encrypted field (has a
+ * recognised version prefix — v1 or v2).
+ *
+ * Accepts both envelopes so idempotency gates and manifest
+ * traversal don't need to know which key model produced the
+ * ciphertext.
  */
 export function isEncryptedValue(value: string | null | undefined): boolean {
-    return typeof value === 'string' && value.startsWith(VERSION_PREFIX);
+    if (typeof value !== 'string') return false;
+    return (
+        value.startsWith(VERSION_PREFIX_V1) ||
+        value.startsWith(VERSION_PREFIX_V2)
+    );
+}
+
+/**
+ * Return the envelope version for a ciphertext, or null if the input
+ * is not a recognised encrypted value. The encryption middleware
+ * dispatches on this to route each ciphertext to the right key.
+ */
+export function getCiphertextVersion(
+    value: string | null | undefined,
+): 'v1' | 'v2' | null {
+    if (typeof value !== 'string') return null;
+    if (value.startsWith(VERSION_PREFIX_V1)) return 'v1';
+    if (value.startsWith(VERSION_PREFIX_V2)) return 'v2';
+    return null;
+}
+
+// ─── Per-tenant (v2) primitives ──────────────────────────────────────
+//
+// Epic B.2 — encrypt/decrypt with an explicit key (the tenant DEK).
+// These mirror `encryptField` / `decryptField` but take the key as an
+// argument instead of deriving it from the global master material.
+// Same AES-256-GCM, same IV length, same tag length — only the key
+// and envelope prefix change.
+//
+// **Never** pass the global KEK through these functions. Their
+// version prefix declares "tenant DEK"; mixing would make rotation
+// and key-purpose separation meaningless. The middleware is the
+// single call site that picks the right primitive based on context.
+
+/**
+ * Validate that a buffer is usable as an AES-256 key. 32 bytes
+ * exactly, not empty. Centralised so callers can't slip a shorter
+ * key past the type system.
+ */
+function assertAesKey(key: Buffer, where: string): void {
+    if (!Buffer.isBuffer(key)) {
+        throw new Error(`${where}: key must be a Buffer`);
+    }
+    if (key.length !== KEY_LENGTH) {
+        throw new Error(
+            `${where}: key must be exactly ${KEY_LENGTH} bytes (got ${key.length})`,
+        );
+    }
+}
+
+/**
+ * Encrypt a plaintext using the provided AES-256 key (the caller's
+ * tenant DEK). Returns a `v2:` envelope — the middleware and
+ * `getCiphertextVersion()` dispatch on this prefix to pick the right
+ * key path on decryption.
+ *
+ * Same AES-256-GCM + fresh random 96-bit IV + 128-bit auth tag as
+ * `encryptField`. Do NOT reuse keys across tenants; the per-tenant
+ * isolation guarantee is that each tenant's ciphertexts are only
+ * decryptable with that tenant's DEK.
+ */
+export function encryptWithKey(key: Buffer, plaintext: string): string {
+    assertAesKey(key, 'encryptWithKey');
+    if (plaintext === null || plaintext === undefined) {
+        throw new Error(
+            'encryptWithKey: plaintext must not be null or undefined',
+        );
+    }
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv, {
+        authTagLength: AUTH_TAG_LENGTH,
+    });
+    const encrypted = Buffer.concat([
+        cipher.update(plaintext, 'utf8'),
+        cipher.final(),
+    ]);
+    const tag = cipher.getAuthTag();
+    const combined = Buffer.concat([iv, encrypted, tag]);
+    return VERSION_PREFIX_V2 + combined.toString('base64');
+}
+
+/**
+ * Decrypt a `v2:` envelope with the provided AES-256 key. Rejects
+ * `v1:` envelopes with a clear error message — the global-KEK path
+ * is `decryptField`, not this function. Splitting the API prevents
+ * a caller from accidentally trying tenant DEKs against global-KEK
+ * ciphertexts and silently getting a GCM auth failure for the wrong
+ * reason.
+ */
+export function decryptWithKey(key: Buffer, ciphertext: string): string {
+    assertAesKey(key, 'decryptWithKey');
+    if (!ciphertext || !ciphertext.startsWith(VERSION_PREFIX_V2)) {
+        throw new Error(
+            'decryptWithKey: expected a v2: ciphertext. v1: ciphertexts ' +
+                'must be decrypted with `decryptField` (global KEK).',
+        );
+    }
+    const payload = ciphertext.slice(VERSION_PREFIX_V2.length);
+    const combined = Buffer.from(payload, 'base64');
+    if (combined.length < IV_LENGTH + AUTH_TAG_LENGTH) {
+        throw new Error('decryptWithKey: ciphertext too short (truncated?)');
+    }
+    const iv = combined.subarray(0, IV_LENGTH);
+    const tag = combined.subarray(combined.length - AUTH_TAG_LENGTH);
+    const encrypted = combined.subarray(
+        IV_LENGTH,
+        combined.length - AUTH_TAG_LENGTH,
+    );
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv, {
+        authTagLength: AUTH_TAG_LENGTH,
+    });
+    decipher.setAuthTag(tag);
+    const plaintext = Buffer.concat([
+        decipher.update(encrypted),
+        decipher.final(),
+    ]);
+    return plaintext.toString('utf8');
 }
 
 /**
@@ -235,4 +457,6 @@ export function _resetKeyCache(): void {
     _cachedEncryptKey = null;
     _cachedHmacKey = null;
     _lastKeySource = null;
+    _cachedPreviousEncryptKey = null;
+    _lastPreviousKeySource = undefined;
 }
