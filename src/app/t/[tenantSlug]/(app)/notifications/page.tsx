@@ -4,25 +4,71 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { AppIcon } from '@/components/icons/AppIcon';
+import { useOptimisticUpdate } from '@/components/ui/hooks';
+
+type Notification = {
+    id: string;
+    type: string;
+    message: string;
+    createdAt: string;
+    read: boolean;
+};
 
 export default function NotificationsPage() {
     const apiUrl = useTenantApiUrl();
     const t = useTranslations('notifications');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [notifications, setNotifications] = useState<any[]>([]);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
 
-    useEffect(() => { fetch(apiUrl('/notifications')).then(r => r.json()).then(setNotifications); }, [apiUrl]);
+    useEffect(() => {
+        fetch(apiUrl('/notifications'))
+            .then(r => r.json())
+            .then(setNotifications);
+    }, [apiUrl]);
+
+    // Epic 60 — mark-read now overlays the read=true state immediately
+    // and rolls back if the PATCH fails. The previous implementation
+    // awaited the network round-trip before updating the UI, so every
+    // click felt ~100-300ms laggy; the overlay is now local-instant.
+    // On error, `rolledBackValue` is the prior list which we re-commit
+    // so the "unread" styling comes back.
+    const { value: optimisticList, update } = useOptimisticUpdate<Notification[]>(
+        notifications,
+        {
+            onError: (_err, rolledBack) => {
+                // Revert: caller state never advanced because our commit
+                // fn below doesn't call setNotifications on success; the
+                // overlay drop + this setState together restore reality.
+                setNotifications(rolledBack);
+            },
+        },
+    );
 
     const markRead = async (id: string) => {
-        await fetch(apiUrl(`/notifications/${id}`), { method: 'PATCH' });
-        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+        try {
+            await update(
+                (prev) => prev.map(n => n.id === id ? { ...n, read: true } : n),
+                async () => {
+                    const res = await fetch(apiUrl(`/notifications/${id}`), {
+                        method: 'PATCH',
+                    });
+                    if (!res.ok) throw new Error('Mark-read failed');
+                    // Commit to canonical state on success — clears the
+                    // optimistic overlay since the new reference matches.
+                    setNotifications(prev =>
+                        prev.map(n => (n.id === id ? { ...n, read: true } : n)),
+                    );
+                },
+            );
+        } catch {
+            // Swallow — onError already rolled the local list back.
+        }
     };
 
     return (
         <div className="space-y-6 animate-fadeIn">
             <h1 className="text-2xl font-bold">{t('title')}</h1>
             <div className="space-y-2">
-                {notifications.map(n => (
+                {optimisticList.map(n => (
                     <div key={n.id} className={`glass-card p-4 flex items-start gap-3 ${!n.read ? 'border-l-2 border-[var(--brand-default)]' : 'opacity-60'}`}>
                         <span className="text-lg"><AppIcon name={n.type === 'EVIDENCE' ? 'evidence' : n.type === 'FINDING' ? 'bug' : 'bell'} size={18} /></span>
                         <div className="flex-1">
@@ -32,7 +78,7 @@ export default function NotificationsPage() {
                         {!n.read && <button onClick={() => markRead(n.id)} className="btn btn-ghost btn-sm text-xs">{t('markRead')}</button>}
                     </div>
                 ))}
-                {notifications.length === 0 && <div className="glass-card p-12 text-center text-content-subtle">{t('noNotifications')}</div>}
+                {optimisticList.length === 0 && <div className="glass-card p-12 text-center text-content-subtle">{t('noNotifications')}</div>}
             </div>
         </div>
     );

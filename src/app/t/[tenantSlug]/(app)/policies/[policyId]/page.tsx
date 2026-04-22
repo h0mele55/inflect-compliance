@@ -11,6 +11,8 @@ import {
     startOfUtcDay,
     toYMD,
 } from '@/components/ui/date-picker/date-utils';
+import { TabSelect } from '@/components/ui/tab-select';
+import { NumberStepper } from '@/components/ui/number-stepper';
 
 const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral', PUBLISHED: 'badge-success', ARCHIVED: 'badge-warning',
@@ -307,9 +309,32 @@ export default function PolicyDetailPage() {
                         {editingReview && (
                             <div className="flex gap-2 items-end mt-2">
                                 <div>
-                                    <label className="text-xs text-content-subtle">Frequency (days)</label>
-                                    <input type="number" className="input w-24 text-sm" value={reviewDays}
-                                        onChange={e => setReviewDays(e.target.value)} min={1} />
+                                    <label
+                                        className="text-xs text-content-subtle"
+                                        htmlFor="policy-review-frequency-input"
+                                    >
+                                        Frequency (days)
+                                    </label>
+                                    {/* Epic 60 — NumberStepper gives us +/- buttons,
+                                        ArrowUp/Down keyboard, bounded clamping, and
+                                        a single accessible spinbutton. `reviewDays`
+                                        stays a string in state so saveReview()'s
+                                        parseInt() path is unchanged. */}
+                                    <NumberStepper
+                                        id="policy-review-frequency-input"
+                                        className="w-36"
+                                        size="sm"
+                                        ariaLabel="Policy review frequency in days"
+                                        value={
+                                            reviewDays === ""
+                                                ? 30
+                                                : Number(reviewDays) || 30
+                                        }
+                                        onChange={(v) => setReviewDays(String(v))}
+                                        min={1}
+                                        max={3650}
+                                        formatValue={(v) => `${v} days`}
+                                    />
                                 </div>
                                 <div>
                                     <label
@@ -363,16 +388,22 @@ export default function PolicyDetailPage() {
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex gap-1 border-b border-border-default/50">
-                {tabItems.map(t => (
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    <button key={t} onClick={() => setTab(t as any)}
-                        id={`tab-${t}`}
-                        className={`px-4 py-2.5 text-sm font-medium transition border-b-2 ${tab === t ? 'border-[var(--brand-default)] text-[var(--brand-default)]' : 'border-transparent text-content-muted hover:text-content-emphasis'
-                            }`}>{tabLabels[t]}</button>
-                ))}
-            </div>
+            {/* Tabs — Epic 60: TabSelect gives us tablist ARIA + Arrow/Home/End
+                keyboard nav for free. `idPrefix="tab-"` preserves the
+                #tab-current / #tab-versions / #tab-editor / #tab-activity
+                DOM ids that long-lived E2E selectors rely on. */}
+            <TabSelect<'current' | 'versions' | 'editor' | 'activity'>
+                ariaLabel="Policy sections"
+                variant="accent"
+                idPrefix="tab-"
+                className="border-b border-border-default/50"
+                options={tabItems.map((t) => ({
+                    id: t as 'current' | 'versions' | 'editor' | 'activity',
+                    label: tabLabels[t],
+                }))}
+                selected={tab}
+                onSelect={setTab}
+            />
 
             {/* ── Current Version ── */}
             {tab === 'current' && (

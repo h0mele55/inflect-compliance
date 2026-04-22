@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTenantContext, useTenantHref } from '@/lib/tenant-context-provider';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { useEnterSubmit } from '@/components/ui/hooks';
 import {
     Building2,
     Map,
@@ -548,6 +549,12 @@ function AssetSetupStep({ data, onUpdate }: { data: StepData; onUpdate: (d: Step
         }
     };
 
+    // Epic 60 — useEnterSubmit replaces the inline
+    // `onKeyDown={(e) => e.key === 'Enter' && addAsset()}`. Wins: IME
+    // composition guard (no phantom adds mid-candidate), Shift+Enter
+    // preserved for paste-with-newlines, disabled opt-out plumbed.
+    const { handleKeyDown: assetKeyDown } = useEnterSubmit({ onSubmit: addAsset });
+
     const removeAsset = (name: string) => {
         onUpdate({ assets: assets.filter(a => a !== name) });
     };
@@ -557,7 +564,7 @@ function AssetSetupStep({ data, onUpdate }: { data: StepData; onUpdate: (d: Step
             <p className="text-sm text-slate-400 mb-4">Add your key information assets. These are the systems, databases, and services you need to protect.</p>
             <div className="flex gap-2">
                 <input className="input flex-1" placeholder="e.g. Customer Database, Cloud Infrastructure..." value={newAsset}
-                    onChange={(e) => setNewAsset(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addAsset()} data-testid="asset-input" />
+                    onChange={(e) => setNewAsset(e.target.value)} onKeyDown={assetKeyDown} data-testid="asset-input" />
                 <button onClick={addAsset} className="btn btn-primary">Add</button>
             </div>
             {assets.length > 0 && (
@@ -650,6 +657,9 @@ function TeamSetupStep({ data, onUpdate }: { data: StepData; onUpdate: (d: StepD
         }
     };
 
+    // Epic 60 — same Enter-submit story as the asset input above.
+    const { handleKeyDown: emailKeyDown } = useEnterSubmit({ onSubmit: addEmail });
+
     const removeEmail = (email: string) => {
         onUpdate({ inviteEmails: emails.filter(e => e !== email) });
     };
@@ -659,7 +669,7 @@ function TeamSetupStep({ data, onUpdate }: { data: StepData; onUpdate: (d: StepD
             <p className="text-sm text-slate-400 mb-4">Invite your team members. They&apos;ll receive an email invitation to join your workspace.</p>
             <div className="flex gap-2">
                 <input className="input flex-1" placeholder="colleague@company.com" type="email" value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addEmail()} data-testid="invite-email" />
+                    onChange={(e) => setNewEmail(e.target.value)} onKeyDown={emailKeyDown} data-testid="invite-email" />
                 <button onClick={addEmail} className="btn btn-primary">Invite</button>
             </div>
             {emails.length > 0 && (

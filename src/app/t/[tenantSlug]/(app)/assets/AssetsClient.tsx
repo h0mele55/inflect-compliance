@@ -15,6 +15,7 @@ import { FilterToolbar } from '@/components/filters/FilterToolbar';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildAssetFilters, ASSET_FILTER_KEYS } from './filter-defs';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { NumberStepper } from '@/components/ui/number-stepper';
 
 const ASSET_TYPES = ['INFORMATION', 'APPLICATION', 'SYSTEM', 'SERVICE', 'DATA_STORE', 'INFRASTRUCTURE', 'VENDOR', 'PROCESS', 'PEOPLE_PROCESS', 'OTHER'];
 const ASSET_TYPE_OPTIONS: ComboboxOption[] = ASSET_TYPES.map(t => ({ value: t, label: t.replace(/_/g, ' ') }));
@@ -187,9 +188,47 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
                         <div><label className="input-label">{t.owner}</label><input className="input" value={form.owner} onChange={e => setForm(f => ({ ...f, owner: e.target.value }))} /></div>
                         <div><label className="input-label">{t.location}</label><input className="input" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} /></div>
                         <div><label className="input-label">{t.dataResidency}</label><input className="input" value={form.dataResidency} onChange={e => setForm(f => ({ ...f, dataResidency: e.target.value }))} placeholder={t.residencyPlaceholder} /></div>
-                        <div><label className="input-label">{t.confidentiality}</label><input type="number" min="1" max="5" className="input" value={form.confidentiality} onChange={e => setForm(f => ({ ...f, confidentiality: +e.target.value }))} /></div>
-                        <div><label className="input-label">{t.integrity}</label><input type="number" min="1" max="5" className="input" value={form.integrity} onChange={e => setForm(f => ({ ...f, integrity: +e.target.value }))} /></div>
-                        <div><label className="input-label">{t.availability}</label><input type="number" min="1" max="5" className="input" value={form.availability} onChange={e => setForm(f => ({ ...f, availability: +e.target.value }))} /></div>
+                        {/* Epic 60 — NumberStepper size="sm" on the CIA triple.
+                            Replaces bare <input type=number> which had no
+                            accessible label, no keyboard +/- affordance, and
+                            variable rendering across browsers. min/max=1..5
+                            matches the ISO 27005 impact scale. */}
+                        <div>
+                            <label className="input-label" htmlFor="asset-confidentiality">{t.confidentiality}</label>
+                            <NumberStepper
+                                id="asset-confidentiality"
+                                size="sm"
+                                ariaLabel={t.confidentiality}
+                                min={1}
+                                max={5}
+                                value={form.confidentiality}
+                                onChange={(v) => setForm(f => ({ ...f, confidentiality: v }))}
+                            />
+                        </div>
+                        <div>
+                            <label className="input-label" htmlFor="asset-integrity">{t.integrity}</label>
+                            <NumberStepper
+                                id="asset-integrity"
+                                size="sm"
+                                ariaLabel={t.integrity}
+                                min={1}
+                                max={5}
+                                value={form.integrity}
+                                onChange={(v) => setForm(f => ({ ...f, integrity: v }))}
+                            />
+                        </div>
+                        <div>
+                            <label className="input-label" htmlFor="asset-availability">{t.availability}</label>
+                            <NumberStepper
+                                id="asset-availability"
+                                size="sm"
+                                ariaLabel={t.availability}
+                                min={1}
+                                max={5}
+                                value={form.availability}
+                                onChange={(v) => setForm(f => ({ ...f, availability: v }))}
+                            />
+                        </div>
                     </div>
                     <div className="flex gap-2"><button type="submit" className="btn btn-primary">{t.createAsset}</button><button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary">{t.cancel}</button></div>
                 </form>
