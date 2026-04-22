@@ -28,7 +28,12 @@ build-output.txt
 tsconfig.tsbuildinfo
 
 # Test outputs
-coverage/
+# `/coverage/` root-anchored so it only matches Jest's coverage output
+# directory. A bare `coverage/` rule would also swallow the real app
+# feature directories `src/app/t/[tenantSlug]/(app)/coverage/` and
+# `src/app/api/t/[tenantSlug]/coverage/` — which is how this file
+# shadowing was masking a real build in CI.
+/coverage/
 test-results/
 playwright-report/
 blob-report/
