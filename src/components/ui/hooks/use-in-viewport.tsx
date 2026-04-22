@@ -1,55 +1,47 @@
-"use client";
-
 import { RefObject, useEffect, useState } from "react";
 
+/**
+ * Track whether a ref'd element is currently within the viewport (or
+ * an explicit root scroll container). Returns a boolean — use
+ * {@link useIntersectionObserver} when the caller needs the full
+ * `IntersectionObserverEntry`.
+ *
+ * Implementation is a thin wrapper around `IntersectionObserver`. The
+ * previous version also wired its own `scroll` + `resize` listeners
+ * and called `getBoundingClientRect()` on every event — redundant
+ * with IO (which already reacts to scroll + resize inside its root)
+ * and forced a layout read on a hot path. Dropped both; observable
+ * behaviour is identical for consumers.
+ *
+ * Cleanup: the observer disconnects on unmount, ref change, or root
+ * change. No event listeners are registered, so there's nothing else
+ * to clean up.
+ *
+ * SSR: state initialises from `defaultValue` (default `false`) so
+ * server and client hydrate to the same value before the effect
+ * runs. The browser guards protect jsdom environments without IO.
+ */
 export function useInViewport(
-  elementRef: RefObject<Element | null>,
-  options: { root?: RefObject<Element | null>; defaultValue?: boolean } = {},
+    elementRef: RefObject<Element | null>,
+    options: { root?: RefObject<Element | null>; defaultValue?: boolean } = {},
 ) {
-  const { root, defaultValue } = options;
-  const [visible, setVisible] = useState(defaultValue ?? false);
+    const { root, defaultValue = false } = options;
+    const [visible, setVisible] = useState(defaultValue);
 
-  useEffect(() => {
-    const checkVisibility = () => {
-      const node = elementRef.current;
-      if (!node) return;
-      const rootNode = root?.current;
+    useEffect(() => {
+        if (typeof window === "undefined" || !window.IntersectionObserver) return;
 
-      const rect = node.getBoundingClientRect();
-      const rootRect = rootNode
-        ? rootNode.getBoundingClientRect()
-        : {
-            top: 0,
-            left: 0,
-            bottom: window.innerHeight,
-            right: window.innerWidth,
-          };
+        const node = elementRef.current;
+        if (!node) return;
 
-      setVisible(
-        rect.top < rootRect.bottom &&
-          rect.bottom > rootRect.top &&
-          rect.left < rootRect.right &&
-          rect.right > rootRect.left,
-      );
-    };
+        const observer = new IntersectionObserver(
+            ([entry]) => setVisible(entry.isIntersecting),
+            { root: root?.current ?? null },
+        );
+        observer.observe(node);
 
-    (root?.current || window).addEventListener("scroll", checkVisibility);
-    window.addEventListener("resize", checkVisibility);
+        return () => observer.disconnect();
+    }, [elementRef, root]);
 
-    let observer: IntersectionObserver | null = null;
-    if (elementRef.current) {
-      observer = new IntersectionObserver(checkVisibility);
-      observer.observe(elementRef.current);
-    }
-
-    checkVisibility();
-
-    return () => {
-      (root?.current || window).removeEventListener("scroll", checkVisibility);
-      window.removeEventListener("resize", checkVisibility);
-      observer?.disconnect();
-    };
-  }, [elementRef, root]);
-
-  return visible;
+    return visible;
 }

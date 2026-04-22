@@ -1,29 +1,35 @@
 import { RefObject, useEffect, useState } from "react";
 
 /**
- * Use a ResizeObserver to react to changes in an element's size
+ * Subscribe to `ResizeObserver` events for a single ref'd element.
  *
- * More about ResizeObserver: https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver
+ * Returns the latest `ResizeObserverEntry` (or `undefined` until the
+ * first observation fires). Handles:
+ *
+ *   - SSR / pre-hydration: effect short-circuits when `ResizeObserver`
+ *     is unavailable (also covers jsdom environments without a polyfill).
+ *   - Cleanup: disconnects on unmount or ref change.
+ *
+ * MDN: https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver
  */
 export function useResizeObserver(
-  elementRef: RefObject<Element | null>,
+    elementRef: RefObject<Element | null>,
 ): ResizeObserverEntry | undefined {
-  const [entry, setEntry] = useState<ResizeObserverEntry>();
+    const [entry, setEntry] = useState<ResizeObserverEntry>();
 
-  const updateEntry = ([entry]: ResizeObserverEntry[]): void => {
-    setEntry(entry);
-  };
+    useEffect(() => {
+        if (typeof window === "undefined" || typeof ResizeObserver === "undefined") {
+            return;
+        }
 
-  useEffect(() => {
-    const node = elementRef?.current;
-    if (!node) return;
+        const node = elementRef?.current;
+        if (!node) return;
 
-    const observer = new ResizeObserver(updateEntry);
+        const observer = new ResizeObserver(([latest]) => setEntry(latest));
+        observer.observe(node);
 
-    observer.observe(node);
+        return () => observer.disconnect();
+    }, [elementRef]);
 
-    return () => observer.disconnect();
-  }, [elementRef]);
-
-  return entry;
+    return entry;
 }
