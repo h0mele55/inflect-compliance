@@ -203,11 +203,20 @@ describe('Auth resolves identity from membership', () => {
     });
 
     it('login resolves from membership, not user.tenant', () => {
-        const registerContent = readSrcFile('app/api/auth/register/route.ts');
-        // Must include membership in user query
-        expect(registerContent).toContain('tenantMemberships');
-        // Must derive role from membership
-        expect(registerContent).toContain('membership?.role');
+        // The credentials login path moved from /api/auth/register (where
+        // it historically lived under `action: 'login'`) into the
+        // NextAuth Credentials provider — `src/lib/auth/credentials.ts`
+        // via `authenticateWithPassword`. That's where membership
+        // resolution must now appear. The JWT callback in `src/auth.ts`
+        // also touches the membership shape; either path satisfies the
+        // guardrail.
+        const credentialsContent = readSrcFile('lib/auth/credentials.ts');
+        const authContent = readSrcFile('auth.ts');
+        const combined = credentialsContent + '\n' + authContent;
+        // Must include membership in the identity resolution path
+        expect(combined).toContain('tenantMemberships');
+        // Must derive role from membership (via JWT or callback)
+        expect(combined).toMatch(/membership\?\.role|defaultMembership\.role|membership\.role/);
     });
 
     it('me endpoint resolves from membership', () => {

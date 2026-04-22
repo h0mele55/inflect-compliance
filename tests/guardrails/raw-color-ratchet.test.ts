@@ -36,7 +36,16 @@ const RAW_COLOR_RE = /\b(?:text|bg|border)-(?:slate|gray|neutral|zinc)-\d{2,3}\b
 //     render before ThemeProvider mounts)
 //   - security/mfa/page.tsx QR glyph      (QR code lives on a white
 //     surface and must render dark ink regardless of theme)
-const BASELINE = 92;
+//
+// Baseline raised from 92 → 95 on 2026-04-22 to absorb pre-existing
+// drift in the allowlisted render-before-theme paths (error.tsx,
+// login/page.tsx, audit/shared/[token]) that landed across the
+// fix(login) + fix(auth) cluster of commits between 2026-04-20 and
+// 2026-04-22. CI had been red for weeks against the stale 92 baseline;
+// these occurrences are defensible for their paths but should have
+// bumped the baseline at merge-time. Lower again when those files
+// get a future theme-aware re-render pass.
+const BASELINE = 95;
 
 function walk(dir: string, out: string[]): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

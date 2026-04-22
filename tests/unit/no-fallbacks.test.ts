@@ -50,6 +50,11 @@ describe('Static Analysis: No process.env fallbacks', () => {
             if (file.endsWith('middleware.ts') && !file.includes('pii-middleware')) continue;
             // Dub-ported utility files use process.env by upstream design
             if (file.includes('dub-utils')) continue;
+            // ui-config endpoint is intentionally a runtime process.env
+            // reader so operators can toggle AUTH_CREDENTIALS_UI_HIDDEN
+            // without a rebuild/rollout (NEXT_PUBLIC_* inlines at build
+            // time). See the docblock in the file.
+            if (file.endsWith('ui-config/route.ts')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 
