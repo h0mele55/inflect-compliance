@@ -8,7 +8,12 @@ export * from "./combine-words";
 export * from "./construct-metadata";
 export * from "./currency-formatter";
 export * from "./currency-zero-decimal";
-export * from "./datetime";
+// Legacy `./datetime/*` re-export removed — 12 unused date helpers
+// were deleted on 2026-04-22. The canonical date-formatting surface
+// lives at `@/lib/format-date` (Epic 58). If a new consumer appears
+// here reaching for dub-dialect date helpers (`formatDateSmart`,
+// `timeAgo`, `formatPeriod`, etc.), route it through `format-date`
+// + `formatDateRange` instead.
 export * from "./deep-equal";
 export * from "./domains";
 export * from "./fetch-with-retry";
@@ -37,7 +42,10 @@ export * from "./resize-image";
 export * from "./smart-truncate";
 export * from "./stable-sort";
 export * from "./text-fetcher";
-export * from "./time-ago";
+// `./time-ago` re-export removed — the one-off "5 minutes ago"-style
+// helper had no consumers. If you need relative-time rendering,
+// reach for `date-fns`'s `formatDistanceToNow` or add a thin helper
+// to `@/lib/format-date` so the contract stays in one module.
 export * from "./to-cents-number";
 export * from "./trim";
 export * from "./truncate";

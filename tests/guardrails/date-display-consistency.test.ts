@@ -42,10 +42,15 @@ const SCAN_DIRS = [
 /**
  * Files we explicitly exempt from the `toLocaleDateString` rule:
  *   - The formatter module is the canonical call site.
- *   - The table pagination helpers format integer row counts, not dates.
- *   - The chart layout module ships a `formatShortDate` default that
- *     callers override when they want the app-wide compact label; the
- *     library itself is date-dialect-agnostic.
+ *   - The table pagination helpers + KpiCard format integer row counts
+ *     with `Number.prototype.toLocaleString()` — that's a numeric
+ *     thousands-separator, not a date cast.
+ *
+ * NOTE: `src/components/ui/charts/layout.ts` was dropped from this
+ * allowlist on 2026-04-22 — its `formatShortDate` now delegates to
+ * the canonical `formatDateCompact` and no longer carries a raw
+ * `toLocaleDateString` call. Re-add only if a contributor
+ * reintroduces a date-locale call there with a justification.
  */
 const ALLOWED_LOCALE_FILES = new Set<string>([
     path.join(ROOT, 'src/lib/format-date.ts'),
@@ -53,7 +58,6 @@ const ALLOWED_LOCALE_FILES = new Set<string>([
     path.join(ROOT, 'src/components/ui/table/pagination-utils.ts'),
     path.join(ROOT, 'src/components/ui/table/table.tsx'),
     path.join(ROOT, 'src/components/ui/KpiCard.tsx'),
-    path.join(ROOT, 'src/components/ui/charts/layout.ts'),
 ]);
 
 function walk(dir: string, acc: string[] = []): string[] {
