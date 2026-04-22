@@ -1,6 +1,6 @@
 # 2026-04-22 — Auth hardening + legacy cleanup
 
-**Commit:** _(pending — will stamp on commit)_
+**Commit:** `5dd22cc feat(auth): harden credentials path — one login surface, real docs, E2E coverage`
 
 Final hardening pass over the credentials path built across the two
 previous prompts. Takes the already-production-grade bones (chokepoint,
