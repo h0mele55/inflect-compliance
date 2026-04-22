@@ -18,15 +18,20 @@ async function safeFetch(url: string): Promise<Response | null> {
     }
 }
 
-/** Safely parse JSON from a response. Returns undefined if response is HTML or malformed. */
-async function safeJson(res: Response): Promise<Record<string, unknown> | null | undefined> {
+/** Safely parse JSON from a response. Returns undefined if response is HTML,
+ *  malformed, or the literal JSON `null` — every callsite treats those three
+ *  cases identically ("skip, no data to assert on"), so collapsing them into
+ *  `undefined` lets the `if (data === undefined) return;` guards narrow to
+ *  `Record<string, unknown>` without each site having to re-check for null. */
+async function safeJson(res: Response): Promise<Record<string, unknown> | undefined> {
     try {
         const text = await res.text();
         if (text.startsWith('<') || text.startsWith('<!DOCTYPE')) {
             // Server returned an HTML error page (cold compilation, 500, etc.)
             return undefined;
         }
-        return JSON.parse(text);
+        const parsed = JSON.parse(text);
+        return parsed === null ? undefined : parsed;
     } catch {
         return undefined;
     }
