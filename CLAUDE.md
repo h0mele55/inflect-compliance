@@ -98,6 +98,40 @@ Job definitions are in `src/app-layer/jobs/`. The executor registry is `src/app-
 - **Path alias**: `@/` maps to `src/`. Always use this alias — never relative paths crossing layer boundaries.
 - **Two `DATABASE_URL` vars**: `DATABASE_URL` points to PgBouncer (transaction-mode, used at runtime). `DIRECT_DATABASE_URL` points directly to Postgres (used for Prisma migrations).
 
+## Implementation notes
+
+Every substantive prompt — architectural decisions, new features, security
+or infrastructure changes, anything worth revisiting in six months — lands
+a short markdown file in `docs/implementation-notes/<YYYY-MM-DD>-<slug>.md`
+alongside the code + tests. Commit messages carry the `what + why`; these
+notes carry the `design + decisions + tradeoffs` in a grep-friendly form.
+
+**Default structure** (skip any section that doesn't apply):
+
+```markdown
+# YYYY-MM-DD — <feature name>
+
+**Commit:** `<sha> <commit subject>`
+
+## Design
+<architectural shape — diagrams or prose, 10-30 lines>
+
+## Files
+<table of files changed with one-line role per file>
+
+## Decisions
+<bullet list of non-obvious tradeoffs and why they went the way they did>
+```
+
+**Do NOT include a "Tests added" section** — the test files themselves
+are the durable record. Duplicating counts into docs creates rot when the
+test list moves.
+
+**Skip** for small UI tweaks, config bumps, bug fixes that don't shift
+architecture. The bar is "would a future engineer need the context?"
+
+Existing examples: `docs/implementation-notes/2026-04-22-*.md`.
+
 ## UI Platform — Epics 51–59
 
 The following epics established shared primitives, guardrail tests, and
