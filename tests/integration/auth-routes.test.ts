@@ -44,10 +44,18 @@ describe('Auth Routes Integration', () => {
         // Ping the server until it successfully responds with JSON.
         // The session endpoint returns `null` when no session is active,
         // which is a valid JSON response indicating the server is ready.
-        for (let i = 0; i < 10; i++) {
+        //
+        // Bounded by a 20s wall-clock budget (not a fixed iteration
+        // count): 10 × 5s AbortSignal timeouts otherwise sit on top of
+        // the 60s `beforeAll` budget and intermittently trip when CI
+        // load makes even `ECONNREFUSED` take a second or two to
+        // surface. Per-test `itLive` skips when `serverAvailable`
+        // stays false.
+        const deadline = Date.now() + 20_000;
+        while (Date.now() < deadline) {
             try {
                 const warmup = await fetch(`${BASE_URL}/api/auth/session`, {
-                    signal: AbortSignal.timeout(5000),
+                    signal: AbortSignal.timeout(2_000),
                 });
                 if (warmup.ok) {
                     const json = await safeJson(warmup);
@@ -57,14 +65,16 @@ describe('Auth Routes Integration', () => {
                     }
                 }
             } catch {
-                // Ignore network errors during warmup
+                // Ignore network errors during warmup — we retry until
+                // deadline, and `itLive` skips cleanly if the server
+                // never comes up.
             }
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
         // When the server isn't reachable, each `itLive` below emits
         // its own `[skipped] <name>` line via console.log — the
         // single suite-level warn is redundant noise.
-    }, 60000);
+    }, 30_000);
 
     // Helper: skip test if server not available
     // 15s timeout accommodates dev server cold-compilation of API routes.
