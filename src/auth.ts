@@ -129,13 +129,19 @@ async function ensureDefaultTenantMembership(userId: string): Promise<void> {
             return;
         }
 
+        // New OAuth-onboarded users default to ADMIN on the single
+        // shared test tenant. Intentional for this stage: every tester
+        // needs install / configure access to exercise the full product
+        // (framework pack install, SSO setup, billing). Revisit when
+        // multi-tenant prod onboarding lands and EDITOR is the safer
+        // default for non-founder joiners.
         await prisma.tenantMembership.upsert({
             where: { tenantId_userId: { tenantId: tenant.id, userId } },
             update: {},
             create: {
                 tenantId: tenant.id,
                 userId,
-                role: 'EDITOR',
+                role: 'ADMIN',
                 status: 'ACTIVE',
             },
         });
