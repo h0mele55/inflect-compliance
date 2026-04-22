@@ -269,3 +269,4 @@ const Menu = forwardRef(
     );
   },
 );
+Menu.displayName = 'Menu';

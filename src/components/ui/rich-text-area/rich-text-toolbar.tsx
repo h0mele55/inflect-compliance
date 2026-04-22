@@ -220,3 +220,4 @@ export const RichTextToolbarButton = forwardRef<
     return <Tooltip content={label}>{button}</Tooltip>;
   },
 );
+RichTextToolbarButton.displayName = 'RichTextToolbarButton';

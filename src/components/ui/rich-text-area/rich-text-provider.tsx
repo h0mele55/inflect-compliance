@@ -275,6 +275,7 @@ export const RichTextProvider = forwardRef<
     );
   },
 );
+RichTextProvider.displayName = 'RichTextProvider';
 
 export function useRichTextContext() {
   const context = useContext(RichTextContext);

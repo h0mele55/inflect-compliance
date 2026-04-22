@@ -565,7 +565,7 @@ const CommandEmpty = ({
       <Command.Empty className="flex min-w-[180px] items-center space-x-2 rounded-md bg-bg-muted px-3 py-2">
         <Magic className="h-4 w-4" />
         <p className="text-center text-sm text-content-default">
-          Ask AI <span className="text-content-emphasis">"{search}"</span>
+          Ask AI <span className="text-content-emphasis">&quot;{search}&quot;</span>
         </p>
       </Command.Empty>
     );

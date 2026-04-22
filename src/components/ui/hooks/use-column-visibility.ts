@@ -54,34 +54,49 @@ export function useColumnVisibility<T extends string>(
   // Check if this is a multi-tab configuration
   const isMultiTab = !isSingleTableConfig(config);
 
+  // Compute the default state for BOTH branches up-front so we can
+  // call `useLocalStorage` exactly once — hooks must be called in
+  // the same order every render (Rules of Hooks). `isMultiTab` is
+  // stable per caller, so in practice only one branch's default is
+  // ever used; the other is cheaply discarded.
+  let defaultState: VisibilityState | Record<T, VisibilityState>;
   if (isMultiTab) {
-    // Multi-tab implementation
     const multiConfig = config as MultiTableConfig<T>;
-
     const getDefaultColumnVisibility = (tab: T) => {
       const columns = multiConfig[tab];
       return Object.fromEntries(
         columns.all.map((id) => [id, columns.defaultVisible.includes(id)]),
       );
     };
-
-    const defaultState = Object.fromEntries(
+    defaultState = Object.fromEntries(
       Object.keys(multiConfig).map((tab) => [
         tab,
         getDefaultColumnVisibility(tab as T),
       ]),
     ) as Record<T, VisibilityState>;
+  } else {
+    const singleConfig = config as SingleTableConfig;
+    defaultState = Object.fromEntries(
+      singleConfig.all.map((id) => [
+        id,
+        singleConfig.defaultVisible.includes(id),
+      ]),
+    );
+  }
 
-    const [columnVisibility, setColumnVisibilityState] = useLocalStorage<
-      Record<T, VisibilityState>
-    >(storageKey, defaultState);
+  const [columnVisibility, setColumnVisibilityState] = useLocalStorage<
+    VisibilityState | Record<T, VisibilityState>
+  >(storageKey, defaultState);
 
+  if (isMultiTab) {
+    const multiConfig = config as MultiTableConfig<T>;
+    const multiVisibility = columnVisibility as Record<T, VisibilityState>;
     return {
-      columnVisibility,
+      columnVisibility: multiVisibility,
       setColumnVisibility: (tab: T, visibility: VisibilityState) => {
         // Ensure all columns for this tab are present in the new state
         const allColumns = multiConfig[tab].all;
-        const currentTabState = columnVisibility[tab] || {};
+        const currentTabState = multiVisibility[tab] || {};
 
         // Create a new state that preserves all columns, defaulting to false for missing ones
         const newTabState = Object.fromEntries(
@@ -93,29 +108,20 @@ export function useColumnVisibility<T extends string>(
           ]),
         );
 
-        setColumnVisibilityState({ ...columnVisibility, [tab]: newTabState });
+        setColumnVisibilityState({ ...multiVisibility, [tab]: newTabState });
       },
     };
   } else {
     // Single table implementation
     const singleConfig = config as SingleTableConfig;
-
-    const defaultState = Object.fromEntries(
-      singleConfig.all.map((id) => [
-        id,
-        singleConfig.defaultVisible.includes(id),
-      ]),
-    );
-
-    const [columnVisibility, setColumnVisibilityState] =
-      useLocalStorage<VisibilityState>(storageKey, defaultState);
+    const singleVisibility = columnVisibility as VisibilityState;
 
     return {
-      columnVisibility,
+      columnVisibility: singleVisibility,
       setColumnVisibility: (visibility: VisibilityState) => {
         // Ensure all columns are present in the new state
         const allColumns = singleConfig.all;
-        const currentState = columnVisibility || {};
+        const currentState = singleVisibility || {};
 
         // Create a new state that preserves all columns, defaulting to false for missing ones
         const newState = Object.fromEntries(

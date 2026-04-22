@@ -108,6 +108,10 @@ BatchActionButton.displayName = "BatchActionButton";
 export function renderBatchActions<T>(
   actions: BatchAction<T>[],
 ): (table: Table<T>) => ReactNode {
+  // This returns a render function for DataTable's `batchActions` slot,
+  // not a React component — ESLint's display-name heuristic misfires on
+  // factories that return JSX-producing functions.
+  // eslint-disable-next-line react/display-name
   return (table: Table<T>) => {
     const selectedRows = table.getSelectedRowModel().rows;
     return (
