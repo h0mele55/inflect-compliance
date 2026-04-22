@@ -26,9 +26,9 @@ jest.mock('@/lib/prisma', () => ({
     },
 }));
 
-const mockAppendAuditEntry = jest.fn(async () => ({
-    id: 'a', entryHash: 'h', previousHash: null,
-}));
+const mockAppendAuditEntry: jest.Mock<Promise<unknown>, unknown[]> = jest.fn(
+    async () => ({ id: 'a', entryHash: 'h', previousHash: null }),
+);
 jest.mock('@/lib/audit', () => ({
     __esModule: true,
     appendAuditEntry: (...a: unknown[]) => mockAppendAuditEntry(...a),

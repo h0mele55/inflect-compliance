@@ -389,11 +389,6 @@ export const UpdateClauseProgressSchema = z.object({
 
 // ─── Auth ───
 
-export const AuthLoginSchema = z.object({
-    email: z.string().email(),
-    password: z.string().min(1),
-}).strip();
-
 export const AuthRegisterSchema = z.object({
     email: z.string().email(),
     password: z.string().min(8),
@@ -401,8 +396,12 @@ export const AuthRegisterSchema = z.object({
     orgName: z.string().min(1),
 }).strip();
 
+// `action: 'login'` was removed 2026-04-22 — the old bespoke /api/auth/
+// register login endpoint was a parallel path to NextAuth's Credentials
+// provider. All production login now flows through NextAuth. The legacy
+// union is kept as a single-variant union for Zod-discriminated-union
+// compatibility; the variant check still catches other malformed bodies.
 export const AuthActionSchema = z.discriminatedUnion('action', [
-    AuthLoginSchema.extend({ action: z.literal('login') }),
     AuthRegisterSchema.extend({ action: z.literal('register') }),
 ]);
 

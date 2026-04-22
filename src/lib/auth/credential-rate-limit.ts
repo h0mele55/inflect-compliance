@@ -171,10 +171,14 @@ export async function resetCredentialsBackoff(email: string): Promise<void> {
 }
 
 /**
- * Test-only helper: wipes the in-memory counters. No effect on Upstash.
- * Exported instead of reaching into `_memoryAttempts` from tests so the
- * private state stays private.
+ * Test-only helper: wipes the in-memory counters AND the Upstash
+ * initialisation flag so the next call re-reads `env.RATE_LIMIT_MODE`.
+ * Exported instead of reaching into private state from tests so jest
+ * setups that flip env between test files get a predictable reset
+ * point.
  */
 export function __resetCredentialsRateLimitForTests(): void {
     _memoryAttempts.clear();
+    _limiter = null;
+    _initialized = false;
 }

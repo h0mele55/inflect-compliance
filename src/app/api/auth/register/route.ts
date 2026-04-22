@@ -1,7 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+/**
+ * POST /api/auth/register  body: { action: 'register', email, password, name, orgName }
+ *
+ * Register is the ONLY credentials flow still served by this route.
+ * Login was served here historically via `action: 'login'` before the
+ * NextAuth Credentials provider became production-grade; that path was
+ * removed on 2026-04-22 to avoid having two concurrent login surfaces
+ * with subtly different rate-limit / audit / email-verification
+ * semantics. All production login now flows through NextAuth
+ * `/api/auth/callback/credentials`.
+ */
+import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { signToken } from '@/lib/auth';
-import { authenticateWithPassword } from '@/lib/auth/credentials';
 import { issueEmailVerification } from '@/lib/auth/email-verification';
 import { hashPassword, validatePasswordPolicy } from '@/lib/auth/passwords';
 import { withValidatedBody } from '@/lib/validation/route';
@@ -10,15 +20,13 @@ import { env } from '@/env';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { logger } from '@/lib/observability/logger';
 
-export const POST = withApiErrorHandling(withValidatedBody(AuthActionSchema, async (req, ctx, body) => {
+export const POST = withApiErrorHandling(withValidatedBody(AuthActionSchema, async (_req, _ctx, body) => {
     try {
-        if (body.action === 'register') {
-            return await handleRegister(body);
-        } else if (body.action === 'login') {
-            return await handleLogin(body);
-        }
-
-        return NextResponse.json<any>({ error: 'Invalid action' }, { status: 400 });
+        // Zod discriminated-union already rejects anything but `register`
+        // — no else branches needed. Keep the try/catch as a final safety
+        // net so a DB error during registration returns JSON instead of
+        // bubbling as an HTML 500 page.
+        return await handleRegister(body);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         logger.error('Auth error', { component: 'auth', error: error instanceof Error ? error.message : String(error) });
@@ -109,54 +117,6 @@ async function handleRegister(body: any) {
         secure: env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 7, // 7 days
-        path: '/',
-    });
-
-    return response;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleLogin(body: any) {
-    const { email, password } = body;
-    if (!email || !password) {
-        return NextResponse.json<any>({ error: 'Missing credentials' }, { status: 400 });
-    }
-
-    // Production-grade credential verification — account-enumeration-safe,
-    // timing-equalised, future-proofed for email-verification gating and
-    // silent rehash-on-verify. See src/lib/auth/credentials.ts.
-    const auth = await authenticateWithPassword({ email, password });
-    if (!auth.ok) {
-        // Collapse every failure reason to the same response shape so this
-        // endpoint doesn't leak anything the NextAuth path doesn't also leak.
-        return NextResponse.json<any>({ error: 'Invalid credentials' }, { status: 401 });
-    }
-
-    // Resolve tenant + role after successful authentication (cheap lookup,
-    // not on the hot path for failed attempts).
-    const membership = await prisma.tenantMembership.findFirst({
-        where: { userId: auth.userId, status: 'ACTIVE' },
-        orderBy: { createdAt: 'asc' },
-        include: { tenant: true },
-    });
-
-    const token = signToken({
-        userId: auth.userId,
-        tenantId: membership?.tenantId ?? '',
-        email: auth.email,
-        role: membership?.role ?? 'READER',
-    });
-
-    const response = NextResponse.json<any>({
-        user: { id: auth.userId, email: auth.email, name: auth.name, role: membership?.role ?? 'READER' },
-        tenant: membership?.tenant ? { id: membership.tenant.id, name: membership.tenant.name } : null,
-    });
-
-    response.cookies.set('token', token, {
-        httpOnly: true,
-        secure: env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7,
         path: '/',
     });
 

@@ -13,10 +13,19 @@ function extractErrorMessage(value: unknown, fallback: string): string {
     return fallback;
 }
 
+type VerifyStatus = 'verified' | 'invalid' | 'expired';
+
 function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
+    const verifyStatusParam = searchParams?.get('verifyStatus');
+    const verifyStatus: VerifyStatus | null =
+        verifyStatusParam === 'verified' ||
+        verifyStatusParam === 'invalid' ||
+        verifyStatusParam === 'expired'
+            ? verifyStatusParam
+            : null;
     const t = useTranslations('login');
     const [mode, setMode] = useState<'login' | 'register'>('login');
     const [email, setEmail] = useState('');
@@ -25,6 +34,8 @@ function LoginForm() {
     const [orgName, setOrgName] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [resendEmail, setResendEmail] = useState('');
+    const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
     // `null` = still resolving the provider list (nothing credentials-shaped
     // renders yet). `false` = server is OAuth-only, hide the form + divider
     // + register toggle. `true` = credentials is registered (dev, or prod
@@ -96,6 +107,25 @@ function LoginForm() {
         }
     };
 
+    const handleResendVerification = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!resendEmail) return;
+        setResendState('sending');
+        try {
+            await fetch('/api/auth/verify-email/resend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: resendEmail }),
+            });
+        } catch {
+            // Uniform response is the whole point — we never branch on
+            // outcome here either. Network errors get the same "sent"
+            // state so the UI doesn't leak that the backend is reachable
+            // for some emails and not others.
+        }
+        setResendState('sent');
+    };
+
     const handleOAuthSignIn = async (provider: string) => {
         setError('');
         setLoading(true);
@@ -141,6 +171,31 @@ function LoginForm() {
                     {error && (
                         <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                             {error}
+                        </div>
+                    )}
+
+                    {verifyStatus === 'verified' && (
+                        <div
+                            role="status"
+                            className="mb-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-300 text-sm"
+                        >
+                            Email verified — you can sign in now.
+                        </div>
+                    )}
+                    {verifyStatus === 'expired' && (
+                        <div
+                            role="status"
+                            className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm"
+                        >
+                            That verification link has expired. Request a new one below.
+                        </div>
+                    )}
+                    {verifyStatus === 'invalid' && (
+                        <div
+                            role="status"
+                            className="mb-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm"
+                        >
+                            That verification link is not valid. Request a new one below.
                         </div>
                     )}
 
@@ -218,6 +273,44 @@ function LoginForm() {
                                     <span>{t('noAccount')} <button onClick={() => setMode('register')} className="text-brand-400 hover:text-brand-300">{t('registerLink')}</button></span>
                                 ) : (
                                     <span>{t('hasAccount')} <button onClick={() => setMode('login')} className="text-brand-400 hover:text-brand-300">{t('signInLink')}</button></span>
+                                )}
+                            </div>
+
+                            {/* Resend verification — shown unconditionally because
+                                the endpoint returns a uniform response regardless
+                                of whether the email is registered / verified / rate-
+                                limited, so exposing the form doesn't leak account
+                                state. Sits below the sign-in/register toggle so it
+                                doesn't steal the primary eye path. */}
+                            <div className="mt-6 pt-4 border-t border-slate-700/50">
+                                {resendState === 'sent' ? (
+                                    <p
+                                        role="status"
+                                        className="text-xs text-slate-400 text-center"
+                                    >
+                                        If that email is registered and not yet verified, a new link is on its way.
+                                    </p>
+                                ) : (
+                                    <form
+                                        onSubmit={handleResendVerification}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <input
+                                            type="email"
+                                            name="resendEmail"
+                                            className="input flex-1 text-xs"
+                                            placeholder="Didn't get a verification email?"
+                                            value={resendEmail}
+                                            onChange={(e) => setResendEmail(e.target.value)}
+                                        />
+                                        <button
+                                            type="submit"
+                                            disabled={resendState === 'sending' || !resendEmail}
+                                            className="text-xs text-brand-400 hover:text-brand-300 disabled:text-slate-600"
+                                        >
+                                            {resendState === 'sending' ? 'Sending…' : 'Resend'}
+                                        </button>
+                                    </form>
                                 )}
                             </div>
                         </>

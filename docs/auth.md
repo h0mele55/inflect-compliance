@@ -1,0 +1,242 @@
+# Authentication
+
+Inflect's auth stack is NextAuth v5 (beta) with a Prisma adapter and a
+JWT session strategy. Three provider paths share one session shape:
+
+| Provider | Files | Session shape |
+|---|---|---|
+| Credentials (email + password) | `src/lib/auth/credentials.ts`, `src/lib/auth/passwords.ts`, `src/lib/auth/credential-rate-limit.ts` | JWT with `userId`, `tenantId`, `role` |
+| Google OAuth | `src/auth.ts` | Same JWT shape, tenant resolved post-signIn |
+| Microsoft Entra ID | `src/auth.ts` | Same JWT shape |
+
+This doc is the operator-facing reference for the credentials path. For
+a deeper architectural rationale, see
+`docs/implementation-notes/2026-04-22-auth-*.md`.
+
+## Credentials flow
+
+```
+                 POST /api/auth/callback/credentials
+                                │
+                                ▼
+                     NextAuth Credentials.authorize
+                                │
+                                ▼
+                    authenticateWithPassword       ← src/lib/auth/credentials.ts
+                        │
+                        ├─▶ checkCredentialsAttempt (per-email rate limit)
+                        ├─▶ prisma.user.findUnique by lowercased email
+                        ├─▶ verifyPassword vs stored bcrypt hash
+                        │      (dummy-compare on unknown email → timing-safe)
+                        ├─▶ if AUTH_REQUIRE_EMAIL_VERIFICATION=1 and
+                        │   user.emailVerified is null → reject
+                        ├─▶ silent rehash-on-verify (if BCRYPT_COST ↑)
+                        ├─▶ resetCredentialsBackoff (clear rate bucket)
+                        └─▶ recordLoginSuccess → audit + structured log
+                                │
+                                ▼
+                      JWT callback enriches with
+                   userId / tenantId / role / MFA state
+                                │
+                                ▼
+                    __Secure-authjs.session-token cookie
+                    (HttpOnly, Secure, SameSite=lax, JWT in body)
+```
+
+Every failure path that isn't rate-limited runs the same bcrypt CPU
+cost as the real-verify path (via `dummyVerify` in `passwords.ts`), so
+an attacker can't enumerate registered emails via response time.
+
+Every failure path collapses to `CredentialsSignin` on the client —
+"Invalid credentials" regardless of whether the email exists, the
+password is wrong, or the account isn't verified. The typed
+`AuthResult.reason` (`credentials_invalid | email_not_verified |
+rate_limited`) stays server-side for audit / observability.
+
+## Registration flow
+
+`POST /api/auth/register` body `{ action: 'register', email, password,
+name, orgName }`. Creates the `User`, a personal `Tenant`, and an
+`ADMIN` `TenantMembership` in sequence, then issues a verification
+token (`issueEmailVerification`). Response is `{ user, tenant,
+emailVerificationRequired: boolean }`; the client uses the last flag
+to decide whether to show the "check your inbox" copy.
+
+`action: 'login'` was removed on 2026-04-22 — login now flows
+exclusively through NextAuth. `AuthLoginSchema` is gone from
+`src/lib/schemas/`.
+
+## Verification flow
+
+```
+               issueEmailVerification(email, { userId })
+                        │
+                        ├─▶ generate 32-byte raw token (hex)
+                        ├─▶ sha256(raw) → store in VerificationToken
+                        │      (raw NEVER touches DB)
+                        ├─▶ prisma.$transaction: delete prior tokens
+                        │   for this email + delete expired tokens
+                        │   globally + create the new row
+                        ├─▶ sendEmail with ${APP_URL}/api/auth/verify-email?token=<raw>
+                        └─▶ recordEmailVerificationIssued → audit
+
+               GET /api/auth/verify-email?token=<raw>
+                        │
+                        ├─▶ sha256(raw) → lookup VerificationToken
+                        ├─▶ if expired → delete row → 302 ?verifyStatus=expired
+                        ├─▶ if not found → 302 ?verifyStatus=invalid
+                        ├─▶ prisma.$transaction: delete token + set
+                        │   User.emailVerified = now()
+                        ├─▶ recordEmailVerified → audit
+                        └─▶ 302 ?verifyStatus=verified
+
+               POST /api/auth/verify-email/resend  body: { email }
+                        │
+                        ├─▶ per-email rate limit (shared with login bucket)
+                        ├─▶ if user exists AND !emailVerified →
+                        │   issueEmailVerification (re-issue; prior links
+                        │   invalidated by the deleteMany in the transaction)
+                        └─▶ 200 + uniform copy, always (no enumeration)
+```
+
+- Token TTL: **24h** (`VERIFICATION_TOKEN_TTL_MS`)
+- Token entropy: **256 bits** (32 bytes / 64 hex chars)
+- Storage: **SHA-256 hash only**; raw lives in the email body, never in the DB
+- Single-use: consume deletes the row inside the same transaction as
+  `User.emailVerified = now()`
+- Maintenance: `issueEmailVerification` opportunistically prunes all
+  expired rows on every write. `pruneExpiredVerificationTokens()` is
+  also exported for cron/job wiring if issuance ever becomes infrequent
+
+## Audit event catalog
+
+| Action | When | Tenant attribution |
+|---|---|---|
+| `AUTH_LOGIN_SUCCESS` | Successful credentials sign-in | User's first ACTIVE `TenantMembership` |
+| `AUTH_LOGIN_FAILURE` | Wrong password for a *known* user | Same |
+| `AUTH_LOGIN_RATE_LIMITED` | Per-identifier bucket tripped for a known user | Same |
+| `AUTH_LOGIN_EMAIL_VERIFICATION_REQUIRED` | Gate on, user unverified | Same |
+| `AUTH_EMAIL_VERIFICATION_ISSUED` | Token written, email queued | Same |
+| `AUTH_EMAIL_VERIFIED` | Token consumed, `emailVerified` set | Same |
+
+**Unknown-user failures** (email not registered) do **not** write
+audit rows — no tenant to attribute to, and writing every attempt
+would become a DoS sink. Those still leave structured logger entries
+for SRE visibility (`event: "login_failure"`, `reason: "unknown_email"`,
+`identifierHash`).
+
+### Privacy invariants (enforced by tests)
+
+- Raw email never written to audit `detailsJson` or structured logs —
+  only `hashEmailForLog(email)`, a deterministic 16-char SHA-256 prefix
+- Raw verification tokens never logged
+- Passwords never logged, anywhere, ever
+- `userId` suppressed from the `unknown_email` log line specifically,
+  so a future log leak doesn't enable enumeration
+
+## Rate limiting
+
+**Two independent gates, same Upstash/memory fallback** (both in
+`src/lib/rate-limit/authRateLimit.ts` and `src/lib/auth/credential-rate-limit.ts`):
+
+| Gate | Key | Limit | Catches |
+|---|---|---|---|
+| Per-IP | SHA-256(ip + UA-hash) | 10 per 60s | Volumetric abuse from one source (any NextAuth endpoint) |
+| Per-email | SHA-256(lowercased email) | 5 per 15-min sliding window | Credential stuffing across rotated IPs |
+
+### Operator kill switches
+
+Matching `authRateLimit.ts` semantics:
+
+- `AUTH_TEST_MODE=1` — both gates short-circuit. E2E tests use this.
+- `RATE_LIMIT_ENABLED=0` — both gates short-circuit. Emergency kill
+  switch if Upstash misbehaves.
+
+On Upstash exception (network partition, credential expiry), **both
+gates fail open** — one log line per failure, auth path proceeds.
+Losing logins across the fleet would be a bigger incident than letting
+one extra brute-force attempt through.
+
+### Reset-on-success
+
+After a successful verify, the chokepoint calls
+`resetCredentialsBackoff(email)` to clear the per-email counter. A user
+who typo'd their password four times and then got it right isn't
+locked out on the correct fifth attempt. Upstash sliding-window mode
+doesn't implement per-key delete; the counter ages out naturally
+within 15 minutes (documented limitation in
+`credential-rate-limit.ts`).
+
+## Cookie / session settings
+
+`src/auth.ts` configures NextAuth cookies:
+
+| Env | Cookie name | `Secure` | `SameSite` | `HttpOnly` |
+|---|---|---|---|---|
+| Prod (`NODE_ENV=production && AUTH_TEST_MODE !== '1'`) | `__Secure-authjs.session-token` | yes | lax | yes |
+| Dev / test (`NODE_ENV=development` or `AUTH_TEST_MODE=1`) | `authjs.session-token` | no | lax | yes |
+
+`SameSite=lax` is the NextAuth default and the right choice for OAuth
+callback flows — `strict` breaks the redirect-from-Google step. Since
+every mutating action in the app goes through either NextAuth's CSRF
+token or per-endpoint double-submit patterns, `lax` doesn't weaken CSRF
+protection.
+
+Session is **JWT-only** — no server-side session table. The JWT carries
+`userId`, `tenantId`, `role`, and MFA state (`mfaPending`,
+`mfaFailClosed`). Revocation is through `User.sessionVersion` — the JWT
+callback revalidates every 5 minutes in non-hot paths.
+
+## Environment variable reference
+
+Every flag the credentials path honors:
+
+| Var | Required | Default | Effect |
+|---|---|---|---|
+| `AUTH_SECRET` | **yes** | — | NextAuth JWT signing secret (≥16 chars) |
+| `JWT_SECRET` | yes (legacy) | — | Legacy `signToken` cookie (still issued by `/api/auth/register`) |
+| `AUTH_TEST_MODE` | no | unset | `1` disables the `__Secure-` cookie prefix + `Secure` flag + **both** rate-limit gates. E2E tests set this |
+| `AUTH_REQUIRE_EMAIL_VERIFICATION` | no | unset | `1` rejects credentials login when `User.emailVerified` is null. Default OFF so existing deployments behave unchanged |
+| `RATE_LIMIT_ENABLED` | no | unset (= enabled) | `0` disables both rate-limit gates. Operator kill switch |
+| `RATE_LIMIT_MODE` | no | `upstash` | `memory` to use in-process fallback (dev/CI) |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | if `RATE_LIMIT_MODE=upstash` | — | Rate-limit backing store |
+| `APP_URL` | no but recommended | unset | Base URL used to construct verification links in outbound email. Unset → relative URL which most mail clients won't render as clickable |
+| `SMTP_FROM` / `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | if real email is needed | `SMTP_FROM=noreply@inflect.app` only | `src/lib/mailer.ts` picks `NodemailerProvider` when `SMTP_HOST` is set; otherwise `ConsoleEmailProvider` logs the message to stdout |
+
+## Operational caveats
+
+- **`AUTH_REQUIRE_EMAIL_VERIFICATION=1` requires a working mailer.**
+  Otherwise newly-registered users can't log in. Test SMTP before
+  flipping this flag in prod.
+- **`AUTH_TEST_MODE=1` bypasses all rate-limit and cookie-hardening.**
+  Never set in prod except as a rollback measure. Prefer
+  `AUTH_REQUIRE_EMAIL_VERIFICATION=0` + OAuth-only if that's the goal.
+- **Mailer failure does not fail register.** The token row is written
+  before `sendEmail` runs; SMTP errors are swallowed inside
+  `issueEmailVerification`. Operator must check mailer logs to notice
+  delivery issues.
+- **Rate-limit counters reset on success.** A user who typo'd their
+  password four times and then gets it right is not locked out. The
+  attacker-who-just-learned-the-correct-password case is already past
+  the point where more attempts matter.
+- **Upstash failure → rate limit fails open.** Structured log line on
+  every failure; alert on `component=rate-limit level=error` in Grafana.
+- **Session version is the revocation mechanism.** Bump
+  `User.sessionVersion` to force a user's active JWTs to be rejected
+  on next request (or within 5 minutes, whichever comes first).
+
+## Pre-prod checklist
+
+Before flipping `AUTH_REQUIRE_EMAIL_VERIFICATION=1` in a live deployment:
+
+- [ ] `SMTP_HOST` + creds set and verified with a test send
+- [ ] `APP_URL` set to the canonical public URL (not a VM IP) so
+      verification links are clickable in email clients
+- [ ] Existing users without `emailVerified` audited — either backfill
+      `emailVerified` for known-good accounts or communicate the flow
+- [ ] Rate-limit config (`RATE_LIMIT_MODE=upstash` + creds) validated
+      against a live Upstash project
+- [ ] Audit action grep (`AUTH_LOGIN_*`, `AUTH_EMAIL_*`) wired into
+      whatever dashboards / alerting the compliance team relies on
+- [ ] `/api/auth/verify-email` verified reachable from the public
+      internet (email links 302 back to `APP_URL/login`)

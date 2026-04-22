@@ -49,16 +49,23 @@ jest.mock('@/env', () => ({
 // Rate-limit + security-events: stubbed wholesale so the chokepoint's
 // integration with them is exercised in their own dedicated test files.
 // The ok/not-ok knob is a jest.fn so specific test cases can flip it.
-const mockCheckCredentialsAttempt = jest.fn(async () => ({ ok: true as const }));
-const mockResetCredentialsBackoff = jest.fn(async () => undefined);
+// `(...args: unknown[]) => unknown` signatures keep mock.calls typed as
+// `unknown[][]` so we can cast individual call[0] payloads per-assertion
+// without TS complaining about spread into a zero-arg mock.
+const mockCheckCredentialsAttempt: jest.Mock<Promise<unknown>, unknown[]> =
+    jest.fn(async () => ({ ok: true as const }));
+const mockResetCredentialsBackoff: jest.Mock<Promise<void>, unknown[]> =
+    jest.fn(async () => undefined);
 jest.mock('@/lib/auth/credential-rate-limit', () => ({
     __esModule: true,
     checkCredentialsAttempt: (...a: unknown[]) => mockCheckCredentialsAttempt(...a),
     resetCredentialsBackoff: (...a: unknown[]) => mockResetCredentialsBackoff(...a),
 }));
 
-const mockRecordLoginSuccess = jest.fn(async () => undefined);
-const mockRecordLoginFailure = jest.fn(async () => undefined);
+const mockRecordLoginSuccess: jest.Mock<Promise<void>, unknown[]> =
+    jest.fn(async () => undefined);
+const mockRecordLoginFailure: jest.Mock<Promise<void>, unknown[]> =
+    jest.fn(async () => undefined);
 jest.mock('@/lib/auth/security-events', () => ({
     __esModule: true,
     recordLoginSuccess: (...a: unknown[]) => mockRecordLoginSuccess(...a),

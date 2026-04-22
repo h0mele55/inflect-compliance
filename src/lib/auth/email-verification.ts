@@ -106,8 +106,16 @@ export async function issueEmailVerification(
     // Replace-by-identifier: drop any prior tokens for this email first
     // so only the latest link is valid. Uses a transaction so a resend
     // mid-verify can't leave two live tokens for the same user.
+    //
+    // Opportunistic global cleanup: issuance is rare enough (~once per
+    // user ever, plus resends) that folding a deleteMany-where-expired
+    // into the same transaction keeps the table tidy without a separate
+    // cron. If issuance volume ever grows, flip this to a scheduled job
+    // via `pruneExpiredVerificationTokens` below.
     await prisma.$transaction([
-        prisma.verificationToken.deleteMany({ where: { identifier } }),
+        prisma.verificationToken.deleteMany({
+            where: { OR: [{ identifier }, { expires: { lt: new Date() } }] },
+        }),
         prisma.verificationToken.create({
             data: {
                 identifier,
@@ -239,4 +247,28 @@ export async function consumeEmailVerification(
     await recordEmailVerified({ userId: user.id, email: user.email });
 
     return { ok: true, userId: user.id, email: user.email };
+}
+
+// ── Maintenance ────────────────────────────────────────────────────────
+
+/**
+ * Delete every verification token whose `expires` has passed. Safe to
+ * call any time — idempotent, tenant-agnostic, O(expired-rows) at the DB.
+ *
+ * Wire-up options (pick one, don't do both):
+ *   - A BullMQ job scheduled via `src/app-layer/jobs/` (daily cadence is
+ *     plenty; tokens have a 24h TTL).
+ *   - A one-shot `scripts/prune-verification-tokens.ts` invoked by a
+ *     cron on the VM.
+ *
+ * As written today, `issueEmailVerification` also folds a prune into
+ * its own write transaction so stale rows get cleaned up naturally
+ * while issuance is occurring. The helper below is for *operators* who
+ * want to force a sweep or schedule one without going through issue.
+ */
+export async function pruneExpiredVerificationTokens(): Promise<number> {
+    const result = await prisma.verificationToken.deleteMany({
+        where: { expires: { lt: new Date() } },
+    });
+    return result.count;
 }
