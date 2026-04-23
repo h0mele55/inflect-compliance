@@ -863,20 +863,21 @@ model FileRecord {
 }
 
 model EvidenceReview {
-  // Phase 1 of denorm-tenantId: column added nullable, backfilled
-  // from evidence.tenantId. Phase 2 flips NOT NULL + composite FK
-  // (evidenceId, tenantId) → Evidence(id, tenantId). Phase 3 swaps
-  // the chained RLS policy for the trivial direct form.
+  // denorm-tenantId — Phase 2: tenantId is NOT NULL and the parent
+  // relation is composite (evidenceId, tenantId) → Evidence(id,
+  // tenantId), which structurally guarantees this row's tenantId
+  // matches its parent's. Phase 3 swaps the chained RLS policy for
+  // the trivial direct form.
   id         String       @id @default(cuid())
-  tenantId   String?
+  tenantId   String
   evidenceId String
   reviewerId String
   action     ReviewAction
   comment    String?
   createdAt  DateTime     @default(now())
-  evidence   Evidence     @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  evidence   Evidence     @relation(fields: [evidenceId, tenantId], references: [id, tenantId], onDelete: Cascade)
   reviewer   User         @relation(fields: [reviewerId], references: [id])
-  tenant     Tenant?      @relation(fields: [tenantId], references: [id])
+  tenant     Tenant       @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([tenantId, evidenceId])
@@ -1076,18 +1077,18 @@ model Audit {
 }
 
 model AuditChecklistItem {
-  // Phase 1 of denorm-tenantId: see EvidenceReview for the
-  // three-phase shape.
+  // denorm-tenantId — Phase 2: see EvidenceReview for the shape.
+  // Composite parent FK (auditId, tenantId) → Audit(id, tenantId).
   id          String          @id @default(cuid())
-  tenantId    String?
+  tenantId    String
   auditId     String
   prompt      String
   result      ChecklistResult @default(NOT_TESTED)
   notes       String?
   evidenceRef String?
   sortOrder   Int             @default(0)
-  audit       Audit           @relation(fields: [auditId], references: [id], onDelete: Cascade)
-  tenant      Tenant?         @relation(fields: [tenantId], references: [id])
+  audit       Audit           @relation(fields: [auditId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([tenantId, auditId])
@@ -1123,18 +1124,19 @@ model Finding {
 }
 
 model FindingEvidence {
-  // Phase 1 of denorm-tenantId: see EvidenceReview for the
-  // three-phase shape. As a junction across two tenant-scoped
-  // parents (Finding × Evidence), Phase 2 lands two composite FKs —
-  // one per parent — which structurally guarantees both parents
-  // share the row's tenantId.
+  // denorm-tenantId — Phase 2: junction with two composite parent
+  // FKs. Each FK references its parent's (id, tenantId) unique
+  // constraint, which transitively guarantees both parents share
+  // this row's tenantId — strictly stronger than the previous
+  // chained-RLS WITH CHECK (which was bypass-able by SECURITY
+  // DEFINER paths or admin migrations).
   id         String   @id @default(cuid())
-  tenantId   String?
+  tenantId   String
   findingId  String
   evidenceId String
-  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
-  finding    Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
-  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
+  evidence   Evidence @relation(fields: [evidenceId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  finding    Finding  @relation(fields: [findingId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
 
   @@unique([findingId, evidenceId])
   @@index([tenantId])
@@ -1619,16 +1621,16 @@ model AuditorAccount {
 }
 
 model AuditorPackAccess {
-  // Phase 1 of denorm-tenantId: see FindingEvidence for the
-  // junction-table shape (two composite FKs in Phase 2).
+  // denorm-tenantId — Phase 2: junction with two composite parent
+  // FKs. See FindingEvidence for the rationale.
   id          String         @id @default(cuid())
-  tenantId    String?
+  tenantId    String
   auditorId   String
   auditPackId String
   grantedAt   DateTime       @default(now())
-  pack        AuditPack      @relation(fields: [auditPackId], references: [id])
-  auditor     AuditorAccount @relation(fields: [auditorId], references: [id])
-  tenant      Tenant?        @relation(fields: [tenantId], references: [id])
+  pack        AuditPack      @relation(fields: [auditPackId, tenantId], references: [id, tenantId])
+  auditor     AuditorAccount @relation(fields: [auditorId, tenantId], references: [id, tenantId])
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
 
   @@unique([auditorId, auditPackId])
   @@index([tenantId])

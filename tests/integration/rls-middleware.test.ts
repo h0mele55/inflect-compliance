@@ -114,7 +114,7 @@ describeFn('RLS middleware — live PostgreSQL enforcement', () => {
         evidenceAId = evidence.id;
 
         const fe = await prisma.findingEvidence.create({
-            data: { findingId: findingAId, evidenceId: evidenceAId },
+            data: { tenantId: tenantA, findingId: findingAId, evidenceId: evidenceAId },
         });
         findingEvidenceId = fe.id;
     });
@@ -267,12 +267,18 @@ describeFn('RLS middleware — live PostgreSQL enforcement', () => {
         });
 
         test('tenant-B cannot create a FindingEvidence linking to tenant-A parents', async () => {
-            // Both parents belong to tenantA; the WITH CHECK requires
-            // both to belong to the session tenant.
+            // denorm-tenantId Phase 2: rejection is now structural
+            // (composite FK from (findingId, tenantId) to Finding(id,
+            // tenantId)) rather than RLS WITH CHECK. The call below
+            // declares tenantId: tenantB (matching the calling
+            // session) but findingId/evidenceId belong to tenantA —
+            // no parent row matches (findingAId, tenantB) so the FK
+            // rejects the insert.
             await expect(
                 runInTenantContext(makeCtx(tenantB), async (db) => {
                     return db.findingEvidence.create({
                         data: {
+                            tenantId: tenantB,
                             findingId: findingAId,
                             evidenceId: evidenceAId,
                         },
