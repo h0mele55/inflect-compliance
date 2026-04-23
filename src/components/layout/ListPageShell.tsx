@@ -94,6 +94,12 @@ function ListPageShellBody({ children, className }: ListPageShellProps) {
                 'md:flex-1 md:min-h-0 md:flex md:flex-col md:overflow-hidden',
                 className,
             )}
+            // Marker for DataTable's whole-row clip useEffect: it
+            // walks up to find this element and uses ITS clientHeight
+            // as the viewport allocation (since the card itself no
+            // longer has flex-1, its own clientHeight == content
+            // height, not available height).
+            data-list-page-body="true"
         >
             {children}
         </div>

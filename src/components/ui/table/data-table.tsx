@@ -203,25 +203,25 @@ export function DataTable<T>({
   // chain that lets the table body scroll within its parent.
   const filledContainerClassName = fillBody
     ? cn(
-        // Container becomes a flex-1 child of its parent (a flex
-        // column like ListPageShell.Body), claiming the parent's
-        // full allocated height. Without `md:flex-1`, the card
-        // would size to its content (= every row naturally
-        // rendered) and grow past the parent — the parent's
-        // overflow-hidden clips visually, but the card's internal
-        // flex-1 scroll wrapper would distribute the (oversized)
-        // natural height, so no scroll triggers. min-h-0 unlocks
-        // shrinking; overflow-hidden ensures the inner scroll
-        // wrapper is the only scroll context.
-        "md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden",
+        // Container is a flex column that sizes to its content
+        // (= the scroll wrapper inside) but is capped by the parent
+        // (ListPageShell.Body). `max-h-full` is the cap;
+        // `min-h-0` allows shrinking. NO `flex-1` — that would
+        // force the card to fill the parent even when the scroll
+        // wrapper inside is short (Evidence with 1 row, empty
+        // state, etc.). Result: card grows with content up to
+        // viewport, then stops; smaller content = smaller card.
+        "md:flex md:flex-col md:max-h-full md:min-h-0 md:overflow-hidden",
         className,
       )
     : className;
   const filledScrollWrapperClassName = fillBody
     ? cn(
-        // Wrapper claims remaining height and provides vertical
-        // scroll; min-h-0 unlocks shrinking inside the flex parent.
-        "md:flex-1 md:min-h-0 md:overflow-y-auto",
+        // Wrapper sizes to content, capped at parent (the card).
+        // The JS whole-row clip in table.tsx adds an inline
+        // max-height when content exceeds the viewport allocation,
+        // overriding this max-h-full to a row-aligned value.
+        "md:max-h-full md:min-h-0 md:overflow-y-auto",
         scrollWrapperClassName,
       )
     : scrollWrapperClassName;
@@ -285,14 +285,12 @@ export function DataTable<T>({
   const { table, ...rest } = useTable(tableProps as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // The outermost wrapper exists for the dataTestId / id hooks the
-  // E2E suite uses. When fillBody is on it must ALSO participate in
-  // the flex chain — otherwise it's a display:block layer between
-  // ListPageShell.Body (flex column) and the Table's outer card,
-  // breaking the chain: the card's flex-1 has nothing to flex from,
-  // so it sizes to its content (= every row natural-height) and
-  // the scroll wrapper inside ends up huge with nothing to scroll.
+  // E2E suite uses. When fillBody is on it participates in the
+  // flex chain (max-h-full + flex flex-col + overflow-hidden) so
+  // the inner card's max-h-full can resolve to a finite parent
+  // height. NO flex-1 — see filledContainerClassName comment.
   const wrapperClassName = fillBody
-    ? "md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-hidden"
+    ? "md:flex md:flex-col md:max-h-full md:min-h-0 md:overflow-hidden"
     : undefined;
 
   return (

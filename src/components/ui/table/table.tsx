@@ -505,14 +505,39 @@ export function Table<T>({
       const tbody = wrapper.querySelector("tbody");
       const firstRow = tbody?.querySelector("tr") as HTMLElement | null;
       if (!firstRow) {
+        // Empty state: no rows to clip against. Let CSS take over
+        // (min-h-96 floor on the empty-state container).
         setMaxScrollHeight(undefined);
         return;
       }
       const rowH = firstRow.offsetHeight;
       if (rowH <= 0) return; // not yet laid out — wait for next RO tick
-      const availH = card.clientHeight;
-      const wholeRows = Math.floor(availH / rowH);
-      const newMax = Math.max(wholeRows * rowH, rowH);
+
+      // The viewport allocation lives on an ancestor up the chain
+      // (ListPageShell.Body, which is flex-1 of ListPageShell). Since
+      // the card has no flex-1 anymore, card.clientHeight = card's
+      // natural size (= content). Walk up to the ListPageShell.Body
+      // (the closest ancestor with the data-list-page-shell-body
+      // marker — fall back to the second ancestor if the marker is
+      // absent on a non-shell page).
+      const allocAncestor =
+        (wrapper.closest("[data-list-page-body]") as HTMLElement | null) ??
+        card.parentElement;
+      const availH = allocAncestor?.clientHeight ?? card.clientHeight;
+
+      // tbody.scrollHeight is the actual content height (sum of all
+      // rows + any borders/padding). If it fits within the
+      // allocation, no clip — CSS max-h-full naturally caps to
+      // parent and content is shorter than that.
+      const contentH = tbody?.scrollHeight ?? 0;
+      if (contentH <= availH) {
+        setMaxScrollHeight((prev) => (prev === undefined ? prev : undefined));
+        return;
+      }
+
+      // Content overflows. Clip to whole rows.
+      const wholeRows = Math.max(Math.floor(availH / rowH), 1);
+      const newMax = wholeRows * rowH;
       setMaxScrollHeight((prev) => (prev === newMax ? prev : newMax));
     };
 

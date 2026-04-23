@@ -135,7 +135,11 @@ describe('DataTable — fillBody composes the flex-fill classes', () => {
         expect(cls).toContain('md:overflow-hidden');
     });
 
-    it('with fillBody the scroll wrapper gets flex-1 + min-h-0 + overflow-y-auto', () => {
+    it('with fillBody the scroll wrapper gets max-h-full + min-h-0 + overflow-y-auto', () => {
+        // Updated for content-sized cards — fillBody dropped flex-1
+        // in favour of max-h-full so the wrapper can shrink to
+        // content height (Evidence with 1 row, empty state) and
+        // only grows up to its parent allocation.
         const { container } = render(
             <DataTable
                 fillBody
@@ -145,13 +149,13 @@ describe('DataTable — fillBody composes the flex-fill classes', () => {
             />
         );
         const wrap = container.querySelector('#filled-table-2');
-        // The scroll wrapper is the table's overflow-x-auto div —
-        // the only descendant of the card that has overflow-x-auto.
         const scrollWrapper = wrap!.querySelector('.overflow-x-auto');
         expect(scrollWrapper).not.toBeNull();
         const cls = scrollWrapper!.className;
-        expect(cls).toContain('md:flex-1');
+        expect(cls).toContain('md:max-h-full');
         expect(cls).toContain('md:min-h-0');
         expect(cls).toContain('md:overflow-y-auto');
+        // Defensive: the legacy flex-1 must NOT be present anymore.
+        expect(cls).not.toContain('md:flex-1');
     });
 });
