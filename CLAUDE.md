@@ -359,6 +359,32 @@ Never add raw `<table>` elements in app pages. Use the
 `useListPagination` adapter for cursor-based APIs. See
 `tests/guards/epic52-datatable-ratchet.test.ts`.
 
+**List-page layout (the viewport-clamped scroll pattern):**
+Wrap the page in `<ListPageShell>` from `@/components/layout/ListPageShell`
+and pass `fillBody` to the primary `<DataTable>`. Result: the table
+card fits the viewport, only the table body scrolls — page header,
+filter toolbar, and pagination footer stay anchored. On mobile (<md)
+the shell is a no-op and natural document scroll resumes.
+
+```tsx
+<ListPageShell>
+  <ListPageShell.Header>...</ListPageShell.Header>
+  <ListPageShell.Filters><FilterToolbar ... /></ListPageShell.Filters>
+  <ListPageShell.Body>
+    <DataTable fillBody data={...} columns={...} />
+  </ListPageShell.Body>
+</ListPageShell>
+```
+
+A new app page that imports `DataTable` MUST either wrap in
+`<ListPageShell>` OR add itself to `EXEMPTIONS` in
+`tests/guards/list-page-shell-coverage.test.ts` with a written
+reason. Exemptions exist for multi-section dashboards (Coverage,
+admin/api-keys, admin/notifications, admin/integrations) and
+detail-page sub-tables / wizards (risks/import) where viewport-
+clamping doesn't fit. See `docs/epic-52-list-page-shell.md` for the
+decision tree.
+
 ### Epic 53 — Enterprise Filter System
 
 Use `FilterToolbar` + `FilterProvider` + `useFilterContext` from
