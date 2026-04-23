@@ -515,7 +515,13 @@ export function Table<T>({
                   "[&_tr>*:first-child]:border-l-transparent",
                   "[&_tr>*:last-child]:border-r-transparent",
                   "[&_tr>*:last-child]:border-r-transparent",
-                  "[&_th]:relative [&_th]:select-none",
+                  // Header cells are `sticky top-0` for the
+                  // viewport-clamped scroll layout. A blanket
+                  // `[&_th]:relative` here would beat the per-th
+                  // `sticky` class via selector specificity (the
+                  // descendant selector outweighs the bare class
+                  // selector). Use select-none only.
+                  "[&_th]:select-none",
                   enableColumnResizing && "[&_th]:group/resize",
                 ],
                 className,
@@ -900,7 +906,12 @@ const getCommonPinningStyles = (column: Column<any>): CSSProperties => {
   return {
     left: isPinned === "left" ? `${column.getStart("left")}px` : undefined,
     right: isPinned === "right" ? `${column.getAfter("right")}px` : undefined,
-    position: isPinned ? "sticky" : "relative",
+    // Pinned columns need `position: sticky` for horizontal pinning.
+    // Non-pinned cells: omit the inline position so the className
+    // wins — `sticky top-0` on thead cells stays effective. Setting
+    // `position: relative` here would override the className and
+    // break the sticky table header.
+    position: isPinned ? "sticky" : undefined,
   };
 };
 
