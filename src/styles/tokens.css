@@ -35,7 +35,7 @@
   --bg-overlay:   rgba(0, 12, 26, 0.70);    /* dark navy backdrop behind modals/drawers */
 
   /* ── Content / Text ────────────────────────────────────────────── */
-  --content-emphasis: #FFFFFF;   /* pure white — headings, selected items, bold labels */
+  --content-emphasis: #ECF1F7;   /* soft off-white (very subtle blue tint) — headings, selected items, bold labels */
   --content-default:  #D9E5F2;   /* light blue-tinted — body text, table cells, default content */
   --content-muted:    #95B0C9;   /* mid blue-gray — secondary text, placeholders, captions */
   --content-subtle:   #6B85A0;   /* deeper blue-gray — disabled text, hints, tertiary info */
