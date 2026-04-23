@@ -36,6 +36,27 @@ body {
   color: var(--content-emphasis);
 }
 
+/* List-page-shell document lock.
+   At md+ (≥768px) the document is locked to viewport height with
+   overflow: hidden. Anything that overflows MUST own its own scroll
+   context — this makes the "the page scrolls" failure mode
+   structurally impossible.
+   Below md the document scrolls naturally so mobile touch behaviour
+   stays predictable.
+   Print mode releases the lock so the printer sees the full document. */
+@media (min-width: 768px) {
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+}
+@media print {
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg-page); }

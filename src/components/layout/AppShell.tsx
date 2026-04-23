@@ -70,7 +70,13 @@ export function AppShell({ user, appName, children }: AppShellProps) {
     // can shrink below their content size — without this, `flex-1`
     // grows to content and the chain breaks.
     return (
-        <div className="min-h-screen md:h-screen md:overflow-hidden flex">
+        // h-full at md+ relies on the html/body lock in globals.css
+        // (height: 100%; overflow: hidden at md+). The wrapper fills
+        // exactly the viewport because its parent (body) is locked.
+        // min-h-screen is the mobile fallback — below md the body
+        // scrolls naturally and min-h-screen ensures the shell fills
+        // the visible viewport at minimum.
+        <div className="min-h-screen md:h-full md:overflow-hidden flex">
             {/* Desktop sidebar — hidden on mobile, visible on md+ */}
             <aside className="hidden md:flex w-56 bg-bg-default border-r border-border-subtle flex-col flex-shrink-0">
                 <SidebarContent user={user} onLogout={handleLogout} />
@@ -105,7 +111,16 @@ export function AppShell({ user, appName, children }: AppShellProps) {
                     </div>
                 </div>
 
-                <div className="p-4 md:p-6 max-w-7xl mx-auto md:flex-1 md:min-h-0 md:overflow-y-auto md:w-full">
+                {/* Inner content container.
+                    Mobile: just padding + max-width + centering.
+                    Desktop: ALSO a flex column itself so any
+                    <ListPageShell> child can claim flex-1 to fill
+                    height. Without `md:flex md:flex-col` here, the
+                    shell falls back to natural height and the inner
+                    div's overflow-y-auto ends up scrolling instead
+                    of the table card scrolling internally — which is
+                    the exact regression we're fixing. */}
+                <div className="p-4 md:p-6 max-w-7xl mx-auto md:flex md:flex-col md:flex-1 md:min-h-0 md:overflow-y-auto md:w-full">
                     {children}
                 </div>
             </main>

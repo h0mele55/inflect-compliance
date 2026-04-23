@@ -552,6 +552,15 @@ export function Table<T>({
                               false,
                               isColumnAfterSelect,
                             ),
+                            // Sticky header — keeps the column titles
+                            // visible while rows scroll inside the
+                            // card. `bg-bg-subtle` provides the
+                            // opaque backdrop so rows don't show
+                            // through. z-20 sits above row cells
+                            // (no z-index) but is independent of the
+                            // pinned-column z-index handled by
+                            // getCommonPinningClassNames.
+                            "sticky top-0 z-20",
                             "text-xs font-semibold text-content-muted uppercase tracking-wider bg-bg-subtle select-none",
                             getCommonPinningClassNames(
                               header.column,
