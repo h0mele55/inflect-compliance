@@ -168,18 +168,6 @@ describeFn('Guardrail: RLS coverage (pg_policies ↔ schema)', () => {
             // would be a permissive sibling that re-introduces the
             // cross-tenant UPDATE leak documented in the migration.
             'UserSession',
-            // denorm-tenantId Phase 1 — these four ownership-chained
-            // tables now carry a nullable `tenantId` column (so the
-            // DMMF-driven `directScoped` check picks them up), but the
-            // chained `EXISTS`-based RLS policy from migration
-            // 20260422180000_enable_rls_coverage is still in force.
-            // Phase 3 swaps to the trivial direct-tenant policy and
-            // adds `tenant_isolation_insert`; at that point these
-            // entries are removed from this exception set.
-            'EvidenceReview',
-            'AuditChecklistItem',
-            'FindingEvidence',
-            'AuditorPackAccess',
         ]);
 
         const { Prisma } = require('@prisma/client');

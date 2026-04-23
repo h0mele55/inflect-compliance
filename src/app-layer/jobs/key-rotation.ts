@@ -318,14 +318,15 @@ export async function runKeyRotation(
 
             // 2. v1 re-encrypt per (model, field) that carries tenantId.
             //    The manifest doesn't expose which models have a
-            //    tenantId column, so we try every manifest model and
-            //    let the SQL's tenantId filter be the arbiter — any
-            //    model without a tenantId column throws on the raw
-            //    query, which we catch and count as zero rows
-            //    processed (not an error — the manifest intentionally
-            //    contains ownership-chained tables like
-            //    EvidenceReview that lack tenantId but still hold
-            //    encrypted content).
+            //    tenantId column, so we probe each manifest model
+            //    once via `modelHasTenantIdColumn`. Models without
+            //    one are skipped — the encrypted content on those
+            //    rows can only be reached via a parent-walking
+            //    rotation, which is currently out of scope (no
+            //    ownership-chained model in the manifest after the
+            //    denorm-tenantId Phase 1–3 sequence landed
+            //    EvidenceReview + AuditChecklistItem with a direct
+            //    tenantId).
             const perField: KeyRotationPerFieldResult[] = [];
             let totalScanned = 0;
             let totalRewritten = 0;
