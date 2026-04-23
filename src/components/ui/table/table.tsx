@@ -17,6 +17,7 @@ import {
   memo,
   MouseEvent,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -491,21 +492,24 @@ export function Table<T>({
   // by flex-1 above, independent of my max-height below.
   const numRows = table.getRowModel().rows.length;
   const [maxScrollHeight, setMaxScrollHeight] = useState<number | undefined>();
-  useEffect(() => {
+  // useLayoutEffect runs synchronously after DOM commit and BEFORE
+  // the browser paints — eliminates the "first paint shows clipped
+  // wrong, then re-renders correctly" flicker. Also more reliable
+  // under Next.js fast-refresh than plain useEffect.
+  useLayoutEffect(() => {
     const wrapper = scrollWrapperRef.current;
     const card = wrapper?.parentElement;
     if (!wrapper || !card) return;
 
     const compute = () => {
-      const firstRow = wrapper.querySelector(
-        "tbody > tr",
-      ) as HTMLElement | null;
+      const tbody = wrapper.querySelector("tbody");
+      const firstRow = tbody?.querySelector("tr") as HTMLElement | null;
       if (!firstRow) {
         setMaxScrollHeight(undefined);
         return;
       }
       const rowH = firstRow.offsetHeight;
-      if (rowH <= 0) return;
+      if (rowH <= 0) return; // not yet laid out — wait for next RO tick
       const availH = card.clientHeight;
       const wholeRows = Math.floor(availH / rowH);
       const newMax = Math.max(wholeRows * rowH, rowH);
@@ -513,8 +517,14 @@ export function Table<T>({
     };
 
     compute();
+    // Observe BOTH the card (its height changes when the viewport
+    // resizes or the chrome above it changes) AND the first row
+    // (its height changes when content reflows, e.g. font load).
     const ro = new ResizeObserver(compute);
     ro.observe(card);
+    const tbody = wrapper.querySelector("tbody");
+    const firstRow = tbody?.querySelector("tr");
+    if (firstRow) ro.observe(firstRow);
     return () => ro.disconnect();
   }, [numRows]);
 
