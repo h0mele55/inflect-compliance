@@ -18,7 +18,6 @@ import {
     DataTable,
     createColumns,
     getDefaultVisibility,
-    useListPagination,
 } from '@/components/ui/table';
 import { useColumnVisibility } from '@/components/ui/hooks';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -222,10 +221,9 @@ function ControlsPageInner({
         [controls],
     );
 
-    // ─── Pagination + column visibility (Epic 52) ───
-    const pg = useListPagination({
-        resetKey: filtersForQuery.toString(),
-    });
+    // ─── Column visibility (Epic 52) ───
+    // Pagination removed — internal scroll inside the table card
+    // (ListPageShell.Body + DataTable fillBody) shows all rows.
     const controlColumnConfig = useMemo(
         () => ({
             all: ['code', 'name', 'status', 'applicability', 'owner', 'frequency', 'tasks', 'evidence'],
@@ -589,7 +587,7 @@ function ControlsPageInner({
             <ListPageShell.Body>
                 <DataTable<ControlListItem>
                     fillBody
-                    data={pg.slice(controls)}
+                    data={controls}
                     columns={controlColumns}
                     loading={loading}
                     getRowId={(c) => c.id}
@@ -602,9 +600,6 @@ function ControlsPageInner({
                     resourceName={(p) => p ? 'controls' : 'control'}
                     columnVisibility={columnVisibility}
                     onColumnVisibilityChange={setColumnVisibility}
-                    pagination={pg.pagination}
-                    onPaginationChange={pg.setPagination}
-                    rowCount={controls.length}
                     data-testid="controls-table"
                     className="hover:bg-bg-muted"
                     // Enable row selection so the Epic 52 SelectionToolbar

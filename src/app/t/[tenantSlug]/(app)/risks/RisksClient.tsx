@@ -16,7 +16,6 @@ import {
     DataTable,
     createColumns,
     getDefaultVisibility,
-    useListPagination,
 } from '@/components/ui/table';
 import { useColumnVisibility } from '@/components/ui/hooks';
 import {
@@ -186,8 +185,10 @@ function RisksPageInner({
     const risks = risksQuery.data ?? [];
     const loading = risksQuery.isLoading && !risksQuery.data;
 
-    // ─── Pagination + column visibility (Epic 52) ───
-    const pg = useListPagination({ resetKey: fetchParams.toString() });
+    // ─── Column visibility (Epic 52) ───
+    // Pagination removed in favour of internal scroll inside the
+    // table card (see ListPageShell.Body + DataTable fillBody).
+    // All filtered rows render at once; the card scrolls.
     const riskColumnConfig = useMemo(
         () => ({
             all: ['title', 'asset', 'threat', 'lxi', 'inherentScore', 'level', 'treatment', 'controls'],
@@ -419,7 +420,7 @@ function RisksPageInner({
                 ) : (
                     <DataTable<RiskListItem>
                         fillBody
-                        data={pg.slice(risks)}
+                        data={risks}
                         columns={riskColumns}
                         loading={loading}
                         getRowId={(r) => r.id}
@@ -432,9 +433,6 @@ function RisksPageInner({
                         resourceName={(p) => p ? 'risks' : 'risk'}
                         columnVisibility={columnVisibility}
                         onColumnVisibilityChange={setColumnVisibility}
-                        pagination={pg.pagination}
-                        onPaginationChange={pg.setPagination}
-                        rowCount={risks.length}
                         data-testid="risks-table"
                         className="hover:bg-bg-muted"
                     />

@@ -139,7 +139,18 @@ describe('ColumnsDropdown — source contract', () => {
 
 // ─── Epic 52 adoption ratchet ───────────────────────────────────────
 
-describe('Epic 52 adoption — migrated pages wire pagination + column visibility', () => {
+describe('Epic 52 adoption — migrated pages wire column visibility', () => {
+    // The list-page-shell work (commits c71556e / 9d7b76d / fa3105d)
+    // moved Controls / Risks / Evidence from paginated rendering to
+    // viewport-clamped internal scroll inside <ListPageShell.Body>
+    // with <DataTable fillBody>. The pagination wiring was removed
+    // because all filtered rows now render inside the table card and
+    // the card scrolls; chunking them into 24-row pages was the
+    // cause of the "I can't see my new row, must be on page 2"
+    // confusion the user reported.
+    //
+    // Column-visibility persistence was retained — that's a per-user
+    // setting independent of how rows are paged.
     const MIGRATED = [
         {
             dir: 'controls',
@@ -158,12 +169,16 @@ describe('Epic 52 adoption — migrated pages wire pagination + column visibilit
         },
     ];
 
-    it.each(MIGRATED)('%s wires useListPagination', (page) => {
+    it.each(MIGRATED)('%s wraps the table in ListPageShell with fillBody (no pagination)', (page) => {
         const src = read(`src/app/t/[tenantSlug]/(app)/${page.dir}/${page.client}`);
-        expect(src).toMatch(/useListPagination/);
-        expect(src).toMatch(/pagination=\{pg\.pagination\}/);
-        expect(src).toMatch(/onPaginationChange=\{pg\.setPagination\}/);
-        expect(src).toMatch(/rowCount=\{[^}]+\.length\}/);
+        expect(src).toContain('ListPageShell');
+        expect(src).toMatch(/\bfillBody\b/);
+        // Pagination wiring should be GONE — internal scroll is the
+        // contract. If a future PR re-adds pagination here, the
+        // user's "no additional pages" requirement is regressing.
+        expect(src).not.toMatch(/useListPagination/);
+        expect(src).not.toMatch(/pagination=\{pg\.pagination\}/);
+        expect(src).not.toMatch(/onPaginationChange=\{pg\.setPagination\}/);
     });
 
     it.each(MIGRATED)('%s wires useColumnVisibility with a namespaced storage key', (page) => {

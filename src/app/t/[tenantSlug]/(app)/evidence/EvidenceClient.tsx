@@ -23,7 +23,6 @@ import {
     DataTable,
     createColumns,
     getDefaultVisibility,
-    useListPagination,
 } from '@/components/ui/table';
 import { useColumnVisibility } from '@/components/ui/hooks';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -255,11 +254,9 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             ? expiringEvidence
             : activeEvidence;
 
-    // ─── Pagination + column visibility (Epic 52) ───
-    // Include the retention tab in the reset key so switching tabs returns to page 1.
-    const pg = useListPagination({
-        resetKey: `${fetchParams.toString()}|${retentionFilter}`,
-    });
+    // ─── Column visibility (Epic 52) ───
+    // Pagination removed — internal scroll inside the table card
+    // (ListPageShell.Body + DataTable fillBody) shows all rows.
     const evidenceColumnConfig = useMemo(
         () => ({
             all: ['title', 'type', 'control', 'retention', 'status', 'owner', 'actions'],
@@ -558,7 +555,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             <ListPageShell.Body>
                 <DataTable
                     fillBody
-                    data={pg.slice(displayEvidence)}
+                    data={displayEvidence}
                     columns={evidenceColumns}
                     getRowId={(ev: any) => ev.id}
                     emptyState={
@@ -571,9 +568,6 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                     resourceName={(p) => p ? 'evidence items' : 'evidence item'}
                     columnVisibility={columnVisibility}
                     onColumnVisibilityChange={setColumnVisibility}
-                    pagination={pg.pagination}
-                    onPaginationChange={pg.setPagination}
-                    rowCount={displayEvidence.length}
                     data-testid="evidence-table"
                     className="hover:bg-bg-muted"
                 />
