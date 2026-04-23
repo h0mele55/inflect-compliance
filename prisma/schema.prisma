@@ -105,6 +105,8 @@ model Tenant {
   auditChecklistItems       AuditChecklistItem[]
   findingEvidences          FindingEvidence[]
   auditorPackAccesses       AuditorPackAccess[]
+  // PolicyControlLink denormalisation (single-table follow-on).
+  policyControlLinks        PolicyControlLink[]
 }
 
 model TenantOnboarding {
@@ -971,6 +973,7 @@ model Policy {
   controlLinks         PolicyControlLink[]
   versions             PolicyVersion[]     @relation("PolicyVersions")
 
+  @@unique([id, tenantId])
   @@index([tenantId, slug])
   @@index([tenantId])
   @@index([tenantId, createdAt])
@@ -1030,13 +1033,24 @@ model PolicyAcknowledgement {
 }
 
 model PolicyControlLink {
+  // denorm-tenantId — direct tenantId + composite parent FK on the
+  // Policy side. The Control side stays single-column because
+  // Control.tenantId is intentionally nullable (library-derived
+  // controls are global). The pre-denorm chained RLS only walked
+  // via Policy too, so this matches the existing protection model
+  // and additionally lifts read perf into the trivial RLS path.
   id        String  @id @default(cuid())
+  tenantId  String
   policyId  String
   controlId String
   control   Control @relation(fields: [controlId], references: [id], onDelete: Cascade)
-  policy    Policy  @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policy    Policy  @relation(fields: [policyId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
 
   @@unique([policyId, controlId])
+  @@index([tenantId])
+  @@index([tenantId, policyId])
+  @@index([tenantId, controlId])
 }
 
 model PolicyTemplate {

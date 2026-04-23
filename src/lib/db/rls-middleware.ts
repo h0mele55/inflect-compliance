@@ -207,14 +207,13 @@ function extractCallerFingerprint(err: Error): string {
 
 const OWNERSHIP_CHAINED_MODELS: readonly string[] = [
     // Remaining ownership-chained tables — no `tenantId` column, RLS
-    // policy walks the parent. The four ex-members of this list
+    // policy walks the parent. Five ex-members of this list
     // (EvidenceReview, AuditChecklistItem, FindingEvidence,
-    // AuditorPackAccess) were migrated to direct-tenantId by the
-    // denorm-tenantId Phase 1–3 migration sequence and are now
-    // picked up by `enumerateDirectTenantScopedModels()` instead.
+    // AuditorPackAccess, PolicyControlLink) were migrated to
+    // direct-tenantId by the denorm-tenantId migration sequences and
+    // are now picked up by `enumerateDirectTenantScopedModels()`.
     'PolicyApproval',
     'PolicyAcknowledgement',
-    'PolicyControlLink',
 ];
 
 function enumerateDirectTenantScopedModels(): string[] {

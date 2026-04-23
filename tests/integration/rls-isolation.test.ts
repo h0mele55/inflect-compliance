@@ -196,7 +196,7 @@ describeFn('Postgres RLS Tenant Isolation', () => {
         });
 
         await globalPrisma.policyControlLink.create({
-            data: { policyId: policyA.id, controlId: controlA.id },
+            data: { tenantId: tenantAId, policyId: policyA.id, controlId: controlA.id },
         });
 
         // Create Tenant B
@@ -271,7 +271,7 @@ describeFn('Postgres RLS Tenant Isolation', () => {
         });
 
         await globalPrisma.policyControlLink.create({
-            data: { policyId: policyB.id, controlId: controlB.id },
+            data: { tenantId: tenantBId, policyId: policyB.id, controlId: controlB.id },
         });
     });
 
@@ -814,26 +814,36 @@ describeFn('Postgres RLS Tenant Isolation', () => {
             const policyB = await globalPrisma.policy.findFirst({ where: { tenantId: tenantBId, title: { contains: testRunId } } });
             const controlA = await globalPrisma.control.findFirst({ where: { tenantId: tenantAId, name: { contains: testRunId } } });
 
+            // denorm-tenantId — rejection now lands via the composite
+            // (policyId, tenantId) → Policy(id, tenantId) FK rather
+            // than the chained RLS WITH CHECK. Either rejection
+            // shape is acceptable.
             await expect(
                 withTenantDb(tenantAId, async (tx) => {
                     await tx.policyControlLink.create({
-                        data: { policyId: policyB!.id, controlId: controlA!.id },
+                        data: { tenantId: tenantAId, policyId: policyB!.id, controlId: controlA!.id },
                     });
                 }, globalPrisma)
-            ).rejects.toThrow(/new row violates row-level security policy/);
+            ).rejects.toThrow(/(violates row-level security policy|[Ff]oreign key constraint (?:violated|violation))/);
         });
 
         it('Cannot insert PolicyControlLink pointing to Tenant B control from Tenant A context', async () => {
             const policyA = await globalPrisma.policy.findFirst({ where: { tenantId: tenantAId, title: { contains: testRunId } } });
             const controlB = await globalPrisma.control.findFirst({ where: { tenantId: tenantBId, name: { contains: testRunId } } });
 
+            // Control-side single-column FK doesn't enforce tenant
+            // equality (Control.tenantId is nullable for global
+            // controls). Rejection here comes from Control's own RLS
+            // FORCE ROW LEVEL SECURITY: under tenant-A's session,
+            // Control.id=controlB.id is invisible, so the FK
+            // resolution returns 0 rows.
             await expect(
                 withTenantDb(tenantAId, async (tx) => {
                     await tx.policyControlLink.create({
-                        data: { policyId: policyA!.id, controlId: controlB!.id },
+                        data: { tenantId: tenantAId, policyId: policyA!.id, controlId: controlB!.id },
                     });
                 }, globalPrisma)
-            ).rejects.toThrow(/new row violates row-level security policy/);
+            ).rejects.toThrow(/(violates row-level security policy|[Ff]oreign key constraint (?:violated|violation))/);
         });
     });
 
