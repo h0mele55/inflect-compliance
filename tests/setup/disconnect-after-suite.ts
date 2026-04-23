@@ -45,4 +45,20 @@ afterAll(async () => {
             /* best effort */
         }
     }
+    // Epic C.4 audit-stream — cancel any pending 5s flush timer.
+    // `streamAuditEvent` schedules `setTimeout(..., 5_000).unref()` on
+    // first event. If it fires after Jest tears down, the flush does
+    // `await import('@/lib/prisma')` against a dead environment and
+    // throws "You are trying to `import` a file after the Jest
+    // environment has been torn down". Only drain if the module was
+    // actually loaded by the suite — pure-mock tests skip this.
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const mod = require('@/app-layer/events/audit-webhook') as {
+            __resetAuditStreamForTests?: () => void;
+        };
+        mod.__resetAuditStreamForTests?.();
+    } catch {
+        /* module never loaded — nothing to drain */
+    }
 });
