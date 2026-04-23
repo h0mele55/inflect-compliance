@@ -100,6 +100,11 @@ model Tenant {
   complianceSnapshots       ComplianceSnapshot[]
   automationRules           AutomationRule[]
   automationExecutions      AutomationExecution[]
+  // denorm-tenantId Phase 1 inverse relations.
+  evidenceReviews           EvidenceReview[]
+  auditChecklistItems       AuditChecklistItem[]
+  findingEvidences          FindingEvidence[]
+  auditorPackAccesses       AuditorPackAccess[]
 }
 
 model TenantOnboarding {
@@ -124,11 +129,11 @@ model TenantOnboarding {
 model TenantCustomRole {
   id              String             @id @default(cuid())
   tenantId        String
-  name            String             /// Display name, e.g. "Compliance Lead"
-  description     String?            /// Optional description of the role's purpose
+  name            String /// Display name, e.g. "Compliance Lead"
+  description     String? /// Optional description of the role's purpose
   baseRole        Role               @default(READER) /// Fallback enum role for coarse checks
-  permissionsJson Json               /// Typed PermissionSet — see src/lib/permissions.ts
-  isActive        Boolean            @default(true)   /// Soft-disable without deleting assignments
+  permissionsJson Json /// Typed PermissionSet — see src/lib/permissions.ts
+  isActive        Boolean            @default(true) /// Soft-disable without deleting assignments
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   tenant          Tenant             @relation(fields: [tenantId], references: [id])
@@ -145,15 +150,15 @@ model TenantCustomRole {
 model TenantApiKey {
   id          String    @id @default(cuid())
   tenantId    String
-  name        String    /// Human-friendly label, e.g. "CI/CD Pipeline"
-  keyPrefix   String    /// First 8 chars of the plaintext key (for identification)
-  keyHash     String    /// SHA-256 hash of the full plaintext key
+  name        String /// Human-friendly label, e.g. "CI/CD Pipeline"
+  keyPrefix   String /// First 8 chars of the plaintext key (for identification)
+  keyHash     String /// SHA-256 hash of the full plaintext key
   scopes      Json      @default("[]") /// JSON array of scope strings, e.g. ["controls:read","evidence:write"]
   expiresAt   DateTime? /// Optional expiry — null = no expiry
   revokedAt   DateTime? /// Non-null = revoked
   lastUsedAt  DateTime? /// Updated on each successful auth
-  lastUsedIp  String?   /// IP of last auth request
-  createdById String    /// User who created this key
+  lastUsedIp  String? /// IP of last auth request
+  createdById String /// User who created this key
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   tenant      Tenant    @relation(fields: [tenantId], references: [id])
@@ -169,7 +174,7 @@ model TenantMembership {
   tenantId        String
   userId          String
   role            Role              @default(READER)
-  customRoleId    String?           /// Optional FK to TenantCustomRole for granular overrides
+  customRoleId    String? /// Optional FK to TenantCustomRole for granular overrides
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   deactivatedAt   DateTime?
@@ -247,6 +252,7 @@ model User {
   vendorDocsUploaded            VendorDocument[]             @relation("VendorDocUploader")
   vendorBundlesCreated          VendorEvidenceBundle[]       @relation("EvidenceBundleCreator")
   apiKeysCreated                TenantApiKey[]               @relation("ApiKeyCreator")
+  userSessions                  UserSession[]                @relation("UserSessionOwner")
 }
 
 model Account {
@@ -277,6 +283,51 @@ model AuthSession {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("Session")
+}
+
+// Epic C.3 — operational session tracking (separate from the
+// NextAuth-adapter `AuthSession` table, which we leave untouched to
+// avoid churning the adapter contract). One row per JWT minted by the
+// `jwt` callback. Subsequent passes look this row up by `sessionId`,
+// honour `revokedAt`, and update `lastActiveAt` (throttled).
+//
+// Privacy notes:
+//   - `ipAddress` is captured from the incoming request at sign-in;
+//     stored as a string (IPv4 / IPv6) so geo-IP correlation can
+//     happen out-of-band. Acceptable under the existing PII model
+//     because it's tied to the user's own auth event.
+//   - `userAgent` is truncated to 512 chars to bound row size.
+//   - Neither field is encrypted; both are operational telemetry,
+//     not business content. If your threat model demands it, route
+//     them through the encrypted-fields manifest later.
+model UserSession {
+  id            String    @id @default(cuid())
+  /// Stable identifier embedded in the JWT so subsequent requests can
+  /// find this row without trusting any other token claim. Min-entropy
+  /// of cuid is acceptable; the token itself is signed by AUTH_SECRET
+  /// so a guessed sessionId on its own does nothing.
+  sessionId     String    @unique
+  userId        String
+  /// Tenant the user signed in against. Nullable because the very
+  /// first JWT mint may precede tenant resolution (rare but possible).
+  tenantId      String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  lastActiveAt  DateTime  @default(now())
+  revokedAt     DateTime?
+  /// Free-form attribution for the revocation (e.g. "admin:abc123" or
+  /// "user:self"). Not displayed to end users; surfaced in the audit
+  /// log entry.
+  revokedReason String?
+
+  user User @relation("UserSessionOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([userId, revokedAt])
+  @@index([tenantId, revokedAt])
 }
 
 model VerificationToken {
@@ -745,8 +796,8 @@ model Evidence {
   fileSize          Int?
   category          String?
   dateCollected     DateTime                  @default(now())
-  owner             String?                                         // Legacy free-text — kept for backward compat
-  ownerUserId       String?                                         // Real user FK — used for due-item routing & notifications
+  owner             String? // Legacy free-text — kept for backward compat
+  ownerUserId       String? // Real user FK — used for due-item routing & notifications
   reviewCycle       ReviewCadence?
   nextReviewDate    DateTime?
   status            EvidenceStatus            @default(DRAFT)
@@ -769,6 +820,7 @@ model Evidence {
   findingLinks      FindingEvidence[]
   reminderHistories ReminderHistory[]
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, createdAt])
   @@index([tenantId, deletedAt])
@@ -811,7 +863,12 @@ model FileRecord {
 }
 
 model EvidenceReview {
+  // Phase 1 of denorm-tenantId: column added nullable, backfilled
+  // from evidence.tenantId. Phase 2 flips NOT NULL + composite FK
+  // (evidenceId, tenantId) → Evidence(id, tenantId). Phase 3 swaps
+  // the chained RLS policy for the trivial direct form.
   id         String       @id @default(cuid())
+  tenantId   String?
   evidenceId String
   reviewerId String
   action     ReviewAction
@@ -819,6 +876,10 @@ model EvidenceReview {
   createdAt  DateTime     @default(now())
   evidence   Evidence     @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
   reviewer   User         @relation(fields: [reviewerId], references: [id])
+  tenant     Tenant?      @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, evidenceId])
 }
 
 model AuditLog {
@@ -878,36 +939,36 @@ model ReminderHistory {
 }
 
 model Policy {
-  id                    String              @id @default(cuid())
-  tenantId              String
-  slug                  String
-  title                 String
-  description           String?
-  category              String?
-  status                PolicyStatus        @default(DRAFT)
-  currentVersionId      String?             @unique
-  ownerUserId           String?
-  reviewFrequencyDays   Int?
-  nextReviewAt          DateTime?
-  language              String?             @default("en")
+  id                   String              @id @default(cuid())
+  tenantId             String
+  slug                 String
+  title                String
+  description          String?
+  category             String?
+  status               PolicyStatus        @default(DRAFT)
+  currentVersionId     String?             @unique
+  ownerUserId          String?
+  reviewFrequencyDays  Int?
+  nextReviewAt         DateTime?
+  language             String?             @default("en")
   /// Lifecycle version counter (matches CISO-Assistant editing_version).
   /// 1 = initial content, 2+ = published. Incremented only on publish.
-  lifecycleVersion      Int                 @default(1)
+  lifecycleVersion     Int                 @default(1)
   /// Persisted history of prior published snapshots as JSON array.
   /// Matches CISO-Assistant editing_history. Entries have fields:
   /// version, payload, publishedAt, publishedBy, changeSummary (optional)
-  lifecycleHistoryJson  Json?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  deletedAt             DateTime?
-  deletedByUserId       String?
-  retentionUntil        DateTime?
-  currentVersion        PolicyVersion?      @relation("CurrentVersion", fields: [currentVersionId], references: [id])
-  owner                 User?               @relation("PolicyOwner", fields: [ownerUserId], references: [id])
-  tenant                Tenant              @relation(fields: [tenantId], references: [id])
-  approvals             PolicyApproval[]
-  controlLinks          PolicyControlLink[]
-  versions              PolicyVersion[]     @relation("PolicyVersions")
+  lifecycleHistoryJson Json?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  deletedAt            DateTime?
+  deletedByUserId      String?
+  retentionUntil       DateTime?
+  currentVersion       PolicyVersion?      @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  owner                User?               @relation("PolicyOwner", fields: [ownerUserId], references: [id])
+  tenant               Tenant              @relation(fields: [tenantId], references: [id])
+  approvals            PolicyApproval[]
+  controlLinks         PolicyControlLink[]
+  versions             PolicyVersion[]     @relation("PolicyVersions")
 
   @@index([tenantId, slug])
   @@index([tenantId])
@@ -1009,12 +1070,16 @@ model Audit {
   checklist       AuditChecklistItem[]
   findings        Finding[]
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, deletedAt])
 }
 
 model AuditChecklistItem {
+  // Phase 1 of denorm-tenantId: see EvidenceReview for the
+  // three-phase shape.
   id          String          @id @default(cuid())
+  tenantId    String?
   auditId     String
   prompt      String
   result      ChecklistResult @default(NOT_TESTED)
@@ -1022,6 +1087,10 @@ model AuditChecklistItem {
   evidenceRef String?
   sortOrder   Int             @default(0)
   audit       Audit           @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  tenant      Tenant?         @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, auditId])
 }
 
 model Finding {
@@ -1048,59 +1117,70 @@ model Finding {
   tenant            Tenant            @relation(fields: [tenantId], references: [id])
   evidenceLinks     FindingEvidence[]
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, deletedAt])
 }
 
 model FindingEvidence {
+  // Phase 1 of denorm-tenantId: see EvidenceReview for the
+  // three-phase shape. As a junction across two tenant-scoped
+  // parents (Finding × Evidence), Phase 2 lands two composite FKs —
+  // one per parent — which structurally guarantees both parents
+  // share the row's tenantId.
   id         String   @id @default(cuid())
+  tenantId   String?
   findingId  String
   evidenceId String
   evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
   finding    Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
 
   @@unique([findingId, evidenceId])
+  @@index([tenantId])
+  @@index([tenantId, findingId])
+  @@index([tenantId, evidenceId])
 }
 
 model Framework {
-  id           String                 @id @default(cuid())
-  key          String                 @unique
-  description  String?
-  name         String
-  version      String?
-  metadataJson String?
-  contentHash  String?
-  sourceUrn    String?
-  createdAt    DateTime               @default(now())
-  updatedAt    DateTime               @default(now()) @updatedAt
-  kind         FrameworkKind          @default(ISO_STANDARD)
-  packs                   FrameworkPack[]
-  requirements            FrameworkRequirement[]
-  mappingSetsAsSource     RequirementMappingSet[]  @relation("MappingSetSource")
-  mappingSetsAsTarget     RequirementMappingSet[]  @relation("MappingSetTarget")
+  id                  String                  @id @default(cuid())
+  key                 String                  @unique
+  description         String?
+  name                String
+  version             String?
+  metadataJson        String?
+  contentHash         String?
+  sourceUrn           String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @default(now()) @updatedAt
+  kind                FrameworkKind           @default(ISO_STANDARD)
+  packs               FrameworkPack[]
+  requirements        FrameworkRequirement[]
+  mappingSetsAsSource RequirementMappingSet[] @relation("MappingSetSource")
+  mappingSetsAsTarget RequirementMappingSet[] @relation("MappingSetTarget")
 
   @@unique([key, version])
 }
 
 model FrameworkRequirement {
-  id            String                           @id @default(cuid())
-  frameworkId   String
-  code          String
-  title         String
-  description   String?
-  category      String?
-  sortOrder     Int                              @default(0)
-  theme         String?
-  themeNumber   Int?
-  section       String?
-  deprecatedAt  DateTime?
+  id                      String                           @id @default(cuid())
+  frameworkId             String
+  code                    String
+  title                   String
+  description             String?
+  category                String?
+  sortOrder               Int                              @default(0)
+  theme                   String?
+  themeNumber             Int?
+  section                 String?
+  deprecatedAt            DateTime?
   controlLinks            ControlRequirementLink[]
   templateLinks           ControlTemplateRequirementLink[]
   mappingsFrom            FrameworkMapping[]               @relation("MappingFrom")
   mappingsTo              FrameworkMapping[]               @relation("MappingTo")
   requirementMappingsFrom RequirementMapping[]             @relation("ReqMappingSource")
   requirementMappingsTo   RequirementMapping[]             @relation("ReqMappingTarget")
-  framework     Framework                        @relation(fields: [frameworkId], references: [id])
+  framework               Framework                        @relation(fields: [frameworkId], references: [id])
 
   @@unique([frameworkId, code])
 }
@@ -1149,19 +1229,19 @@ model FrameworkMapping {
 // Individual Mappings carry explicit strength semantics.
 
 model RequirementMappingSet {
-  id                  String               @id @default(cuid())
-  sourceFrameworkId   String
-  targetFrameworkId   String
-  name                String
-  description         String?
-  version             Int                  @default(1)
-  sourceUrn           String?                                     // Provenance URN from library system
-  contentHash         String?                                     // Deduplication hash
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @default(now()) @updatedAt
-  sourceFramework     Framework            @relation("MappingSetSource", fields: [sourceFrameworkId], references: [id])
-  targetFramework     Framework            @relation("MappingSetTarget", fields: [targetFrameworkId], references: [id])
-  mappings            RequirementMapping[]
+  id                String               @id @default(cuid())
+  sourceFrameworkId String
+  targetFrameworkId String
+  name              String
+  description       String?
+  version           Int                  @default(1)
+  sourceUrn         String? // Provenance URN from library system
+  contentHash       String? // Deduplication hash
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @default(now()) @updatedAt
+  sourceFramework   Framework            @relation("MappingSetSource", fields: [sourceFrameworkId], references: [id])
+  targetFramework   Framework            @relation("MappingSetTarget", fields: [targetFrameworkId], references: [id])
+  mappings          RequirementMapping[]
 
   @@unique([sourceFrameworkId, targetFrameworkId])
   @@index([sourceFrameworkId])
@@ -1169,17 +1249,17 @@ model RequirementMappingSet {
 }
 
 model RequirementMapping {
-  id                    String               @id @default(cuid())
-  mappingSetId          String
-  sourceRequirementId   String
-  targetRequirementId   String
-  strength              MappingStrength      @default(RELATED)
-  rationale             String?
-  metadataJson          String?                                   // Provenance, ingestion source, extra context
-  createdAt             DateTime             @default(now())
-  mappingSet            RequirementMappingSet @relation(fields: [mappingSetId], references: [id], onDelete: Cascade)
-  sourceRequirement     FrameworkRequirement  @relation("ReqMappingSource", fields: [sourceRequirementId], references: [id])
-  targetRequirement     FrameworkRequirement  @relation("ReqMappingTarget", fields: [targetRequirementId], references: [id])
+  id                  String                @id @default(cuid())
+  mappingSetId        String
+  sourceRequirementId String
+  targetRequirementId String
+  strength            MappingStrength       @default(RELATED)
+  rationale           String?
+  metadataJson        String? // Provenance, ingestion source, extra context
+  createdAt           DateTime              @default(now())
+  mappingSet          RequirementMappingSet @relation(fields: [mappingSetId], references: [id], onDelete: Cascade)
+  sourceRequirement   FrameworkRequirement  @relation("ReqMappingSource", fields: [sourceRequirementId], references: [id])
+  targetRequirement   FrameworkRequirement  @relation("ReqMappingTarget", fields: [targetRequirementId], references: [id])
 
   @@unique([mappingSetId, sourceRequirementId, targetRequirementId])
   @@index([sourceRequirementId])
@@ -1324,34 +1404,34 @@ model QuestionnaireQuestion {
 }
 
 model VendorAssessment {
-  id                    String                   @id @default(cuid())
-  tenantId              String
-  vendorId              String
-  templateId            String
-  status                AssessmentStatus         @default(DRAFT)
-  startedAt             DateTime                 @default(now())
-  submittedAt           DateTime?
-  decidedAt             DateTime?
-  requestedByUserId     String
-  decidedByUserId       String?
-  score                 Float?
-  riskRating            VendorCriticality?
-  notes                 String?
-  nextReviewAt          DateTime?
+  id                   String                   @id @default(cuid())
+  tenantId             String
+  vendorId             String
+  templateId           String
+  status               AssessmentStatus         @default(DRAFT)
+  startedAt            DateTime                 @default(now())
+  submittedAt          DateTime?
+  decidedAt            DateTime?
+  requestedByUserId    String
+  decidedByUserId      String?
+  score                Float?
+  riskRating           VendorCriticality?
+  notes                String?
+  nextReviewAt         DateTime?
   /// Lifecycle version counter (matches CISO-Assistant editing_version).
   /// 1 = initial, 2+ = approved. Incremented on each approval cycle.
-  lifecycleVersion      Int                      @default(1)
+  lifecycleVersion     Int                      @default(1)
   /// Persisted history of prior assessment snapshots as JSON array.
   /// Matches CISO-Assistant editing_history.
-  lifecycleHistoryJson  Json?
-  createdAt             DateTime                 @default(now())
-  updatedAt             DateTime                 @updatedAt
-  decidedBy             User?                    @relation("AssessmentDecider", fields: [decidedByUserId], references: [id])
-  requestedBy           User                     @relation("AssessmentRequester", fields: [requestedByUserId], references: [id])
-  template              QuestionnaireTemplate    @relation(fields: [templateId], references: [id])
-  tenant                Tenant                   @relation(fields: [tenantId], references: [id])
-  vendor                Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  answers               VendorAssessmentAnswer[]
+  lifecycleHistoryJson Json?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  decidedBy            User?                    @relation("AssessmentDecider", fields: [decidedByUserId], references: [id])
+  requestedBy          User                     @relation("AssessmentRequester", fields: [requestedByUserId], references: [id])
+  template             QuestionnaireTemplate    @relation(fields: [templateId], references: [id])
+  tenant               Tenant                   @relation(fields: [tenantId], references: [id])
+  vendor               Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  answers              VendorAssessmentAnswer[]
 
   @@index([tenantId, vendorId])
   @@index([tenantId, status])
@@ -1482,6 +1562,7 @@ model AuditPack {
   shares          AuditPackShare[]
   auditorAccess   AuditorPackAccess[]
 
+  @@unique([id, tenantId])
   @@index([tenantId, auditCycleId])
   @@index([tenantId, deletedAt])
 }
@@ -1532,19 +1613,27 @@ model AuditorAccount {
   tenant         Tenant              @relation(fields: [tenantId], references: [id])
   packAccess     AuditorPackAccess[]
 
+  @@unique([id, tenantId])
   @@unique([tenantId, email])
   @@index([emailHash])
 }
 
 model AuditorPackAccess {
+  // Phase 1 of denorm-tenantId: see FindingEvidence for the
+  // junction-table shape (two composite FKs in Phase 2).
   id          String         @id @default(cuid())
+  tenantId    String?
   auditorId   String
   auditPackId String
   grantedAt   DateTime       @default(now())
   pack        AuditPack      @relation(fields: [auditPackId], references: [id])
   auditor     AuditorAccount @relation(fields: [auditorId], references: [id])
+  tenant      Tenant?        @relation(fields: [tenantId], references: [id])
 
   @@unique([auditorId, auditPackId])
+  @@index([tenantId])
+  @@index([tenantId, auditPackId])
+  @@index([tenantId, auditorId])
 }
 
 model ControlTestPlan {
@@ -1758,14 +1847,29 @@ model UserIdentityLink {
 }
 
 model TenantSecuritySettings {
-  id                   String    @id @default(cuid())
-  tenantId             String    @unique
-  mfaPolicy            MfaPolicy @default(DISABLED)
-  sessionMaxAgeMinutes Int?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  mfaFailClosed        Boolean   @default(false)
-  tenant               Tenant    @relation(fields: [tenantId], references: [id])
+  id                          String    @id @default(cuid())
+  tenantId                    String    @unique
+  mfaPolicy                   MfaPolicy @default(DISABLED)
+  /// Hard cap on JWT lifetime in minutes. When set, every newly minted
+  /// session row's `expiresAt` is min(NextAuth max-age, now + this).
+  sessionMaxAgeMinutes        Int?
+  /// Maximum number of concurrent active sessions allowed per user
+  /// in this tenant. When reached, the oldest session (by
+  /// `lastActiveAt` ASC) is revoked to make room for the new sign-in.
+  /// Null = unlimited (legacy behaviour).
+  maxConcurrentSessions       Int?
+  /// Epic C.4 — outbound audit-event streaming.
+  /// `auditWebhookUrl`: HTTPS endpoint the audit streamer POSTs batched
+  /// audit events to. Null disables streaming.
+  /// `auditWebhookSecretEncrypted`: HMAC-SHA256 secret used to sign
+  /// each batch. Stored encrypted via the field-encryption manifest
+  /// (added to `ENCRYPTED_FIELDS.TenantSecuritySettings`).
+  auditWebhookUrl             String?
+  auditWebhookSecretEncrypted String?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
+  mfaFailClosed               Boolean   @default(false)
+  tenant                      Tenant    @relation(fields: [tenantId], references: [id])
 }
 
 model UserMfaEnrollment {
@@ -1823,18 +1927,18 @@ model TenantScimToken {
 }
 
 model IntegrationConnection {
-  id              String                 @id @default(cuid())
+  id              String                   @id @default(cuid())
   tenantId        String
   provider        String
   name            String
-  isEnabled       Boolean                @default(true)
-  configJson      Json                   @default("{}")
+  isEnabled       Boolean                  @default(true)
+  configJson      Json                     @default("{}")
   secretEncrypted String?
   lastTestedAt    DateTime?
   lastTestStatus  String?
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id])
   executions      IntegrationExecution[]
   syncMappings    IntegrationSyncMapping[]
 
@@ -1897,7 +2001,7 @@ model IntegrationWebhookEvent {
 // (e.g., 'IntegrationSyncMapping' instead of 'integration_sync_mappings').
 // The isolated AuthSession model mapped strictly to "Session" remains an anomaly.
 model IntegrationSyncMapping {
-  id                String              @id @default(cuid())
+  id                String                 @id @default(cuid())
   tenantId          String
   provider          String
   connectionId      String?
@@ -1905,19 +2009,19 @@ model IntegrationSyncMapping {
   localEntityId     String
   remoteEntityType  String
   remoteEntityId    String
-  syncStatus        SyncStatus          @default(PENDING)
+  syncStatus        SyncStatus             @default(PENDING)
   lastSyncDirection SyncDirection?
-  conflictStrategy  ConflictStrategy    @default(REMOTE_WINS)
+  conflictStrategy  ConflictStrategy       @default(REMOTE_WINS)
   localUpdatedAt    DateTime?
   remoteUpdatedAt   DateTime?
   remoteDataJson    Json?
-  version           Int                 @default(1)
+  version           Int                    @default(1)
   errorMessage      String?
   lastSyncedAt      DateTime?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
   connection        IntegrationConnection? @relation(fields: [connectionId], references: [id])
-  tenant            Tenant              @relation(fields: [tenantId], references: [id])
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, provider, localEntityType, localEntityId])
   @@unique([tenantId, provider, remoteEntityType, remoteEntityId])
@@ -2311,11 +2415,11 @@ enum FrameworkKind {
 // Defines the semantic strength of a mapping between two requirement nodes.
 // Used by RequirementMapping to express how closely two requirements align.
 enum MappingStrength {
-  EQUAL      // Semantically equivalent: source and target express the same obligation
-  SUPERSET   // Source fully covers target: implementing source satisfies target
-  SUBSET     // Source partially covers target: implementing source only partially satisfies target
-  INTERSECT  // Partial overlap: source and target share common ground but neither fully covers the other
-  RELATED    // Conceptually related: useful for awareness but no direct coverage claim
+  EQUAL // Semantically equivalent: source and target express the same obligation
+  SUPERSET // Source fully covers target: implementing source satisfies target
+  SUBSET // Source partially covers target: implementing source only partially satisfies target
+  INTERSECT // Partial overlap: source and target share common ground but neither fully covers the other
+  RELATED // Conceptually related: useful for awareness but no direct coverage claim
 }
 
 enum VendorStatus {
@@ -2455,60 +2559,60 @@ enum ConflictStrategy {
 /// One row per tenant per day. Idempotent via @@unique([tenantId, snapshotDate]).
 /// Stores denormalized KPI values computed by the daily snapshot job.
 model ComplianceSnapshot {
-  id                    String   @id @default(cuid())
-  tenantId              String
+  id           String   @id @default(cuid())
+  tenantId     String
   /// Calendar date (midnight UTC) — NOT a full timestamp.
   /// Enables clean GROUP BY / ORDER BY for trend queries.
-  snapshotDate          DateTime @db.Date
+  snapshotDate DateTime @db.Date
 
   // ── Control Coverage ──
-  controlsTotal         Int      @default(0)
-  controlsApplicable    Int      @default(0)
-  controlsImplemented   Int      @default(0)
-  controlsInProgress    Int      @default(0)
-  controlsNotStarted    Int      @default(0)
+  controlsTotal       Int @default(0)
+  controlsApplicable  Int @default(0)
+  controlsImplemented Int @default(0)
+  controlsInProgress  Int @default(0)
+  controlsNotStarted  Int @default(0)
   /// Cached coverage % × 10 (e.g. 753 = 75.3%). Int avoids float precision issues.
-  controlCoverageBps    Int      @default(0)
+  controlCoverageBps  Int @default(0)
 
   // ── Risks ──
-  risksTotal            Int      @default(0)
-  risksOpen             Int      @default(0)
-  risksMitigating       Int      @default(0)
-  risksAccepted         Int      @default(0)
-  risksClosed           Int      @default(0)
-  risksLow              Int      @default(0)
-  risksMedium           Int      @default(0)
-  risksHigh             Int      @default(0)
-  risksCritical         Int      @default(0)
+  risksTotal      Int @default(0)
+  risksOpen       Int @default(0)
+  risksMitigating Int @default(0)
+  risksAccepted   Int @default(0)
+  risksClosed     Int @default(0)
+  risksLow        Int @default(0)
+  risksMedium     Int @default(0)
+  risksHigh       Int @default(0)
+  risksCritical   Int @default(0)
 
   // ── Evidence ──
-  evidenceTotal         Int      @default(0)
-  evidenceOverdue       Int      @default(0)
-  evidenceDueSoon7d     Int      @default(0)
-  evidenceDueSoon30d    Int      @default(0)
-  evidenceCurrent       Int      @default(0)
+  evidenceTotal      Int @default(0)
+  evidenceOverdue    Int @default(0)
+  evidenceDueSoon7d  Int @default(0)
+  evidenceDueSoon30d Int @default(0)
+  evidenceCurrent    Int @default(0)
 
   // ── Policies ──
-  policiesTotal         Int      @default(0)
-  policiesPublished     Int      @default(0)
-  policiesOverdueReview Int      @default(0)
+  policiesTotal         Int @default(0)
+  policiesPublished     Int @default(0)
+  policiesOverdueReview Int @default(0)
 
   // ── Tasks ──
-  tasksTotal            Int      @default(0)
-  tasksOpen             Int      @default(0)
-  tasksOverdue          Int      @default(0)
+  tasksTotal   Int @default(0)
+  tasksOpen    Int @default(0)
+  tasksOverdue Int @default(0)
 
   // ── Vendors ──
-  vendorsTotal          Int      @default(0)
-  vendorsOverdueReview  Int      @default(0)
+  vendorsTotal         Int @default(0)
+  vendorsOverdueReview Int @default(0)
 
   // ── Findings ──
-  findingsOpen          Int      @default(0)
+  findingsOpen Int @default(0)
 
   // ── Meta ──
-  createdAt             DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([tenantId, snapshotDate])
   @@index([tenantId, snapshotDate])
@@ -2536,44 +2640,44 @@ model ComplianceSnapshot {
 // ═══════════════════════════════════════════════════════════════════════
 
 model AutomationRule {
-  id                 String                   @id @default(cuid())
-  tenantId           String
-  name               String
-  description        String?
+  id                String               @id @default(cuid())
+  tenantId          String
+  name              String
+  description       String?
   /// The event name this rule subscribes to. Free-form string so new
   /// events can be emitted without a migration; the canonical catalog
   /// lives at src/app-layer/automation/events.ts so typos are caught
   /// at the producer side, not here.
-  triggerEvent       String
+  triggerEvent      String
   /// Optional filter expression (e.g. `{ severity: "CRITICAL" }`).
   /// Evaluated by the dispatcher against the event payload before any
   /// action fires. `null` means "match every event of this type".
-  triggerFilterJson  Json?
-  actionType         AutomationActionType
+  triggerFilterJson Json?
+  actionType        AutomationActionType
   /// Action-specific config. Shape depends on `actionType`:
   ///   NOTIFY_USER       → { userIds: string[], message: string }
   ///   CREATE_TASK       → { title, severity, assigneeUserId? }
   ///   UPDATE_STATUS     → { entityType, field, toStatus }
   ///   WEBHOOK           → { url, method, headers?, secretRef? }
-  actionConfigJson   Json
-  status             AutomationRuleStatus     @default(DRAFT)
+  actionConfigJson  Json
+  status            AutomationRuleStatus @default(DRAFT)
   /// Higher priority runs first when multiple rules match the same
   /// event. Ties broken by `createdAt`.
-  priority           Int                      @default(0)
+  priority          Int                  @default(0)
   /// Cheap dashboard counters. Incremented by the dispatcher; never
   /// the source of truth (AutomationExecution is).
-  executionCount     Int                      @default(0)
-  lastTriggeredAt    DateTime?
-  createdByUserId    String?
-  updatedByUserId    String?
-  createdAt          DateTime                 @default(now())
-  updatedAt          DateTime                 @updatedAt
+  executionCount    Int                  @default(0)
+  lastTriggeredAt   DateTime?
+  createdByUserId   String?
+  updatedByUserId   String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
   /// Soft-delete. Archived rules stop firing but their execution
   /// history survives for audit.
-  deletedAt          DateTime?
+  deletedAt         DateTime?
 
-  tenant             Tenant                   @relation(fields: [tenantId], references: [id])
-  executions         AutomationExecution[]
+  tenant     Tenant                @relation(fields: [tenantId], references: [id])
+  executions AutomationExecution[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -2584,7 +2688,7 @@ model AutomationRule {
 }
 
 model AutomationExecution {
-  id                 String                       @id @default(cuid())
+  id                 String                    @id @default(cuid())
   tenantId           String
   ruleId             String
   /// Denormalised copy of the rule's trigger event at fire time so
@@ -2594,7 +2698,7 @@ model AutomationExecution {
   /// Snapshot of the event payload that matched. Kept verbatim for
   /// replay + audit — the shape depends on the event producer.
   triggerPayloadJson Json
-  status             AutomationExecutionStatus    @default(PENDING)
+  status             AutomationExecutionStatus @default(PENDING)
   /// Action output (e.g. created task ids, notified user ids, webhook
   /// response code). Shape mirrors the rule's `actionType`.
   outcomeJson        Json?
@@ -2607,17 +2711,17 @@ model AutomationExecution {
   /// What caused the fire. `event` for normal event-bus dispatch,
   /// `manual` for admin-triggered replay, `schedule` for cron
   /// re-evaluation of pending rules.
-  triggeredBy        String                       @default("event")
+  triggeredBy        String                    @default("event")
   /// Deduplication handle. The dispatcher computes this from
   /// (ruleId, event, stable identifier in payload) so a retried
   /// event never double-fires an action. Unique per tenant when set.
   idempotencyKey     String?
   startedAt          DateTime?
   completedAt        DateTime?
-  createdAt          DateTime                     @default(now())
+  createdAt          DateTime                  @default(now())
 
-  tenant             Tenant                       @relation(fields: [tenantId], references: [id])
-  rule               AutomationRule               @relation(fields: [ruleId], references: [id])
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  rule   AutomationRule @relation(fields: [ruleId], references: [id])
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId])

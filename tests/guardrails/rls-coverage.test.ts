@@ -35,7 +35,19 @@ const describeFn = DB_AVAILABLE ? describe : describe.skip;
 
 describeFn('Guardrail: RLS coverage (pg_policies ↔ schema)', () => {
     let prisma: PrismaClient;
-    let policies: Array<{ tablename: string; policyname: string; cmd: string }>;
+    let policies: Array<{
+        tablename: string;
+        policyname: string;
+        cmd: string;
+        // `qual` is the USING expression; `with_check` is the
+        // WITH CHECK expression. Both come back as raw SQL strings or
+        // null when the clause was omitted at CREATE POLICY time. We
+        // lift them out of pg_catalog so the SINGLE_POLICY_EXCEPTIONS
+        // sanity check can verify the asymmetric shape is real, not
+        // just that the policy name exists.
+        qual: string | null;
+        with_check: string | null;
+    }>;
     let forcedTables: Set<string>;
 
     beforeAll(async () => {
@@ -43,7 +55,7 @@ describeFn('Guardrail: RLS coverage (pg_policies ↔ schema)', () => {
         await prisma.$connect();
 
         policies = await prisma.$queryRawUnsafe<typeof policies>(`
-            SELECT tablename, policyname, cmd
+            SELECT tablename, policyname, cmd, qual, with_check
             FROM pg_policies
             WHERE schemaname = 'public'
         `);
@@ -148,6 +160,26 @@ describeFn('Guardrail: RLS coverage (pg_policies ↔ schema)', () => {
         const SINGLE_POLICY_EXCEPTIONS = new Set<string>([
             // Nullable tenantId — USING permissive on NULL, WITH CHECK strict.
             'IntegrationWebhookEvent',
+            // Epic D.1 — `UserSession` follows the same nullable-tenant
+            // pattern: USING (tenantId IS NULL OR own) lets the
+            // operational sign-in flow read pre-resolution rows;
+            // WITH CHECK (own) keeps writes strictly own-tenant.
+            // A split tenant_isolation_insert FOR INSERT WITH CHECK
+            // would be a permissive sibling that re-introduces the
+            // cross-tenant UPDATE leak documented in the migration.
+            'UserSession',
+            // denorm-tenantId Phase 1 — these four ownership-chained
+            // tables now carry a nullable `tenantId` column (so the
+            // DMMF-driven `directScoped` check picks them up), but the
+            // chained `EXISTS`-based RLS policy from migration
+            // 20260422180000_enable_rls_coverage is still in force.
+            // Phase 3 swaps to the trivial direct-tenant policy and
+            // adds `tenant_isolation_insert`; at that point these
+            // entries are removed from this exception set.
+            'EvidenceReview',
+            'AuditChecklistItem',
+            'FindingEvidence',
+            'AuditorPackAccess',
         ]);
 
         const { Prisma } = require('@prisma/client');
@@ -182,10 +214,40 @@ describeFn('Guardrail: RLS coverage (pg_policies ↔ schema)', () => {
         }
 
         // Sanity check — the exceptions list must still exist as
-        // tenant-scoped tables with a tenant_isolation policy.
+        // tenant-scoped tables AND each one's `tenant_isolation`
+        // policy must actually carry BOTH a USING (qual) and a
+        // WITH CHECK clause. That is the entire reason the table is
+        // exempt from the split-policy rule; if a future migration
+        // "simplifies" the policy back to USING-only or WITH CHECK-
+        // only, the asymmetric-semantics guarantee evaporates and the
+        // exception is no longer load-bearing.
         for (const exception of SINGLE_POLICY_EXCEPTIONS) {
             expect(TENANT_SCOPED_MODELS.has(exception)).toBe(true);
-            expect(policiesFor(exception)).toContain('tenant_isolation');
+
+            const isolation = policies.find(
+                (p) =>
+                    p.tablename === exception &&
+                    p.policyname === 'tenant_isolation',
+            );
+            expect(isolation).toBeDefined();
+            if (!isolation) continue;
+
+            // Both clauses must be non-null — that's what makes the
+            // single-policy form safer than a permissive split.
+            if (!isolation.qual || !isolation.with_check) {
+                throw new Error(
+                    `Single-policy exception '${exception}' lost its asymmetric ` +
+                        `USING + WITH CHECK shape — qual=${JSON.stringify(isolation.qual)} ` +
+                        `with_check=${JSON.stringify(isolation.with_check)}.\n\n` +
+                        `Either restore the policy to the canonical form\n` +
+                        `  CREATE POLICY tenant_isolation ON "${exception}"\n` +
+                        `      USING (... permissive read filter ...)\n` +
+                        `      WITH CHECK (... strict write filter ...);\n` +
+                        `or remove '${exception}' from SINGLE_POLICY_EXCEPTIONS in ` +
+                        `tests/guardrails/rls-coverage.test.ts and add the dedicated ` +
+                        `tenant_isolation_insert policy via a new migration.`,
+                );
+            }
         }
     });
 

@@ -134,6 +134,7 @@ export class EvidenceRepository {
     static async addReview(db: PrismaTx, ctx: RequestContext, evidenceId: string, action: 'SUBMITTED' | 'APPROVED' | 'REJECTED', comment?: string | null) {
         return db.evidenceReview.create({
             data: {
+                tenantId: ctx.tenantId,
                 evidenceId,
                 reviewerId: ctx.userId,
                 action,

@@ -110,7 +110,7 @@ export async function grantAuditorAccess(ctx: RequestContext, auditorId: string,
         if (!pack) throw notFound('Pack not found');
 
         try {
-            await tdb.auditorPackAccess.create({ data: { auditorId, auditPackId: packId } });
+            await tdb.auditorPackAccess.create({ data: { tenantId: ctx.tenantId, auditorId, auditPackId: packId } });
         } catch { throw badRequest('Auditor already has access to this pack'); }
 
         await logEvent(tdb, ctx, { action: 'AUDITOR_GRANTED', entityType: 'AuditorPackAccess', entityId: `${auditorId}_${packId}`, details: JSON.stringify({ email: auditor.email }), detailsJson: { category: 'access', operation: 'permission_changed', targetUserId: auditorId, detail: `Auditor granted access to pack ${packId}` } });

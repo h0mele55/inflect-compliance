@@ -45,6 +45,7 @@ export class AuditRepository {
     static async createChecklistItem(db: PrismaTx, ctx: RequestContext, auditId: string, prompt: string, sortOrder: number) {
         return db.auditChecklistItem.create({
             data: {
+                tenantId: ctx.tenantId,
                 auditId,
                 prompt,
                 sortOrder,
