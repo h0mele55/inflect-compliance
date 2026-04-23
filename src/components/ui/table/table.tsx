@@ -477,60 +477,6 @@ export function Table<T>({
   }
   const scrollWrapperRef = useRef<HTMLDivElement>(null);
 
-  // Rolling sticky row — track the index of the topmost visible row
-  // and apply `position: sticky` to its cells only. As the user
-  // scrolls, the index updates and the sticky behaviour rolls
-  // through the data: at any scroll position there's exactly one row
-  // anchored just below the column header. Throttled via rAF so a
-  // fast scroll doesn't pin the main thread.
-  //
-  // CSS-only "every row sticky" doesn't roll — sibling stickies all
-  // stack at the same threshold (row 0 always wins). We need JS to
-  // pick a single row at a time.
-  const [stickyRowIdx, setStickyRowIdx] = useState<number | null>(null);
-  const numRows = table.getRowModel().rows.length;
-  useEffect(() => {
-    const wrapper = scrollWrapperRef.current;
-    if (!wrapper) return;
-
-    let frame = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const rows = wrapper.querySelectorAll(
-          "tbody > tr",
-        ) as NodeListOf<HTMLElement>;
-        if (rows.length === 0) {
-          setStickyRowIdx(null);
-          return;
-        }
-        // Use offsetTop (layout-based, not affected by sticky's
-        // display position) so the detection still works once a
-        // row is stuck. getBoundingClientRect would lie — once
-        // row N is sticky, its rect.top is fixed at the threshold
-        // and we'd never advance past row N.
-        const headerHeight = 37;
-        const visibleTop = wrapper.scrollTop + headerHeight;
-        let topIdx: number | null = null;
-        for (let i = 0; i < rows.length; i++) {
-          const r = rows[i];
-          if (r.offsetTop + r.offsetHeight > visibleTop) {
-            topIdx = i;
-            break;
-          }
-        }
-        setStickyRowIdx(topIdx);
-      });
-    };
-
-    onScroll(); // initial
-    wrapper.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      wrapper.removeEventListener("scroll", onScroll);
-      cancelAnimationFrame(frame);
-    };
-  }, [numRows]);
-
   const utilityColumnWidths = new Map(
     visibleColumns.map((column) => [column.id, column.getSize()]),
   );
@@ -791,16 +737,6 @@ export function Table<T>({
                                 isColumnAfterSelect,
                               ),
                               "text-content-default group",
-                              // Rolling sticky row — apply sticky
-                              // ONLY to the row tracked by the JS
-                              // scroll handler (stickyRowIdx).
-                              // CSS-only "every row sticky" doesn't
-                              // roll — sibling stickies all stack
-                              // at the same top, with row 0 always
-                              // on top. JS picks the topmost
-                              // visible row at each scroll frame.
-                              row.index === stickyRowIdx &&
-                                "sticky top-[37px] z-10 bg-bg-default",
                               getCommonPinningClassNames(
                                 cell.column,
                                 row.index ===
