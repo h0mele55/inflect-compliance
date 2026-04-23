@@ -477,6 +477,47 @@ export function Table<T>({
   }
   const scrollWrapperRef = useRef<HTMLDivElement>(null);
 
+  // Whole-row clip — clamp the scroll wrapper to a multiple of the
+  // row height so the bottom of the card never cuts a row in half.
+  // Without this, the card height is whatever the flex chain
+  // allocates (= viewport - chrome), which rarely divides evenly by
+  // row height and leaves the last visible row half-shown.
+  //
+  // Strategy: measure the outer card's height (= wrapper's intended
+  // height, set by flex-1 in the chain) and the first row's height,
+  // then set the wrapper's max-height to floor(avail / rowH) * rowH.
+  // ResizeObserver watches the OUTER CARD (not the wrapper) so my
+  // max-height update doesn't loop — the card's size is determined
+  // by flex-1 above, independent of my max-height below.
+  const numRows = table.getRowModel().rows.length;
+  const [maxScrollHeight, setMaxScrollHeight] = useState<number | undefined>();
+  useEffect(() => {
+    const wrapper = scrollWrapperRef.current;
+    const card = wrapper?.parentElement;
+    if (!wrapper || !card) return;
+
+    const compute = () => {
+      const firstRow = wrapper.querySelector(
+        "tbody > tr",
+      ) as HTMLElement | null;
+      if (!firstRow) {
+        setMaxScrollHeight(undefined);
+        return;
+      }
+      const rowH = firstRow.offsetHeight;
+      if (rowH <= 0) return;
+      const availH = card.clientHeight;
+      const wholeRows = Math.floor(availH / rowH);
+      const newMax = Math.max(wholeRows * rowH, rowH);
+      setMaxScrollHeight((prev) => (prev === newMax ? prev : newMax));
+    };
+
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(card);
+    return () => ro.disconnect();
+  }, [numRows]);
+
   const utilityColumnWidths = new Map(
     visibleColumns.map((column) => [column.id, column.getSize()]),
   );
@@ -516,6 +557,14 @@ export function Table<T>({
               "snap-y snap-proximity scroll-pt-[37px]",
               scrollWrapperClassName,
             )}
+            // maxHeight clamps the wrapper to a whole number of rows
+            // (see whole-row-clip useEffect above). Inline style so
+            // it overrides Tailwind's md:flex-1 from fillBody.
+            style={
+              maxScrollHeight !== undefined
+                ? { maxHeight: maxScrollHeight }
+                : undefined
+            }
           >
             <table
               className={cn(
