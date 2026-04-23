@@ -51,7 +51,10 @@ describe('Framework Coverage & Templates', () => {
         const schema = readFileSync(join(basePath, 'prisma/schema.prisma'), 'utf-8');
 
         it('Framework model has kind field', () => {
-            expect(schema).toContain('kind         FrameworkKind');
+            // Whitespace-tolerant: prisma format re-aligns columns
+            // when sibling fields change. Match the field declaration
+            // shape, not the exact gap.
+            expect(schema).toMatch(/\bkind\s+FrameworkKind\b/);
         });
 
         it('FrameworkKind enum exists', () => {
