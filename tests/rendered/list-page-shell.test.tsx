@@ -1,0 +1,157 @@
+/**
+ * Phase 1 of list-page-shell — rendered DOM contract for
+ * `<ListPageShell>` and `<DataTable fillBody>`.
+ *
+ * The user-visible promise is "page header + filter toolbar +
+ * pagination footer stay anchored; only the table body scrolls."
+ * Layout fidelity (actual scroll behaviour at a given viewport) is
+ * a manual / Playwright concern. What we lock down here is the
+ * class-name contract that delivers that behaviour:
+ *
+ *   • The shell root carries `data-list-page-shell="true"` so the
+ *     print-stylesheet escape can target it (without that hook,
+ *     printing a viewport-clamped page would only print the rows
+ *     visible above the fold).
+ *   • The shell root and its Body slot carry the flex-chain
+ *     classes that allow children to shrink — the `min-h-0` /
+ *     `flex-1` / `overflow-hidden` triad on md+ that nothing else
+ *     in the page should override.
+ *   • DataTable's `fillBody` prop composes the same classes onto
+ *     its outer container + scroll wrapper so the table is the
+ *     only scroll context inside the shell body.
+ *
+ * If a future refactor strips one of those classes the layout
+ * silently falls back to the old "whole page scrolls" behaviour —
+ * no runtime error, just bad UX. These assertions catch that.
+ */
+
+import React from 'react';
+import { render } from '@testing-library/react';
+import { ListPageShell } from '@/components/layout/ListPageShell';
+import { DataTable, createColumns } from '@/components/ui/table/data-table';
+
+describe('ListPageShell — slot contract', () => {
+    it('root carries the data-list-page-shell hook + flex-column chain', () => {
+        const { container } = render(
+            <ListPageShell>
+                <div data-testid="child" />
+            </ListPageShell>
+        );
+        const root = container.querySelector(
+            '[data-list-page-shell="true"]',
+        );
+        expect(root).not.toBeNull();
+        const cls = root!.className;
+        expect(cls).toContain('flex');
+        expect(cls).toContain('flex-col');
+        // md+ flex-1 + min-h-0 are the load-bearing classes for the
+        // viewport-clamped chain to actually clamp.
+        expect(cls).toContain('md:flex-1');
+        expect(cls).toContain('md:min-h-0');
+    });
+
+    it('Body slot fills remaining space and clips its own overflow on md+', () => {
+        const { getByTestId } = render(
+            <ListPageShell>
+                <ListPageShell.Body>
+                    <div data-testid="body-child" />
+                </ListPageShell.Body>
+            </ListPageShell>
+        );
+        const bodyChild = getByTestId('body-child');
+        const body = bodyChild.parentElement!;
+        const cls = body.className;
+        // The four invariants the design relies on:
+        expect(cls).toContain('md:flex-1');
+        expect(cls).toContain('md:min-h-0');
+        expect(cls).toContain('md:flex');
+        expect(cls).toContain('md:flex-col');
+        expect(cls).toContain('md:overflow-hidden');
+    });
+
+    it('Header / Filters / Footer slots are flex-shrink-0 so they keep natural height', () => {
+        const { getByText } = render(
+            <ListPageShell>
+                <ListPageShell.Header>HEADER</ListPageShell.Header>
+                <ListPageShell.Filters>FILTERS</ListPageShell.Filters>
+                <ListPageShell.Footer>FOOTER</ListPageShell.Footer>
+            </ListPageShell>
+        );
+        for (const text of ['HEADER', 'FILTERS', 'FOOTER']) {
+            expect(getByText(text).className).toContain('flex-shrink-0');
+        }
+    });
+
+    it('renders the Header as a semantic <header> and Footer as <footer>', () => {
+        const { getByText } = render(
+            <ListPageShell>
+                <ListPageShell.Header>HEAD</ListPageShell.Header>
+                <ListPageShell.Footer>FOOT</ListPageShell.Footer>
+            </ListPageShell>
+        );
+        expect(getByText('HEAD').tagName).toBe('HEADER');
+        expect(getByText('FOOT').tagName).toBe('FOOTER');
+    });
+});
+
+describe('DataTable — fillBody composes the flex-fill classes', () => {
+    type Row = { id: string; name: string };
+    const columns = createColumns<Row>([
+        { accessorKey: 'name', header: 'Name' },
+    ]);
+    const data: Row[] = [{ id: '1', name: 'Alpha' }];
+
+    it('without fillBody the table renders without the md flex classes (legacy default)', () => {
+        const { container } = render(
+            <DataTable
+                data={data}
+                columns={columns}
+                data-testid="legacy-table"
+            />
+        );
+        const wrap = container.querySelector('#legacy-table');
+        expect(wrap).not.toBeNull();
+        // The Table primitive's outer container should not have
+        // gained the fillBody classes.
+        const outerCard = wrap!.querySelector('.border-border-subtle');
+        expect(outerCard?.className ?? '').not.toContain('md:flex-1');
+    });
+
+    it('with fillBody the outer container gets the flex-column + clip classes', () => {
+        const { container } = render(
+            <DataTable
+                fillBody
+                data={data}
+                columns={columns}
+                data-testid="filled-table"
+            />
+        );
+        const wrap = container.querySelector('#filled-table');
+        const outerCard = wrap!.querySelector('.border-border-subtle');
+        const cls = outerCard?.className ?? '';
+        expect(cls).toContain('md:flex');
+        expect(cls).toContain('md:flex-col');
+        expect(cls).toContain('md:min-h-0');
+        expect(cls).toContain('md:overflow-hidden');
+    });
+
+    it('with fillBody the scroll wrapper gets flex-1 + min-h-0 + overflow-y-auto', () => {
+        const { container } = render(
+            <DataTable
+                fillBody
+                data={data}
+                columns={columns}
+                data-testid="filled-table-2"
+            />
+        );
+        const wrap = container.querySelector('#filled-table-2');
+        // The scroll wrapper is the table's overflow-x-auto div —
+        // the only descendant of the card that has overflow-x-auto.
+        const scrollWrapper = wrap!.querySelector('.overflow-x-auto');
+        expect(scrollWrapper).not.toBeNull();
+        const cls = scrollWrapper!.className;
+        expect(cls).toContain('md:flex-1');
+        expect(cls).toContain('md:min-h-0');
+        expect(cls).toContain('md:overflow-y-auto');
+    });
+});

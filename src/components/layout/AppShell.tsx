@@ -53,8 +53,24 @@ export function AppShell({ user, appName, children }: AppShellProps) {
         }
     }, [pathname]);
 
+    // Layout chain (Phase 1 of list-page-shell):
+    //   • Mobile (<md): natural document scroll. `min-h-screen` on
+    //     the wrapper, `overflow-auto` on <main>, no flex-column.
+    //     The mobile sticky top bar continues to behave as before.
+    //   • Desktop (md+): viewport-clamped flex chain. Wrapper is
+    //     `h-screen overflow-hidden`, <main> is a flex column with
+    //     `overflow-hidden`. The inner content div is the default
+    //     scroll container for pages that DON'T use ListPageShell —
+    //     pages that DO use the shell take over the flex chain and
+    //     the inner div's overflow-y-auto becomes a no-op (because
+    //     the shell is `flex-1 min-h-0` and never overflows the
+    //     inner div).
+    //
+    // Every flex parent in this chain carries `min-h-0` so children
+    // can shrink below their content size — without this, `flex-1`
+    // grows to content and the chain breaks.
     return (
-        <div className="min-h-screen flex">
+        <div className="min-h-screen md:h-screen md:overflow-hidden flex">
             {/* Desktop sidebar — hidden on mobile, visible on md+ */}
             <aside className="hidden md:flex w-56 bg-bg-default border-r border-border-subtle flex-col flex-shrink-0">
                 <SidebarContent user={user} onLogout={handleLogout} />
@@ -66,7 +82,7 @@ export function AppShell({ user, appName, children }: AppShellProps) {
             </MobileDrawer>
 
             {/* Main content */}
-            <main className="flex-1 overflow-auto min-w-0">
+            <main className="flex-1 overflow-auto md:overflow-hidden md:flex md:flex-col min-w-0 md:min-h-0">
                 {/* Mobile top bar — visible on <md only */}
                 <div className="md:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-2 bg-bg-page/80 backdrop-blur-sm border-b border-border-subtle">
                     <button
@@ -89,7 +105,7 @@ export function AppShell({ user, appName, children }: AppShellProps) {
                     </div>
                 </div>
 
-                <div className="p-4 md:p-6 max-w-7xl mx-auto">
+                <div className="p-4 md:p-6 max-w-7xl mx-auto md:flex-1 md:min-h-0 md:overflow-y-auto md:w-full">
                     {children}
                 </div>
             </main>

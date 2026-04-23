@@ -27,6 +27,7 @@ import {
 import { Dispatch, MouseEvent, ReactNode, SetStateAction, useCallback, useState } from "react";
 import { type BatchAction, renderBatchActions } from "./selection-toolbar";
 import { Table, useTable } from "./table";
+import { cn } from "./table-utils";
 
 // ── Public Column Helper ────────────────────────────────────────────
 
@@ -148,6 +149,21 @@ export interface DataTableProps<T> {
   /** Additional class for the scroll wrapper. */
   scrollWrapperClassName?: string;
 
+  /**
+   * Make the table fill its parent's flex space and provide its own
+   * internal vertical scroll instead of growing arbitrarily.
+   *
+   * Use inside `<ListPageShell.Body>` (or any flex column with
+   * `min-h-0` set) to keep the page header / filter toolbar /
+   * pagination footer anchored while only the table body scrolls.
+   *
+   * On mobile (<md) this is a no-op — the table grows naturally and
+   * the document scrolls.
+   *
+   * Default: `false` (legacy behaviour).
+   */
+  fillBody?: boolean;
+
   /** Test ID for automated testing. */
   "data-testid"?: string;
 }
@@ -178,8 +194,31 @@ export function DataTable<T>({
   rowCount,
   className,
   scrollWrapperClassName,
+  fillBody,
   "data-testid": dataTestId,
 }: DataTableProps<T>) {
+  // Compose the viewport-fill classes onto the existing className /
+  // scrollWrapperClassName slots. Tailwind's `md:` prefixes mean
+  // mobile keeps natural document scroll; desktop gets the flex
+  // chain that lets the table body scroll within its parent.
+  const filledContainerClassName = fillBody
+    ? cn(
+        // Container fills its parent column and clips its own
+        // overflow so the scroll wrapper inside is the only scroll.
+        "md:flex md:flex-col md:min-h-0 md:overflow-hidden",
+        // Padding-top zero so the page header sits flush on the card.
+        // Caller can still pass spacing via className.
+        className,
+      )
+    : className;
+  const filledScrollWrapperClassName = fillBody
+    ? cn(
+        // Wrapper claims remaining height and provides vertical
+        // scroll; min-h-0 unlocks shrinking inside the flex parent.
+        "md:flex-1 md:min-h-0 md:overflow-y-auto",
+        scrollWrapperClassName,
+      )
+    : scrollWrapperClassName;
   // Auto-manage selection state when batchActions are provided without explicit selection handlers
   const [internalSelection, setInternalSelection] = useState<RowSelectionState>({});
   const hasExplicitSelection = !!onRowSelectionChange || !!selectionControls;
@@ -212,8 +251,8 @@ export function DataTable<T>({
         pagination,
         onPaginationChange,
         rowCount,
-        containerClassName: className,
-        scrollWrapperClassName,
+        containerClassName: filledContainerClassName,
+        scrollWrapperClassName: filledScrollWrapperClassName,
       }
     : {
         data,
@@ -233,8 +272,8 @@ export function DataTable<T>({
         selectionControls: effectiveSelectionControls,
         columnVisibility,
         onColumnVisibilityChange,
-        containerClassName: className,
-        scrollWrapperClassName,
+        containerClassName: filledContainerClassName,
+        scrollWrapperClassName: filledScrollWrapperClassName,
       };
 
   const { table, ...rest } = useTable(tableProps as any); // eslint-disable-line @typescript-eslint/no-explicit-any

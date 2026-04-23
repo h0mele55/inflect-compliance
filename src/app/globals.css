@@ -266,6 +266,17 @@ textarea.input { @apply resize-y min-h-[80px]; }
   .print-page { page-break-after: always; }
   .print-table { page-break-inside: auto; }
   .print-table tr { page-break-inside: avoid; }
+  /* List-page-shell escape: when printing a viewport-clamped list
+     page, undo the internal-scroll layout so the printer sees the
+     full table, not just the visible rows. The data attribute is
+     emitted by `<ListPageShell>`. */
+  [data-list-page-shell="true"],
+  [data-list-page-shell="true"] * {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+  }
   @page { margin: 15mm 12mm; size: A4 landscape; }
 }
 @media screen {
