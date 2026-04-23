@@ -560,14 +560,14 @@ export function Table<T>({
                             ),
                             // Sticky header — keeps the column titles
                             // visible while rows scroll inside the
-                            // card. `bg-bg-subtle` provides the
-                            // opaque backdrop so rows don't show
-                            // through. z-20 sits above row cells
-                            // (no z-index) but is independent of the
-                            // pinned-column z-index handled by
-                            // getCommonPinningClassNames.
+                            // card. Use `bg-bg-muted` (solid) not
+                            // `bg-bg-subtle` (rgba 7% alpha) so
+                            // scrolling rows don't bleed through.
+                            // z-20 sits above row cells (z-10 below
+                            // for the first-row sticky) and above
+                            // the pinned-column z-index.
                             "sticky top-0 z-20",
-                            "text-xs font-semibold text-content-muted uppercase tracking-wider bg-bg-subtle select-none",
+                            "text-xs font-semibold text-content-muted uppercase tracking-wider bg-bg-muted select-none",
                             getCommonPinningClassNames(
                               header.column,
                               !table.getRowModel().rows.length,
@@ -736,6 +736,18 @@ export function Table<T>({
                                 isColumnAfterSelect,
                               ),
                               "text-content-default group",
+                              // First row of the body: sticks just
+                              // below the sticky header so the user
+                              // always sees an anchor row while
+                              // scrolling deep into a long table.
+                              // `top-[37px]` matches the header's
+                              // py-2.5 + text-xs line-height. z-10
+                              // sits between row cells (no z) and
+                              // the header (z-20). bg-bg-default
+                              // provides an opaque backdrop so the
+                              // row beneath doesn't bleed through.
+                              row.index === 0 &&
+                                "sticky top-[37px] z-10 bg-bg-default",
                               getCommonPinningClassNames(
                                 cell.column,
                                 row.index ===
