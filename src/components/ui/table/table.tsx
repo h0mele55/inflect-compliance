@@ -891,7 +891,13 @@ export function Table<T>({
       ) : (
         <div
           className={cn(
-            "text-content-muted flex h-96 w-full items-center justify-center text-sm",
+            // flex-1 + min-h-96: fills the card when the parent is
+            // a flex column (fillBody mode) so the message is in
+            // the vertical centre of the WHOLE card, not stuck in
+            // the upper 384px. min-h-96 keeps the legacy
+            // empty-state height as a floor in non-fillBody mode.
+            // text-center handles multi-line empty messages.
+            "text-content-muted flex flex-1 min-h-96 w-full items-center justify-center text-center text-sm",
             emptyWrapperClassName,
           )}
         >
