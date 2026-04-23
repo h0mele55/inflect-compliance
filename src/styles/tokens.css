@@ -18,35 +18,39 @@
  */
 
 /* ═══════════════════════════════════════════════════════════════════
-   DARK THEME (default)
+   DARK THEME (default) — METRO Cash & Carry palette.
+
+   METRO yellow (#FFCD11) on deep navy blue surfaces. Status colors
+   kept as conventional emerald/amber/red/blue so semantic meaning is
+   preserved across themes.
    ═══════════════════════════════════════════════════════════════════ */
 :root {
   /* ── Surfaces ──────────────────────────────────────────────────── */
-  --bg-page:      #0f172a;                  /* slate-900  — app/page background, deepest layer */
-  --bg-default:   #1e293b;                  /* slate-800  — cards, panels, tables, modals, popovers */
-  --bg-muted:     #253447;                  /* ~slate-750 — hover surfaces, pressed/active states */
-  --bg-subtle:    rgba(51, 65, 85, 0.30);   /* slate-700 @ 30% — selection bg, disabled surfaces, faint tints */
-  --bg-elevated:  #334155;                  /* slate-700  — tooltips, dropdowns sitting above default */
-  --bg-inverted:  #f1f5f9;                  /* slate-100  — inverted surface (primary button bg) */
-  --bg-overlay:   rgba(0, 0, 0, 0.60);      /* backdrop behind modals/drawers */
+  --bg-page:      #001830;                  /* very deep METRO navy — app/page background */
+  --bg-default:   #002F5F;                  /* METRO navy — cards, panels, tables, modals, popovers */
+  --bg-muted:     #003C7A;                  /* lighter navy — hover surfaces, pressed/active states */
+  --bg-subtle:    rgba(0, 83, 140, 0.30);   /* navy @ 30% — selection bg, disabled surfaces, faint tints */
+  --bg-elevated:  #004B96;                  /* medium navy — tooltips, dropdowns sitting above default */
+  --bg-inverted:  #FFCD11;                  /* METRO yellow — inverted surface (primary button bg) */
+  --bg-overlay:   rgba(0, 12, 26, 0.70);    /* dark navy backdrop behind modals/drawers */
 
   /* ── Content / Text ────────────────────────────────────────────── */
-  --content-emphasis: #f1f5f9;   /* slate-100 — headings, selected items, bold labels */
-  --content-default:  #cbd5e1;   /* slate-300 — body text, table cells, default content */
-  --content-muted:    #94a3b8;   /* slate-400 — secondary text, placeholders, captions */
-  --content-subtle:   #64748b;   /* slate-500 — disabled text, hints, tertiary info */
-  --content-inverted: #0f172a;   /* slate-900 — text on inverted/light surfaces */
+  --content-emphasis: #FFFFFF;   /* pure white — headings, selected items, bold labels */
+  --content-default:  #D9E5F2;   /* light blue-tinted — body text, table cells, default content */
+  --content-muted:    #95B0C9;   /* mid blue-gray — secondary text, placeholders, captions */
+  --content-subtle:   #6B85A0;   /* deeper blue-gray — disabled text, hints, tertiary info */
+  --content-inverted: #001830;   /* deep navy — text on inverted (yellow) surfaces */
 
   /* ── Borders / Dividers ────────────────────────────────────────── */
-  --border-default:  #334155;               /* slate-700 — standard borders */
-  --border-subtle:   rgba(51, 65, 85, 0.50); /* slate-700 @ 50% — soft dividers, card edges */
-  --border-emphasis: #475569;               /* slate-600 — focused inputs, emphasized outlines */
+  --border-default:  #00538C;               /* navy border — standard borders */
+  --border-subtle:   rgba(0, 83, 140, 0.50); /* navy @ 50% — soft dividers, card edges */
+  --border-emphasis: #007BCC;               /* brighter navy — focused inputs, emphasized outlines */
 
-  /* ── Brand / Primary ───────────────────────────────────────────── */
-  --brand-default:  #6366f1;                /* indigo-500 — brand accent, links */
-  --brand-emphasis: #4f46e5;                /* indigo-600 — primary buttons, active brand */
-  --brand-muted:    #818cf8;                /* indigo-400 — hover accent, lighter brand */
-  --brand-subtle:   rgba(99, 102, 241, 0.20); /* indigo-500 @ 20% — brand tint backgrounds */
+  /* ── Brand / Primary (METRO yellow) ────────────────────────────── */
+  --brand-default:  #FFCD11;                /* METRO signature yellow — brand accent, links */
+  --brand-emphasis: #E6B800;                /* darker yellow — primary buttons, active brand */
+  --brand-muted:    #FFE066;                /* lighter yellow — hover accent */
+  --brand-subtle:   rgba(255, 205, 17, 0.18); /* yellow @ 18% — brand tint backgrounds */
 
   /* ── Status: Success ───────────────────────────────────────────── */
   --bg-success:      rgba(16, 185, 129, 0.15);  /* emerald-500 @ 15% */
@@ -74,17 +78,17 @@
   --border-attention:  rgba(251, 191, 36, 0.30); /* amber-400 @ 30% */
 
   /* ── Interactive / Focus ───────────────────────────────────────── */
-  --ring-default: rgba(99, 102, 241, 0.50);  /* brand focus ring */
-  --focus-ring:   rgba(99, 102, 241, 0.50);  /* alias for components that use a different name */
+  --ring-default: rgba(255, 205, 17, 0.55);  /* METRO yellow focus ring */
+  --focus-ring:   rgba(255, 205, 17, 0.55);  /* alias for components that use a different name */
 
   /* shadcn / Radix compatibility tokens */
-  --ring:                   rgba(99, 102, 241, 0.50);
-  --ring-offset-background: #0f172a;
-  --primary:                #6366f1;
+  --ring:                   rgba(255, 205, 17, 0.55);
+  --ring-offset-background: #001830;
+  --primary:                #FFCD11;
 
   /* ── Glass ─────────────────────────────────────────────────────── */
-  --glass-bg:     rgba(30, 41, 59, 0.80);    /* glass-card background */
-  --glass-border: rgba(51, 65, 85, 0.50);    /* glass-card border */
+  --glass-bg:     rgba(0, 47, 95, 0.82);     /* navy glass-card background */
+  --glass-border: rgba(0, 83, 140, 0.50);    /* navy glass-card border */
   --glass-blur:   12px;                      /* backdrop blur radius */
 
   /* ── Radius ────────────────────────────────────────────────────── */
