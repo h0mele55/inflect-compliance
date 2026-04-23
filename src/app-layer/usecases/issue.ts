@@ -10,6 +10,7 @@ import { logEvent } from '../events/audit';
 import { emitAutomationEvent } from '../automation';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound } from '@/lib/errors/types';
+import { sanitizePlainText } from '@/lib/security/sanitize';
 import { TERMINAL_WORK_ITEM_STATUSES } from '../domain/work-item-status';
 
 /** @deprecated Use TaskFilters */
@@ -197,8 +198,10 @@ export async function listIssueComments(ctx: RequestContext, issueId: string) {
 
 export async function addIssueComment(ctx: RequestContext, issueId: string, body: string) {
     assertCanComment(ctx);
+    // Epic C.5 — sanitise before persist; mirrors addTaskComment.
+    const safeBody = sanitizePlainText(body);
     return runInTenantContext(ctx, async (db) => {
-        const comment = await TaskCommentRepository.add(db, ctx, issueId, body);
+        const comment = await TaskCommentRepository.add(db, ctx, issueId, safeBody);
         await logEvent(db, ctx, {
             action: 'ISSUE_COMMENT_ADDED',
             entityType: 'Issue',

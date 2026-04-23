@@ -1,0 +1,228 @@
+/**
+ * Route → permission map for the API surface (Epic C.1).
+ *
+ * The map is the single declarative source of truth for "which
+ * `PermissionKey` does this URL require?" — it lets us:
+ *
+ *   1. Roll the `requirePermission(...)` middleware across handlers
+ *      without duplicating the policy in twelve different files.
+ *   2. Guard against a new sensitive route shipping unprotected: the
+ *      coverage test in `tests/guards/route-permission-coverage.test.ts`
+ *      walks `src/app/api/**\/route.ts` and verifies every in-scope
+ *      route has a matching rule AND uses `requirePermission(...)` in
+ *      its handler.
+ *   3. Surface the policy in code review: a PR that touches an admin
+ *      route is forced to update this map, which a reviewer can read
+ *      in isolation without context-switching across handler files.
+ *
+ * Adding or moving an admin/privileged route:
+ *   - Add a rule below covering the path + methods.
+ *   - Wire `requirePermission(<key>, …)` into the route handler.
+ *   - Run `npm test -- tests/guards/route-permission-coverage.test.ts`
+ *     to verify the rollout is complete.
+ *
+ * This file is intentionally narrow in scope. It only enumerates
+ * privileged routes (admin, key rotation, member management, etc.).
+ * Read-mostly tenant routes (controls, evidence, risks, reports,
+ * etc.) continue to authorise via the existing usecase-layer policy
+ * helpers (`assertCanRead/Write/Admin/Audit`) — Epic C.2 will widen
+ * the route-map to those once the granular policy keys settle.
+ */
+
+import type { PermissionKey, PermissionMode } from './permission-middleware';
+
+// ─── Rule shape ─────────────────────────────────────────────────────
+
+export interface RoutePermissionRule {
+    /**
+     * Regex matched against `req.nextUrl.pathname`. Use `\/[^/]+\/` for
+     * a single dynamic segment (so trailing slashes / query strings
+     * don't accidentally match).
+     */
+    path: RegExp;
+    /**
+     * HTTP methods this rule covers. Omit to apply to every method.
+     */
+    methods?: readonly string[];
+    /**
+     * Permission key(s) required to call the route.
+     */
+    permission: PermissionKey | readonly PermissionKey[];
+    /**
+     * All-of vs any-of when multiple keys. Defaults to `'all'`.
+     */
+    mode?: PermissionMode;
+    /**
+     * Short human-readable rationale. Required so a reviewer can sanity-
+     * check the policy at a glance — `'admin.scim'` on the SCIM route is
+     * obvious; rules that combine keys or carve exceptions are not.
+     */
+    note: string;
+}
+
+// ─── Tenant route prefix ────────────────────────────────────────────
+
+/**
+ * Shared prefix for every tenant-scoped API path. Centralised so a
+ * future rename (`/api/t/` → `/api/tenants/`) updates one place.
+ */
+const T = String.raw`\/api\/t\/[^/]+`;
+
+// ─── The map ────────────────────────────────────────────────────────
+
+export const ROUTE_PERMISSIONS: readonly RoutePermissionRule[] = [
+    // ── Member management ───────────────────────────────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/members(\\/.*)?$`),
+        permission: 'admin.members',
+        note:
+            'Listing members, inviting, editing role, deactivating — ' +
+            'changes who can access the tenant and at what level.',
+    },
+
+    // ── Session management (Epic C.3) ────────────────────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/sessions(\\/.*)?$`),
+        permission: 'admin.members',
+        note:
+            'Listing + revoking active user sessions for the tenant. ' +
+            'Treated as a member-management action since it controls ' +
+            'who currently has live access.',
+    },
+
+    // ── SCIM token management ───────────────────────────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/scim$`),
+        permission: 'admin.scim',
+        note:
+            'Generating, listing and revoking SCIM bearer tokens — ' +
+            'controls automated provisioning from the IdP.',
+    },
+
+    // ── Custom RBAC roles ───────────────────────────────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/roles(\\/.*)?$`),
+        permission: 'admin.manage',
+        note:
+            'Creating / editing / deleting custom roles. Falls under ' +
+            "admin.manage — there's no separate `admin.roles` key.",
+    },
+
+    // ── Tenant-wide settings ────────────────────────────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/settings(\\/.*)?$`),
+        permission: 'admin.manage',
+        note: 'Tenant settings (display name, branding, defaults).',
+    },
+
+    // ── Outbound integrations ───────────────────────────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/integrations(\\/.*)?$`),
+        permission: 'admin.manage',
+        note:
+            'CRUD on outbound integrations (Slack, webhooks, ticketing). ' +
+            'Mis-configuration leaks data outside the tenant.',
+    },
+
+    // ── M2M API keys ────────────────────────────────────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/api-keys(\\/.*)?$`),
+        permission: 'admin.manage',
+        note:
+            'API key issuance + revocation — every key is a long-lived ' +
+            'credential against the tenant; treat as admin-only.',
+    },
+
+    // ── Per-tenant DEK rotation (Epic B) ────────────────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/key-rotation(\\/.*)?$`),
+        permission: 'admin.manage',
+        note:
+            'Triggers per-tenant data-encryption-key rotation. Heavy + ' +
+            'long-running; keep behind admin.manage.',
+    },
+
+    // ── Billing (Epic D.3 — was legacy requireAdminCtx) ─────────────
+    {
+        path: new RegExp(`^${T}\\/billing\\/(checkout|portal|events)(\\/.*)?$`),
+        permission: 'admin.manage',
+        note:
+            'Stripe checkout + customer portal + billing-event listing — ' +
+            'commercial actions; treat as admin-only.',
+    },
+
+    // ── Security session-management bulk routes (Epic D.3) ──────────
+    {
+        path: new RegExp(`^${T}\\/security\\/sessions\\/(revoke-all|revoke-user)$`),
+        permission: 'admin.members',
+        note:
+            'Admin-driven session revocation for the whole tenant or a ' +
+            'specific colleague — same surface as /admin/sessions; ' +
+            'gated under admin.members for consistency.',
+    },
+
+    // ── Tenant MFA policy (Epic D.3 — PUT only; GET is open) ────────
+    // Only the PUT method is mapped here. The GET handler in the same
+    // file is intentionally unprotected by `requirePermission` — any
+    // tenant member can read the current MFA posture from the security
+    // settings page. The methods array enforces the asymmetry.
+    {
+        path: new RegExp(`^${T}\\/security\\/mfa\\/policy$`),
+        methods: ['PUT'],
+        permission: 'admin.manage',
+        note:
+            'Mutating the tenant MFA policy is admin-only; the GET ' +
+            'sibling stays open so the settings UI can render for ' +
+            'every tenant member.',
+    },
+
+    // ── Tenant SSO configuration (Epic D.3) ─────────────────────────
+    {
+        path: new RegExp(`^${T}\\/sso(\\/.*)?$`),
+        permission: 'admin.manage',
+        note:
+            'SSO provider configuration — provider list, upsert, ' +
+            'enable/enforce toggles, deletion. All ADMIN-only.',
+    },
+] as const;
+
+// ─── Resolver ───────────────────────────────────────────────────────
+
+export interface ResolvedRoutePermission {
+    rule: RoutePermissionRule;
+    permission: PermissionKey | readonly PermissionKey[];
+    mode: PermissionMode;
+}
+
+/**
+ * Look up the permission rule that applies to a request path + method.
+ * Returns `null` for routes the map doesn't cover — callers decide
+ * whether to fall back to legacy guards (Epic C.1 scope) or to fail
+ * closed (a future Epic C.3 enforcement-by-default mode).
+ */
+export function resolveRoutePermission(
+    pathname: string,
+    method: string,
+): ResolvedRoutePermission | null {
+    const upperMethod = method.toUpperCase();
+    for (const rule of ROUTE_PERMISSIONS) {
+        if (!rule.path.test(pathname)) continue;
+        if (rule.methods && !rule.methods.map((m) => m.toUpperCase()).includes(upperMethod)) {
+            continue;
+        }
+        return {
+            rule,
+            permission: rule.permission,
+            mode: rule.mode ?? 'all',
+        };
+    }
+    return null;
+}
+
+/**
+ * Quick membership test for guard / coverage tests. True iff the path
+ * matches at least one rule (regardless of method).
+ */
+export function isRouteCovered(pathname: string): boolean {
+    return ROUTE_PERMISSIONS.some((r) => r.path.test(pathname));
+}

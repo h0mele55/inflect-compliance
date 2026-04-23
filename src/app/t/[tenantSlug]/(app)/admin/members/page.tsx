@@ -5,12 +5,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import {
     Users, UserPlus, ChevronDown, Shield, XCircle, CheckCircle,
-    Search, MoreVertical, UserMinus, Mail,
+    Search, MoreVertical, UserMinus, Mail, Monitor,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { statusBadgeVariants } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton, SkeletonButton } from '@/components/ui/skeleton';
+import { Modal } from '@/components/ui/modal';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@dub/utils';
@@ -41,6 +43,19 @@ interface Member {
         createdAt: string;
     };
     invitedBy: { id: string; name: string | null } | null;
+    /** Epic C.3 — count of live (non-revoked, non-expired) sessions. */
+    activeSessionCount?: number;
+}
+
+interface MemberSession {
+    sessionId: string;
+    userId: string;
+    tenantId: string | null;
+    ipAddress: string | null;
+    userAgent: string | null;
+    createdAt: string;
+    expiresAt: string;
+    lastActiveAt: string;
 }
 
 interface Invite {
@@ -95,6 +110,12 @@ export default function MembersAdminPage() {
 
     // Action menu
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+    // Epic C.3 — sessions modal
+    const [sessionsModalUser, setSessionsModalUser] = useState<Member | null>(null);
+    const [memberSessions, setMemberSessions] = useState<MemberSession[]>([]);
+    const [sessionsLoading, setSessionsLoading] = useState(false);
+    const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
 
     // ─── Data fetching ───
     const fetchMembers = useCallback(async () => {
@@ -228,6 +249,60 @@ export default function MembersAdminPage() {
             setError((err as Error).message);
         }
     }
+
+    // ─── Sessions modal handlers (Epic C.3) ───
+    const openSessionsModal = useCallback(async (member: Member) => {
+        setSessionsModalUser(member);
+        setSessionsLoading(true);
+        setMemberSessions([]);
+        try {
+            const res = await fetch(
+                apiUrl(`/admin/sessions?userId=${encodeURIComponent(member.userId)}`),
+            );
+            if (res.ok) {
+                const data = await res.json() as { sessions: MemberSession[] };
+                setMemberSessions(data.sessions);
+            } else {
+                setError('Failed to load sessions');
+            }
+        } catch {
+            setError('Failed to load sessions');
+        } finally {
+            setSessionsLoading(false);
+        }
+    }, [apiUrl]);
+
+    const closeSessionsModal = useCallback(() => {
+        setSessionsModalUser(null);
+        setMemberSessions([]);
+    }, []);
+
+    const handleRevokeSession = useCallback(async (sessionId: string) => {
+        if (!sessionsModalUser) return;
+        if (!confirm('Revoke this session? The user will be signed out from this device on their next request.')) return;
+        setRevokingSessionId(sessionId);
+        try {
+            const res = await fetch(apiUrl('/admin/sessions'), {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId, reason: `Revoked from members admin UI` }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                setError(err?.error?.message || 'Revocation failed');
+                return;
+            }
+            setMemberSessions((sessions) => sessions.filter((s) => s.sessionId !== sessionId));
+            setSuccess('Session revoked');
+            // Refresh members list so the activeSessionCount badge
+            // reflects the new total without a page reload.
+            void fetchMembers();
+        } catch (err) {
+            setError((err as Error).message);
+        } finally {
+            setRevokingSessionId(null);
+        }
+    }, [apiUrl, fetchMembers, sessionsModalUser]);
 
     // ─── Filter ───
     const filteredMembers = members.filter((m) => {
@@ -375,6 +450,7 @@ export default function MembersAdminPage() {
                             <th>Email</th>
                             <th>Role</th>
                             <th>Status</th>
+                            <th>Sessions</th>
                             <th>Joined</th>
                             <th className="text-right">Actions</th>
                         </tr>
@@ -476,6 +552,23 @@ export default function MembersAdminPage() {
                                         {m.status}
                                     </StatusBadge>
                                 </td>
+                                <td>
+                                    <button
+                                        type="button"
+                                        onClick={() => openSessionsModal(m)}
+                                        className={cn(
+                                            'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium border transition-colors',
+                                            (m.activeSessionCount ?? 0) > 0
+                                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
+                                                : 'bg-bg-muted text-content-subtle border-border-subtle hover:bg-bg-elevated',
+                                        )}
+                                        id={`sessions-count-${m.id}`}
+                                        aria-label={`View ${m.activeSessionCount ?? 0} active sessions for ${m.user.email}`}
+                                    >
+                                        <Monitor className="w-3 h-3" />
+                                        {m.activeSessionCount ?? 0}
+                                    </button>
+                                </td>
                                 <td className="text-xs text-content-subtle">
                                     {formatDate(m.createdAt)}
                                 </td>
@@ -504,6 +597,17 @@ export default function MembersAdminPage() {
                                                         Change Role
                                                     </button>
                                                     <button
+                                                        onClick={() => {
+                                                            setOpenMenuId(null);
+                                                            void openSessionsModal(m);
+                                                        }}
+                                                        className="w-full text-left px-3 py-2 text-xs text-content-emphasis hover:bg-bg-muted flex items-center gap-2"
+                                                        id={`action-view-sessions-${m.id}`}
+                                                    >
+                                                        <Monitor className="w-3 h-3" />
+                                                        View Sessions
+                                                    </button>
+                                                    <button
                                                         onClick={() => handleDeactivate(m.id, m.user.email)}
                                                         className="w-full text-left px-3 py-2 text-xs text-content-error hover:bg-bg-error flex items-center gap-2"
                                                         id={`action-deactivate-${m.id}`}
@@ -520,7 +624,7 @@ export default function MembersAdminPage() {
                         ))}
                         {filteredMembers.length === 0 && (
                             <tr>
-                                <td colSpan={6}>
+                                <td colSpan={7}>
                                     <EmptyState
                                         icon={search ? Search : Users}
                                         title={search ? 'No members match your search' : 'No members found'}
@@ -577,6 +681,83 @@ export default function MembersAdminPage() {
                     onClick={() => setOpenMenuId(null)}
                 />
             )}
+
+            {/* Epic C.3 — sessions modal (Epic 54 Modal primitive) */}
+            <Modal
+                showModal={sessionsModalUser !== null}
+                setShowModal={(open) => {
+                    if (!open) closeSessionsModal();
+                }}
+                size="lg"
+                title={sessionsModalUser
+                    ? `Sessions for ${sessionsModalUser.user.name || sessionsModalUser.user.email}`
+                    : 'Sessions'}
+                description="Live sessions for this member. Revoke any device to sign it out on its next request."
+            >
+                <Modal.Header
+                    title={sessionsModalUser
+                        ? `Sessions for ${sessionsModalUser.user.name || sessionsModalUser.user.email}`
+                        : 'Sessions'}
+                    description={memberSessions.length === 0 && !sessionsLoading
+                        ? 'No active sessions.'
+                        : `${memberSessions.length} active ${memberSessions.length === 1 ? 'session' : 'sessions'}.`}
+                />
+                <Modal.Body>
+                    {sessionsLoading ? (
+                        <ul className="space-y-2" aria-busy="true" aria-label="Loading sessions">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                                <li
+                                    key={i}
+                                    className="border border-border-subtle rounded-md p-3 flex items-start justify-between gap-3"
+                                >
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                        <Skeleton className="h-4 w-2/3" />
+                                        <Skeleton className="h-3 w-1/2" />
+                                    </div>
+                                    <SkeletonButton className="h-6 w-16" />
+                                </li>
+                            ))}
+                        </ul>
+                    ) : memberSessions.length === 0 ? (
+                        <EmptyState
+                            icon={Monitor}
+                            title="No active sessions"
+                            description="This user is not currently signed in on any device."
+                        />
+                    ) : (
+                        <ul className="space-y-2" id="sessions-list">
+                            {memberSessions.map((s) => (
+                                <li
+                                    key={s.sessionId}
+                                    className="border border-border-subtle rounded-md p-3 flex items-start justify-between gap-3"
+                                    data-session-id={s.sessionId}
+                                >
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-medium text-content-emphasis truncate">
+                                            {s.userAgent || 'Unknown device'}
+                                        </p>
+                                        <p className="text-xs text-content-muted mt-0.5">
+                                            IP {s.ipAddress || '—'} · last active {formatDate(s.lastActiveAt)}
+                                        </p>
+                                        <p className="text-[10px] text-content-subtle mt-0.5 font-mono break-all">
+                                            {s.sessionId}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        variant="secondary"
+                                        size="xs"
+                                        onClick={() => handleRevokeSession(s.sessionId)}
+                                        disabled={revokingSessionId === s.sessionId}
+                                        id={`revoke-session-${s.sessionId}`}
+                                    >
+                                        {revokingSessionId === s.sessionId ? 'Revoking…' : 'Revoke'}
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </Modal.Body>
+            </Modal>
         </div>
     );
 }

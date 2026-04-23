@@ -10,7 +10,7 @@
  * Secrets are NEVER returned after creation — only a masked status.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminCtx } from '@/lib/auth/require-admin';
+import { requirePermission } from '@/lib/security/permission-middleware';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import {
     listIntegrationConnections,
@@ -26,8 +26,8 @@ import { registry } from '@/app-layer/integrations/registry';
  * GET — list all integration connections for this tenant.
  * Secrets are never included. Returns provider metadata too.
  */
-export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await requireAdminCtx(params, req);
+export const GET = withApiErrorHandling(
+    requirePermission('admin.manage', async (req: NextRequest, _routeArgs, ctx) => {
 
     const connections = await listIntegrationConnections(ctx) as Array<Record<string, unknown>>;
 
@@ -44,14 +44,15 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         availableProviders: listAvailableProviders(),
         webhookBaseUrl: `${baseUrl}/api/integrations/webhooks`,
     });
-});
+    }),
+);
 
 /**
  * POST — create or update an integration connection.
  * Secrets are encrypted before storage. Plaintext is never persisted.
  */
-export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await requireAdminCtx(params, req);
+export const POST = withApiErrorHandling(
+    requirePermission('admin.manage', async (req: NextRequest, _routeArgs, ctx) => {
 
     const body = await req.json() as {
         id?: string;
@@ -98,14 +99,15 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
         secretStatus: body.secrets ? 'configured' : 'unchanged',
         warning: body.secrets ? 'Secrets have been encrypted and stored. They cannot be retrieved.' : undefined,
     }, { status: body.id ? 200 : 201 });
-});
+    }),
+);
 
 /**
  * PUT — validate/test an integration connection.
  * Tests connectivity without saving changes.
  */
-export const PUT = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await requireAdminCtx(params, req);
+export const PUT = withApiErrorHandling(
+    requirePermission('admin.manage', async (req: NextRequest, _routeArgs, ctx) => {
 
     const body = await req.json() as {
         connectionId?: string;
@@ -139,13 +141,14 @@ export const PUT = withApiErrorHandling(async (req: NextRequest, { params }: { p
         error: result.error,
         testedAt: new Date().toISOString(),
     });
-});
+    }),
+);
 
 /**
  * DELETE — disable an integration connection.
  */
-export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await requireAdminCtx(params, req);
+export const DELETE = withApiErrorHandling(
+    requirePermission('admin.manage', async (req: NextRequest, _routeArgs, ctx) => {
 
     const { connectionId } = await req.json() as { connectionId: string };
     if (!connectionId) {
@@ -155,4 +158,5 @@ export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: 
     await removeIntegrationConnection(ctx, connectionId);
 
     return NextResponse.json<any>({ ok: true });
-});
+    }),
+);

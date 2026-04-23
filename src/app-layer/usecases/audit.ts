@@ -4,7 +4,15 @@ import { assertCanRead, assertCanWrite } from '../policies/common';
 import { logEvent } from '../events/audit';
 import { notFound } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
+import { sanitizePlainText } from '@/lib/security/sanitize';
 import type { AuditStatus } from '@prisma/client';
+
+// Epic D.2 — preserve the three-state contract on update paths.
+function sanitizeOptional(v: string | null | undefined): string | null | undefined {
+    if (v === undefined) return undefined;
+    if (v === null) return null;
+    return sanitizePlainText(v);
+}
 
 export async function listAudits(ctx: RequestContext) {
     assertCanRead(ctx);
@@ -36,13 +44,17 @@ export async function createAudit(ctx: RequestContext, data: {
 
     return runInTenantContext(ctx, async (db) => {
         const audit = await AuditRepository.create(db, ctx, {
-            title: data.title,
-            auditScope: data.scope,
-            criteria: data.criteria,
+            // Epic D.2 — sanitise free-text before persistence.
+            // `auditScope`, `criteria`, `auditors`, `auditees`,
+            // `departments` are all encrypted in the manifest and
+            // also surface in audit-log details + PDF exports.
+            title: sanitizePlainText(data.title),
+            auditScope: sanitizeOptional(data.scope),
+            criteria: sanitizeOptional(data.criteria),
             schedule: data.schedule ? new Date(data.schedule) : null,
-            auditors: data.auditors,
-            auditees: data.auditees,
-            departments: data.departments,
+            auditors: sanitizeOptional(data.auditors),
+            auditees: sanitizeOptional(data.auditees),
+            departments: sanitizeOptional(data.departments),
             status: 'PLANNED',
         });
 
@@ -106,13 +118,15 @@ export async function updateAudit(ctx: RequestContext, id: string, data: {
 
     return runInTenantContext(ctx, async (db) => {
         const audit = await AuditRepository.update(db, ctx, id, {
-            title: data.title,
-            auditScope: data.scope,
-            criteria: data.criteria,
+            // Epic D.2 — sanitise on update only when the field is
+            // actually being written.
+            title: sanitizeOptional(data.title) ?? undefined,
+            auditScope: sanitizeOptional(data.scope),
+            criteria: sanitizeOptional(data.criteria),
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum boundary
             status: data.status as AuditStatus | undefined,
-            auditors: data.auditors,
-            auditees: data.auditees,
+            auditors: sanitizeOptional(data.auditors),
+            auditees: sanitizeOptional(data.auditees),
         });
 
         if (!audit) throw notFound('Audit not found');
@@ -120,8 +134,13 @@ export async function updateAudit(ctx: RequestContext, id: string, data: {
         if (data.checklistUpdates) {
             for (const item of data.checklistUpdates) {
                 await AuditRepository.updateChecklistItem(db, ctx, item.id, {
+                    // `result` is enum-shaped; do NOT sanitise.
                     result: item.result,
-                    notes: item.notes,
+                    // `notes` is encrypted on AuditChecklistItem.notes
+                    // and free-text — sanitise per element.
+                    notes: typeof item.notes === 'string'
+                        ? sanitizePlainText(item.notes)
+                        : item.notes,
                 });
             }
         }

@@ -30,12 +30,28 @@ afterAll(() => {
 
 // ── Mocks ───────────────────────────────────────────────────────────
 
+// Epic D.3 — the route migrated from `requireAdminCtx` to
+// `requirePermission('admin.manage', …)`, which resolves the context
+// via `@/app-layer/context.getTenantCtx`. Mock at the resolver layer:
+// returning a non-ADMIN ctx triggers the same 403 path the legacy
+// `requireAdminCtx` would have produced.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const requireAdminCtxMock = jest.fn<any, [unknown, unknown]>();
-jest.mock('@/lib/auth/require-admin', () => ({
+const getTenantCtxMock = jest.fn<any, [unknown, unknown]>();
+jest.mock('@/app-layer/context', () => ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    requireAdminCtx: (params: unknown, req: unknown) =>
-        requireAdminCtxMock(params, req),
+    getTenantCtx: (params: unknown, req: unknown) =>
+        getTenantCtxMock(params, req),
+}));
+
+// Stub the audit writer so the AUTHZ_DENIED row that
+// `requirePermission` writes on denial doesn't try to hit the real DB
+// during the denied-path tests.
+jest.mock('@/lib/audit', () => ({
+    appendAuditEntry: jest.fn(async () => ({
+        id: 'audit-x',
+        entryHash: 'hash-x',
+        previousHash: null,
+    })),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,7 +84,6 @@ import {
     API_KEY_CREATE_LIMIT,
 } from '@/lib/security/rate-limit-middleware';
 import { getPermissionsForRole } from '@/lib/permissions';
-import { forbidden } from '@/lib/errors/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -93,6 +108,29 @@ function adminCtx(overrides: Partial<{
     };
 }
 
+/**
+ * Reader context for the denied-path test. With Epic D.3,
+ * `requirePermission('admin.manage', …)` denies based on the
+ * resolved `appPermissions` rather than the resolver throwing — so
+ * we hand back a non-admin ctx and let the middleware produce 403.
+ */
+function readerCtx() {
+    return {
+        requestId: 'req-1',
+        userId: 'reader-1',
+        tenantId: 'tenant-A',
+        role: 'READER' as const,
+        permissions: {
+            canRead: true,
+            canWrite: false,
+            canAdmin: false,
+            canAudit: false,
+            canExport: false,
+        },
+        appPermissions: getPermissionsForRole('READER'),
+    };
+}
+
 function req(
     method: string,
     opts: { url?: string; ip?: string } = {},
@@ -114,9 +152,7 @@ describe('POST /api/t/:tenantSlug/admin/key-rotation', () => {
     });
 
     test('non-admin is rejected with 403 before any queue interaction', async () => {
-        requireAdminCtxMock.mockImplementationOnce(() => {
-            throw forbidden('Admin role required');
-        });
+        getTenantCtxMock.mockResolvedValueOnce(readerCtx());
 
         const res = await POST(req('POST'), { params: { tenantSlug: 'acme' } });
         expect(res.status).toBe(403);
@@ -125,7 +161,7 @@ describe('POST /api/t/:tenantSlug/admin/key-rotation', () => {
     });
 
     test('admin → enqueues job + writes audit entry + returns 202', async () => {
-        requireAdminCtxMock.mockResolvedValueOnce(adminCtx());
+        getTenantCtxMock.mockResolvedValueOnce(adminCtx());
         enqueueMock.mockResolvedValueOnce({ id: 'bullmq-job-42' });
 
         const res = await POST(req('POST'), { params: { tenantSlug: 'acme' } });
@@ -162,7 +198,7 @@ describe('POST /api/t/:tenantSlug/admin/key-rotation', () => {
     });
 
     test('applies API_KEY_CREATE_LIMIT (tighter than default)', async () => {
-        requireAdminCtxMock.mockImplementation(async () => adminCtx());
+        getTenantCtxMock.mockImplementation(async () => adminCtx());
         enqueueMock.mockResolvedValue({ id: 'job-x' });
 
         const maxAttempts = API_KEY_CREATE_LIMIT.maxAttempts; // 5
@@ -187,7 +223,7 @@ describe('GET /api/t/:tenantSlug/admin/key-rotation', () => {
     });
 
     test('admin + valid jobId → returns state + progress + result', async () => {
-        requireAdminCtxMock.mockResolvedValueOnce(adminCtx());
+        getTenantCtxMock.mockResolvedValueOnce(adminCtx());
         const fakeJob = {
             data: { tenantId: 'tenant-A' },
             getState: jest.fn(async () => 'completed'),
@@ -221,13 +257,13 @@ describe('GET /api/t/:tenantSlug/admin/key-rotation', () => {
     });
 
     test('missing jobId parameter → 400', async () => {
-        requireAdminCtxMock.mockResolvedValueOnce(adminCtx());
+        getTenantCtxMock.mockResolvedValueOnce(adminCtx());
         const res = await GET(req('GET'), { params: { tenantSlug: 'acme' } });
         expect(res.status).toBe(400);
     });
 
     test('job-from-another-tenant → 404 (no cross-tenant leak)', async () => {
-        requireAdminCtxMock.mockResolvedValueOnce(adminCtx({ tenantId: 'tenant-A' }));
+        getTenantCtxMock.mockResolvedValueOnce(adminCtx({ tenantId: 'tenant-A' }));
         getQueueMock.mockReturnValueOnce({
             getJob: jest.fn(async () => ({
                 data: { tenantId: 'tenant-B' }, // different tenant
@@ -242,7 +278,7 @@ describe('GET /api/t/:tenantSlug/admin/key-rotation', () => {
     });
 
     test('non-existent jobId → 404', async () => {
-        requireAdminCtxMock.mockResolvedValueOnce(adminCtx());
+        getTenantCtxMock.mockResolvedValueOnce(adminCtx());
         getQueueMock.mockReturnValueOnce({
             getJob: jest.fn(async () => null),
         });
@@ -254,9 +290,7 @@ describe('GET /api/t/:tenantSlug/admin/key-rotation', () => {
     });
 
     test('non-admin rejected with 403 even before the queue is consulted', async () => {
-        requireAdminCtxMock.mockImplementationOnce(() => {
-            throw forbidden('Admin role required');
-        });
+        getTenantCtxMock.mockResolvedValueOnce(readerCtx());
         const r = req('GET', {
             url: 'http://localhost/api/t/acme/admin/key-rotation?jobId=x',
         });

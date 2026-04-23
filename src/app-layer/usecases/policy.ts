@@ -8,6 +8,7 @@ import { logEvent } from '../events/audit';
 import { enqueueEmail } from '../notifications/enqueue';
 import { notFound, badRequest, forbidden, conflict } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
+import { sanitizePolicyContent } from '@/lib/security/sanitize';
 import { logger } from '@/lib/observability/logger';
 
 // ─── Slug helper ───
@@ -105,11 +106,12 @@ export async function createPolicy(ctx: RequestContext, data: {
             language: data.language,
         });
 
-        // Create initial version if content provided
+        // Create initial version if content provided. Sanitised
+        // before persistence — same contract as createPolicyVersion.
         if (data.content) {
             const version = await PolicyVersionRepository.create(db, ctx, policy.id, {
                 contentType: 'MARKDOWN',
-                contentText: data.content,
+                contentText: sanitizePolicyContent('MARKDOWN', data.content),
                 changeSummary: 'Initial version',
             });
             await PolicyRepository.setCurrentVersion(db, ctx, policy.id, version.id);
@@ -218,7 +220,27 @@ export async function createPolicyVersion(ctx: RequestContext, policyId: string,
             throw badRequest('contentText is required for MARKDOWN/HTML content type');
         }
 
-        const version = await PolicyVersionRepository.create(db, ctx, policyId, data);
+        // Epic C.5 — sanitise BEFORE the repository write so the
+        // stored row never carries dangerous HTML. HTML content gets
+        // the rich-text allowlist; MARKDOWN/EXTERNAL_LINK get
+        // plain-text stripping (markdown's renderer escapes; embedded
+        // raw HTML inside a markdown blob would bypass it).
+        const safeData =
+            data.contentText && (
+                data.contentType === 'HTML'
+                || data.contentType === 'MARKDOWN'
+                || data.contentType === 'EXTERNAL_LINK'
+            )
+                ? {
+                      ...data,
+                      contentText: sanitizePolicyContent(
+                          data.contentType as 'HTML' | 'MARKDOWN' | 'EXTERNAL_LINK',
+                          data.contentText,
+                      ),
+                  }
+                : data;
+
+        const version = await PolicyVersionRepository.create(db, ctx, policyId, safeData);
 
         // Move policy back to DRAFT if it was in a published/approved state
         if (policy.status === 'PUBLISHED' || policy.status === 'APPROVED') {

@@ -130,6 +130,139 @@ tenant reports zero `v1:` rows under the old key, remove
 rotation runbook, observability signals, rollback procedure, and
 the full test coverage map.
 
+### Defense-in-Depth (Epic C)
+
+Five complementary controls. Treat them as one system — each
+sub-epic has the others as backstops.
+
+**C.1 — API permission middleware.** Wrap every privileged API
+handler with `requirePermission(<key>, …)` from
+`@/lib/security/permission-middleware`. The key is a typed dotted
+literal (`'admin.scim'`, `'risks.create'`, …) derived from
+`PermissionSet`. Denials emit a hash-chained `AUTHZ_DENIED` audit
+entry (`category: 'access'`) and surface as a generic 403 — the
+key itself is never echoed to the client. The route ↔ map sync is
+guarded by `tests/guardrails/api-permission-coverage.test.ts`;
+new admin/privileged routes MUST add a rule in
+`src/lib/security/route-permissions.ts` and use
+`requirePermission(...)`. Avoid the legacy
+`requireAdminCtx` helper for new code — it still works but the
+permission-key model is the canonical pattern.
+
+**C.2 — Secret detection.** Local pre-commit hook
+(`.husky/pre-commit` → `scripts/detect-secrets.sh`) scans staged
+files; CI guardrail (`tests/guardrails/no-secrets.test.ts`) walks
+the whole tree. Both load patterns from `.secret-patterns` (one
+source of truth). Carve-outs: inline
+`// pragma: allowlist secret` for one-off lines, or move fixtures
+under `tests/fixtures/secrets/` (auto-skipped). Pre-existing
+placeholder fixtures live in `REPO_BASELINE` in the guardrail; add
+to that array only with a written `reason`.
+
+**C.3 — Session hardening.** A `UserSession` row is minted on every
+sign-in (NextAuth `jwt` callback → `recordNewSession`) carrying
+`ipAddress`, `userAgent`, `expiresAt`, `lastActiveAt`. Every JWT
+pass calls `verifyAndTouchSession` — revoked or expired rows
+short-circuit as `SessionRevoked`. Per-tenant policy lives on
+`TenantSecuritySettings.maxConcurrentSessions` (overflow → revoke
+oldest by `lastActiveAt` ASC) and `sessionMaxAgeMinutes` (caps
+`expiresAt` at insert time). The admin UI lives at
+`/admin/members` — Sessions column + modal + per-row revoke,
+backed by `GET/DELETE /api/t/:slug/admin/sessions`. The pre-Epic-C
+endpoints (`security/sessions/revoke-current` etc.) and the
+`User.sessionVersion` bump still work as the coarse-grained
+backstop.
+
+**C.4 — Audit event streaming.** Every committed audit row is
+fired through `streamAuditEvent` into a per-tenant in-memory
+buffer (lazy-imported by `appendAuditEntry` so cold-start cost is
+zero for tenants without streaming configured). Flush happens on
+100 events OR 5 seconds, HMAC-SHA256-signed
+(`X-Inflect-Signature: sha256=<hex>`), POSTed to
+`TenantSecuritySettings.auditWebhookUrl`. The HMAC secret is on
+the same row, encrypted at rest via the Epic B field-encryption
+manifest. Fail-safe — the audit row is already committed, so a
+broken SIEM never undoes the write. Privacy-aware payload — free-
+text `details` is dropped, only structured `detailsJson` ships;
+actor is opaque `userId` + `actorType`, never email.
+
+**C.5 — Server-side rich-text sanitisation.** Use
+`sanitizeRichTextHtml` / `sanitizePlainText` /
+`sanitizePolicyContent` from `@/lib/security/sanitize` BEFORE
+persisting any user-supplied rich-text. Already wired into
+`policy.createPolicy`, `policy.createPolicyVersion`,
+`task.addTaskComment`, `issue.addIssueComment`. New write paths
+that accept HTML or comment text MUST sanitise at the usecase
+layer (not just at render time) — render-time sanitisation alone
+would leave the row dangerous to PDF export, audit-pack share
+links, and future SDK consumers reading the row verbatim. The
+allowlist (tags, attributes, link schemes) is in
+`src/lib/security/sanitize.ts`; do not widen it without a security
+review.
+
+**See `docs/epic-c-security.md`** for the unified operator
+runbook (env vars, verification commands, rollback procedures,
+failure modes) and `SECURITY.md` for the responsible-disclosure
+policy.
+
+### Isolation & Sanitisation Completeness (Epic D)
+
+Epic D closed three concrete gaps left after Epic C. Each is now
+guarded by a CI ratchet so the regression surface is small.
+
+**D.1 — `UserSession` RLS.** The Epic C.3 `UserSession` table
+shipped without RLS policies. It now carries a single asymmetric
+`tenant_isolation` policy (`USING (tenantId IS NULL OR own) WITH
+CHECK (own)`) plus the canonical `superuser_bypass`, with `FORCE
+ROW LEVEL SECURITY` enabled. The single-policy form is mandatory
+because `tenantId` is nullable: a split `tenant_isolation_insert`
+policy would be a permissive sibling that lets `app_user` UPDATE a
+NULL row to any tenantId. `UserSession` is listed in
+`SINGLE_POLICY_EXCEPTIONS` in `tests/guardrails/rls-coverage.test.ts`,
+where the post-loop sanity check verifies the asymmetric `qual` +
+`with_check` shape is real — a future "simplify" PR that strips
+either clause fails CI. See migration
+`prisma/migrations/20260423150000_epic_d1_user_session_rls/` and
+`tests/integration/user-session-rls.test.ts` for the seven
+behavioural assertions (own-INSERT accepts; foreign-INSERT rejects;
+NULL-INSERT-under-app_user rejects; NULL-row-claim-to-other-tenant
+rejects; etc.).
+
+**D.2 — Encrypted-field write paths sanitised.** Five usecase
+files (`finding`, `risk`, `vendor`, `audit`, `control-test`) wrote
+to encrypted free-text columns without server-side sanitisation.
+Encryption protects confidentiality at rest; sanitisation protects
+every downstream renderer (UI, PDF export, audit-pack share link,
+SDK consumer reading the row verbatim) that decrypts and reads the
+field. All five now route user-supplied free text through
+`sanitizePlainText` (or, for surfaces that share the call shape,
+the per-file `sanitizeOptional` helper that preserves the
+undefined/null/string three-state contract). The
+`tests/guardrails/sanitize-rich-text-coverage.test.ts` ratchet has
+`SANITISER_COVERAGE_FLOOR = 8`; a future PR cannot silently drop
+one of the eight known sanitised usecases without bumping the
+floor in the same diff. The companion
+`tests/unit/security/sanitize-write-paths.test.ts` carries 20
+write-path assertions — one positive XSS-strip per call site.
+
+**D.3 — Legacy `requireAdminCtx` migrated to `requirePermission`.**
+Seven tenant API routes (billing × 3, security/sessions × 2,
+security/mfa/policy PUT, sso) used the legacy role-tier guard,
+which threw a 403 but **did not write an `AUTHZ_DENIED` audit
+row** and was invisible to the Epic C.1 permission guardrail. All
+seven now use `requirePermission(...)` — denials audit cleanly,
+and `tests/guardrails/api-permission-coverage.test.ts` now treats
+`billing/`, `sso/`, and `security/` as privileged roots with five
+self-service routes (own MFA enrolment, own session revocation)
+explicitly listed in `EXCLUDED_ROUTES` with written reasons. The
+canonical pattern for new admin routes is now
+`requirePermission('<key>', handler)`; `requireAdminCtx` is
+explicitly marked legacy/fallback in its own docstring.
+
+**See `docs/epic-d-completeness.md`** for the Epic D operator
+runbook (verification commands, rollback procedures, the five
+self-service security carve-outs, the asymmetric-RLS rationale).
+
 ### RBAC & Permissions
 
 - `src/lib/permissions.ts` — `PermissionSet` (granular UI flags) resolved from the user's role

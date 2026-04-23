@@ -120,7 +120,20 @@ export async function loginAndGetTenant(
     // <form>. See src/app/login/page.tsx.
     const credentialsForm = page.locator('#credentials-form');
     const emailInput = credentialsForm.locator('input[type="email"][name="email"]');
-    await emailInput.waitFor({ state: 'visible', timeout: 60000 });
+    // Resilience against `next dev` server pressure on long serial runs:
+    // if the form doesn't render within 30s, reload once and try again.
+    // Both the original test and the Playwright retry have hit cases
+    // where the dev server returned a partial /login page (login GET
+    // succeeded but the React tree didn't hydrate) — a single reload
+    // forces a fresh JIT compile and unsticks the page.
+    const formVisible = await emailInput
+        .waitFor({ state: 'visible', timeout: 30_000 })
+        .then(() => true)
+        .catch(() => false);
+    if (!formVisible) {
+        await safeGoto(page, '/login', { timeout: 60_000 });
+        await emailInput.waitFor({ state: 'visible', timeout: 30_000 });
+    }
 
     // Wait for React hydration — ensure onSubmit is attached before interacting.
     // Without this, the browser does a native form POST to '#', not the JS auth flow.
@@ -187,6 +200,33 @@ export async function loginAndGetTenant(
 }
 
 /**
+ * Wait until React has hydrated the given element so that its onClick /
+ * onSubmit handlers are attached. After `page.reload`, the DOM lands
+ * before the client bundle finishes hydrating; clicking a button whose
+ * onClick is still detached fires the click against a no-op DOM node and
+ * the test then waits forever for a side effect that never happens.
+ */
+export async function waitForHydration(
+    page: Page,
+    selector = 'main',
+    timeoutMs = 15_000,
+) {
+    await page.waitForFunction(
+        (sel) => {
+            const el = document.querySelector(sel as string);
+            return !!el && Object.keys(el).some(
+                (k) =>
+                    k.startsWith('__reactEvents') ||
+                    k.startsWith('__reactFiber') ||
+                    k.startsWith('__reactProps'),
+            );
+        },
+        selector,
+        { timeout: timeoutMs },
+    );
+}
+
+/**
  * Navigate to a page and verify that a specific selector is rendered.
  * Retries on server 500s / blank pages from JIT compilation.
  */
@@ -206,15 +246,7 @@ export async function gotoAndVerify(
             .isVisible()
             .catch(() => false);
         if (rendered) {
-            // Wait for React hydration — event handlers must be attached
-            // before tests interact with any elements.
-            await page.waitForFunction(() => {
-                const el = document.querySelector('[data-hydrated]')
-                    || document.querySelector('main');
-                return el && Object.keys(el).some(
-                    k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber') || k.startsWith('__reactProps'),
-                );
-            }, { timeout: 15000 }).catch(() => {});
+            await waitForHydration(page, '[data-hydrated], main').catch(() => {});
             return;
         }
         attempts--;

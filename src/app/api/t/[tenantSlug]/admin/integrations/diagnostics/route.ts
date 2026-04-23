@@ -11,14 +11,13 @@
  * Secrets are never included. Delegates to app-layer usecase.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminCtx } from '@/lib/auth/require-admin';
+import { requirePermission } from '@/lib/security/permission-middleware';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { getIntegrationDiagnostics } from '@/app-layer/usecases/integrations';
 
-export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await requireAdminCtx(params, req);
-
-    const diagnostics = await getIntegrationDiagnostics(ctx);
-
-    return NextResponse.json<any>(diagnostics);
-});
+export const GET = withApiErrorHandling(
+    requirePermission('admin.manage', async (_req: NextRequest, _routeArgs, ctx) => {
+        const diagnostics = await getIntegrationDiagnostics(ctx);
+        return NextResponse.json<any>(diagnostics);
+    }),
+);

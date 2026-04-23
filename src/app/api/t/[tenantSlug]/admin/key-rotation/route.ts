@@ -10,7 +10,7 @@
  *     Reports the current state of a previously-enqueued job.
  *     Status + progress payload (no key material).
  *
- * Restricted to ADMIN (via `requireAdminCtx`). Wrapped in the
+ * Gated by `admin.manage` (Epic C.1 / D.3). Wrapped in the
  * default API wrapper, which also applies the Epic A.2 rate limit —
  * overridden to `API_KEY_CREATE_LIMIT` (5/hr) because rotation is a
  * high-privilege operation that should not be hammered.
@@ -20,7 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminCtx } from '@/lib/auth/require-admin';
+import { requirePermission } from '@/lib/security/permission-middleware';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { enqueue, getQueue } from '@/app-layer/jobs/queue';
 import { API_KEY_CREATE_LIMIT } from '@/lib/security/rate-limit-middleware';
@@ -30,8 +30,7 @@ import { prisma } from '@/lib/prisma';
 // ─── POST — initiate rotation ──────────────────────────────────────
 
 export const POST = withApiErrorHandling(
-    async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-        const ctx = await requireAdminCtx(params, req);
+    requirePermission('admin.manage', async (_req: NextRequest, _routeArgs, ctx) => {
 
         const job = await enqueue('key-rotation', {
             tenantId: ctx.tenantId,
@@ -59,7 +58,7 @@ export const POST = withApiErrorHandling(
             },
             { status: 202 },
         );
-    },
+    }),
     {
         // Much tighter than the default API_MUTATION_LIMIT — rotation
         // is a once-a-quarter operation at most; 5/hr is comfortably
@@ -74,8 +73,7 @@ export const POST = withApiErrorHandling(
 // ─── GET — poll job status ─────────────────────────────────────────
 
 export const GET = withApiErrorHandling(
-    async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-        const ctx = await requireAdminCtx(params, req);
+    requirePermission('admin.manage', async (req: NextRequest, _routeArgs, ctx) => {
         const url = new URL(req.url);
         const jobId = url.searchParams.get('jobId');
         if (!jobId) {
@@ -126,7 +124,7 @@ export const GET = withApiErrorHandling(
             result: returnvalue,
             failedReason,
         });
-    },
+    }),
     // GET is not considered a mutation; default wrapper rate limit
     // does not apply to GET.
 );

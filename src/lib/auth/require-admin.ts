@@ -1,20 +1,31 @@
 /**
  * Server-side admin authorization guards for API routes.
  *
- * These are drop-in replacements for `getTenantCtx()` that additionally
- * enforce role-based access control. They throw `AppError(403)` which is
- * caught by `withApiErrorHandling` and returned as a JSON 403 response.
+ * **STATUS — legacy / fallback only.** Per Epic C.1 + D.3, the
+ * canonical pattern for new admin/privileged API routes is
+ * `requirePermission(<permissionKey>, handler)` from
+ * `@/lib/security/permission-middleware`. Reasons:
  *
- * Usage in an admin API route:
+ *   - It composes with the typed `PermissionKey` derived from
+ *     `PermissionSet`, so a missing key fails to compile.
+ *   - It writes a hash-chained `AUTHZ_DENIED` audit row on denial,
+ *     which `requireAdminCtx` does not.
+ *   - It is recognised by `tests/guardrails/api-permission-coverage.test.ts`
+ *     so a misconfigured route fails CI.
  *
- *   import { requireAdminCtx } from '@/lib/auth/require-admin';
+ * The helpers in this file remain in the codebase only for:
+ *   1. Routes outside the tenant-API tree (`/api/admin/diagnostics`,
+ *      etc.) that haven't been folded into the permission-key model.
+ *   2. The legacy guardrail's accept list (which lists this name
+ *      alongside `requirePermission` so an in-flight migration PR
+ *      passes both checks).
+ *   3. Tests that exercise the legacy guard directly.
  *
- *   export const POST = withApiErrorHandling(async (req, { params }) => {
- *       const ctx = await requireAdminCtx(params, req);
- *       // ... admin-only logic
- *   });
+ * **Do not** use these helpers in new tenant-scoped admin routes.
  *
- * Defence-in-depth layers:
+ * They throw `AppError(403)` which is caught by
+ * `withApiErrorHandling` and returned as a JSON 403 response.
+ * Defence-in-depth layers (unchanged):
  *   1. Edge middleware — redirects non-admin from /admin paths
  *   2. Admin layout guard — client-side RequirePermission
  *   3. This utility — server-side 403 enforcement on API routes

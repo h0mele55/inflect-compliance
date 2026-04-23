@@ -90,20 +90,28 @@ export interface TooltipProps {
  *
  * Content supports a short string or composed ReactNode; use `title` for the
  * heading + body pattern instead of building markup every time.
+ *
+ * Wrapped in `forwardRef` so a parent that uses `asChild` (Popover.Trigger,
+ * Dialog.Trigger, Radix Slot) can compose its ref with the underlying
+ * trigger element. Without this, `<Popover><Tooltip>...</Tooltip></Popover>`
+ * triggers React's "function components cannot be given refs" warning.
  */
-export function Tooltip({
-    children,
-    content,
-    title,
-    shortcut,
-    disabled,
-    side = "top",
-    align = "center",
-    sideOffset = 6,
-    delayDuration,
-    disableHoverableContent,
-    contentClassName,
-}: TooltipProps) {
+export const Tooltip = forwardRef<HTMLButtonElement, TooltipProps>(function Tooltip(
+    {
+        children,
+        content,
+        title,
+        shortcut,
+        disabled,
+        side = "top",
+        align = "center",
+        sideOffset = 6,
+        delayDuration,
+        disableHoverableContent,
+        contentClassName,
+    },
+    ref,
+) {
     if (disabled || (content == null && title == null)) {
         return <>{children}</>;
     }
@@ -113,7 +121,7 @@ export function Tooltip({
             delayDuration={delayDuration}
             disableHoverableContent={disableHoverableContent}
         >
-            <TooltipPrimitive.Trigger asChild>
+            <TooltipPrimitive.Trigger ref={ref} asChild>
                 {children}
             </TooltipPrimitive.Trigger>
             <TooltipPrimitive.Portal>
@@ -145,7 +153,7 @@ export function Tooltip({
             </TooltipPrimitive.Portal>
         </TooltipPrimitive.Root>
     );
-}
+});
 
 function TooltipBody({
     title,
@@ -224,13 +232,17 @@ export const InfoTooltip = forwardRef<
  *     <StatusBadge ... />
  *   </DynamicTooltipWrapper>
  */
-export function DynamicTooltipWrapper({
-    children,
-    tooltipProps,
-}: {
-    children: ReactNode;
-    tooltipProps?: Omit<TooltipProps, "children">;
-}) {
+export const DynamicTooltipWrapper = forwardRef<
+    HTMLButtonElement,
+    {
+        children: ReactNode;
+        tooltipProps?: Omit<TooltipProps, "children">;
+    }
+>(function DynamicTooltipWrapper({ children, tooltipProps }, ref) {
     if (!tooltipProps) return <>{children}</>;
-    return <Tooltip {...tooltipProps}>{children}</Tooltip>;
-}
+    return (
+        <Tooltip ref={ref} {...tooltipProps}>
+            {children}
+        </Tooltip>
+    );
+});

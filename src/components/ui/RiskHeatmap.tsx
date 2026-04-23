@@ -22,6 +22,7 @@
  * />
  * ```
  */
+import { Fragment } from 'react';
 
 // ─── Props ──────────────────────────────────────────────────────────
 
@@ -115,10 +116,9 @@ export default function RiskHeatmap({
                         }}
                     >
                         {rows.map((likelihood) => (
-                            <>
+                            <Fragment key={`row-${likelihood}`}>
                                 {/* Row label */}
                                 <div
-                                    key={`label-${likelihood}`}
                                     className="flex items-center justify-center text-[10px] text-content-subtle tabular-nums"
                                 >
                                     {likelihood}
@@ -144,7 +144,7 @@ export default function RiskHeatmap({
                                         </div>
                                     );
                                 })}
-                            </>
+                            </Fragment>
                         ))}
 
                         {/* X-axis labels */}

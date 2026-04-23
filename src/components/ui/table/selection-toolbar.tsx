@@ -179,7 +179,14 @@ export function SelectionToolbar<T>({
           : "pointer-events-none opacity-0",
         className,
       )}
-      inert={selectedCount === 0}
+      // React 18 doesn't recognise `inert` as a known boolean attribute,
+      // so passing a JSX boolean triggers the "non-boolean attribute"
+      // warning. Conditionally spread the attribute: present (empty
+      // string) when active, omitted otherwise. HTML treats any present
+      // `inert` attribute as truthy.
+      {...(selectedCount === 0
+          ? ({ inert: "" } as Record<string, string>)
+          : {})}
       role="toolbar"
       aria-label="Batch actions"
       data-testid="selection-toolbar"

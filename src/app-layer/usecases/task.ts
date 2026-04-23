@@ -6,6 +6,7 @@ import { emitAutomationEvent } from '../automation';
 import { enqueueEmail } from '../notifications/enqueue';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
+import { sanitizePlainText } from '@/lib/security/sanitize';
 import { validateTaskMetadata } from '../schemas/json-columns.schemas';
 import { logger } from '@/lib/observability/logger';
 import type { PrismaTx } from '@/lib/db-context';
@@ -332,8 +333,13 @@ export async function listTaskComments(ctx: RequestContext, taskId: string) {
 
 export async function addTaskComment(ctx: RequestContext, taskId: string, body: string) {
     assertCanCommentOnTasks(ctx);
+    // Epic C.5 — comments today are plain text. Strip any HTML the
+    // client tries to inject before persistence so a future renderer
+    // change (Markdown, HTML preview) can never accidentally re-enable
+    // a stored XSS vector.
+    const safeBody = sanitizePlainText(body);
     return runInTenantContext(ctx, async (db) => {
-        const comment = await TaskCommentRepository.add(db, ctx, taskId, body);
+        const comment = await TaskCommentRepository.add(db, ctx, taskId, safeBody);
         await logEvent(db, ctx, {
             action: 'TASK_COMMENT_ADDED',
             entityType: 'Task',

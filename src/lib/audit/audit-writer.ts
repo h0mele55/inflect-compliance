@@ -120,6 +120,12 @@ export async function appendAuditEntry(input: AppendAuditInput, client?: PrismaC
     const id = generateCuid();
     const actorType = input.actorType || 'USER';
     const version = input.version ?? 1;
+    // Capture the wall-clock timestamp here for the streamer payload.
+    // The actual hash-chain `occurredAt` is recomputed inside the
+    // transaction (after the advisory lock) — using a slightly earlier
+    // timestamp for the streamed copy is acceptable; it only changes
+    // the SIEM-visible "sent at" by milliseconds.
+    const streamOccurredAt = new Date().toISOString();
 
     // Build the structured detailsJson for hashing.
     // If caller provides detailsJson, use it directly.
@@ -131,7 +137,7 @@ export async function appendAuditEntry(input: AppendAuditInput, client?: PrismaC
 
     const db = client || getDefaultPrisma();
 
-    return db.$transaction(async (tx) => {
+    const result = await db.$transaction(async (tx) => {
         // 1. Acquire per-tenant advisory lock
         //    hashtext() returns a 32-bit int from a string — perfect for advisory locks
         await tx.$executeRawUnsafe(
@@ -212,6 +218,41 @@ export async function appendAuditEntry(input: AppendAuditInput, client?: PrismaC
 
         return { id, entryHash, previousHash };
     });
+
+    // Epic C.4 — best-effort outbound streaming. The audit row is
+    // already committed at this point, so a thrown error in the
+    // streamer must not propagate. The streamer enqueues into a
+    // per-tenant in-memory buffer and returns synchronously; HTTP
+    // POSTs happen out-of-band on a 5s / 100-event flush.
+    try {
+        // Lazy import: the streamer pulls in node:crypto + a logger
+        // chain; loading it here keeps the cold-start cost off the
+        // happy path for tenants that don't use streaming.
+        const { streamAuditEvent } = await import(
+            '@/app-layer/events/audit-webhook'
+        );
+        streamAuditEvent({
+            id: result.id,
+            entryHash: result.entryHash,
+            previousHash: result.previousHash,
+            tenantId: input.tenantId,
+            userId: input.userId,
+            actorType,
+            entity: input.entity,
+            entityId: input.entityId,
+            action: input.action,
+            // `details` is intentionally NOT forwarded — it can carry
+            // human-readable PII. SIEMs consume `detailsJson`.
+            detailsJson: input.detailsJson ?? null,
+            metadataJson: input.metadataJson ?? null,
+            requestId: input.requestId ?? null,
+            occurredAt: streamOccurredAt,
+        });
+    } catch {
+        // Streamer is fail-safe; this catch is belt-and-braces.
+    }
+
+    return result;
 }
 
 // ─── Chain Verification ─────────────────────────────────────────────

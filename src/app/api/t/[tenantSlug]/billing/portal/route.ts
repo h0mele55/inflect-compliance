@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminCtx } from '@/lib/auth/require-admin';
+import { requirePermission } from '@/lib/security/permission-middleware';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { findOrCreateCustomer, createPortalSession } from '@/lib/stripe';
 import { env } from '@/env';
@@ -7,23 +7,23 @@ import { env } from '@/env';
 /**
  * POST /api/t/[tenantSlug]/billing/portal
  * Creates a Stripe Customer Portal session.
- * Admin-only.
+ * Gated by `admin.manage` (Epic D.3).
  */
-export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
-    const ctx = await requireAdminCtx(params, req);
+export const POST = withApiErrorHandling(
+    requirePermission('admin.manage', async (req: NextRequest, _routeArgs, ctx) => {
+        const appUrl = env.APP_URL || `https://${req.headers.get('host') || 'localhost:3000'}`;
 
-    const appUrl = env.APP_URL || `https://${req.headers.get('host') || 'localhost:3000'}`;
+        const { stripeCustomerId } = await findOrCreateCustomer(
+            ctx.tenantId,
+            ctx.tenantSlug!,
+            '',
+        );
 
-    const { stripeCustomerId } = await findOrCreateCustomer(
-        ctx.tenantId,
-        ctx.tenantSlug!,
-        '',
-    );
+        const url = await createPortalSession(
+            stripeCustomerId,
+            `${appUrl}/t/${ctx.tenantSlug}/admin`,
+        );
 
-    const url = await createPortalSession(
-        stripeCustomerId,
-        `${appUrl}/t/${ctx.tenantSlug}/admin`,
-    );
-
-    return NextResponse.json<any>({ url });
-});
+        return NextResponse.json<any>({ url });
+    }),
+);

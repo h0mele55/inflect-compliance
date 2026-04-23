@@ -149,7 +149,12 @@ describe('Regression: Import hygiene', () => {
         // key-rotation passes the prisma client through to `logEvent` so
         // the audit row lands on the same transaction the BullMQ job
         // will later use (Epic B.3 — admin-initiated tenant key rotation).
-        const ROUTE_ALLOWLIST = ['audit-log', 'scim', 'key-rotation'];
+        // admin/sessions (Epic C.3) passes prisma to `logEvent` for the
+        // SESSION_REVOKED_BY_ADMIN audit row — same pattern as
+        // key-rotation; row lookups go through `findOwnTenantSession`
+        // in `lib/security/session-tracker.ts`, not through
+        // `prisma.userSession.…` in the route.
+        const ROUTE_ALLOWLIST = ['audit-log', 'scim', 'key-rotation', 'sessions'];
         const routes = walk(routeDir, ['.ts']).filter(f =>
             f.endsWith('route.ts') && !ROUTE_ALLOWLIST.some(a => f.includes(a))
         );

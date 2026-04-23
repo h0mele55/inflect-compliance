@@ -17,13 +17,19 @@ function getDimensions() {
 }
 
 export function useMediaQuery() {
+  // Start as `null` on both SSR and first client render so React's
+  // hydration check passes cleanly, then resolve to the real device on
+  // mount. Without this, SSR renders with `device=null` (treated as
+  // desktop) while a 375px-viewport client renders with `device="mobile"`,
+  // and any consumer that branches on `isMobile` (popover.tsx swaps
+  // Radix Popover for Vaul Drawer) hits a className hydration mismatch.
   const [device, setDevice] = useState<"mobile" | "tablet" | "desktop" | null>(
-    getDevice(),
+    null,
   );
   const [dimensions, setDimensions] = useState<{
     width: number;
     height: number;
-  } | null>(getDimensions());
+  } | null>(null);
 
   useEffect(() => {
     const checkDevice = () => {

@@ -1,14 +1,22 @@
 /**
  * Guardrail test: Admin API route authorization coverage.
  *
- * Scans all admin-only API route files to ensure they use `requireAdminCtx`
- * (or `requireRoleCtx`/`requireWriteCtx`) instead of raw `getTenantCtx`.
+ * Scans all admin-only API route files to ensure they import a centralised
+ * authorization guard rather than raw `getTenantCtx`.
  *
- * This prevents regressions where a new admin route is added without
- * proper server-side admin enforcement.
+ * Accepted guards:
+ *   - `requirePermission` — preferred (Epic C.1 — granular PermissionKey).
+ *   - `requireAdminCtx` / `requireWriteCtx` / `requireRoleCtx` — legacy
+ *     role-based guards that predate the permission-key model. Routes
+ *     that haven't migrated yet still satisfy the guardrail through
+ *     these.
  *
- * Adding a new admin route? Import `requireAdminCtx` from
- * `@/lib/auth/require-admin` instead of `getTenantCtx` from `@/app-layer/context`.
+ * Adding a new admin route? Wrap the handler with
+ * `requirePermission('admin.X', …)` from
+ * `@/lib/security/permission-middleware` and add the URL to
+ * `ROUTE_PERMISSIONS` in `@/lib/security/route-permissions`. The
+ * companion guardrail `tests/guardrails/api-permission-coverage.test.ts`
+ * verifies the route ↔ map sync.
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -35,6 +43,7 @@ const ADMIN_ONLY_ROUTES = [
     'admin/api-keys/route.ts',
     'admin/api-keys/[keyId]/route.ts',
     'admin/key-rotation/route.ts',
+    'admin/sessions/route.ts',
 
     // Billing routes (admin-only)
     'billing/checkout/route.ts',
@@ -53,8 +62,13 @@ const ADMIN_ONLY_ROUTES = [
 /**
  * The import patterns that indicate proper admin authorization.
  * A route must import at least one of these.
+ *
+ * `requirePermission` is the Epic C.1 canonical guard; the three
+ * `require*Ctx` helpers are the legacy role-based guards that still
+ * satisfy the rule for routes pending migration.
  */
 const ADMIN_GUARD_PATTERNS = [
+    'requirePermission',
     'requireAdminCtx',
     'requireWriteCtx',
     'requireRoleCtx',

@@ -4,7 +4,19 @@ import { assertCanRead, assertCanWrite } from '../policies/common';
 import { logEvent } from '../events/audit';
 import { notFound } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
+import { sanitizePlainText } from '@/lib/security/sanitize';
 import type { FindingSeverity, FindingType, FindingStatus } from '@prisma/client';
+
+// Epic D.2 — sanitise optional free-text on UPDATE without disturbing
+// the three-state contract: undefined → don't touch, null → SET NULL,
+// string → sanitise + SET. The shared `sanitizePlainText` helper
+// returns '' for null/undefined inputs, which would silently turn an
+// "untouched" column into an empty-string write — hence this guard.
+function sanitizeOptional(v: string | null | undefined): string | null | undefined {
+    if (v === undefined) return undefined;
+    if (v === null) return null;
+    return sanitizePlainText(v);
+}
 
 export async function listFindings(ctx: RequestContext) {
     assertCanRead(ctx);
@@ -40,11 +52,17 @@ export async function createFinding(ctx: RequestContext, data: {
             auditId: data.auditId || null,
             severity: data.severity as FindingSeverity,
             type: data.type as FindingType,
-            title: data.title,
-            description: data.description || '',
-            rootCause: data.rootCause,
-            correctiveAction: data.correctiveAction,
-            owner: data.owner,
+            // Epic D.2 — sanitise free-text before persistence. Encryption
+            // protects confidentiality at rest; sanitisation protects
+            // every downstream renderer (UI, PDF, audit-pack, SDK) that
+            // reads the row verbatim.
+            title: sanitizePlainText(data.title),
+            description: data.description ? sanitizePlainText(data.description) : '',
+            rootCause: data.rootCause ? sanitizePlainText(data.rootCause) : data.rootCause,
+            correctiveAction: data.correctiveAction
+                ? sanitizePlainText(data.correctiveAction)
+                : data.correctiveAction,
+            owner: data.owner ? sanitizePlainText(data.owner) : data.owner,
             dueDate: data.dueDate ? new Date(data.dueDate) : null,
             status: 'OPEN',
         });
@@ -88,14 +106,16 @@ export async function updateFinding(ctx: RequestContext, id: string, data: {
         const finding = await FindingRepository.update(db, ctx, id, {
             severity: data.severity as FindingSeverity | undefined,
             type: data.type as FindingType | undefined,
-            title: data.title,
-            description: data.description,
-            rootCause: data.rootCause,
-            correctiveAction: data.correctiveAction,
-            owner: data.owner,
+            // Epic D.2 — sanitise on update only when the field is
+            // actually being written (preserves "don't touch" semantics).
+            title: sanitizeOptional(data.title) ?? undefined,
+            description: sanitizeOptional(data.description) ?? undefined,
+            rootCause: sanitizeOptional(data.rootCause) ?? undefined,
+            correctiveAction: sanitizeOptional(data.correctiveAction) ?? undefined,
+            owner: sanitizeOptional(data.owner) ?? undefined,
             dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
             status: data.status as FindingStatus | undefined,
-            verificationNotes: data.verificationNotes,
+            verificationNotes: sanitizeOptional(data.verificationNotes) ?? undefined,
             verifiedBy: data.status === 'CLOSED' ? ctx.userId : undefined,
             verifiedAt: data.status === 'CLOSED' ? new Date() : undefined,
         });

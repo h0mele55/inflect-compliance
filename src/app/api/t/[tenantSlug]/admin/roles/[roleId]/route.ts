@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminCtx } from '@/lib/auth/require-admin';
+import { requirePermission } from '@/lib/security/permission-middleware';
 import { updateCustomRole, deleteCustomRole } from '@/app-layer/usecases/custom-roles';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
@@ -11,22 +11,24 @@ const UpdateRoleSchema = z.object({
     permissionsJson: z.record(z.record(z.boolean())).optional(),
 });
 
-export const PATCH = withApiErrorHandling(async (
-    req: NextRequest,
-    { params }: { params: { tenantSlug: string; roleId: string } },
-) => {
-    const ctx = await requireAdminCtx(params, req);
-    const body = await req.json();
-    const input = UpdateRoleSchema.parse(body);
-    const role = await updateCustomRole(ctx, params.roleId, input);
-    return NextResponse.json<any>(role);
-});
+export const PATCH = withApiErrorHandling(
+    requirePermission<{ tenantSlug: string; roleId: string }>(
+        'admin.manage',
+        async (req: NextRequest, { params }, ctx) => {
+            const body = await req.json();
+            const input = UpdateRoleSchema.parse(body);
+            const role = await updateCustomRole(ctx, params.roleId, input);
+            return NextResponse.json<any>(role);
+        },
+    ),
+);
 
-export const DELETE = withApiErrorHandling(async (
-    req: NextRequest,
-    { params }: { params: { tenantSlug: string; roleId: string } },
-) => {
-    const ctx = await requireAdminCtx(params, req);
-    const result = await deleteCustomRole(ctx, params.roleId);
-    return NextResponse.json<any>(result);
-});
+export const DELETE = withApiErrorHandling(
+    requirePermission<{ tenantSlug: string; roleId: string }>(
+        'admin.manage',
+        async (_req: NextRequest, { params }, ctx) => {
+            const result = await deleteCustomRole(ctx, params.roleId);
+            return NextResponse.json<any>(result);
+        },
+    ),
+);

@@ -1,5 +1,17 @@
 const createNextIntlPlugin = require('next-intl/plugin');
 
+// Bump EventEmitter cap before Next loads any HTTP/socket modules so the
+// undici keep-alive socket pool doesn't trigger spurious
+// MaxListenersExceededWarning lines for per-socket
+// unpipe/error/close/finish listeners that accumulate across pooled
+// requests. Set here (not in src/instrumentation.ts) because the dev
+// server starts listening on the port before instrumentation.ts runs,
+// so sockets created during early bootstrap miss the bump otherwise.
+require('node:events').EventEmitter.defaultMaxListeners = Math.max(
+    require('node:events').EventEmitter.defaultMaxListeners ?? 10,
+    50,
+);
+
 const withNextIntl = createNextIntlPlugin('./src/i18n.ts');
 
 const defaultOptions = {

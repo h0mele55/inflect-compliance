@@ -6,6 +6,18 @@
 export async function register() {
     // Only initialize on the server (Node.js runtime), not Edge.
     if (process.env.NEXT_RUNTIME === 'nodejs' || !process.env.NEXT_RUNTIME) {
+        // Bump EventEmitter cap so undici's keep-alive socket pooling
+        // doesn't trigger spurious MaxListenersExceededWarning lines for
+        // the per-socket unpipe/error/close/finish listeners that
+        // accumulate across pooled requests. Default is 10 — every test
+        // run was producing dozens of these warnings under serial-mode
+        // E2E pressure with no actual leak (sockets get reused and the
+        // listeners are torn down when the request stream finishes).
+        const { EventEmitter } = await import('node:events');
+        if (EventEmitter.defaultMaxListeners < 50) {
+            EventEmitter.defaultMaxListeners = 50;
+        }
+
         const { initTelemetry } = await import('@/lib/observability/instrumentation');
         const { initSentry } = await import('@/lib/observability/sentry');
         const { installAutomationBusDispatcher } = await import(

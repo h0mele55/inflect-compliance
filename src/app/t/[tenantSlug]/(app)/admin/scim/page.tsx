@@ -36,9 +36,18 @@ export default function ScimAdminPage() {
     const fetchTokens = useCallback(async () => {
         try {
             const res = await fetch(apiUrl('/admin/scim'));
-            if (res.ok) setState(await res.json());
-        } catch { /* ignore */ }
-        finally { setLoading(false); }
+            if (res.ok) {
+                setState(await res.json());
+            } else if (res.status === 401 || res.status === 403) {
+                setError('You do not have permission to view SCIM tokens.');
+            } else {
+                setError(`Failed to load SCIM state (${res.status}).`);
+            }
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to load SCIM state.');
+        } finally {
+            setLoading(false);
+        }
     }, [apiUrl]);
 
     useEffect(() => { fetchTokens(); }, [fetchTokens]);
@@ -112,27 +121,30 @@ export default function ScimAdminPage() {
                 </div>
             </div>
 
-            {/* Endpoint Info */}
-            {state && (
-                <div className="glass-card p-4">
-                    <h3 className="text-sm font-medium text-content-default mb-2">SCIM Endpoint</h3>
-                    <div className="flex items-center gap-2 bg-bg-default/50 rounded px-3 py-2">
-                        <code className="text-xs text-[var(--brand-muted)] flex-1 select-all" id="scim-endpoint-url">
-                            {state.scimEndpoint}
-                        </code>
-                        <CopyButton
-                            value={state.scimEndpoint}
-                            label="Copy SCIM endpoint"
-                            successMessage="SCIM endpoint copied"
-                            size="sm"
-                        />
-                        <ExternalLink className="w-3.5 h-3.5 text-content-subtle" />
-                    </div>
-                    <p className="text-xs text-content-subtle mt-1">
-                        Use this base URL when configuring SCIM in your identity provider.
-                    </p>
+            {/* Endpoint Info — render the slot eagerly so #scim-endpoint-url
+                is queryable before the GET /admin/scim fetch resolves. */}
+            <div className="glass-card p-4">
+                <h3 className="text-sm font-medium text-content-default mb-2">SCIM Endpoint</h3>
+                <div className="flex items-center gap-2 bg-bg-default/50 rounded px-3 py-2">
+                    <code
+                        className="text-xs text-[var(--brand-muted)] flex-1 select-all min-h-[1.25rem] inline-block"
+                        id="scim-endpoint-url"
+                    >
+                        {state?.scimEndpoint ?? (loading ? 'Loading endpoint…' : '—')}
+                    </code>
+                    <CopyButton
+                        value={state?.scimEndpoint ?? ''}
+                        label="Copy SCIM endpoint"
+                        successMessage="SCIM endpoint copied"
+                        size="sm"
+                        disabled={!state?.scimEndpoint}
+                    />
+                    <ExternalLink className="w-3.5 h-3.5 text-content-subtle" />
                 </div>
-            )}
+                <p className="text-xs text-content-subtle mt-1">
+                    Use this base URL when configuring SCIM in your identity provider.
+                </p>
+            </div>
 
             {/* New Token Alert - Only shown once */}
             {newTokenPlaintext && (

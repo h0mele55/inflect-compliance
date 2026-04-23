@@ -5,7 +5,27 @@ import { assertCanReadVendors, assertCanManageVendors, assertCanManageVendorDocs
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
+import { sanitizePlainText } from '@/lib/security/sanitize';
 import { computeAnswerPoints, computeAssessmentScore, scoreToRiskRating } from '../services/vendor-scoring';
+
+// Epic D.2 — preserve the three-state contract on update paths.
+function sanitizeOptional(v: string | null | undefined): string | null | undefined {
+    if (v === undefined) return undefined;
+    if (v === null) return null;
+    return sanitizePlainText(v);
+}
+
+// Epic D.2 — list of free-text Vendor columns the loose-typed
+// `updateVendor` patch may carry. Anything not in this list is left
+// untouched (enums, foreign keys, dates, JSON, arrays of non-strings).
+const FREE_TEXT_VENDOR_FIELDS = [
+    'name',
+    'legalName',
+    'country',
+    'domain',
+    'websiteUrl',
+    'description',
+] as const;
 
 // ─── Vendor CRUD ───
 
@@ -44,8 +64,20 @@ export async function createVendor(ctx: RequestContext, input: {
     description?: string | null;
 }) {
     assertCanManageVendors(ctx);
+    // Epic D.2 — sanitise every free-text column. Enums + booleans +
+    // FK ids pass through untouched.
+    const sanitisedInput = {
+        ...input,
+        name: sanitizePlainText(input.name),
+        legalName: input.legalName ? sanitizePlainText(input.legalName) : input.legalName,
+        country: input.country ? sanitizePlainText(input.country) : input.country,
+        domain: input.domain ? sanitizePlainText(input.domain) : input.domain,
+        websiteUrl: input.websiteUrl ? sanitizePlainText(input.websiteUrl) : input.websiteUrl,
+        description: input.description ? sanitizePlainText(input.description) : input.description,
+        tags: input.tags?.map((t) => sanitizePlainText(t)),
+    };
     return runInTenantContext(ctx, async (db) => {
-        const vendor = await VendorRepository.create(db, ctx, input);
+        const vendor = await VendorRepository.create(db, ctx, sanitisedInput);
         await logEvent(db, ctx, {
             action: 'VENDOR_CREATED',
             entityType: 'Vendor',
@@ -60,9 +92,23 @@ export async function createVendor(ctx: RequestContext, input: {
 
 export async function updateVendor(ctx: RequestContext, vendorId: string, patch: Record<string, unknown>) {
     assertCanManageVendors(ctx);
+    // Epic D.2 — sanitise the loose-typed patch one key at a time.
+    // Enums, ids, dates, and structured JSON pass through unchanged
+    // because they don't satisfy `typeof === 'string'`.
+    const sanitisedPatch: Record<string, unknown> = { ...patch };
+    for (const key of FREE_TEXT_VENDOR_FIELDS) {
+        if (typeof sanitisedPatch[key] === 'string') {
+            sanitisedPatch[key] = sanitizePlainText(sanitisedPatch[key] as string);
+        }
+    }
+    if (Array.isArray(sanitisedPatch.tags)) {
+        sanitisedPatch.tags = (sanitisedPatch.tags as unknown[]).map((t) =>
+            typeof t === 'string' ? sanitizePlainText(t) : t,
+        );
+    }
     return runInTenantContext(ctx, async (db) => {
         const previousStatus = patch.status ? (await VendorRepository.getById(db, ctx, vendorId))?.status : null;
-        const vendor = await VendorRepository.update(db, ctx, vendorId, patch);
+        const vendor = await VendorRepository.update(db, ctx, vendorId, sanitisedPatch);
         if (!vendor) throw notFound('Vendor not found');
 
         const action = patch.status && patch.status !== previousStatus ? 'VENDOR_STATUS_CHANGED' : 'VENDOR_UPDATED';
@@ -95,8 +141,17 @@ export async function addVendorDocument(ctx: RequestContext, vendorId: string, d
     notes?: string | null;
 }) {
     assertCanManageVendorDocs(ctx);
+    // Epic D.2 — sanitise the free-text columns before persistence.
+    // `notes` is encrypted at rest (manifest); sanitisation closes the
+    // downstream-renderer integrity gap.
+    const sanitisedDoc = {
+        ...docInput,
+        title: sanitizeOptional(docInput.title) as string | null | undefined,
+        externalUrl: sanitizeOptional(docInput.externalUrl) as string | null | undefined,
+        notes: sanitizeOptional(docInput.notes) as string | null | undefined,
+    };
     return runInTenantContext(ctx, async (db) => {
-        const doc = await VendorDocumentRepository.create(db, ctx, vendorId, docInput);
+        const doc = await VendorDocumentRepository.create(db, ctx, vendorId, sanitisedDoc);
         await logEvent(db, ctx, {
             action: 'VENDOR_DOCUMENT_ADDED',
             entityType: 'Vendor',
@@ -228,8 +283,12 @@ export async function submitVendorAssessment(ctx: RequestContext, assessmentId: 
 
 export async function decideVendorAssessment(ctx: RequestContext, assessmentId: string, decision: string, notes?: string | null) {
     assertCanApproveAssessment(ctx);
+    // Epic D.2 — `notes` is encrypted on `VendorAssessment.notes` and
+    // also surfaces verbatim in the audit-log details string, so
+    // sanitise once at the top of the path.
+    const safeNotes = sanitizeOptional(notes);
     return runInTenantContext(ctx, async (db) => {
-        const assessment = await VendorAssessmentRepository.decide(db, ctx, assessmentId, decision, notes);
+        const assessment = await VendorAssessmentRepository.decide(db, ctx, assessmentId, decision, safeNotes ?? undefined);
         if (!assessment) throw notFound('Assessment not found or not in IN_REVIEW status');
 
         const action = decision === 'APPROVED' ? 'VENDOR_ASSESSMENT_APPROVED' : 'VENDOR_ASSESSMENT_REJECTED';

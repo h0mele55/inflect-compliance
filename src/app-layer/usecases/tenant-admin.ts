@@ -32,7 +32,7 @@ const VALID_ROLES: Role[] = ['ADMIN', 'EDITOR', 'AUDITOR', 'READER'];
 
 export async function listTenantMembers(ctx: RequestContext) {
     assertCanViewAdminSettings(ctx);
-    return runInTenantContext(ctx, (db) =>
+    const memberships = await runInTenantContext(ctx, (db) =>
         db.tenantMembership.findMany({
             where: {
                 tenantId: ctx.tenantId,
@@ -58,6 +58,24 @@ export async function listTenantMembers(ctx: RequestContext) {
             orderBy: { createdAt: 'asc' },
         })
     );
+
+    // Epic C.3 — attach live-session counts so the admin members UI
+    // can surface "3 active sessions" without an N+1 cascade of
+    // requests. Best-effort: a DB failure falls back to 0 counts and
+    // the UI degrades gracefully rather than failing the whole page.
+    let counts: Record<string, number> = {};
+    try {
+        const { countActiveSessionsForTenantUsers } = await import(
+            '@/lib/security/session-tracker'
+        );
+        counts = await countActiveSessionsForTenantUsers(ctx.tenantId);
+    } catch {
+        counts = {};
+    }
+    return memberships.map((m) => ({
+        ...m,
+        activeSessionCount: counts[m.userId] ?? 0,
+    }));
 }
 
 // ─── Invite Member ───

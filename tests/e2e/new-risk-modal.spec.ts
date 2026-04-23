@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { loginAndGetTenant, safeGoto } from './e2e-utils';
+import { loginAndGetTenant, safeGoto, waitForHydration } from './e2e-utils';
 
 /**
  * Epic 54 — New Risk modal migration.
@@ -27,6 +27,8 @@ test.describe('Epic 54 — New Risk modal', () => {
         // earlier modal-heavy specs in the same Playwright run.
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#new-risk-btn', { timeout: 15000 });
+        // Click would otherwise race against React hydration of RisksClient.
+        await waitForHydration(page);
         const listUrl = page.url();
 
         await page.click('#new-risk-btn');
@@ -46,6 +48,7 @@ test.describe('Epic 54 — New Risk modal', () => {
         await safeGoto(page, `/t/${tenantSlug}/risks`);
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#new-risk-btn', { timeout: 15000 });
+        await waitForHydration(page);
         await page.click('#new-risk-btn');
         await expect(page.locator('#risk-title')).toBeVisible({ timeout: 60_000 });
 
@@ -70,6 +73,7 @@ test.describe('Epic 54 — New Risk modal', () => {
         // mounts.
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#new-risk-btn', { timeout: 15000 });
+        await waitForHydration(page);
         await page.click('#new-risk-btn');
         await expect(page.locator('#risk-title')).toBeVisible({ timeout: 60_000 });
 

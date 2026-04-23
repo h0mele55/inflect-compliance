@@ -312,7 +312,50 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     }
                 }
 
+                // Epic C.3 — record an operational session row so the
+                // server can later list/revoke this specific session.
+                // Best-effort; a DB failure here logs but does not
+                // block sign-in (see session-tracker.ts).
+                try {
+                    const { recordNewSession } = await import(
+                        '@/lib/security/session-tracker'
+                    );
+                    // NextAuth defaults the JWT max-age to 30 days; we
+                    // mirror that here. If the auth.config maxAge ever
+                    // changes, plumb it through `token.expires` instead.
+                    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+                    const recorded = await recordNewSession({
+                        userId: token.userId as string,
+                        tenantId: (token.tenantId as string) ?? null,
+                        expiresAt: new Date(Date.now() + THIRTY_DAYS_MS),
+                    });
+                    token.userSessionId = recorded.sessionId;
+                } catch {
+                    // Already swallowed in the helper; nothing left to do.
+                }
+
                 return token;
+            }
+
+            // Epic C.3 — verify the session still exists + isn't revoked.
+            // Throttled `lastActiveAt` write happens inside the helper.
+            if (typeof token.userSessionId === 'string' && token.userSessionId) {
+                try {
+                    const { verifyAndTouchSession } = await import(
+                        '@/lib/security/session-tracker'
+                    );
+                    const result = await verifyAndTouchSession(
+                        token.userSessionId,
+                    );
+                    if (result.revoked) {
+                        return { ...token, error: 'SessionRevoked' };
+                    }
+                } catch {
+                    // Helper already logs; fail-open on telemetry-side
+                    // failures so a transient DB blip doesn't sign every
+                    // user out. The classic sessionVersion check below
+                    // is still in force as a backstop.
+                }
             }
 
             // Subsequent requests — check if OAuth token needs refresh

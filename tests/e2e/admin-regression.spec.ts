@@ -29,18 +29,12 @@ test.describe('Admin Area Regression', () => {
     });
 
     // ── 2. SCIM page renders ──
-    // Pre-existing flake unrelated to Epics 56-60: the `#scim-endpoint-url`
-    // element only renders once the `/api/t/[tenantSlug]/admin/scim`
-    // GET populates the page's `state`. In CI the test times out waiting
-    // for that state — the page compiles, `/admin/scim` API receives
-    // the request, but something between the request and `setState` is
-    // not landing within 30s (cold-compile? admin-ctx resolution?). All
-    // other SCIM-adjacent tests in this suite pass, including the
-    // non-admin guard below. `test.fixme()` preserves the assertion +
-    // documents the gap while keeping CI green. Follow-up ticket:
-    // investigate SCIM GET latency / state-init path under the CI
-    // dev-server. Track before shipping a dedicated SCIM admin release.
-    test.fixme('SCIM admin page renders token management', async ({ page }) => {
+    // The `#scim-endpoint-url` slot is now rendered eagerly (with a
+    // "Loading endpoint…" placeholder) so the selector resolves before
+    // the GET /admin/scim fetch lands. The previous `test.fixme()` was
+    // a workaround for the slot only mounting after `setState`, which
+    // could time out on cold-compile dev-server runs.
+    test('SCIM admin page renders token management', async ({ page }) => {
         const slug = await loginAndGetTenant(page, ADMIN_USER);
         await safeGoto(page, `/t/${slug}/admin/scim`, { waitUntil: 'domcontentloaded' });
         await page.waitForLoadState('networkidle').catch(() => {});

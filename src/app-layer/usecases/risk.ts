@@ -6,7 +6,19 @@ import { logEvent } from '../events/audit';
 import { notFound, badRequest } from '@/lib/errors/types';
 import { calculateRiskScore } from '@/lib/risk-scoring';
 import { runInTenantContext } from '@/lib/db-context';
+import { sanitizePlainText } from '@/lib/security/sanitize';
 import type { TreatmentDecision, RiskStatus } from '@prisma/client';
+
+// Epic D.2 — sanitise optional free-text on UPDATE without disturbing
+// the three-state contract: undefined → don't touch, null → SET NULL,
+// string → sanitise + SET. The shared `sanitizePlainText` helper
+// returns '' for null/undefined inputs, which would silently turn an
+// "untouched" column into an empty-string write — hence this guard.
+function sanitizeOptional(v: string | null | undefined): string | null | undefined {
+    if (v === undefined) return undefined;
+    if (v === null) return null;
+    return sanitizePlainText(v);
+}
 
 // ─── Tenant-level usecases ───
 
@@ -57,19 +69,20 @@ export async function createRisk(ctx: RequestContext, data: {
         const inherentScore = calculateRiskScore(data.likelihood ?? 3, data.impact ?? 3, maxScale);
 
         const risk = await RiskRepository.create(db, ctx, {
-            title: data.title,
-            description: data.description || null,
-            category: data.category || null,
-            threat: data.threat || '',
-            vulnerability: data.vulnerability || '',
+            // Epic D.2 — sanitise free-text before persistence.
+            title: sanitizePlainText(data.title),
+            description: data.description ? sanitizePlainText(data.description) : null,
+            category: data.category ? sanitizePlainText(data.category) : null,
+            threat: data.threat ? sanitizePlainText(data.threat) : '',
+            vulnerability: data.vulnerability ? sanitizePlainText(data.vulnerability) : '',
             impact: data.impact ?? 3,
             likelihood: data.likelihood ?? 3,
             inherentScore,
             score: inherentScore,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum boundary
             treatment: (data.treatment || null) as TreatmentDecision | null,
-            treatmentOwner: data.treatmentOwner || null,
-            treatmentNotes: data.treatmentNotes || null,
+            treatmentOwner: data.treatmentOwner ? sanitizePlainText(data.treatmentOwner) : null,
+            treatmentNotes: data.treatmentNotes ? sanitizePlainText(data.treatmentNotes) : null,
             ownerUserId: data.ownerUserId || null,
             createdByUserId: ctx.userId,
             targetDate: data.targetDate ? new Date(data.targetDate) : null,
@@ -119,9 +132,17 @@ export async function createRiskFromTemplate(ctx: RequestContext, templateId: st
         const score = calculateRiskScore(likelihood, impact, maxScale);
 
         const risk = await RiskRepository.create(db, ctx, {
-            title: overrides.title ?? template.title,
-            description: overrides.description ?? template.description ?? null,
-            category: overrides.category ?? template.category ?? null,
+            // Epic D.2 — sanitise the merged value (override OR template),
+            // since the override comes from the API caller.
+            title: sanitizePlainText(overrides.title ?? template.title),
+            description: ((): string | null => {
+                const v = overrides.description ?? template.description ?? null;
+                return v ? sanitizePlainText(v) : null;
+            })(),
+            category: ((): string | null => {
+                const v = overrides.category ?? template.category ?? null;
+                return v ? sanitizePlainText(v) : null;
+            })(),
             likelihood,
             impact,
             score,
@@ -173,17 +194,20 @@ export async function updateRisk(ctx: RequestContext, id: string, data: {
             : undefined;
 
         const risk = await RiskRepository.update(db, ctx, id, {
-            title: data.title,
-            description: data.description,
-            category: data.category,
-            threat: data.threat,
-            vulnerability: data.vulnerability,
+            // Epic D.2 — sanitise on update only when the field is
+            // actually being written (preserves "don't touch" semantics
+            // for undefined; preserves explicit-clear for null).
+            title: sanitizeOptional(data.title) ?? undefined,
+            description: sanitizeOptional(data.description),
+            category: sanitizeOptional(data.category),
+            threat: sanitizeOptional(data.threat) ?? undefined,
+            vulnerability: sanitizeOptional(data.vulnerability) ?? undefined,
             impact: data.impact,
             likelihood: data.likelihood,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma enum boundary
             treatment: data.treatment as TreatmentDecision | undefined,
-            treatmentOwner: data.treatmentOwner,
-            treatmentNotes: data.treatmentNotes,
+            treatmentOwner: sanitizeOptional(data.treatmentOwner),
+            treatmentNotes: sanitizeOptional(data.treatmentNotes),
             targetDate: data.targetDate ? new Date(data.targetDate) : undefined,
             nextReviewAt: data.nextReviewAt ? new Date(data.nextReviewAt) : undefined,
             inherentScore,

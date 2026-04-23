@@ -24,8 +24,16 @@ import {
 import { logEvent } from '../events/audit';
 import { notFound, badRequest } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
+import { sanitizePlainText } from '@/lib/security/sanitize';
 import { computeNextDueAt } from '../utils/cadence';
 import { createTask } from './task';
+
+// Epic D.2 — preserve the three-state contract on update paths.
+function sanitizeOptional(v: string | null | undefined): string | null | undefined {
+    if (v === undefined) return undefined;
+    if (v === null) return null;
+    return sanitizePlainText(v);
+}
 
 // ─── Queries ───
 
@@ -74,8 +82,24 @@ export async function createTestPlan(ctx: RequestContext, controlId: string, inp
 }) {
     assertCanManageTestPlans(ctx);
 
+    // Epic D.2 — sanitise free-text on the test-plan write path. The
+    // plan row itself is not in the encrypted-fields manifest, but
+    // `name` + `description` + `steps[].instruction|expectedOutput`
+    // surface in UI, audit details, and PDF exports — sanitise at
+    // the row level so every downstream consumer is safe.
+    const sanitisedInput = {
+        ...input,
+        name: sanitizePlainText(input.name),
+        description: input.description ? sanitizePlainText(input.description) : input.description,
+        steps: input.steps?.map((s) => ({
+            instruction: sanitizePlainText(s.instruction),
+            expectedOutput: s.expectedOutput == null
+                ? s.expectedOutput
+                : sanitizePlainText(s.expectedOutput),
+        })),
+    };
     return runInTenantContext(ctx, async (db) => {
-        const plan = await TestPlanRepository.create(db, ctx, controlId, input);
+        const plan = await TestPlanRepository.create(db, ctx, controlId, sanitisedInput);
 
         // Compute initial nextDueAt
         const nextDueAt = computeNextDueAt(input.frequency || 'AD_HOC');
@@ -99,6 +123,14 @@ export async function updateTestPlan(ctx: RequestContext, planId: string, patch:
 }) {
     assertCanManageTestPlans(ctx);
 
+    // Epic D.2 — sanitise the free-text fields in the patch only when
+    // they're actually being written (preserves "don't touch"
+    // semantics for undefined).
+    const sanitisedPatch = {
+        ...patch,
+        name: sanitizeOptional(patch.name) ?? undefined,
+        description: sanitizeOptional(patch.description),
+    };
     return runInTenantContext(ctx, async (db) => {
         const existing = await TestPlanRepository.getById(db, ctx, planId);
         if (!existing) throw notFound('Test plan not found');
@@ -107,7 +139,7 @@ export async function updateTestPlan(ctx: RequestContext, planId: string, patch:
         const oldStatus = existing.status;
         const newStatus = patch.status;
 
-        const updated = await TestPlanRepository.update(db, ctx, planId, patch);
+        const updated = await TestPlanRepository.update(db, ctx, planId, sanitisedPatch);
 
         // Recompute nextDueAt if frequency changed
         if (patch.frequency && patch.frequency !== existing.frequency) {
@@ -153,13 +185,23 @@ export async function completeTestRun(ctx: RequestContext, runId: string, input:
 }) {
     assertCanExecuteTests(ctx);
 
+    // Epic D.2 — `notes` and `findingSummary` are encrypted on
+    // `ControlTestRun` and also surface verbatim in the auto-created
+    // CONTROL_GAP task's description below. Sanitise once at the top
+    // so the row at rest, the task body, and any audit/event payload
+    // all carry the cleaned value.
+    const sanitisedInput = {
+        ...input,
+        notes: sanitizeOptional(input.notes),
+        findingSummary: sanitizeOptional(input.findingSummary),
+    };
     return runInTenantContext(ctx, async (db) => {
         const run = await TestRunRepository.getById(db, ctx, runId);
         if (!run) throw notFound('Test run not found');
         if (run.status === 'COMPLETED') throw badRequest('Test run is already completed');
 
         // 1. Complete the run
-        const completedRun = await TestRunRepository.complete(db, ctx, runId, input);
+        const completedRun = await TestRunRepository.complete(db, ctx, runId, sanitisedInput);
 
         // 2. Update the plan's nextDueAt based on frequency
         const plan = run.testPlan;
@@ -177,13 +219,13 @@ export async function completeTestRun(ctx: RequestContext, runId: string, input:
 
         // 4. If FAIL, create a CONTROL_GAP task and emit failure event
         if (input.result === 'FAIL') {
-            await emitTestRunFailed(db, ctx, { id: runId, findingSummary: input.findingSummary });
+            await emitTestRunFailed(db, ctx, { id: runId, findingSummary: sanitisedInput.findingSummary });
 
             try {
                 await createTask(ctx, {
                     title: `Test failed: ${plan?.name || 'Unknown plan'}`,
                     type: 'CONTROL_GAP',
-                    description: input.findingSummary || input.notes || 'A control test run failed and requires remediation.',
+                    description: sanitisedInput.findingSummary || sanitisedInput.notes || 'A control test run failed and requires remediation.',
                     severity: 'HIGH',
                     priority: 'P1',
                     source: 'INTEGRATION',

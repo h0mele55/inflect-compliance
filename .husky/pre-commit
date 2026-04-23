@@ -1,0 +1,25 @@
+# Epic C.2 — secret-detection pre-commit hook.
+#
+# Two checks run, in cheap-first order, and abort the commit on the
+# first failure:
+#
+#   1. scripts/detect-secrets.sh — regex scan for AWS keys, GitHub /
+#      Slack / Anthropic / OpenAI / Stripe tokens, JWTs, PEM private
+#      keys, npm tokens, and suspicious password assignments. Limited
+#      to staged files.
+#
+#   2. lint-staged — currently re-runs the secret scan against the
+#      explicit staged subset (matches the per-file lint-staged
+#      contract). Future formatters / linters can be added under the
+#      `"lint-staged"` key in package.json without touching this hook.
+#
+# Bypass (use sparingly + flag in the commit message):
+#   git commit --no-verify
+
+set -e
+
+# Cheap top-level scan first — fast feedback before we spawn lint-staged.
+bash scripts/detect-secrets.sh
+
+# Per-file pipelines (formatters, linters, the per-file secret scan).
+npx --no-install lint-staged
