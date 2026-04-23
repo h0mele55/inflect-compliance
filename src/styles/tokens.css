@@ -27,8 +27,8 @@
 :root {
   /* ── Surfaces ──────────────────────────────────────────────────── */
   --bg-page:      #001830;                  /* very deep METRO navy — app/page background */
-  --bg-default:   #002F5F;                  /* METRO navy — cards, panels, tables, modals, popovers */
-  --bg-muted:     #003C7A;                  /* lighter navy — hover surfaces, pressed/active states */
+  --bg-default:   #003C7A;                  /* METRO navy (lighter) — cards, panels, tables, modals, popovers */
+  --bg-muted:     #002F5F;                  /* darker navy — hover surfaces, pressed/active states */
   --bg-subtle:    rgba(0, 83, 140, 0.30);   /* navy @ 30% — selection bg, disabled surfaces, faint tints */
   --bg-elevated:  #004B96;                  /* medium navy — tooltips, dropdowns sitting above default */
   --bg-inverted:  #FFCD11;                  /* METRO yellow — inverted surface (primary button bg) */
