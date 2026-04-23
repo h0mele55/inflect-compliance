@@ -158,8 +158,12 @@ test.describe('Core Certification Flow', () => {
         expect(riskResult.ok).toBe(true);
         expect(riskResult.title).toBe(RISK_TITLE);
 
-        // Reload the risks page to confirm risk is visible in the register
-        await page.reload();
+        // Navigate with a search filter so the new risk is the only row
+        // on the page. Without the filter, accumulated test data from
+        // prior runs (all named "E2E Risk <UNIQUE>", all score 20)
+        // pushes the new row into a later pagination page where the
+        // text-locator can't find it.
+        await safeGoto(page, `/t/${tenantSlug}/risks?q=${encodeURIComponent(RISK_TITLE)}`);
         await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('h1', { timeout: 30000 });
         await expect(page.locator(`text=${RISK_TITLE}`).first()).toBeVisible({ timeout: 10000 });
