@@ -570,12 +570,17 @@ export function Table<T>({
     >
       {(!error && !!data?.length) || loading ? (
         <>
-          {/* Selection Toolbar Overlay */}
+          {/* Selection Toolbar Overlay.
+              z-30 (was z-10) so it sits ABOVE the sticky thead
+              (z-20). When rows are selected the toolbar covers the
+              top of the card; the sticky thead would otherwise
+              render on top of it because of source order + the
+              earlier z-20 bump. */}
           {selectionEnabled && (
             <SelectionToolbar
               table={table}
               controls={selectionControls}
-              className="absolute left-0 top-0 z-10 rounded-t-[inherit]"
+              className="absolute left-0 top-0 z-30 rounded-t-[inherit]"
             />
           )}
           <div

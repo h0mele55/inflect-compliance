@@ -44,8 +44,12 @@ test.describe('DataTable Platform — Cross-page regression', () => {
             : page.locator('table').first();
 
         // Table might be empty — that's fine, but the structure should exist
-        // unless there's genuinely no data (empty state shown instead)
-        const tableVisible = await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
+        // unless there's genuinely no data (empty state shown instead).
+        // Bumped from 5s → 15s: admin audit-log occasionally takes
+        // longer than 5s on the first load (the audit-log API hits a
+        // hash-chain integrity check before returning), and the
+        // 5s budget produced a flake under load.
+        const tableVisible = await tableLocator.isVisible({ timeout: 15000 }).catch(() => false);
 
         if (tableVisible) {
             // If table is visible, verify it has headers
