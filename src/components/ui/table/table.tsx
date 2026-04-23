@@ -506,6 +506,14 @@ export function Table<T>({
             ref={scrollWrapperRef}
             className={cn(
               "relative min-h-[400px] overflow-x-auto rounded-[inherit]",
+              // Scroll-snap so rows align cleanly with the sticky
+              // header instead of stopping mid-row. `snap-proximity`
+              // only snaps when you stop near a snap point, so free
+              // scrolling still feels natural — half-row positions
+              // get a gentle nudge to align. `scroll-pt-[37px]`
+              // matches the sticky header height so a row's "start"
+              // snap point lands BELOW the header, not under it.
+              "snap-y snap-proximity scroll-pt-[37px]",
               scrollWrapperClassName,
             )}
           >
@@ -690,6 +698,13 @@ export function Table<T>({
                       key={row.id}
                       className={cn(
                         "group/row",
+                        // Each row is a snap point — combined with
+                        // the scroll wrapper's `snap-y
+                        // snap-proximity scroll-pt-[37px]`, this
+                        // makes rows align cleanly with the bottom
+                        // edge of the sticky header instead of
+                        // stopping half-row up or down.
+                        "snap-start",
                         onRowClick && "cursor-pointer select-none",
                         table.getRowModel().rows.length > 8 &&
                           row.index === table.getRowModel().rows.length - 1 &&
