@@ -14,6 +14,7 @@ import {
     useFilters,
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildTaskFilters, TASK_FILTER_KEYS } from './filter-defs';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
@@ -340,33 +341,36 @@ function TasksPageInner({
     }, [appPermissions.tasks.edit, selected, tasks.length, tenantHref, hydratedNow]);
 
     return (
-        <div className="space-y-6 animate-fadeIn" data-hydrated={hydrated || undefined}>
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Tasks</h1>
-                    <p className="text-content-muted text-sm">{tasks.length} tasks in register</p>
+        <ListPageShell className="animate-fadeIn gap-6" data-hydrated={hydrated || undefined}>
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold">Tasks</h1>
+                        <p className="text-content-muted text-sm">{tasks.length} tasks in register</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Link href={tenantHref('/tasks/dashboard')} className="btn btn-secondary inline-flex items-center gap-2" id="dashboard-btn"><AppIcon name="dashboard" size={16} /> Dashboard</Link>
+                        {appPermissions.tasks.create && (
+                            <Link href={tenantHref('/tasks/new')} className="btn btn-primary" id="new-task-btn">
+                                + New Task
+                            </Link>
+                        )}
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <Link href={tenantHref('/tasks/dashboard')} className="btn btn-secondary inline-flex items-center gap-2" id="dashboard-btn"><AppIcon name="dashboard" size={16} /> Dashboard</Link>
-                    {appPermissions.tasks.create && (
-                        <Link href={tenantHref('/tasks/new')} className="btn btn-primary" id="new-task-btn">
-                            + New Task
-                        </Link>
-                    )}
-                </div>
-            </div>
+            </ListPageShell.Header>
 
-            {/* Filters */}
-            <FilterToolbar
-                filters={liveFilters}
-                searchId="task-search"
-                searchPlaceholder="Search tasks… (Enter)"
-            />
+            <ListPageShell.Filters>
+                <FilterToolbar
+                    filters={liveFilters}
+                    searchId="task-search"
+                    searchPlaceholder="Search tasks… (Enter)"
+                />
+            </ListPageShell.Filters>
 
-            {/* Bulk Actions Toolbar */}
+            {/* Bulk Actions Toolbar — flex-shrink-0 so it keeps its
+                natural height in the ListPageShell column. */}
             {appPermissions.tasks.edit && selected.size > 0 && (
-                <div className="glass-card p-3 flex items-center gap-3 border border-[var(--brand-default)]/30" id="bulk-toolbar">
+                <div className="glass-card p-3 flex items-center gap-3 border border-[var(--brand-default)]/30 flex-shrink-0" id="bulk-toolbar">
                     <span className="text-sm text-[var(--brand-default)] font-medium">{selected.size} selected</span>
                     <Combobox
                         hideSearch
@@ -425,18 +429,20 @@ function TasksPageInner({
                 </div>
             )}
 
-            {/* Table */}
-            <DataTable<TaskListItem>
-                data={tasks}
-                columns={taskColumns}
-                loading={loading}
-                getRowId={(t) => t.id}
-                onRowClick={(row) => router.push(tenantHref(`/tasks/${row.original.id}`))}
-                emptyState="No tasks found. Create a task to get started."
-                resourceName={(p) => p ? 'tasks' : 'task'}
-                data-testid="tasks-table"
-                className="hover:bg-bg-muted"
-            />
-        </div>
+            <ListPageShell.Body>
+                <DataTable<TaskListItem>
+                    fillBody
+                    data={tasks}
+                    columns={taskColumns}
+                    loading={loading}
+                    getRowId={(t) => t.id}
+                    onRowClick={(row) => router.push(tenantHref(`/tasks/${row.original.id}`))}
+                    emptyState="No tasks found. Create a task to get started."
+                    resourceName={(p) => p ? 'tasks' : 'task'}
+                    data-testid="tasks-table"
+                    className="hover:bg-bg-muted"
+                />
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }

@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { DatePicker } from '@/components/ui/date-picker/date-picker';
 import {
@@ -187,12 +188,14 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
     ]), [t]);
 
     return (
-        <>
-            <div className="flex items-center justify-between">
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-content-muted text-sm">{findings.filter((f: any) => f.status !== 'CLOSED').length} {t.open.toLowerCase()}</p></div>
-                <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t.newFinding}</button>
-            </div>
+        <ListPageShell className="gap-6">
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                    <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-content-muted text-sm">{findings.filter((f: any) => f.status !== 'CLOSED').length} {t.open.toLowerCase()}</p></div>
+                    <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t.newFinding}</button>
+                </div>
+            </ListPageShell.Header>
 
             {showForm && (
                 <form onSubmit={createFinding} className="glass-card p-6 space-y-4 animate-fadeIn">
@@ -279,14 +282,17 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
                 </form>
             )}
 
-            <DataTable
-                data={findings}
-                columns={findingColumns}
-                getRowId={(f: any) => f.id}
-                emptyState={t.noFindings}
-                resourceName={(p) => p ? 'findings' : 'finding'}
-                data-testid="findings-table"
-            />
-        </>
+            <ListPageShell.Body>
+                <DataTable
+                    fillBody
+                    data={findings}
+                    columns={findingColumns}
+                    getRowId={(f: any) => f.id}
+                    emptyState={t.noFindings}
+                    resourceName={(p) => p ? 'findings' : 'finding'}
+                    data-testid="findings-table"
+                />
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }

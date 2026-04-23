@@ -12,6 +12,7 @@ import {
     useFilters,
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildAssetFilters, ASSET_FILTER_KEYS } from './filter-defs';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
@@ -160,24 +161,27 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
     ]), [t]);
 
     return (
-        <>
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">{t.title}</h1>
-                    <p className="text-content-muted text-sm">{assets.length} assets</p>
+        <ListPageShell className="gap-6">
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold">{t.title}</h1>
+                        <p className="text-content-muted text-sm">{assets.length} assets</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Link href={tenantHref('/coverage')} className="btn btn-secondary">Coverage</Link>
+                        <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t.addAsset}</button>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <Link href={tenantHref('/coverage')} className="btn btn-secondary">Coverage</Link>
-                    <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t.addAsset}</button>
-                </div>
-            </div>
+            </ListPageShell.Header>
 
-            {/* Filters */}
-            <FilterToolbar
-                filters={liveFilters}
-                searchId="asset-search"
-                searchPlaceholder="Search assets… (Enter)"
-            />
+            <ListPageShell.Filters>
+                <FilterToolbar
+                    filters={liveFilters}
+                    searchId="asset-search"
+                    searchPlaceholder="Search assets… (Enter)"
+                />
+            </ListPageShell.Filters>
 
             {showForm && (
                 <form onSubmit={createAsset} className="glass-card p-6 space-y-4 animate-fadeIn">
@@ -234,16 +238,19 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
                 </form>
             )}
 
-            <DataTable
-                data={assets}
-                columns={assetColumns}
-                getRowId={(a: any) => a.id}
-                onRowClick={(row) => router.push(tenantHref(`/assets/${row.original.id}`))}
-                emptyState={hasActive ? 'No assets match your filters' : t.noAssets}
-                resourceName={(p) => p ? 'assets' : 'asset'}
-                data-testid="assets-table"
-                className="hover:bg-bg-muted"
-            />
-        </>
+            <ListPageShell.Body>
+                <DataTable
+                    fillBody
+                    data={assets}
+                    columns={assetColumns}
+                    getRowId={(a: any) => a.id}
+                    onRowClick={(row) => router.push(tenantHref(`/assets/${row.original.id}`))}
+                    emptyState={hasActive ? 'No assets match your filters' : t.noAssets}
+                    resourceName={(p) => p ? 'assets' : 'asset'}
+                    data-testid="assets-table"
+                    className="hover:bg-bg-muted"
+                />
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }

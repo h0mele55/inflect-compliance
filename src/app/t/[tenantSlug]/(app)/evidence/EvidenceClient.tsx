@@ -34,6 +34,7 @@ import {
     type FilterType,
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import {
     buildEvidenceFilters,
@@ -453,34 +454,35 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     ]), [t, permissions, editingRetention, editRetentionDate, apiUrl]);
 
     return (
-        <div className="space-y-6 animate-fadeIn">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">{t.title}</h1>
-                    <p className="text-content-muted text-sm">{evidence.length} evidence items</p>
-                </div>
-                {permissions.canWrite && (
-                    <div className="flex gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setShowUpload(true)}
-                            className="btn btn-primary"
-                            id="upload-evidence-btn"
-                        >
-                            Upload File
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowTextForm(true)}
-                            className="btn btn-secondary"
-                            id="add-text-evidence-btn"
-                        >
-                            {t.addEvidence}
-                        </button>
+        <ListPageShell className="animate-fadeIn gap-6">
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold">{t.title}</h1>
+                        <p className="text-content-muted text-sm">{evidence.length} evidence items</p>
                     </div>
-                )}
-            </div>
+                    {permissions.canWrite && (
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowUpload(true)}
+                                className="btn btn-primary"
+                                id="upload-evidence-btn"
+                            >
+                                Upload File
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowTextForm(true)}
+                                className="btn btn-secondary"
+                                id="add-text-evidence-btn"
+                            >
+                                {t.addEvidence}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </ListPageShell.Header>
 
             {permissions.canWrite && (
                 <>
@@ -501,78 +503,82 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                 </>
             )}
 
-            {/* Retention filter tabs + Control filter */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="flex items-center gap-1" id="retention-tabs">
-                    <button
-                        onClick={() => setFilter('tab', 'active')}
-                        className={`btn ${retentionFilter === 'active' ? 'btn-primary' : 'btn-ghost'}`}
-                        id="tab-active"
-                    >
-                        Active ({activeEvidence.length})
-                    </button>
-                    <button
-                        onClick={() => setFilter('tab', 'expiring')}
-                        className={`btn ${retentionFilter === 'expiring' ? 'btn-danger' : 'btn-ghost'}`}
-                        id="tab-expiring"
-                    >
-                        Expiring ({expiringEvidence.length})
-                    </button>
-                    <button
-                        onClick={() => setFilter('tab', 'archived')}
-                        className={`btn ${retentionFilter === 'archived' ? 'btn-secondary' : 'btn-ghost'}`}
-                        id="tab-archived"
-                    >
-                        Archived ({archivedEvidence.length})
-                    </button>
-                </div>
-
-                <EvidenceFilterToolbar
-                    controls={controls}
-                    columnsDropdown={
-                        <ColumnsDropdown
-                            columns={evidenceColumnDropdown}
-                            visibility={columnVisibility}
-                            onChange={(v) => setColumnVisibility(v)}
-                            defaultVisibility={defaultEvidenceVisibility}
-                        />
-                    }
-                />
-            </div>
-
-            {/* Archived warning */}
-            {retentionFilter === 'archived' && archivedEvidence.length > 0 && (
-                <div className="bg-amber-900/20 border border-amber-700/30 rounded-lg px-4 py-3 text-sm text-amber-300 flex items-start gap-2">
-                    <span className="text-lg">!</span>
-                    <div>
-                        <strong>Archived evidence</strong> should not be used in active audit packs or compliance assessments.
-                        Unarchive if you need to reuse this evidence.
+            <ListPageShell.Filters className="space-y-3">
+                {/* Retention filter tabs + Control filter */}
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-1" id="retention-tabs">
+                        <button
+                            onClick={() => setFilter('tab', 'active')}
+                            className={`btn ${retentionFilter === 'active' ? 'btn-primary' : 'btn-ghost'}`}
+                            id="tab-active"
+                        >
+                            Active ({activeEvidence.length})
+                        </button>
+                        <button
+                            onClick={() => setFilter('tab', 'expiring')}
+                            className={`btn ${retentionFilter === 'expiring' ? 'btn-danger' : 'btn-ghost'}`}
+                            id="tab-expiring"
+                        >
+                            Expiring ({expiringEvidence.length})
+                        </button>
+                        <button
+                            onClick={() => setFilter('tab', 'archived')}
+                            className={`btn ${retentionFilter === 'archived' ? 'btn-secondary' : 'btn-ghost'}`}
+                            id="tab-archived"
+                        >
+                            Archived ({archivedEvidence.length})
+                        </button>
                     </div>
-                </div>
-            )}
 
-            {/* Evidence table */}
-            <DataTable
-                data={pg.slice(displayEvidence)}
-                columns={evidenceColumns}
-                getRowId={(ev: any) => ev.id}
-                emptyState={
-                    retentionFilter === 'archived'
-                        ? 'No archived evidence'
-                        : retentionFilter === 'expiring'
-                            ? 'No evidence expiring soon'
-                            : t.noEvidence
-                }
-                resourceName={(p) => p ? 'evidence items' : 'evidence item'}
-                columnVisibility={columnVisibility}
-                onColumnVisibilityChange={setColumnVisibility}
-                pagination={pg.pagination}
-                onPaginationChange={pg.setPagination}
-                rowCount={displayEvidence.length}
-                data-testid="evidence-table"
-                className="hover:bg-bg-muted"
-            />
-        </div>
+                    <EvidenceFilterToolbar
+                        controls={controls}
+                        columnsDropdown={
+                            <ColumnsDropdown
+                                columns={evidenceColumnDropdown}
+                                visibility={columnVisibility}
+                                onChange={(v) => setColumnVisibility(v)}
+                                defaultVisibility={defaultEvidenceVisibility}
+                            />
+                        }
+                    />
+                </div>
+
+                {/* Archived warning */}
+                {retentionFilter === 'archived' && archivedEvidence.length > 0 && (
+                    <div className="bg-amber-900/20 border border-amber-700/30 rounded-lg px-4 py-3 text-sm text-amber-300 flex items-start gap-2">
+                        <span className="text-lg">!</span>
+                        <div>
+                            <strong>Archived evidence</strong> should not be used in active audit packs or compliance assessments.
+                            Unarchive if you need to reuse this evidence.
+                        </div>
+                    </div>
+                )}
+            </ListPageShell.Filters>
+
+            <ListPageShell.Body>
+                <DataTable
+                    fillBody
+                    data={pg.slice(displayEvidence)}
+                    columns={evidenceColumns}
+                    getRowId={(ev: any) => ev.id}
+                    emptyState={
+                        retentionFilter === 'archived'
+                            ? 'No archived evidence'
+                            : retentionFilter === 'expiring'
+                                ? 'No evidence expiring soon'
+                                : t.noEvidence
+                    }
+                    resourceName={(p) => p ? 'evidence items' : 'evidence item'}
+                    columnVisibility={columnVisibility}
+                    onColumnVisibilityChange={setColumnVisibility}
+                    pagination={pg.pagination}
+                    onPaginationChange={pg.setPagination}
+                    rowCount={displayEvidence.length}
+                    data-testid="evidence-table"
+                    className="hover:bg-bg-muted"
+                />
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }
 

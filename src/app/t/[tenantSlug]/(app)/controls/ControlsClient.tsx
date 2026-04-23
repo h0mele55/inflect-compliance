@@ -34,6 +34,7 @@ import {
     type FilterType,
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import {
     buildControlFilters,
     CONTROL_FILTER_KEYS,
@@ -537,78 +538,83 @@ function ControlsPageInner({
     ]), [appPermissions, handleStatusClick, handleApplicabilityClick, tenantHref, taskStats]);
 
     return (
-        <div className="space-y-6 animate-fadeIn">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold"><AppIcon name="controls" className="inline-block mr-2 align-text-bottom" /> Controls</h1>
-                    <p className="text-content-muted text-sm">{controls.length} controls in register</p>
-                </div>
-                {appPermissions.controls.create && (
-                    <div className="flex gap-2">
-                        <Link href={tenantHref('/controls/dashboard')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="controls-dashboard-btn">
-                            <AppIcon name="dashboard" size={14} /> Dashboard
-                        </Link>
-                        <Link href={tenantHref('/frameworks')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="frameworks-btn">
-                            <AppIcon name="frameworks" size={14} /> Frameworks
-                        </Link>
-                        <Link href={tenantHref('/controls/templates')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="install-templates-btn">
-                            <AppIcon name="templates" size={14} /> Install from Templates
-                        </Link>
-                        <button
-                            type="button"
-                            className={buttonVariants({ variant: 'primary', size: 'sm' })}
-                            id="new-control-btn"
-                            onClick={() => setIsCreateOpen(true)}
-                        >
-                            + New Control
-                        </button>
+        <ListPageShell className="animate-fadeIn gap-6">
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold"><AppIcon name="controls" className="inline-block mr-2 align-text-bottom" /> Controls</h1>
+                        <p className="text-content-muted text-sm">{controls.length} controls in register</p>
                     </div>
-                )}
-            </div>
+                    {appPermissions.controls.create && (
+                        <div className="flex gap-2">
+                            <Link href={tenantHref('/controls/dashboard')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="controls-dashboard-btn">
+                                <AppIcon name="dashboard" size={14} /> Dashboard
+                            </Link>
+                            <Link href={tenantHref('/frameworks')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="frameworks-btn">
+                                <AppIcon name="frameworks" size={14} /> Frameworks
+                            </Link>
+                            <Link href={tenantHref('/controls/templates')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="install-templates-btn">
+                                <AppIcon name="templates" size={14} /> Install from Templates
+                            </Link>
+                            <button
+                                type="button"
+                                className={buttonVariants({ variant: 'primary', size: 'sm' })}
+                                id="new-control-btn"
+                                onClick={() => setIsCreateOpen(true)}
+                            >
+                                + New Control
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </ListPageShell.Header>
 
-            {/* Filters — Epic 53 enterprise filter system */}
-            <FilterToolbar
-                filters={liveFilterDefs}
-                searchId="control-search"
-                searchPlaceholder="Search controls… (Enter)"
-                actions={
-                    <ColumnsDropdown
-                        columns={columnDropdownItems}
-                        visibility={columnVisibility}
-                        onChange={(v) => setColumnVisibility(v)}
-                        defaultVisibility={defaultControlVisibility}
-                    />
-                }
-            />
+            <ListPageShell.Filters>
+                {/* Epic 53 enterprise filter system */}
+                <FilterToolbar
+                    filters={liveFilterDefs}
+                    searchId="control-search"
+                    searchPlaceholder="Search controls… (Enter)"
+                    actions={
+                        <ColumnsDropdown
+                            columns={columnDropdownItems}
+                            visibility={columnVisibility}
+                            onChange={(v) => setColumnVisibility(v)}
+                            defaultVisibility={defaultControlVisibility}
+                        />
+                    }
+                />
+            </ListPageShell.Filters>
 
-            {/* Table */}
-            <DataTable<ControlListItem>
-                data={pg.slice(controls)}
-                columns={controlColumns}
-                loading={loading}
-                getRowId={(c) => c.id}
-                onRowClick={(row) => router.push(tenantHref(`/controls/${row.original.id}`))}
-                emptyState={
-                    hasActive
-                        ? 'No controls match your filters. Try adjusting your search or filters.'
-                        : 'No controls found. Install from templates or create a new control.'
-                }
-                resourceName={(p) => p ? 'controls' : 'control'}
-                columnVisibility={columnVisibility}
-                onColumnVisibilityChange={setColumnVisibility}
-                pagination={pg.pagination}
-                onPaginationChange={pg.setPagination}
-                rowCount={controls.length}
-                data-testid="controls-table"
-                className="hover:bg-bg-muted"
-                // Enable row selection so the Epic 52 SelectionToolbar
-                // (and its Epic 56 Tooltip-wrapped Clear button) is
-                // reachable on this page. The current scope only needs
-                // the toolbar to render — concrete batch actions can be
-                // added incrementally without changing this wiring.
-                onRowSelectionChange={() => {}}
-            />
+            <ListPageShell.Body>
+                <DataTable<ControlListItem>
+                    fillBody
+                    data={pg.slice(controls)}
+                    columns={controlColumns}
+                    loading={loading}
+                    getRowId={(c) => c.id}
+                    onRowClick={(row) => router.push(tenantHref(`/controls/${row.original.id}`))}
+                    emptyState={
+                        hasActive
+                            ? 'No controls match your filters. Try adjusting your search or filters.'
+                            : 'No controls found. Install from templates or create a new control.'
+                    }
+                    resourceName={(p) => p ? 'controls' : 'control'}
+                    columnVisibility={columnVisibility}
+                    onColumnVisibilityChange={setColumnVisibility}
+                    pagination={pg.pagination}
+                    onPaginationChange={pg.setPagination}
+                    rowCount={controls.length}
+                    data-testid="controls-table"
+                    className="hover:bg-bg-muted"
+                    // Enable row selection so the Epic 52 SelectionToolbar
+                    // (and its Epic 56 Tooltip-wrapped Clear button) is
+                    // reachable on this page. The current scope only needs
+                    // the toolbar to render — concrete batch actions can be
+                    // added incrementally without changing this wiring.
+                    onRowSelectionChange={() => {}}
+                />
+            </ListPageShell.Body>
 
             {/* Create Control Modal (Epic 54) */}
             <NewControlModal
@@ -687,7 +693,7 @@ function ControlsPageInner({
                     />
                 </Modal.Actions>
             </Modal>
-        </div>
+        </ListPageShell>
     );
 }
 

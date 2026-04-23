@@ -3,6 +3,7 @@ import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { ToggleGroup } from '@/components/ui/toggle-group';
 
@@ -79,20 +80,24 @@ export default function TestsRollupPage() {
     if (loading) return <div className="p-12 text-center text-content-subtle animate-pulse">Loading tests overview...</div>;
 
     return (
-        <div className="space-y-6 animate-fadeIn">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold" id="tests-page-title">Tests</h1>
-                    <p className="text-sm text-content-muted mt-1">Test plans and recent results across all controls</p>
+        <ListPageShell className="animate-fadeIn gap-6">
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold" id="tests-page-title">Tests</h1>
+                        <p className="text-sm text-content-muted mt-1">Test plans and recent results across all controls</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Link href={tenantHref('/tests/due')} className="btn btn-ghost btn-sm">Due Queue</Link>
+                        <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">Dashboard</Link>
+                        <Link href={tenantHref('/findings')} className="btn btn-ghost btn-sm" id="findings-link-btn">Findings</Link>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <Link href={tenantHref('/tests/due')} className="btn btn-ghost btn-sm">Due Queue</Link>
-                    <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">Dashboard</Link>
-                </div>
-            </div>
+            </ListPageShell.Header>
 
-            {/* Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <ListPageShell.Filters className="space-y-6">
+                {/* Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition" onClick={() => setFilter('all')}>
                     <div className="text-2xl font-bold text-[var(--brand-default)]">{plans.length}</div>
                     <div className="text-xs text-content-muted mt-1">Total Plans</div>
@@ -117,22 +122,24 @@ export default function TestsRollupPage() {
                 </div>
             </div>
 
-            {/* Filter Toggle — Epic 60: ToggleGroup size="sm" for a
-                compact radiogroup with keyboard arrow nav. */}
-            <ToggleGroup
-                size="sm"
-                ariaLabel="Test plan filter"
-                options={[
-                    { value: 'all', label: 'All' },
-                    { value: 'due', label: 'Overdue' },
-                    { value: 'failed', label: 'Failed' },
-                ]}
-                selected={filter}
-                selectAction={(v) => setFilter(v as 'all' | 'due' | 'failed')}
-            />
+                {/* Filter Toggle — Epic 60: ToggleGroup size="sm" for a
+                    compact radiogroup with keyboard arrow nav. */}
+                <ToggleGroup
+                    size="sm"
+                    ariaLabel="Test plan filter"
+                    options={[
+                        { value: 'all', label: 'All' },
+                        { value: 'due', label: 'Overdue' },
+                        { value: 'failed', label: 'Failed' },
+                    ]}
+                    selected={filter}
+                    selectAction={(v) => setFilter(v as 'all' | 'due' | 'failed')}
+                />
+            </ListPageShell.Filters>
 
-            {/* Plans Table */}
-            {(() => {
+            <ListPageShell.Body>
+                {/* Plans Table */}
+                {(() => {
                 const planColumns = createColumns<TestPlanSummary>([
                     {
                         id: 'plan', header: 'Plan', accessorKey: 'name',
@@ -192,6 +199,7 @@ export default function TestsRollupPage() {
                 ]);
                 return (
                     <DataTable
+                        fillBody
                         data={filteredPlans}
                         columns={planColumns}
                         getRowId={(p) => p.id}
@@ -202,6 +210,7 @@ export default function TestsRollupPage() {
                     />
                 );
             })()}
-        </div>
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }

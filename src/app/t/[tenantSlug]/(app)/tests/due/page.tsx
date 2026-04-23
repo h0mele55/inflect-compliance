@@ -3,6 +3,7 @@ import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 
 interface DuePlan {
@@ -78,30 +79,32 @@ export default function DueQueuePage() {
     if (loading) return <div className="p-12 text-center text-content-subtle animate-pulse">Loading due queue...</div>;
 
     return (
-        <div className="space-y-6 animate-fadeIn">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold" id="due-queue-title">Due Queue</h1>
-                    <p className="text-sm text-content-muted mt-1">Test plans due or overdue for execution</p>
+        <ListPageShell className="animate-fadeIn gap-6">
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold" id="due-queue-title">Due Queue</h1>
+                        <p className="text-sm text-content-muted mt-1">Test plans due or overdue for execution</p>
+                    </div>
+                    <div className="flex gap-3">
+                        <Link href={tenantHref('/tests')} className="btn btn-ghost btn-sm">← Tests</Link>
+                        <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">Dashboard</Link>
+                        {permissions.canWrite && (
+                            <button
+                                onClick={handleRunDuePlanning}
+                                disabled={planning}
+                                className="btn btn-primary btn-sm"
+                                id="run-due-planning-btn"
+                            >
+                                {planning ? 'Running...' : 'Run Due Planning'}
+                            </button>
+                        )}
+                    </div>
                 </div>
-                <div className="flex gap-3">
-                    <Link href={tenantHref('/tests')} className="btn btn-ghost btn-sm">← Tests</Link>
-                    <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">Dashboard</Link>
-                    {permissions.canWrite && (
-                        <button
-                            onClick={handleRunDuePlanning}
-                            disabled={planning}
-                            className="btn btn-primary btn-sm"
-                            id="run-due-planning-btn"
-                        >
-                            {planning ? 'Running...' : 'Run Due Planning'}
-                        </button>
-                    )}
-                </div>
-            </div>
+            </ListPageShell.Header>
 
-            {/* Planning result */}
+            <ListPageShell.Filters className="space-y-6">
+                {/* Planning result */}
             {planningResult && (
                 <div className="glass-card p-4 border border-green-500/30 bg-green-500/5" id="planning-result">
                     <p className="text-sm text-green-400">
@@ -129,8 +132,11 @@ export default function DueQueuePage() {
                 </div>
             </div>
 
-            {/* Queue Table */}
-            {(() => {
+            </ListPageShell.Filters>
+
+            <ListPageShell.Body>
+                {/* Queue Table */}
+                {(() => {
                 const dueColumns = createColumns<DuePlan>([
                     {
                         id: 'plan', header: 'Plan', accessorKey: 'name',
@@ -174,6 +180,7 @@ export default function DueQueuePage() {
                 ]);
                 return (
                     <DataTable
+                        fillBody
                         data={queue}
                         columns={dueColumns}
                         getRowId={(p) => p.id}
@@ -183,6 +190,7 @@ export default function DueQueuePage() {
                     />
                 );
             })()}
-        </div>
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }

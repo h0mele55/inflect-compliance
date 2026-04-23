@@ -18,6 +18,7 @@ import {
     useFilters,
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 import { buildVendorFilters, VENDOR_FILTER_KEYS } from './filter-defs';
@@ -174,50 +175,57 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
     ]), [tenantHref, hydratedNow]);
 
     return (
-        <>
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-content-emphasis">Vendor Register</h1>
-                    <p className="text-content-muted text-sm">{vendors.length} vendors</p>
-                </div>
-                <div className="flex gap-2">
-                    <Link href={tenantHref('/vendors/dashboard')} className={cn(buttonVariants({ variant: 'secondary', size: 'md' }))} id="vendor-dashboard-btn">
-                        Dashboard
-                    </Link>
-                    {permissions.canCreate && (
-                        <Link href={tenantHref('/vendors/new')} className={cn(buttonVariants({ variant: 'primary', size: 'md' }))} id="new-vendor-btn">
-                            + New Vendor
+        <ListPageShell className="gap-6">
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-content-emphasis">Vendor Register</h1>
+                        <p className="text-content-muted text-sm">{vendors.length} vendors</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Link href={tenantHref('/vendors/dashboard')} className={cn(buttonVariants({ variant: 'secondary', size: 'md' }))} id="vendor-dashboard-btn">
+                            Dashboard
                         </Link>
-                    )}
+                        {permissions.canCreate && (
+                            <Link href={tenantHref('/vendors/new')} className={cn(buttonVariants({ variant: 'primary', size: 'md' }))} id="new-vendor-btn">
+                                + New Vendor
+                            </Link>
+                        )}
+                    </div>
                 </div>
-            </div>
+            </ListPageShell.Header>
 
-            {/* Filters */}
-            <FilterToolbar
-                filters={liveFilters}
-                searchId="vendor-search"
-                searchPlaceholder="Search vendors… (Enter)"
-            />
-
-            {/* Table */}
-            <div className="border border-border-default rounded-lg overflow-hidden">
-                <DataTable
-                    data={vendors}
-                    columns={vendorColumns}
-                    getRowId={(v: any) => v.id}
-                    onRowClick={(row) => router.push(tenantHref(`/vendors/${row.original.id}`))}
-                    emptyState={
-                        <EmptyState
-                            icon={Package}
-                            title={hasActive ? 'No vendors match your filters' : 'No vendors found'}
-                            description={hasActive ? undefined : 'Add your first vendor to get started.'}
-                        />
-                    }
-                    resourceName={(p) => p ? 'vendors' : 'vendor'}
-                    data-testid="vendors-table"
-                    className="hover:bg-bg-muted"
+            <ListPageShell.Filters>
+                <FilterToolbar
+                    filters={liveFilters}
+                    searchId="vendor-search"
+                    searchPlaceholder="Search vendors… (Enter)"
                 />
-            </div>
-        </>
+            </ListPageShell.Filters>
+
+            <ListPageShell.Body>
+                {/* Outer card preserves the legacy bordered look while
+                    delegating internal scroll to DataTable's fillBody. */}
+                <div className="border border-border-default rounded-lg overflow-hidden md:flex md:flex-col md:flex-1 md:min-h-0">
+                    <DataTable
+                        fillBody
+                        data={vendors}
+                        columns={vendorColumns}
+                        getRowId={(v: any) => v.id}
+                        onRowClick={(row) => router.push(tenantHref(`/vendors/${row.original.id}`))}
+                        emptyState={
+                            <EmptyState
+                                icon={Package}
+                                title={hasActive ? 'No vendors match your filters' : 'No vendors found'}
+                                description={hasActive ? undefined : 'Add your first vendor to get started.'}
+                            />
+                        }
+                        resourceName={(p) => p ? 'vendors' : 'vendor'}
+                        data-testid="vendors-table"
+                        className="hover:bg-bg-muted"
+                    />
+                </div>
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }

@@ -26,6 +26,7 @@ import {
     type FilterType,
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import {
     buildRiskFilters,
@@ -310,129 +311,135 @@ function RisksPageInner({
     ]), [t, getRiskLevel]);
 
     return (
-        <div className="space-y-6 animate-fadeIn">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">{t.title}</h1>
-                    <p className="text-content-muted text-sm">{t.risksIdentified}</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setView(view === 'register' ? 'heatmap' : 'register')} className="btn btn-secondary">
-                        {view === 'register' ? t.heatmap : t.register}
-                    </button>
-                    {permissions.canWrite && (
-                        <>
-                            <Link href={tenantHref('/risks/ai')} className="btn btn-secondary" id="ai-risk-btn">
-                                AI Assessment
-                            </Link>
-                            <Link href={tenantHref('/risks/import')} className="btn btn-secondary" id="risk-import-btn">
-                                Import
-                            </Link>
-                            <button
-                                type="button"
-                                onClick={() => setIsCreateOpen(true)}
-                                className="btn btn-primary"
-                                id="new-risk-btn"
-                            >
-                                {t.addRisk}
-                            </button>
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div
-                    className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition"
-                    onClick={() => filterCtx.clearAll()}
-                >
-                    <p className="text-xs text-content-muted uppercase tracking-wider">{t.totalRisks}</p>
-                    <p className="text-3xl font-bold mt-2">{total}</p>
-                </div>
-                <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-content-muted uppercase tracking-wider">{t.avgScore}</p>
-                    <p className="text-3xl font-bold mt-2 text-amber-400">{avgScore}</p>
-                </div>
-                <div
-                    className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition"
-                    onClick={() => filterCtx.set('status', 'OPEN')}
-                >
-                    <p className="text-xs text-content-muted uppercase tracking-wider">{t.openRisks}</p>
-                    <p className="text-3xl font-bold mt-2 text-emerald-400">{openCount}</p>
-                </div>
-                <div className="glass-card p-5 text-center">
-                    <p className="text-xs text-content-muted uppercase tracking-wider">{t.overdueReviews}</p>
-                    <p className="text-3xl font-bold mt-2 text-red-400">{overdueRisks.length}</p>
-                </div>
-            </div>
-
-            {/* Filters */}
-            <RisksFilterToolbar
-                risks={risks}
-                columnsDropdown={
-                    <ColumnsDropdown
-                        columns={riskColumnDropdown}
-                        visibility={columnVisibility}
-                        onChange={(v) => setColumnVisibility(v)}
-                        defaultVisibility={defaultRiskVisibility}
-                    />
-                }
-            />
-
-            {view === 'heatmap' ? (
-                <div className="glass-card p-6">
-                    <h3 className="text-sm font-semibold text-content-default mb-4">{t.heatmapTitle}</h3>
+        <ListPageShell className="animate-fadeIn gap-6">
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold">{t.title}</h1>
+                        <p className="text-content-muted text-sm">{t.risksIdentified}</p>
+                    </div>
                     <div className="flex gap-2">
-                        <div className="flex flex-col items-center justify-between text-xs text-content-muted pr-2">
-                            {[5, 4, 3, 2, 1].map(n => <span key={n} className="h-16 flex items-center">{n}</span>)}
-                            <span className="mt-1">L↑</span>
-                        </div>
-                        <div className="flex-1">
-                            <div className="grid grid-rows-5 gap-1">
-                                {heatmap.map((row, li) => (
-                                    <div key={li} className="grid grid-cols-5 gap-1">
-                                        {row.map((count, ii) => {
-                                            const score = (5 - li) * (ii + 1);
-                                            const bg = score <= 5 ? 'bg-emerald-900/50' : score <= 12 ? 'bg-amber-900/50' : score <= 18 ? 'bg-orange-900/50' : 'bg-red-900/50';
-                                            return (
-                                                <div key={ii} className={`${bg} h-16 rounded-lg flex items-center justify-center text-sm font-bold transition hover:scale-105 ${count > 0 ? 'ring-1 ring-white/20' : ''}`}>
-                                                    {count > 0 ? count : ''}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex justify-between text-xs text-content-muted mt-2 px-3">
-                                {[1, 2, 3, 4, 5].map(n => <span key={n}>{n}</span>)}
-                            </div>
-                            <div className="text-center text-xs text-content-muted mt-1">Impact →</div>
-                        </div>
+                        <button onClick={() => setView(view === 'register' ? 'heatmap' : 'register')} className="btn btn-secondary">
+                            {view === 'register' ? t.heatmap : t.register}
+                        </button>
+                        {permissions.canWrite && (
+                            <>
+                                <Link href={tenantHref('/risks/ai')} className="btn btn-secondary" id="ai-risk-btn">
+                                    AI Assessment
+                                </Link>
+                                <Link href={tenantHref('/risks/import')} className="btn btn-secondary" id="risk-import-btn">
+                                    Import
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCreateOpen(true)}
+                                    className="btn btn-primary"
+                                    id="new-risk-btn"
+                                >
+                                    {t.addRisk}
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
-            ) : (
-                <DataTable<RiskListItem>
-                    data={pg.slice(risks)}
-                    columns={riskColumns}
-                    loading={loading}
-                    getRowId={(r) => r.id}
-                    onRowClick={(row) => router.push(tenantHref(`/risks/${row.original.id}`))}
-                    emptyState={
-                        hasActive
-                            ? 'No risks match your filters'
-                            : t.noRisks
+            </ListPageShell.Header>
+
+            <ListPageShell.Filters className="space-y-6">
+                {/* KPI Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div
+                        className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition"
+                        onClick={() => filterCtx.clearAll()}
+                    >
+                        <p className="text-xs text-content-muted uppercase tracking-wider">{t.totalRisks}</p>
+                        <p className="text-3xl font-bold mt-2">{total}</p>
+                    </div>
+                    <div className="glass-card p-5 text-center">
+                        <p className="text-xs text-content-muted uppercase tracking-wider">{t.avgScore}</p>
+                        <p className="text-3xl font-bold mt-2 text-amber-400">{avgScore}</p>
+                    </div>
+                    <div
+                        className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition"
+                        onClick={() => filterCtx.set('status', 'OPEN')}
+                    >
+                        <p className="text-xs text-content-muted uppercase tracking-wider">{t.openRisks}</p>
+                        <p className="text-3xl font-bold mt-2 text-emerald-400">{openCount}</p>
+                    </div>
+                    <div className="glass-card p-5 text-center">
+                        <p className="text-xs text-content-muted uppercase tracking-wider">{t.overdueReviews}</p>
+                        <p className="text-3xl font-bold mt-2 text-red-400">{overdueRisks.length}</p>
+                    </div>
+                </div>
+
+                <RisksFilterToolbar
+                    risks={risks}
+                    columnsDropdown={
+                        <ColumnsDropdown
+                            columns={riskColumnDropdown}
+                            visibility={columnVisibility}
+                            onChange={(v) => setColumnVisibility(v)}
+                            defaultVisibility={defaultRiskVisibility}
+                        />
                     }
-                    resourceName={(p) => p ? 'risks' : 'risk'}
-                    columnVisibility={columnVisibility}
-                    onColumnVisibilityChange={setColumnVisibility}
-                    pagination={pg.pagination}
-                    onPaginationChange={pg.setPagination}
-                    rowCount={risks.length}
-                    data-testid="risks-table"
-                    className="hover:bg-bg-muted"
                 />
-            )}
+            </ListPageShell.Filters>
+
+            <ListPageShell.Body>
+                {view === 'heatmap' ? (
+                    <div className="glass-card p-6">
+                        <h3 className="text-sm font-semibold text-content-default mb-4">{t.heatmapTitle}</h3>
+                        <div className="flex gap-2">
+                            <div className="flex flex-col items-center justify-between text-xs text-content-muted pr-2">
+                                {[5, 4, 3, 2, 1].map(n => <span key={n} className="h-16 flex items-center">{n}</span>)}
+                                <span className="mt-1">L↑</span>
+                            </div>
+                            <div className="flex-1">
+                                <div className="grid grid-rows-5 gap-1">
+                                    {heatmap.map((row, li) => (
+                                        <div key={li} className="grid grid-cols-5 gap-1">
+                                            {row.map((count, ii) => {
+                                                const score = (5 - li) * (ii + 1);
+                                                const bg = score <= 5 ? 'bg-emerald-900/50' : score <= 12 ? 'bg-amber-900/50' : score <= 18 ? 'bg-orange-900/50' : 'bg-red-900/50';
+                                                return (
+                                                    <div key={ii} className={`${bg} h-16 rounded-lg flex items-center justify-center text-sm font-bold transition hover:scale-105 ${count > 0 ? 'ring-1 ring-white/20' : ''}`}>
+                                                        {count > 0 ? count : ''}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex justify-between text-xs text-content-muted mt-2 px-3">
+                                    {[1, 2, 3, 4, 5].map(n => <span key={n}>{n}</span>)}
+                                </div>
+                                <div className="text-center text-xs text-content-muted mt-1">Impact →</div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <DataTable<RiskListItem>
+                        fillBody
+                        data={pg.slice(risks)}
+                        columns={riskColumns}
+                        loading={loading}
+                        getRowId={(r) => r.id}
+                        onRowClick={(row) => router.push(tenantHref(`/risks/${row.original.id}`))}
+                        emptyState={
+                            hasActive
+                                ? 'No risks match your filters'
+                                : t.noRisks
+                        }
+                        resourceName={(p) => p ? 'risks' : 'risk'}
+                        columnVisibility={columnVisibility}
+                        onColumnVisibilityChange={setColumnVisibility}
+                        pagination={pg.pagination}
+                        onPaginationChange={pg.setPagination}
+                        rowCount={risks.length}
+                        data-testid="risks-table"
+                        className="hover:bg-bg-muted"
+                    />
+                )}
+            </ListPageShell.Body>
 
             {permissions.canWrite && (
                 <NewRiskModal
@@ -442,7 +449,7 @@ function RisksPageInner({
                     apiUrl={apiUrl}
                 />
             )}
-        </div>
+        </ListPageShell>
     );
 }
 

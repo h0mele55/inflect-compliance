@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { ToggleGroup } from '@/components/ui/toggle-group';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 
 interface AdminClientProps {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,40 +78,45 @@ export function AdminClient({ auditLog, tenantSlug, translations: t }: AdminClie
     ]), [t]);
 
     return (
-        <>
-            {/* Epic 60 — ToggleGroup replaces the hand-rolled tab bar. */}
-            <ToggleGroup
-                ariaLabel="Admin view"
-                options={[
-                    { value: 'log', label: t.auditLog },
-                    { value: 'templates', label: t.policyTemplates },
-                ]}
-                selected={tab}
-                selectAction={(v) => setTab(v as 'log' | 'templates')}
-            />
-
-            {tab === 'log' ? (
-                <DataTable
-                    data={auditLog}
-                    columns={logColumns}
-                    getRowId={(e: any) => e.id}
-                    emptyState={t.noEntries}
-                    resourceName={(p) => p ? 'log entries' : 'log entry'}
-                    data-testid="audit-log-table"
+        <ListPageShell className="gap-4">
+            <ListPageShell.Filters>
+                {/* Epic 60 — ToggleGroup replaces the hand-rolled tab bar. */}
+                <ToggleGroup
+                    ariaLabel="Admin view"
+                    options={[
+                        { value: 'log', label: t.auditLog },
+                        { value: 'templates', label: t.policyTemplates },
+                    ]}
+                    selected={tab}
+                    selectAction={(v) => setTab(v as 'log' | 'templates')}
                 />
-            ) : (
-                <div className="glass-card p-6">
-                    <p className="text-sm text-content-muted mb-4">{t.templateDescription}</p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {templateKeys.map(key => (
-                            <div key={key} className="p-4 border border-border-default rounded-lg hover:border-[var(--brand-default)] transition cursor-pointer">
-                                <span className="text-sm font-medium text-content-emphasis">{t.templateLabels[key]}</span>
-                                <p className="text-xs text-content-subtle mt-1">{t.clickToUse}</p>
-                            </div>
-                        ))}
+            </ListPageShell.Filters>
+
+            <ListPageShell.Body>
+                {tab === 'log' ? (
+                    <DataTable
+                        fillBody
+                        data={auditLog}
+                        columns={logColumns}
+                        getRowId={(e: any) => e.id}
+                        emptyState={t.noEntries}
+                        resourceName={(p) => p ? 'log entries' : 'log entry'}
+                        data-testid="audit-log-table"
+                    />
+                ) : (
+                    <div className="glass-card p-6">
+                        <p className="text-sm text-content-muted mb-4">{t.templateDescription}</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {templateKeys.map(key => (
+                                <div key={key} className="p-4 border border-border-default rounded-lg hover:border-[var(--brand-default)] transition cursor-pointer">
+                                    <span className="text-sm font-medium text-content-emphasis">{t.templateLabels[key]}</span>
+                                    <p className="text-xs text-content-subtle mt-1">{t.clickToUse}</p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </div>
-            )}
-        </>
+                )}
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }

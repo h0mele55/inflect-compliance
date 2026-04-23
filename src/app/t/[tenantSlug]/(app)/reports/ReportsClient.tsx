@@ -6,6 +6,7 @@ import { RequirePermission } from '@/components/require-permission';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import type { SoAReportDTO } from '@/lib/dto/soa';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { ToggleGroup } from '@/components/ui/toggle-group';
 
 interface ControlOption {
@@ -98,54 +99,61 @@ export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, 
     ]), [t]);
 
     return (
-        <>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div><h1 className="text-2xl font-bold" id="reports-heading">{t.title}</h1><p className="text-content-muted text-sm">{t.subtitle}</p></div>
-                <RequirePermission resource="reports" action="export">
-                    <div className="flex flex-wrap gap-2">
-                        <button onClick={() => downloadCSV(data.riskRegister, 'risk-register.csv')} className="btn btn-secondary" id="export-risks-btn">{t.exportRisks}</button>
-                        <UpgradeGate feature="PDF_EXPORTS">
-                            <PdfExportButton
-                                tenantSlug={tenantSlug}
-                                reportType="RISK_REGISTER"
-                                label="Risk Register PDF"
-                                allowSave={canEdit}
-                            />
-                        </UpgradeGate>
-                    </div>
-                </RequirePermission>
-            </div>
+        <ListPageShell className="gap-4">
+            <ListPageShell.Header>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div><h1 className="text-2xl font-bold" id="reports-heading">{t.title}</h1><p className="text-content-muted text-sm">{t.subtitle}</p></div>
+                    <RequirePermission resource="reports" action="export">
+                        <div className="flex flex-wrap gap-2">
+                            <button onClick={() => downloadCSV(data.riskRegister, 'risk-register.csv')} className="btn btn-secondary" id="export-risks-btn">{t.exportRisks}</button>
+                            <UpgradeGate feature="PDF_EXPORTS">
+                                <PdfExportButton
+                                    tenantSlug={tenantSlug}
+                                    reportType="RISK_REGISTER"
+                                    label="Risk Register PDF"
+                                    allowSave={canEdit}
+                                />
+                            </UpgradeGate>
+                        </div>
+                    </RequirePermission>
+                </div>
+            </ListPageShell.Header>
 
-            {/* Epic 60 — ToggleGroup with `id` on each option to
-                preserve `#soa-tab-btn` / `#risk-tab-btn` E2E selectors
-                used by tests/e2e/reporting.spec.ts. */}
-            <ToggleGroup
-                ariaLabel="Report"
-                options={[
-                    { value: 'soa', label: t.soa, id: 'soa-tab-btn' },
-                    { value: 'risk', label: t.riskRegister, id: 'risk-tab-btn' },
-                ]}
-                selected={tab}
-                selectAction={(v) => setTab(v as 'soa' | 'risk')}
-            />
+            <ListPageShell.Filters>
+                {/* Epic 60 — ToggleGroup with `id` on each option to
+                    preserve `#soa-tab-btn` / `#risk-tab-btn` E2E selectors
+                    used by tests/e2e/reporting.spec.ts. */}
+                <ToggleGroup
+                    ariaLabel="Report"
+                    options={[
+                        { value: 'soa', label: t.soa, id: 'soa-tab-btn' },
+                        { value: 'risk', label: t.riskRegister, id: 'risk-tab-btn' },
+                    ]}
+                    selected={tab}
+                    selectAction={(v) => setTab(v as 'soa' | 'risk')}
+                />
+            </ListPageShell.Filters>
 
-            {tab === 'soa' ? (
-                <SoAClient
-                    report={soaReport}
-                    controls={controls}
-                    tenantSlug={tenantSlug}
-                    canEdit={canEdit}
-                />
-            ) : (
-                <DataTable
-                    data={data.riskRegister}
-                    columns={riskColumns}
-                    getRowId={(r: any) => r.id}
-                    emptyState="No risks in the register"
-                    resourceName={(p) => p ? 'risks' : 'risk'}
-                    data-testid="risk-table"
-                />
-            )}
-        </>
+            <ListPageShell.Body>
+                {tab === 'soa' ? (
+                    <SoAClient
+                        report={soaReport}
+                        controls={controls}
+                        tenantSlug={tenantSlug}
+                        canEdit={canEdit}
+                    />
+                ) : (
+                    <DataTable
+                        fillBody
+                        data={data.riskRegister}
+                        columns={riskColumns}
+                        getRowId={(r: any) => r.id}
+                        emptyState="No risks in the register"
+                        resourceName={(p) => p ? 'risks' : 'risk'}
+                        data-testid="risk-table"
+                    />
+                )}
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }

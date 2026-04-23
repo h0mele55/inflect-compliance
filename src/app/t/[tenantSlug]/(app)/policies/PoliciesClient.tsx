@@ -13,6 +13,7 @@ import {
     useFilters,
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildPolicyFilters, POLICY_FILTER_KEYS } from './filter-defs';
 import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
@@ -170,44 +171,48 @@ function PoliciesPageInner({
     ]), [tenantHref, hydratedNow]);
 
     return (
-        <div className="space-y-6 animate-fadeIn">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">{t.title}</h1>
-                    <p className="text-content-muted text-sm">{policies.length} policies</p>
-                </div>
-                {permissions.canWrite && (
-                    <div className="flex gap-2">
-                        <Link href={tenantHref('/policies/templates')} className="btn btn-secondary" id="policy-from-template-btn">
-                            From Template
-                        </Link>
-                        <Link href={tenantHref('/policies/new')} className="btn btn-primary" id="new-policy-btn">
-                            + New Policy
-                        </Link>
+        <ListPageShell className="animate-fadeIn gap-6">
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold">{t.title}</h1>
+                        <p className="text-content-muted text-sm">{policies.length} policies</p>
                     </div>
-                )}
-            </div>
+                    {permissions.canWrite && (
+                        <div className="flex gap-2">
+                            <Link href={tenantHref('/policies/templates')} className="btn btn-secondary" id="policy-from-template-btn">
+                                From Template
+                            </Link>
+                            <Link href={tenantHref('/policies/new')} className="btn btn-primary" id="new-policy-btn">
+                                + New Policy
+                            </Link>
+                        </div>
+                    )}
+                </div>
+            </ListPageShell.Header>
 
-            {/* Filters */}
-            <FilterToolbar
-                filters={liveFilters}
-                searchId="policy-search"
-                searchPlaceholder="Search policies… (Enter)"
-            />
+            <ListPageShell.Filters>
+                <FilterToolbar
+                    filters={liveFilters}
+                    searchId="policy-search"
+                    searchPlaceholder="Search policies… (Enter)"
+                />
+            </ListPageShell.Filters>
 
-            {/* Table */}
-            <DataTable
-                data={policies}
-                columns={policyColumns}
-                loading={loading}
-                getRowId={(p: any) => p.id}
-                onRowClick={(row) => router.push(tenantHref(`/policies/${row.original.id}`))}
-                emptyState={hasActive ? 'No policies match your filters' : 'No policies found. Create your first policy to get started.'}
-                resourceName={(p) => p ? 'policies' : 'policy'}
-                data-testid="policies-table"
-                className="hover:bg-bg-muted"
-            />
-        </div>
+            <ListPageShell.Body>
+                <DataTable
+                    fillBody
+                    data={policies}
+                    columns={policyColumns}
+                    loading={loading}
+                    getRowId={(p: any) => p.id}
+                    onRowClick={(row) => router.push(tenantHref(`/policies/${row.original.id}`))}
+                    emptyState={hasActive ? 'No policies match your filters' : 'No policies found. Create your first policy to get started.'}
+                    resourceName={(p) => p ? 'policies' : 'policy'}
+                    data-testid="policies-table"
+                    className="hover:bg-bg-muted"
+                />
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }
