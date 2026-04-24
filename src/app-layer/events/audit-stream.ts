@@ -46,6 +46,7 @@ import { computeHmacSha256 } from '@/app-layer/integrations/webhook-crypto';
 import { logger } from '@/lib/observability/logger';
 import { buildOutboundHeaders, computeBatchId } from '@/app-layer/events/webhook-headers';
 import { recordAuditStreamDeliveryFailure } from '@/lib/observability/metrics';
+import { env } from '@/env';
 
 // ─── Public payload shape ──────────────────────────────────────────
 
@@ -400,7 +401,7 @@ async function deliverBatch(
 
     // Retry loop — the same batchId rides every attempt so consumer
     // SIEMs can deduplicate without any retry-aware code on their side.
-    const retryEnabled = process.env.AUDIT_STREAM_RETRY_ENABLED !== '0';
+    const retryEnabled = env.AUDIT_STREAM_RETRY_ENABLED !== '0';
     const maxAttempts = retryEnabled ? 3 : 1;
 
     let result: { ok: boolean; status: number; statusText?: string };
