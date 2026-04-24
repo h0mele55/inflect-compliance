@@ -10,7 +10,10 @@ import { NextResponse } from 'next/server';
 const PUBLIC_PATH_PREFIXES = [
     '/login',
     '/register',
+    '/no-tenant',        // Landing page for uninvited users — must not gate-loop
+    '/invite/',          // Invite preview page — public so unauthenticated users can see invite details
     '/api/auth',         // Auth.js callbacks, session, csrf, providers
+    '/api/invites/',     // Invite redemption API (public) + start-signin cookie setter
     '/api/health',       // Health check (no auth) — deprecated alias
     '/api/livez',        // Liveness probe (no auth)
     '/api/readyz',       // Readiness probe (no auth)
@@ -154,4 +157,54 @@ export function forbiddenJson(reason?: string): NextResponse {
         { error: reason || 'Forbidden' },
         { status: 403 }
     );
+}
+
+/**
+ * Extract the tenant slug from a tenant-scoped URL path.
+ *
+ * Handles both:
+ *   /t/:slug/...           → slug
+ *   /api/t/:slug/...       → slug
+ *
+ * Returns null for any path that is not tenant-scoped.
+ */
+export function extractTenantSlugFromPath(pathname: string): string | null {
+    // /t/:slug/...  or  /t/:slug (trailing-slash-less)
+    const webMatch = pathname.match(/^\/t\/([^/]+)(?:\/|$)/);
+    if (webMatch) return webMatch[1];
+
+    // /api/t/:slug/...
+    const apiMatch = pathname.match(/^\/api\/t\/([^/]+)(?:\/|$)/);
+    if (apiMatch) return apiMatch[1];
+
+    return null;
+}
+
+/**
+ * Pure gate function: check whether a JWT tenant slug is allowed to access
+ * the given path. Extracted as a pure function so it can be unit-tested
+ * without Next.js framework machinery.
+ *
+ * Returns:
+ *   'allow'             — pass through
+ *   'no_tenant_access'  — authed user has no tenant membership at all
+ *   'cross_tenant'      — authed user's tenant does not match the URL slug
+ */
+export type TenantGateResult = 'allow' | 'no_tenant_access' | 'cross_tenant';
+
+export function checkTenantAccess(
+    pathname: string,
+    jwtTenantSlug: string | null | undefined,
+): TenantGateResult {
+    // Only gate tenant-scoped routes.
+    const urlSlug = extractTenantSlugFromPath(pathname);
+    if (!urlSlug) return 'allow';
+
+    // Public paths that should always pass (e.g. MFA challenge within a tenant URL).
+    // Already checked upstream in isPublicPath, but be defensive.
+    if (isPublicPath(pathname)) return 'allow';
+
+    if (!jwtTenantSlug) return 'no_tenant_access';
+    if (jwtTenantSlug !== urlSlug) return 'cross_tenant';
+    return 'allow';
 }

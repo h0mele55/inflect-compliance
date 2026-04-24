@@ -52,7 +52,9 @@ export default async function InvitePage({ params, searchParams }: InvitePagePro
     // returns JSON; a thin client form handles the redirect.
     const isReady = session && preview.matchesSession;
 
-    const loginUrl = `/login?callbackUrl=${encodeURIComponent(`/api/invites/${token}/accept-redirect`)}`;
+    // start-signin sets the inflect_invite_token cookie then redirects to /login.
+    // After OAuth the signIn callback reads the cookie and calls redeemInvite.
+    const loginUrl = `/api/invites/${token}/start-signin`;
 
     return (
         <main className="min-h-screen bg-bg-default flex items-center justify-center p-4">

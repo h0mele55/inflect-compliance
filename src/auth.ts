@@ -79,58 +79,57 @@ providers.push(
 );
 
 /**
- * Join the user to the oldest active tenant as EDITOR if they have no
- * membership yet. Idempotent — the upsert is a no-op when membership
- * already exists. Swallows errors so auth callbacks never fail-close
- * over a housekeeping blip; the worst case is the user bounces to
- * /login with tenantId=null, which is no worse than the pre-fix state.
+ * Redeem a tenant-invite token at sign-in time.
  *
- * Lives at module scope (not inside the NextAuth config object) so
- * both the account-linking branch and the plain auto-onboard branch
- * of the signIn callback can call it.
+ * The token arrives via a cookie set by the `/api/invites/<token>/start-signin`
+ * route before the user clicked "sign in to accept".
+ *
+ * NO-OP when no invite is in flight. That is the point of this function:
+ * sign-in alone grants authentication, never tenant membership.
+ *
+ * Membership is created ONLY via:
+ *   1. Token redemption here or through POST /api/invites/:token
+ *   2. createTenantWithOwner (platform-admin tenant creation)
+ * No other path exists. A guardrail test in PR 5 will enforce this.
  */
-async function ensureDefaultTenantMembership(userId: string): Promise<void> {
+async function ensureTenantMembershipFromInvite(
+    userId: string,
+    userEmail: string,
+    inviteToken: string | null,
+): Promise<void> {
+    if (!inviteToken) return; // the common case
     try {
-        const existing = await prisma.tenantMembership.findFirst({
-            where: { userId, status: 'ACTIVE' },
-            select: { id: true },
-        });
-        if (existing) return; // already a member of at least one tenant
-
-        const tenant = await prisma.tenant.findFirst({
-            orderBy: { createdAt: 'asc' },
-            select: { id: true },
-        });
-        if (!tenant) {
-            edgeLogger.warn('signIn: no tenant exists to auto-join', {
-                component: 'auth',
-                userId,
-            });
-            return;
-        }
-
-        // New OAuth-onboarded users default to ADMIN on the single
-        // shared test tenant. Intentional for this stage: every tester
-        // needs install / configure access to exercise the full product
-        // (framework pack install, SSO setup, billing). Revisit when
-        // multi-tenant prod onboarding lands and EDITOR is the safer
-        // default for non-founder joiners.
-        await prisma.tenantMembership.upsert({
-            where: { tenantId_userId: { tenantId: tenant.id, userId } },
-            update: {},
-            create: {
-                tenantId: tenant.id,
-                userId,
-                role: 'ADMIN',
-                status: 'ACTIVE',
-            },
-        });
+        const { redeemInvite } = await import('@/app-layer/usecases/tenant-invites');
+        await redeemInvite({ token: inviteToken, userId, userEmail });
     } catch (err) {
-        edgeLogger.error('signIn: ensureDefaultTenantMembership failed', {
+        // Surface via logger; do NOT fail the sign-in. The user is
+        // authenticated; they'll land on /no-tenant where they can
+        // see a "this invite is invalid" hint on their next visit.
+        edgeLogger.warn('signIn: invite redemption failed', {
             component: 'auth',
             userId,
             error: err instanceof Error ? err.message : String(err),
         });
+    }
+}
+
+/**
+ * Read the invite token from the `inflect_invite_token` cookie.
+ *
+ * The cookie is set by `/api/invites/<token>/start-signin` before the user
+ * is redirected to /login. It is HttpOnly and expires in 10 min.
+ *
+ * Returns null if the cookie is absent or if cookies() is unavailable
+ * (some NextAuth internal invocations run outside a Request context).
+ */
+async function readInviteTokenFromCookies(): Promise<string | null> {
+    try {
+        const { cookies } = await import('next/headers');
+        const cookieStore = await cookies();
+        return cookieStore.get('inflect_invite_token')?.value ?? null;
+    } catch {
+        // cookies() throws outside a Request context — safe to ignore.
+        return null;
     }
 }
 
@@ -148,28 +147,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
          *      OAuth `Account` to the existing User rather than
          *      creating a duplicate.
          *
-         *   2. Auto-onboard / self-heal: ensure the user has at least
-         *      one ACTIVE `TenantMembership`. If not, join them to the
-         *      oldest tenant as EDITOR. Idempotent via upsert.
+         *   2. Invite redemption: if an `inflect_invite_token` cookie is
+         *      present (set by /api/invites/:token/start-signin before the
+         *      user was redirected to /login), redeem it to create a
+         *      TenantMembership. NO auto-join without an invite — this is
+         *      the GAP-01 closure.
          *
-         * The auto-onboard moved out of `events.createUser` (where it
-         * used to live) because that hook only fires on first User
-         * creation. Orphan users whose User row got created during a
-         * deploy window before auto-onboarding shipped would stay
-         * orphaned forever — signing in, creating a session with
-         * `tenantId=null`, and bouncing back to /login. Running the
-         * check on every sign-in gives us self-healing: orphans are
-         * repaired on their next login, brand-new users are onboarded
-         * on their first.
-         *
-         * Current bootstrap policy: oldest tenant, EDITOR role,
-         * ACTIVE status. Matches the "single test tenant" stance on
-         * the prod VM while invitation tokens aren't built yet. As
-         * written, ANY successful OAuth sign-in (Google/Microsoft)
-         * self-joins that tenant.
+         * Sign-in alone grants authentication, never tenant membership.
+         * Uninvited OAuth users land on /no-tenant after this callback.
          */
         async signIn({ user, account }) {
             if (!account) return true;
+
+            // Invite token lives in a short-lived HttpOnly cookie set by
+            // /api/invites/:token/start-signin before OAuth redirect.
+            const inviteToken = await readInviteTokenFromCookies();
 
             // ── 1. Account linking for OAuth (not credentials) ──
             if (account.provider !== 'credentials' && user.email) {
@@ -204,17 +196,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                             },
                         });
                     }
-                    // Fall through to the membership check below — we
-                    // want to onboard the EXISTING user, not the OAuth-
+                    // Invite redemption uses the EXISTING user id, not the OAuth-
                     // payload user.id. Use existingUser.id for that.
-                    await ensureDefaultTenantMembership(existingUser.id);
+                    await ensureTenantMembershipFromInvite(
+                        existingUser.id,
+                        user.email,
+                        inviteToken,
+                    );
                     return true;
                 }
             }
 
-            // ── 2. Auto-onboard / self-heal ──
-            if (user.id) {
-                await ensureDefaultTenantMembership(user.id);
+            // ── 2. Invite redemption (no auto-join) ──
+            if (user.id && user.email) {
+                await ensureTenantMembershipFromInvite(
+                    user.id,
+                    user.email,
+                    inviteToken,
+                );
             }
             return true;
         },
@@ -245,10 +244,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     const defaultMembership = dbUser.tenantMemberships[0];
                     if (defaultMembership) {
                         token.tenantId = defaultMembership.tenantId;
+                        token.tenantSlug = defaultMembership.tenant?.slug ?? null;
                         token.role = defaultMembership.role;
                     } else {
                         // No membership — user has no tenant access yet
                         token.tenantId = null;
+                        token.tenantSlug = null;
                         token.role = 'READER' as Role;
                     }
                 } else {

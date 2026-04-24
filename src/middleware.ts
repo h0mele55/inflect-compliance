@@ -18,6 +18,7 @@ import {
     buildLoginRedirect,
     unauthorizedJson,
     forbiddenJson,
+    checkTenantAccess,
 } from '@/lib/auth/guard';
 import { generateNonce, buildCspHeader, CSP_NONCE_HEADER, CSP_REPORT_PATH, CSP_REPORT_GROUP, getCspHeaderName, isCspReportOnly } from '@/lib/security/csp';
 import { applySecurityHeaders } from '@/lib/security/headers';
@@ -122,7 +123,39 @@ const authMiddleware = auth(async (req) => {
         }
     }
 
-    // ── 5. Authenticated and authorized → proceed ──
+    // ── 5. Tenant-access gate ──
+    // Verify the JWT's tenantSlug matches the URL's :slug segment.
+    // No DB hit — the JWT claim is the authority. O(1) per request.
+    // Carve-outs (public paths, /no-tenant, /invite/*, /api/invites/*)
+    // are already handled by isPublicPath() above.
+    if (isTenantPath(pathname)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const session = req.auth as any;
+        const jwtTenantSlug = session?.tenantSlug as string | null | undefined;
+        const gateResult = checkTenantAccess(pathname, jwtTenantSlug);
+
+        if (gateResult === 'no_tenant_access') {
+            if (isApiRoute(pathname)) {
+                return NextResponse.json(
+                    { error: 'no_tenant_access' },
+                    { status: 403 },
+                );
+            }
+            return NextResponse.redirect(new URL('/no-tenant', req.nextUrl.origin));
+        }
+
+        if (gateResult === 'cross_tenant') {
+            if (isApiRoute(pathname)) {
+                return NextResponse.json(
+                    { error: 'cross_tenant_access_denied' },
+                    { status: 403 },
+                );
+            }
+            return NextResponse.redirect(new URL('/no-tenant', req.nextUrl.origin));
+        }
+    }
+
+    // ── 6. Authenticated and authorized → proceed ──
     return NextResponse.next();
 });
 

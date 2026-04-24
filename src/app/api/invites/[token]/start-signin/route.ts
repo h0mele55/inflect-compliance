@@ -1,0 +1,47 @@
+/**
+ * GET /api/invites/:token/start-signin
+ *
+ * Sets a short-lived HttpOnly cookie carrying the invite token, then
+ * redirects the user to /login. After the user completes OAuth, the
+ * signIn callback reads the cookie and calls redeemInvite to create
+ * their TenantMembership.
+ *
+ * This is the entry point for the "Sign in to accept" flow on the
+ * /invite/:token page. The invite preview page links here instead of
+ * directly to /login so the token is never exposed in the URL or
+ * referrer header after the OAuth round-trip.
+ *
+ * Cookie spec:
+ *   - HttpOnly — JS cannot read it; prevents XSS exfiltration
+ *   - SameSite=Lax — survives the OAuth top-level cross-origin redirect
+ *   - Secure in production — HTTPS only
+ *   - Max-Age=600 (10 min) — the user has time to complete OAuth
+ *   - Path=/ — must be visible to the signIn callback at /api/auth/*
+ *
+ * The cookie is single-use in effect (redeemInvite burns the token on
+ * the first call) so a leaked cookie cannot be exploited after the
+ * invite is consumed.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { env } from '@/env';
+
+export async function GET(
+    req: NextRequest,
+    ctx: { params: Promise<{ token: string }> },
+): Promise<NextResponse> {
+    const { token } = await ctx.params;
+
+    const response = NextResponse.redirect(
+        new URL('/login', req.nextUrl.origin),
+    );
+
+    response.cookies.set('inflect_invite_token', token, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: 600, // 10 min — user has time to complete OAuth
+    });
+
+    return response;
+}

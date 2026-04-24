@@ -121,8 +121,32 @@ export async function updateTenantMemberRole(
         // Safety: prevent self-demotion
         assertNotSelfDemotion(ctx, membership.userId, input.role);
 
-        // Safety: last-admin protection
-        if (membership.role === 'ADMIN' && input.role !== 'ADMIN') {
+        // Safety: OWNER-boundary checks — only OWNERs can touch OWNER memberships
+        // or promote to OWNER. The DB trigger is the backstop; these checks are
+        // the user-friendly front door with clearer error messages.
+        if (input.role === 'OWNER' && !ctx.appPermissions.admin.owner_management) {
+            throw forbidden('Only OWNERs can promote to OWNER.');
+        }
+        if (membership.role === 'OWNER' && !ctx.appPermissions.admin.owner_management) {
+            throw forbidden('Only OWNERs can modify an OWNER membership.');
+        }
+
+        // Safety: last-OWNER protection — do not demote the only OWNER.
+        if (membership.role === 'OWNER' && input.role !== 'OWNER') {
+            const ownerCount = await db.tenantMembership.count({
+                where: {
+                    tenantId: ctx.tenantId,
+                    role: 'OWNER',
+                    status: 'ACTIVE',
+                },
+            });
+            if (ownerCount <= 1) {
+                throw forbidden('Cannot demote the last OWNER. Promote another OWNER first.');
+            }
+        }
+
+        // Safety: last-admin protection (legacy — keep for non-OWNER admins)
+        if (membership.role === 'ADMIN' && input.role !== 'ADMIN' && input.role !== 'OWNER') {
             const adminCount = await db.tenantMembership.count({
                 where: {
                     tenantId: ctx.tenantId,
@@ -185,7 +209,21 @@ export async function deactivateTenantMember(
         // Safety: prevent self-deactivation
         assertNotSelfDeactivation(ctx, membership.userId);
 
-        // Safety: last-admin protection
+        // Safety: last-OWNER protection — cannot deactivate the only OWNER.
+        if (membership.role === 'OWNER') {
+            const ownerCount = await db.tenantMembership.count({
+                where: {
+                    tenantId: ctx.tenantId,
+                    role: 'OWNER',
+                    status: 'ACTIVE',
+                },
+            });
+            if (ownerCount <= 1) {
+                throw forbidden('Cannot deactivate the last OWNER.');
+            }
+        }
+
+        // Safety: last-admin protection (legacy — keep for non-OWNER admins)
         if (membership.role === 'ADMIN') {
             const adminCount = await db.tenantMembership.count({
                 where: {
