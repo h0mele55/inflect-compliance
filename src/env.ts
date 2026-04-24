@@ -109,6 +109,13 @@ export const env = createEnv({
         // '0' disables retry (single POST); anything else (or unset) keeps retry on.
         // Kill-switch for debugging a misbehaving SIEM without redeploy.
         AUDIT_STREAM_RETRY_ENABLED: z.string().optional(),
+
+        // Epic 1, PR 2 — Platform-admin API key.
+        // Optional platform-scoped secret for the tenant-creation endpoint
+        // (POST /api/admin/tenants). Keep out of tenant env — inject via
+        // orchestrator or secret-manager only. When unset, the endpoint
+        // returns 503 "Platform admin API not configured".
+        PLATFORM_ADMIN_API_KEY: z.string().min(32).optional(),
     },
 
     /**
@@ -188,6 +195,7 @@ export const env = createEnv({
         AI_RISK_PLAN_REQUIRED: process.env.AI_RISK_PLAN_REQUIRED,
 
         AUDIT_STREAM_RETRY_ENABLED: process.env.AUDIT_STREAM_RETRY_ENABLED,
+        PLATFORM_ADMIN_API_KEY: process.env.PLATFORM_ADMIN_API_KEY,
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

@@ -209,6 +209,21 @@ export const EMAIL_DISPATCH_LIMIT: RateLimitConfig = {
     windowMs: 60 * 60 * 1000,
 };
 
+/**
+ * Platform-admin tenant creation: 5 per hour per calling IP.
+ *
+ * Threat model: a leaked PLATFORM_ADMIN_API_KEY being used to spin up
+ * many tenants in rapid succession. 5/hour is comfortable for
+ * orchestrator-driven batch provisioning while throttling an attacker
+ * who obtained the key. Keyed by IP (the platform key itself is a
+ * single shared secret, so per-key bucketing would add no isolation).
+ */
+export const TENANT_CREATE_LIMIT: RateLimitConfig = {
+    maxAttempts: 5,
+    windowMs: 60 * 60 * 1000,
+    lockoutMs: 60 * 60 * 1000,
+};
+
 // ═══════════════════════════════════════════════════════════════════
 // Progressive rate limit — Epic A.3 auth brute-force protection
 // ═══════════════════════════════════════════════════════════════════

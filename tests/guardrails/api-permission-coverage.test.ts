@@ -108,6 +108,20 @@ const EXCLUDED_ROUTES: ReadonlyArray<{ relPath: string; reason: string }> = [
         relPath: 'api/t/[tenantSlug]/security/mfa/challenge/verify/route.ts',
         reason: 'Self-service: complete MY MFA challenge during sign-in.',
     },
+    // Epic 1, PR 2 — Platform-admin routes authenticated by PLATFORM_ADMIN_API_KEY
+    // (X-Platform-Admin-Key header, constant-time verified). These routes operate
+    // outside the tenant-session model — there is no tenantId or userId in scope
+    // when the platform key is verified, so requirePermission(...) does not apply.
+    // The key is injected by the orchestrator / secret-manager and is never exposed
+    // to tenant-level callers.
+    {
+        relPath: 'api/admin/tenants/route.ts',
+        reason: 'Platform-admin-key-gated: POST /api/admin/tenants — tenant-scope does not apply.',
+    },
+    {
+        relPath: 'api/admin/tenants/[slug]/transfer-ownership/route.ts',
+        reason: 'Platform-admin-key-gated: transfer-ownership — tenant-scope does not apply.',
+    },
 ];
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
