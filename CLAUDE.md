@@ -266,28 +266,73 @@ explicitly marked legacy/fallback in its own docstring.
 runbook (verification commands, rollback procedures, the five
 self-service security carve-outs, the asymmetric-RLS rationale).
 
-### Epic E.3 — Graceful shutdown
+### Observability & Operational Hardening (Epic E)
 
-On a rolling deploy the process receives SIGTERM. Without a drain
-handler, three observability surfaces lose data: per-tenant
-audit-stream buffers (irreversible — events never reach the SIEM),
-OTel span batches still in the `BatchSpanProcessor`, and Sentry
-errors still in the transport queue. Epic E.3 adds a single
-registration point that drains all three in the order most-to-least
-critical for audit correctness: audit buffers first, then OTel,
-then Sentry.
+Three remediations that close the operational gaps left after Epic D.
+Treat them as one subsystem — each protects a different blast-radius
+class for the same deploy event.
 
-The handler lives in `src/lib/observability/shutdown.ts`
-(`installShutdownHandlers`). Each stage is `Promise.race`'d against
-its per-stage budget from `src/lib/observability/shutdown-budget.ts`
-so a slow exporter can never block the process past the container's
-grace period (k8s default 30 s). The three stage budgets
-(3 s + 2 s + 2 s = 7 s) fit under the 20 s ceiling that leaves
-the rest for Next.js's own HTTP-drain handler running in parallel.
-The handler never calls `process.exit` — `next start` owns the
-process lifecycle. Registration happens in
+**E.2 — Audit-stream retry + idempotency key.** `deliverBatch` in
+`src/app-layer/events/audit-stream.ts` now attempts each batch up
+to 3 times (original + 2 retries) on `408 / 429 / 5xx / network
+throw`. Linear backoff (1 s, 2 s). Every attempt carries the SAME
+`X-Inflect-Batch-Id` header — deterministic from
+`(tenantId, schemaVersion, eventIds)` via `computeBatchId` in
+`src/app-layer/events/webhook-headers.ts`. The same id doubles as
+`X-Inflect-Idempotency-Key`, so consumer SIEMs dedupe retries with
+zero retry-aware code on our side. Kill-switch via
+`AUDIT_STREAM_RETRY_ENABLED=0` (force single-POST for debugging a
+misbehaving SIEM without redeploy). A module-level
+`_deliveryFailureCount` counter bumps once per batch whose final
+attempt is still not-ok — future work wires this to OTel.
+
+`webhook-headers.ts` is the canonical module for any future outbound
+webhook in the repo (SCIM push, billing fanout, per-tenant SIEM
+pluralisation). Every caller uses `buildOutboundHeaders(...)` and
+`computeBatchId(...)` — never spell `X-Inflect-*` header names
+inline, never hand-roll dedupe keys.
+
+**E.3 — Graceful shutdown.** On a rolling deploy the process receives
+SIGTERM. Without a drain handler, three observability surfaces lose
+data: per-tenant audit-stream buffers (irreversible — events never
+reach the SIEM), OTel span batches still in the `BatchSpanProcessor`,
+and Sentry errors still in the transport queue.
+`installShutdownHandlers()` in `src/lib/observability/shutdown.ts`
+drains all three in the order most-to-least critical for audit
+correctness: audit buffers first, then OTel, then Sentry. Each stage
+is `Promise.race`'d against its per-stage budget from
+`src/lib/observability/shutdown-budget.ts` so a slow exporter never
+blocks past the container's grace period (k8s default 30 s). The
+three stage budgets (3 s + 2 s + 2 s = 7 s) fit under the 20 s
+ceiling — leaving 10+ s for Next.js's own HTTP-drain handler
+running in parallel. The handler never calls `process.exit` —
+`next start` owns the process lifecycle. Registration happens in
 `src/instrumentation.ts::register()`, after all `init*` calls, and
-is idempotent under HMR via a module-level flag.
+is idempotent under HMR via a module-level flag. SIGINT gets the
+same treatment. A second SIGTERM falls through to Node's default
+(via `process.once`) so an escalating runtime can always terminate.
+
+Paired shutdown helpers live beside their init counterparts:
+`shutdownTelemetry` in `src/lib/observability/instrumentation.ts`,
+`shutdownSentry` in `src/lib/observability/sentry.ts`. Both are
+bounded, idempotent, never throw — the handler composes them as
+stable contracts.
+
+**E.4 — HIBP guardrail.** `tests/guardrails/hibp-coverage.test.ts`
+locks in the invariant that every API route ingesting a
+user-chosen password MUST import AND call
+`checkPasswordAgainstHIBP`. Mirrors the
+`sanitize-rich-text-coverage.test.ts` template: a curated
+`HIBP_REQUIRED_ROUTES` list (today: just `auth/register`) paired
+with a structural scan of `src/app/api/**/route.ts` for
+password-shaped Zod fields. An in-memory mutation regression proof
+confirms the detector catches removals. Vacuously passes today —
+the first password-change / reset / recovery route forced to
+register is the point.
+
+**See `docs/epic-e-observability.md`** for the Epic E operator
+runbook (verification commands, rollback procedures, how to add a
+new password-handling route, how to add a new outbound webhook).
 
 ### RBAC & Permissions
 
