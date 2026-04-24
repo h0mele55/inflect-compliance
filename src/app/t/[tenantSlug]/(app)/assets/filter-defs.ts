@@ -11,28 +11,32 @@ import {
 } from '@/components/ui/filter/filter-definitions';
 import { CircleDot, Flag, Layers } from 'lucide-react';
 
+// Values MUST match the Prisma enums (AssetType, AssetStatus, Criticality) in
+// schema.prisma — the UI selection is passed straight through to Prisma, so
+// any label key not present in the DB enum produces
+// PrismaClientValidationError on query and a 500 in the list page.
 export const ASSET_TYPE_LABELS = {
-    HARDWARE: 'Hardware',
-    SOFTWARE: 'Software',
-    NETWORK: 'Network',
-    DATA_STORE: 'Data Store',
+    INFORMATION: 'Information',
     SYSTEM: 'System',
-    PEOPLE: 'People',
-    FACILITY: 'Facility',
     SERVICE: 'Service',
+    DATA_STORE: 'Data Store',
+    VENDOR: 'Vendor',
+    PEOPLE_PROCESS: 'People / Process',
+    APPLICATION: 'Application',
+    INFRASTRUCTURE: 'Infrastructure',
+    PROCESS: 'Process',
+    OTHER: 'Other',
 } as const;
 
 export const ASSET_STATUS_LABELS = {
     ACTIVE: 'Active',
-    DECOMMISSIONED: 'Decommissioned',
-    UNDER_REVIEW: 'Under Review',
+    RETIRED: 'Retired',
 } as const;
 
 export const ASSET_CRITICALITY_LABELS = {
     LOW: 'Low',
     MEDIUM: 'Medium',
     HIGH: 'High',
-    CRITICAL: 'Critical',
 } as const;
 
 const STATIC_DEFS = {
