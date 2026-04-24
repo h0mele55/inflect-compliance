@@ -1,3 +1,19 @@
+/**
+ * Canonical outbound HTTP retry helper for this repo.
+ *
+ * Use this for any outbound HTTP call that may hit 429 (rate-limit) or 5xx
+ * (transient server error). It wraps every attempt in an AbortController-
+ * bounded timeout, retries with quadratic backoff on 429/5xx, and throws a
+ * descriptive Error after `maxRetries` exhaustion.
+ *
+ * First real consumer: Epic E.2 (audit-stream webhook delivery).
+ *
+ * @param input  - The URL or Request to fetch.
+ * @param init   - Standard `fetch` init options (headers, method, body, …).
+ * @param options.timeout    - Per-attempt timeout in ms (default 5 000).
+ * @param options.maxRetries - Maximum attempts before throwing (default 10).
+ * @param options.retryDelay - Base delay between retries in ms (default 1 000).
+ */
 export async function fetchWithRetry(
   input: RequestInfo | URL,
   init?: RequestInit | undefined,
@@ -50,7 +66,6 @@ export async function fetchWithRetry(
         } catch {
           errorMessage = `HTTP error ${response.status}`;
         }
-        console.error(`fetchWithRetry error: ${errorMessage}`);
         throw new Error(errorMessage);
       }
     } catch (error) {
@@ -60,7 +75,6 @@ export async function fetchWithRetry(
       // If this is the last retry, throw the error
       if (i === maxRetries - 1) {
         const errMsg = `Failed after ${maxRetries} retries. Last error: ${lastError.message}`;
-        console.error(`fetchWithRetry error: ${errMsg}`);
         throw new Error(errMsg);
       }
 

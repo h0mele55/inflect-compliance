@@ -16,7 +16,8 @@ export * from "./currency-zero-decimal";
 // + `formatDateRange` instead.
 export * from "./deep-equal";
 export * from "./domains";
-export * from "./fetch-with-retry";
+// fetchWithRetry relocated to @/lib/http/fetch-with-retry (canonical
+// outbound HTTP retry helper). Import from there — not from this barrel.
 export * from "./fetch-with-timeout";
 export * from "./fetcher";
 export * from "./format-file-size";
