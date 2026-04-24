@@ -16,6 +16,12 @@
 import { DiagConsoleLogger, DiagLogLevel, diag } from '@opentelemetry/api';
 
 let _initialized = false;
+/**
+ * Populated by initTelemetry when providers are successfully created.
+ * shutdownTelemetry drains both on the graceful-shutdown path.
+ * Null when OTel is disabled (the guard short-circuits init).
+ */
+let _shutdown: (() => Promise<void>) | null = null;
 
 /**
  * Initialize OpenTelemetry SDK (traces + metrics).
@@ -86,6 +92,15 @@ export async function initTelemetry(): Promise<void> {
     const { metrics } = await import('@opentelemetry/api');
     metrics.setGlobalMeterProvider(meterProvider);
 
+    _shutdown = async () => {
+        // Drain exporters in parallel — both independently bounded by
+        // the outer shutdownTelemetry timeout via Promise.race.
+        await Promise.all([
+            tracerProvider.shutdown().catch(() => { /* swallow — best-effort */ }),
+            meterProvider.shutdown().catch(() => { /* swallow — best-effort */ }),
+        ]);
+    };
+
     _initialized = true;
     // Use pinoInstance directly since request context is not available during bootstrap
     const { pinoInstance: pino } = require('./logger');
@@ -98,9 +113,33 @@ export function isTelemetryInitialized(): boolean {
 }
 
 /**
+ * Drain the OTel tracer + meter providers. Bounded by `timeoutMs` —
+ * if draining hasn't completed within the budget, the promise resolves
+ * anyway so graceful shutdown can continue to the next stage (Sentry
+ * close, process exit). Never throws.
+ *
+ * Noop when OTel was disabled or was never initialised.
+ *
+ * Safe to call multiple times: after the first call, `_shutdown` is
+ * cleared so subsequent calls resolve immediately.
+ */
+export async function shutdownTelemetry(timeoutMs = 2_000): Promise<void> {
+    if (!_shutdown) return;
+    const shutdown = _shutdown;
+    _shutdown = null;
+    _initialized = false;
+
+    await Promise.race([
+        shutdown(),
+        new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
+}
+
+/**
  * Reset initialization flag (for testing only).
  * @internal
  */
 export function _resetForTesting(): void {
     _initialized = false;
+    _shutdown = null;
 }

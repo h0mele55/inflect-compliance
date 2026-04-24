@@ -139,6 +139,26 @@ export function isSentryInitialized(): boolean {
 }
 
 /**
+ * Flush pending Sentry events and close the client. Bounded by
+ * `timeoutMs` — Sentry.close() takes its own timeout and never
+ * throws, but we guard with Promise.race so a misbehaving transport
+ * can't block shutdown past the graceful-shutdown budget.
+ *
+ * Noop when Sentry was never initialised (SENTRY_DSN unset).
+ *
+ * Safe to call multiple times.
+ */
+export async function shutdownSentry(timeoutMs = 2_000): Promise<void> {
+    if (!_initialized) return;
+    _initialized = false;
+
+    await Promise.race([
+        Sentry.close(timeoutMs).then(() => { /* discard boolean */ }),
+        new Promise<void>((resolve) => setTimeout(resolve, timeoutMs + 100)),
+    ]);
+}
+
+/**
  * Capture an error in Sentry with request context correlation.
  *
  * Only captures errors with status >= 500 (server errors).
