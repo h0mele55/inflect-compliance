@@ -20,6 +20,10 @@ import {
     __setStreamPost,
     __setTenantStreamConfigResolver,
     __resetAuditStreamForTests,
+    __getDeliveryFailureCount,
+    __resetDeliveryFailureCount,
+    __setRetryBaseDelayMs,
+    __resetRetryBaseDelayMs,
     type StreamedAuditEvent,
     type AuditStreamPayload,
 } from '@/app-layer/events/audit-stream';
@@ -61,6 +65,9 @@ function makeEvent(
 
 beforeEach(() => {
     __resetAuditStreamForTests();
+    __resetDeliveryFailureCount();
+    // Zero backoff so retry loops don't introduce real-time waits in tests.
+    __setRetryBaseDelayMs(0);
     capturedPosts = [];
     nextPostResult = { ok: true, status: 200 };
 
@@ -82,8 +89,11 @@ beforeEach(() => {
 
 afterEach(() => {
     __resetAuditStreamForTests();
+    __resetDeliveryFailureCount();
+    __resetRetryBaseDelayMs();
     __setStreamPost(null);
     __setTenantStreamConfigResolver(null);
+    delete process.env.AUDIT_STREAM_RETRY_ENABLED;
 });
 
 // ─── Payload shape ─────────────────────────────────────────────────
@@ -287,5 +297,83 @@ describe('audit-stream — fail-safe behaviour', () => {
         // Buffer for tenant-1 is empty after the first flush; the
         // second flush is a no-op (no events). Expect exactly 1 POST.
         expect(capturedPosts).toHaveLength(1);
+    });
+});
+
+// ─── Retry behaviour (Epic E.2) ────────────────────────────────────
+
+describe('audit-stream — retry behaviour', () => {
+    it('Case A — retry happy path: 503 then 200 calls postFn twice and succeeds', async () => {
+        let callCount = 0;
+        __setStreamPost(async (url, body, headers) => {
+            capturedPosts.push({ url, body, headers });
+            callCount += 1;
+            if (callCount === 1) {
+                return { ok: false, status: 503, statusText: 'Service Unavailable' };
+            }
+            return { ok: true, status: 200, statusText: 'OK' };
+        });
+
+        streamAuditEvent(makeEvent({ id: 'retry-a' }));
+        await flushAllAuditStreams();
+
+        expect(capturedPosts).toHaveLength(2);
+        // Both calls must carry the same X-Inflect-Batch-Id (idempotency key).
+        expect(capturedPosts[0].headers['X-Inflect-Batch-Id']).toBeDefined();
+        expect(capturedPosts[0].headers['X-Inflect-Batch-Id']).toBe(
+            capturedPosts[1].headers['X-Inflect-Batch-Id'],
+        );
+        // Final result was ok — failure counter must NOT have been bumped.
+        expect(__getDeliveryFailureCount()).toBe(0);
+    });
+
+    it('Case B — retry double-fail: 503 on all attempts increments failure count once', async () => {
+        __setStreamPost(async (url, body, headers) => {
+            capturedPosts.push({ url, body, headers });
+            return { ok: false, status: 503, statusText: 'Service Unavailable' };
+        });
+
+        streamAuditEvent(makeEvent({ id: 'retry-b' }));
+        await flushAllAuditStreams();
+
+        // 3 attempts total (1 initial + 2 retries).
+        expect(capturedPosts).toHaveLength(3);
+        // Only one batch failed — failure counter bumped exactly once (not per-attempt).
+        expect(__getDeliveryFailureCount()).toBe(1);
+    });
+
+    it('Case C — network throw then 200 succeeds via retry', async () => {
+        let callCount = 0;
+        __setStreamPost(async (url, body, headers) => {
+            callCount += 1;
+            if (callCount === 1) {
+                throw new Error('ECONNRESET');
+            }
+            capturedPosts.push({ url, body, headers });
+            return { ok: true, status: 200, statusText: 'OK' };
+        });
+
+        streamAuditEvent(makeEvent({ id: 'retry-c' }));
+        await flushAllAuditStreams();
+
+        // Second call succeeded — one captured POST (throw on first was swallowed).
+        expect(capturedPosts).toHaveLength(1);
+        expect(__getDeliveryFailureCount()).toBe(0);
+    });
+
+    it('Case D — kill switch AUDIT_STREAM_RETRY_ENABLED=0 sends exactly one POST', async () => {
+        process.env.AUDIT_STREAM_RETRY_ENABLED = '0';
+
+        __setStreamPost(async (url, body, headers) => {
+            capturedPosts.push({ url, body, headers });
+            return { ok: false, status: 503, statusText: 'Service Unavailable' };
+        });
+
+        streamAuditEvent(makeEvent({ id: 'retry-d' }));
+        await flushAllAuditStreams();
+
+        // Kill-switch forces single attempt — no retry.
+        expect(capturedPosts).toHaveLength(1);
+        expect(__getDeliveryFailureCount()).toBe(1);
     });
 });

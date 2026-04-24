@@ -185,7 +185,9 @@ the Epic B field-encryption manifest. Fail-safe — the audit row is
 already committed, so a broken SIEM never undoes the write.
 Privacy-aware payload — free-text `details` is dropped, only
 structured `detailsJson` ships; actor is opaque `userId` +
-`actorType`, never email.
+`actorType`, never email. Each batch delivery gets up to 3 attempts
+(original + 2 retries) with linear backoff (1 s, 2 s). Kill-switch
+via `AUDIT_STREAM_RETRY_ENABLED=0`.
 
 **C.5 — Server-side rich-text sanitisation.** Use
 `sanitizeRichTextHtml` / `sanitizePlainText` /

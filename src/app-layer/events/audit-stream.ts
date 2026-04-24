@@ -183,6 +183,49 @@ export function __setStreamPost(fn: StreamPostFn | null): void {
     postFn = fn ?? defaultPost;
 }
 
+// ─── Delivery failure counter ──────────────────────────────────────
+
+/**
+ * Bumped once per batch whose final attempt is not-ok. MVP counter —
+ * future work wires this to the OTel meter without changing the
+ * contract.
+ */
+let _deliveryFailureCount = 0;
+
+export function __getDeliveryFailureCount(): number {
+    return _deliveryFailureCount;
+}
+
+export function __resetDeliveryFailureCount(): void {
+    _deliveryFailureCount = 0;
+}
+
+// ─── Retry helpers ─────────────────────────────────────────────────
+
+/**
+ * Returns true for status codes that warrant a retry attempt.
+ * Status 0 is our synthetic "network throw" sentinel.
+ */
+function isRetryable(status: number): boolean {
+    return status === 0 || status === 408 || status === 429 || status >= 500;
+}
+
+/**
+ * Base delay (ms) between retry attempts. Tests override this to 0
+ * so the retry loop runs synchronously without waiting.
+ */
+let _retryBaseDelayMs = 1_000;
+
+/** Test-only seam — set to 0 to skip real-time backoff waits. */
+export function __setRetryBaseDelayMs(ms: number): void {
+    _retryBaseDelayMs = ms;
+}
+
+/** Restore production delay. Called in afterEach. */
+export function __resetRetryBaseDelayMs(): void {
+    _retryBaseDelayMs = 1_000;
+}
+
 // ─── Per-tenant buffer ─────────────────────────────────────────────
 
 interface TenantBuffer {
@@ -350,9 +393,40 @@ async function deliverBatch(
         schemaVersion: SCHEMA_VERSION,
     });
 
-    const result = await postFn(config.url, body, headers);
+    // Retry loop — the same batchId rides every attempt so consumer
+    // SIEMs can deduplicate without any retry-aware code on their side.
+    const retryEnabled = process.env.AUDIT_STREAM_RETRY_ENABLED !== '0';
+    const maxAttempts = retryEnabled ? 3 : 1;
+
+    let result: { ok: boolean; status: number; statusText?: string };
+    try {
+        result = await postFn(config.url, body, headers);
+    } catch (err) {
+        result = {
+            ok: false,
+            status: 0,
+            statusText: err instanceof Error ? err.message : String(err),
+        };
+    }
+
+    let attempts = 1;
+    while (!result.ok && isRetryable(result.status) && attempts < maxAttempts) {
+        // Linear backoff: baseDelay * attempts (1×, 2×). Tests set baseDelay to 0.
+        await new Promise<void>((r) => setTimeout(r, _retryBaseDelayMs * attempts));
+        try {
+            result = await postFn(config.url, body, headers);
+        } catch (err) {
+            result = {
+                ok: false,
+                status: 0,
+                statusText: err instanceof Error ? err.message : String(err),
+            };
+        }
+        attempts += 1;
+    }
 
     if (!result.ok) {
+        _deliveryFailureCount += 1;
         logger.warn('audit-stream POST returned non-2xx', {
             component: 'audit-stream',
             tenantId,
@@ -360,6 +434,7 @@ async function deliverBatch(
             status: result.status,
             statusText: result.statusText,
             count: batch.length,
+            attempts,
         });
     } else {
         logger.info('audit-stream batch delivered', {
@@ -368,6 +443,7 @@ async function deliverBatch(
             batchId,
             status: result.status,
             count: batch.length,
+            attempts,
         });
     }
 }

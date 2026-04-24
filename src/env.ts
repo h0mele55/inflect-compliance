@@ -104,6 +104,11 @@ export const env = createEnv({
         AI_RISK_USER_RPM: z.string().optional(),
         AI_RISK_ENABLED: z.string().default('true'),
         AI_RISK_PLAN_REQUIRED: z.string().default(''),
+
+        // Audit stream delivery retry (Epic E.2)
+        // '0' disables retry (single POST); anything else (or unset) keeps retry on.
+        // Kill-switch for debugging a misbehaving SIEM without redeploy.
+        AUDIT_STREAM_RETRY_ENABLED: z.string().optional(),
     },
 
     /**
@@ -181,6 +186,8 @@ export const env = createEnv({
         AI_RISK_USER_RPM: process.env.AI_RISK_USER_RPM,
         AI_RISK_ENABLED: process.env.AI_RISK_ENABLED,
         AI_RISK_PLAN_REQUIRED: process.env.AI_RISK_PLAN_REQUIRED,
+
+        AUDIT_STREAM_RETRY_ENABLED: process.env.AUDIT_STREAM_RETRY_ENABLED,
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
