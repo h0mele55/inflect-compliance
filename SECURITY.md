@@ -8,13 +8,16 @@ commitments that apply to good-faith research.
 
 ## Reporting a vulnerability
 
-Email **security@inflect-compliance.example** with a description of
-the issue. PGP key:
-[https://inflect-compliance.example/.well-known/pgp.txt](https://inflect-compliance.example/.well-known/pgp.txt).
+Use **GitHub Security Advisories** — the private-by-default channel
+for this repository. Click
+[Report a vulnerability](../../security/advisories/new) to open a
+report visible only to the maintainers and to you. This is the
+primary channel; we monitor it and respond on the timeline below.
 
-If GitHub Security Advisories are enabled for this repository, you may
-also use [Report a vulnerability](../../security/advisories/new) to file
-the report privately.
+If GHSA is not available for any reason (fork, mirror, GitHub outage),
+open a minimal public issue stating only that you have a private
+vulnerability report to share, and wait for a maintainer response —
+do NOT paste the details.
 
 A complete report typically includes:
 
@@ -115,9 +118,17 @@ implements:
   concurrent-session limits, max-duration enforcement, per-session
   revocation from the admin UI.
 - Outbound audit-event streaming (Epic C.4) for SIEM integration with
-  HMAC-SHA256 signing and per-tenant configuration.
+  HMAC-SHA256 signing and per-tenant configuration. Delivery is bounded
+  by retry + a deterministic idempotency key (Epic E.2) so transient
+  SIEM failures don't drop batches and retries never double-deliver.
 - Server-side rich-text sanitisation (Epic C.5) on every write path
   that accepts HTML.
+- Graceful shutdown (Epic E.3) drains audit-stream buffers, OTel
+  exporters, and Sentry before the container exits — per-stage
+  Promise.race'd against bounded budgets.
+- HIBP password-breach check on signup (Epic A.3) and an API-route
+  guardrail (Epic E.4) that forces any future password-change /
+  reset route to wire the same check.
 
 If you discover a way around any of the above, please flag it
 prominently in your report. Operator runbooks:
@@ -127,3 +138,6 @@ prominently in your report. Operator runbooks:
 - [`docs/epic-d-completeness.md`](./docs/epic-d-completeness.md) —
   Epic D remediations (`UserSession` RLS, encrypted-field
   sanitisation, legacy-admin-route migration).
+- [`docs/epic-e-observability.md`](./docs/epic-e-observability.md) —
+  Epic E observability + operational hardening (audit-stream retry,
+  graceful shutdown, HIBP guardrail).
