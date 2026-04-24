@@ -23,13 +23,13 @@
 name: Deploy
 
 on:
-  # Auto-deploy staging when CI passes on main
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
-
-  # Manual deploy (staging re-deploy or production promote)
+  # Manual only. The auto-trigger on CI pass has been disabled —
+  # actual production deployment today is via Watchtower polling
+  # GHCR:latest (see docker-compose on the VM). This workflow is
+  # kept wired for the day a real SSH-based staging / prod
+  # environment is provisioned; configure DEPLOY_HOST, DEPLOY_USER,
+  # DEPLOY_SSH_KEY, DEPLOY_PATH in the environment secrets and
+  # re-enable the `workflow_run` trigger above.
   workflow_dispatch:
     inputs:
       environment:
