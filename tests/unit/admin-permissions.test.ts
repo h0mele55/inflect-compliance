@@ -91,7 +91,20 @@ describe('Admin Safety Invariants', () => {
 // ─── PermissionSet Tests ───
 
 describe('PermissionSet admin capabilities', () => {
-    it('ADMIN has all admin permissions', () => {
+    it('OWNER has all admin permissions including tenant_lifecycle and owner_management', () => {
+        const perms = getPermissionsForRole('OWNER');
+        expect(perms.admin).toEqual({
+            view: true,
+            manage: true,
+            members: true,
+            sso: true,
+            scim: true,
+            tenant_lifecycle: true,
+            owner_management: true,
+        });
+    });
+
+    it('ADMIN has operational permissions but NOT tenant_lifecycle or owner_management', () => {
         const perms = getPermissionsForRole('ADMIN');
         expect(perms.admin).toEqual({
             view: true,
@@ -99,6 +112,8 @@ describe('PermissionSet admin capabilities', () => {
             members: true,
             sso: true,
             scim: true,
+            tenant_lifecycle: false,
+            owner_management: false,
         });
     });
 
@@ -110,6 +125,8 @@ describe('PermissionSet admin capabilities', () => {
             members: false,
             sso: false,
             scim: false,
+            tenant_lifecycle: false,
+            owner_management: false,
         });
     });
 
@@ -121,6 +138,8 @@ describe('PermissionSet admin capabilities', () => {
             members: false,
             sso: false,
             scim: false,
+            tenant_lifecycle: false,
+            owner_management: false,
         });
     });
 
@@ -132,6 +151,8 @@ describe('PermissionSet admin capabilities', () => {
             members: false,
             sso: false,
             scim: false,
+            tenant_lifecycle: false,
+            owner_management: false,
         });
     });
 });

@@ -34,6 +34,7 @@ export interface TenantContext {
 // ─── Permission calculator ───
 
 const ROLE_ORDER: Record<Role, number> = {
+    OWNER: 5,
     ADMIN: 4,
     EDITOR: 3,
     AUDITOR: 2,

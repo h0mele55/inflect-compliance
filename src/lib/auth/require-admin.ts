@@ -41,6 +41,7 @@ import type { Role } from '@prisma/client';
  * AUDITOR is a sidecar role (not in the linear ADMIN > EDITOR > READER chain).
  */
 const ROLE_LEVEL: Record<Role, number> = {
+    OWNER: 5,
     ADMIN: 4,
     EDITOR: 3,
     AUDITOR: 2,

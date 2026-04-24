@@ -6,7 +6,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 
 const UpdateMemberSchema = z.object({
-    role: z.enum(['ADMIN', 'EDITOR', 'AUDITOR', 'READER']).optional(),
+    role: z.enum(['OWNER', 'ADMIN', 'EDITOR', 'AUDITOR', 'READER']).optional(),
     customRoleId: z.string().nullable().optional(),
 });
 

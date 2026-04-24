@@ -94,6 +94,7 @@ export async function getCurrentUser(): Promise<User | null> {
  * AUDITOR is sidecar — not in the linear chain.
  */
 const ROLE_HIERARCHY: Record<Role, number> = {
+    OWNER: 5,
     ADMIN: 4,
     EDITOR: 3,
     AUDITOR: 2,

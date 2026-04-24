@@ -2071,6 +2071,11 @@ model IntegrationSyncMapping {
 }
 
 enum Role {
+  /// OWNER — tenant lifecycle (delete tenant, rotate DEK, transfer
+  /// ownership) + owner management (invite/remove OWNERs, assign OWNER
+  /// role). Strictly superset of ADMIN. The last ACTIVE OWNER of a
+  /// tenant cannot be removed or demoted (DB trigger + usecase guard).
+  OWNER
   ADMIN
   EDITOR
   READER

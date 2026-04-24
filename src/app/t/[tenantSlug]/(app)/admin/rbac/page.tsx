@@ -41,8 +41,9 @@ export default async function RbacPage({
         orderBy: { createdAt: 'asc' },
     });
 
-    const roles: Role[] = ['ADMIN', 'EDITOR', 'AUDITOR', 'READER'];
+    const roles: Role[] = ['OWNER', 'ADMIN', 'EDITOR', 'AUDITOR', 'READER'];
     const permissionMatrix: Record<Role, PermissionSet> = {
+        OWNER: getPermissionsForRole('OWNER'),
         ADMIN: getPermissionsForRole('ADMIN'),
         EDITOR: getPermissionsForRole('EDITOR'),
         AUDITOR: getPermissionsForRole('AUDITOR'),

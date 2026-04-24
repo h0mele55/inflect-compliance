@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 const InviteMemberSchema = z.object({
     email: z.string().email('Valid email required'),
-    role: z.enum(['ADMIN', 'EDITOR', 'AUDITOR', 'READER']),
+    role: z.enum(['OWNER', 'ADMIN', 'EDITOR', 'AUDITOR', 'READER']),
 });
 
 export const GET = withApiErrorHandling(

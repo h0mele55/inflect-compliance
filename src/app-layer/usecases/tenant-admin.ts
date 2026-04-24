@@ -26,7 +26,7 @@ import { randomBytes } from 'crypto';
 import type { Role } from '@prisma/client';
 
 // ─── Valid roles for assignment ───
-const VALID_ROLES: Role[] = ['ADMIN', 'EDITOR', 'AUDITOR', 'READER'];
+const VALID_ROLES: Role[] = ['OWNER', 'ADMIN', 'EDITOR', 'AUDITOR', 'READER'];
 
 // ─── List Members ───
 

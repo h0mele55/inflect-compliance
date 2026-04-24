@@ -1,0 +1,14 @@
+-- Epic 1, PR 1 — Introduce OWNER role.
+--
+-- OWNER is strictly superior to ADMIN: it adds tenant lifecycle
+-- (delete tenant, rotate DEK, transfer ownership) and owner
+-- management (invite/remove OWNERs, assign OWNER role). The
+-- permission resolution in src/lib/permissions.ts encodes the
+-- distinction; this migration only makes the enum value exist.
+--
+-- No data is modified by this migration. Existing ADMINs stay
+-- ADMINs. A later migration (PR 2, OWNER bootstrap) promotes the
+-- oldest ADMIN per tenant to OWNER.
+--
+-- ADD VALUE is non-blocking and does not rewrite tables.
+ALTER TYPE "Role" ADD VALUE IF NOT EXISTS 'OWNER' BEFORE 'ADMIN';

@@ -11,7 +11,23 @@ export type PermissionSet = {
     frameworks: { view: boolean; install: boolean };
     audits: { view: boolean; manage: boolean; freeze: boolean; share: boolean };
     reports: { view: boolean; export: boolean };
-    admin: { view: boolean; manage: boolean; members: boolean; sso: boolean; scim: boolean };
+    admin: {
+        view: boolean;
+        manage: boolean;
+        members: boolean;
+        sso: boolean;
+        scim: boolean;
+        /**
+         * Tenant lifecycle operations: delete tenant, rotate DEK,
+         * transfer ownership. OWNER-only by policy; ADMIN gets false.
+         */
+        tenant_lifecycle: boolean;
+        /**
+         * Invite / remove OWNERs, assign OWNER role. OWNER-only by
+         * policy; ADMIN gets false (ADMIN can still invite ADMIN).
+         */
+        owner_management: boolean;
+    };
 };
 
 /**
@@ -29,7 +45,7 @@ const PERMISSION_SCHEMA: Record<keyof PermissionSet, string[]> = {
     frameworks: ['view', 'install'],
     audits: ['view', 'manage', 'freeze', 'share'],
     reports: ['view', 'export'],
-    admin: ['view', 'manage', 'members', 'sso', 'scim'],
+    admin: ['view', 'manage', 'members', 'sso', 'scim', 'tenant_lifecycle', 'owner_management'],
 };
 
 /**
@@ -42,6 +58,26 @@ const PERMISSION_SCHEMA: Record<keyof PermissionSet, string[]> = {
  */
 export function getPermissionsForRole(role: Role): PermissionSet {
     switch (role) {
+        case 'OWNER':
+            // OWNER = ADMIN + tenant_lifecycle + owner_management.
+            // Only role that can delete the tenant, rotate DEK, transfer
+            // ownership, invite/remove other OWNERs, or assign OWNER role.
+            return {
+                controls: { view: true, create: true, edit: true },
+                evidence: { view: true, upload: true, edit: true, download: true },
+                policies: { view: true, create: true, edit: true, approve: true },
+                tasks: { view: true, create: true, edit: true, assign: true },
+                risks: { view: true, create: true, edit: true },
+                vendors: { view: true, create: true, edit: true },
+                tests: { view: true, create: true, execute: true },
+                frameworks: { view: true, install: true },
+                audits: { view: true, manage: true, freeze: true, share: true },
+                reports: { view: true, export: true },
+                admin: {
+                    view: true, manage: true, members: true, sso: true, scim: true,
+                    tenant_lifecycle: true, owner_management: true,
+                },
+            };
         case 'ADMIN':
             return {
                 controls: { view: true, create: true, edit: true },
@@ -54,7 +90,12 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 frameworks: { view: true, install: true },
                 audits: { view: true, manage: true, freeze: true, share: true },
                 reports: { view: true, export: true },
-                admin: { view: true, manage: true, members: true, sso: true, scim: true },
+                admin: {
+                    view: true, manage: true, members: true, sso: true, scim: true,
+                    // Explicit false: ADMIN is NOT the tenant owner.
+                    // Delete / DEK rotation / OWNER management require OWNER role.
+                    tenant_lifecycle: false, owner_management: false,
+                },
             };
         case 'EDITOR':
             return {
@@ -70,7 +111,7 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 frameworks: { view: true, install: false },
                 audits: { view: true, manage: false, freeze: false, share: false },
                 reports: { view: true, export: true },
-                admin: { view: false, manage: false, members: false, sso: false, scim: false },
+                admin: { view: false, manage: false, members: false, sso: false, scim: false, tenant_lifecycle: false, owner_management: false },
             };
         case 'AUDITOR':
             return {
@@ -87,7 +128,7 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 // Auditors can view and maybe export/share depending on policy, but let's keep view/share
                 audits: { view: true, manage: false, freeze: false, share: true },
                 reports: { view: true, export: true },
-                admin: { view: false, manage: false, members: false, sso: false, scim: false },
+                admin: { view: false, manage: false, members: false, sso: false, scim: false, tenant_lifecycle: false, owner_management: false },
             };
         case 'READER':
         default:
@@ -102,7 +143,7 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 frameworks: { view: true, install: false },
                 audits: { view: true, manage: false, freeze: false, share: false },
                 reports: { view: true, export: false },
-                admin: { view: false, manage: false, members: false, sso: false, scim: false },
+                admin: { view: false, manage: false, members: false, sso: false, scim: false, tenant_lifecycle: false, owner_management: false },
             };
     }
 }
