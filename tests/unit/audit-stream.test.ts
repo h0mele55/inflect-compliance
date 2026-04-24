@@ -12,7 +12,16 @@
  *   - hard cap (oldest dropped above BUFFER_HARD_CAP)
  */
 
+// Intercept the OTel counter call without breaking other exports from
+// the metrics module (transitive imports in the test graph use the real
+// ones). Keep everything else as requireActual.
+jest.mock('@/lib/observability/metrics', () => {
+    const actual = jest.requireActual('@/lib/observability/metrics');
+    return { ...actual, recordAuditStreamDeliveryFailure: jest.fn() };
+});
+
 import { computeHmacSha256 } from '@/app-layer/integrations/webhook-crypto';
+import { recordAuditStreamDeliveryFailure } from '@/lib/observability/metrics';
 
 import {
     streamAuditEvent,
@@ -27,6 +36,10 @@ import {
     type StreamedAuditEvent,
     type AuditStreamPayload,
 } from '@/app-layer/events/audit-stream';
+
+const mockRecordFailure = recordAuditStreamDeliveryFailure as jest.MockedFunction<
+    typeof recordAuditStreamDeliveryFailure
+>;
 
 // ─── Test harness ──────────────────────────────────────────────────
 
@@ -66,6 +79,7 @@ function makeEvent(
 beforeEach(() => {
     __resetAuditStreamForTests();
     __resetDeliveryFailureCount();
+    mockRecordFailure.mockClear();
     // Zero backoff so retry loops don't introduce real-time waits in tests.
     __setRetryBaseDelayMs(0);
     capturedPosts = [];
@@ -325,6 +339,8 @@ describe('audit-stream — retry behaviour', () => {
         );
         // Final result was ok — failure counter must NOT have been bumped.
         expect(__getDeliveryFailureCount()).toBe(0);
+        // OTel counter must also be untouched — one success = zero failures.
+        expect(mockRecordFailure).not.toHaveBeenCalled();
     });
 
     it('Case B — retry double-fail: 503 on all attempts increments failure count once', async () => {
@@ -340,6 +356,10 @@ describe('audit-stream — retry behaviour', () => {
         expect(capturedPosts).toHaveLength(3);
         // Only one batch failed — failure counter bumped exactly once (not per-attempt).
         expect(__getDeliveryFailureCount()).toBe(1);
+        // OTel counter mirrors the in-process counter — one failure with the
+        // final attempt's status carried as the label.
+        expect(mockRecordFailure).toHaveBeenCalledTimes(1);
+        expect(mockRecordFailure).toHaveBeenCalledWith({ status: 503 });
     });
 
     it('Case C — network throw then 200 succeeds via retry', async () => {

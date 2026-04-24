@@ -11,6 +11,11 @@
  *   job.execution.duration — Histogram (job_name, status) [ms]
  *   job.queue.depth        — Observable Gauge (queue_name, state)
  *
+ * ── AUDIT-STREAM METRICS ──
+ *   audit_stream.delivery.failures — Counter (http.status_code)
+ *     Bumped once per batch whose final delivery attempt (after retry)
+ *     was not-ok. Status 0 == network throw / timeout.
+ *
  * CARDINALITY SAFETY:
  *   Route labels are normalized via `normalizeRoute()` to collapse dynamic
  *   segments (UUIDs, slugs) into placeholder tokens. This prevents
@@ -210,6 +215,41 @@ export function recordJobMetrics(attrs: {
 
     getJobCount().add(1, labels);
     getJobDuration().record(attrs.durationMs, labels);
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// AUDIT-STREAM METRICS — Instrument Singletons
+// ════════════════════════════════════════════════════════════════════════
+
+let _auditStreamFailures: ReturnType<ReturnType<typeof getMeter>['createCounter']> | null = null;
+
+function getAuditStreamFailures() {
+    if (!_auditStreamFailures) {
+        _auditStreamFailures = getMeter().createCounter('audit_stream.delivery.failures', {
+            description: 'Audit-stream batches whose final delivery attempt was not-ok (after retry)',
+            unit: '1',
+        });
+    }
+    return _auditStreamFailures;
+}
+
+/**
+ * Record a final-attempt delivery failure for an audit-stream batch.
+ *
+ * Called from `deliverBatch` in `src/app-layer/events/audit-stream.ts`
+ * when the retry loop exhausts all attempts. NOT called per retry
+ * attempt — one bump per batch.
+ *
+ * Labels: only `http.status_code` (finite cardinality). Status 0
+ * means the final attempt threw (network error, timeout) rather
+ * than returning an HTTP response. TenantId deliberately NOT a
+ * label — tenant-level debugging uses the existing structured
+ * `logger.warn` in the same code path.
+ */
+export function recordAuditStreamDeliveryFailure(attrs: { status: number }): void {
+    getAuditStreamFailures().add(1, {
+        'http.status_code': attrs.status,
+    });
 }
 
 // ════════════════════════════════════════════════════════════════════════

@@ -45,6 +45,7 @@
 import { computeHmacSha256 } from '@/app-layer/integrations/webhook-crypto';
 import { logger } from '@/lib/observability/logger';
 import { buildOutboundHeaders, computeBatchId } from '@/app-layer/events/webhook-headers';
+import { recordAuditStreamDeliveryFailure } from '@/lib/observability/metrics';
 
 // ─── Public payload shape ──────────────────────────────────────────
 
@@ -186,9 +187,13 @@ export function __setStreamPost(fn: StreamPostFn | null): void {
 // ─── Delivery failure counter ──────────────────────────────────────
 
 /**
- * Bumped once per batch whose final attempt is not-ok. MVP counter —
- * future work wires this to the OTel meter without changing the
- * contract.
+ * In-process counter bumped once per batch whose final attempt is
+ * not-ok. Exposed via `__getDeliveryFailureCount` for tests. The
+ * same event also increments the OTel counter
+ * `audit_stream.delivery.failures` via
+ * `recordAuditStreamDeliveryFailure` — this local counter exists
+ * purely so tests can assert "exactly N failures" without reaching
+ * into the OTel SDK.
  */
 let _deliveryFailureCount = 0;
 
@@ -427,6 +432,7 @@ async function deliverBatch(
 
     if (!result.ok) {
         _deliveryFailureCount += 1;
+        recordAuditStreamDeliveryFailure({ status: result.status });
         logger.warn('audit-stream POST returned non-2xx', {
             component: 'audit-stream',
             tenantId,
