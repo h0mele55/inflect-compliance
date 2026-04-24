@@ -342,6 +342,53 @@ register is the point.
 runbook (verification commands, rollback procedures, how to add a
 new password-handling route, how to add a new outbound webhook).
 
+### Finishing Touches (Epic F)
+
+Small, independent remediations that close the long tail after
+Epic E. Each landed as a focused PR; treating them as one "epic"
+was purely a scheduling convenience.
+
+**F.2 — `rotateTenantDek` surface reserved.** A new stub at
+`src/lib/security/tenant-key-manager.ts::rotateTenantDek(tenantId)`
+throws with an inline three-step runbook (master-KEK rotation
+workaround: set `DATA_ENCRYPTION_KEY_PREVIOUS` and
+`DATA_ENCRYPTION_KEY`, redeploy, POST to the existing admin
+key-rotation endpoint). The stub is deliberately sibling-shaped —
+same signature as `createTenantWithDek` / `ensureTenantDek` — so
+the real implementation can land without a signature change.
+Paired with a new `Tenant.previousEncryptedDek String?` column
+reserved by migration `20260424010000_add_tenant_previous_encrypted_dek`,
+which also lands a CHECK constraint
+(`previousEncryptedDek IS NULL OR != encryptedDek` — silent key
+mixing guard) and a partial index for the future sweep-rotations
+query. Integration test at `tests/integration/tenant-dek-rotation-stub.test.ts`
+verifies all three artefacts (stub throws, column queryable, CHECK
+enforces).
+
+**F.3 — `HttpMethod` union + sentinel comment.** The route
+permission matcher previously did
+`rule.methods.map((m) => m.toUpperCase()).includes(upperMethod)`
+per gated-route request. The new `type HttpMethod = 'GET' | 'POST'
+| 'PUT' | 'PATCH' | 'DELETE'` union enforces uppercase at compile
+time, so the hot path drops the `.map(...)` allocation.
+Ratchet: `tests/guardrails/route-permissions-uppercase.test.ts`
+catches `as` casts, lowercase union-member additions, and type
+widening back to `readonly string[]`. Separately, `encryption.ts:139`
+now carries a three-state sentinel comment explaining that
+`_lastPreviousKeySource: string | null | undefined` uses all three
+states deliberately (undefined = never checked, null = checked-no-key,
+string = checked-with-key-source).
+
+**F.4 — SECURITY.md + detect-secrets.** `SECURITY.md` now documents
+GitHub Security Advisories as the private-by-default primary
+reporting channel (no fabricated security email). `scripts/detect-secrets.sh`
+uses `git diff --cached --name-only --diff-filter=ACMR` so renamed
+files with staged secrets still get scanned.
+
+**See `docs/epic-f-finishing-touches.md`** for the Epic F operator
+runbook (verification commands, rollback procedures, how to add a
+new DEK-lifecycle verb to `tenant-key-manager`).
+
 ### RBAC & Permissions
 
 - `src/lib/permissions.ts` — `PermissionSet` (granular UI flags) resolved from the user's role
