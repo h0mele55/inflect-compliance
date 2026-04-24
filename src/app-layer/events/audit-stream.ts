@@ -44,6 +44,7 @@
 
 import { computeHmacSha256 } from '@/app-layer/integrations/webhook-crypto';
 import { logger } from '@/lib/observability/logger';
+import { buildOutboundHeaders, computeBatchId } from '@/app-layer/events/webhook-headers';
 
 // ─── Public payload shape ──────────────────────────────────────────
 
@@ -99,9 +100,8 @@ const POST_TIMEOUT_MS = 10_000;
 /** Hard cap on buffered events per tenant — drops oldest above this. */
 const BUFFER_HARD_CAP = 1_000;
 
-const SIGNATURE_HEADER = 'X-Inflect-Signature';
-const SIGNATURE_PREFIX = 'sha256=';
 const USER_AGENT = 'Inflect-Audit-Stream/1';
+const SCHEMA_VERSION = 1;
 
 // ─── Tenant config resolver (overridable for tests) ────────────────
 
@@ -329,25 +329,34 @@ async function deliverBatch(
     batch: StreamedAuditEvent[],
 ): Promise<void> {
     const payload: AuditStreamPayload = {
-        schemaVersion: 1,
+        schemaVersion: SCHEMA_VERSION,
         tenantId,
         sentAt: new Date().toISOString(),
         count: batch.length,
         events: batch,
     };
     const body = JSON.stringify(payload);
-    const sig = computeHmacSha256(body, config.secret, 'hex');
-
-    const result = await postFn(config.url, body, {
-        'Content-Type': 'application/json',
-        'User-Agent': USER_AGENT,
-        [SIGNATURE_HEADER]: `${SIGNATURE_PREFIX}${sig}`,
+    const signatureHex = computeHmacSha256(body, config.secret, 'hex');
+    const batchId = computeBatchId({
+        tenantId,
+        schemaVersion: SCHEMA_VERSION,
+        eventIds: batch.map((e) => e.id),
     });
+
+    const headers = buildOutboundHeaders({
+        batchId,
+        signatureHex,
+        userAgent: USER_AGENT,
+        schemaVersion: SCHEMA_VERSION,
+    });
+
+    const result = await postFn(config.url, body, headers);
 
     if (!result.ok) {
         logger.warn('audit-stream POST returned non-2xx', {
             component: 'audit-stream',
             tenantId,
+            batchId,
             status: result.status,
             statusText: result.statusText,
             count: batch.length,
@@ -356,6 +365,7 @@ async function deliverBatch(
         logger.info('audit-stream batch delivered', {
             component: 'audit-stream',
             tenantId,
+            batchId,
             status: result.status,
             count: batch.length,
         });
