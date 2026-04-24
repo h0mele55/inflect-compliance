@@ -33,6 +33,14 @@ import type { PermissionKey, PermissionMode } from './permission-middleware';
 
 // ─── Rule shape ─────────────────────────────────────────────────────
 
+/**
+ * Closed set of HTTP methods a rule may gate. Template-literal union
+ * enforces at compile time that every rule uses the canonical
+ * uppercase form — the hot path at line ~210 does a direct
+ * `includes` with no per-call normalisation.
+ */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
 export interface RoutePermissionRule {
     /**
      * Regex matched against `req.nextUrl.pathname`. Use `\/[^/]+\/` for
@@ -42,8 +50,9 @@ export interface RoutePermissionRule {
     path: RegExp;
     /**
      * HTTP methods this rule covers. Omit to apply to every method.
+     * MUST be uppercase — the compile-time `HttpMethod` union enforces.
      */
-    methods?: readonly string[];
+    methods?: readonly HttpMethod[];
     /**
      * Permission key(s) required to call the route.
      */
@@ -204,10 +213,10 @@ export function resolveRoutePermission(
     pathname: string,
     method: string,
 ): ResolvedRoutePermission | null {
-    const upperMethod = method.toUpperCase();
+    const upperMethod = method.toUpperCase() as HttpMethod;
     for (const rule of ROUTE_PERMISSIONS) {
         if (!rule.path.test(pathname)) continue;
-        if (rule.methods && !rule.methods.map((m) => m.toUpperCase()).includes(upperMethod)) {
+        if (rule.methods && !rule.methods.includes(upperMethod)) {
             continue;
         }
         return {

@@ -136,6 +136,15 @@ function getEncryptionKey(): Buffer {
 // memory on next access.
 
 let _cachedPreviousEncryptKey: Buffer | null = null;
+// Three states matter, distinguished intentionally:
+//   undefined — never checked; first `getPreviousEncryptionKey` call
+//               does the env read.
+//   null      — checked + no previous key configured (env var unset
+//               or too short). Subsequent calls short-circuit
+//               without re-reading the env.
+//   string    — checked + previous key present; value is the raw
+//               env string so the cache invalidates correctly when
+//               the operator swaps `DATA_ENCRYPTION_KEY_PREVIOUS`.
 let _lastPreviousKeySource: string | null | undefined = undefined;
 
 function getPreviousRawKey(): string | null {
