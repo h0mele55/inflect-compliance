@@ -102,10 +102,10 @@
  */
 export const ENCRYPTED_FIELDS: Readonly<Record<string, readonly string[]>> = {
     // ─── Tenant security settings ──────────────────────
-    //  Epic C.4 — outbound audit-stream HMAC secret. URL stays plaintext
-    //  so DBAs can audit which tenants are forwarding to which SIEM
-    //  without holding the decryption key.
-    TenantSecuritySettings: ['auditWebhookSecretEncrypted'],
+    //  Epic C.4 — audit-stream HMAC secret. URL stays plaintext so DBAs
+    //  can audit which tenants are forwarding to which SIEM without
+    //  holding the decryption key.
+    TenantSecuritySettings: ['auditStreamSecretEncrypted'],
 
     // ─── Risk ──────────────────────────────────────────
     //  `description` omitted — searched via RiskRepository `contains`.

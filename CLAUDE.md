@@ -179,12 +179,13 @@ buffer (lazy-imported by `appendAuditEntry` so cold-start cost is
 zero for tenants without streaming configured). Flush happens on
 100 events OR 5 seconds, HMAC-SHA256-signed
 (`X-Inflect-Signature: sha256=<hex>`), POSTed to
-`TenantSecuritySettings.auditWebhookUrl`. The HMAC secret is on
-the same row, encrypted at rest via the Epic B field-encryption
-manifest. Fail-safe — the audit row is already committed, so a
-broken SIEM never undoes the write. Privacy-aware payload — free-
-text `details` is dropped, only structured `detailsJson` ships;
-actor is opaque `userId` + `actorType`, never email.
+`TenantSecuritySettings.auditStreamUrl`. The HMAC secret is on
+the same row (`auditStreamSecretEncrypted`), encrypted at rest via
+the Epic B field-encryption manifest. Fail-safe — the audit row is
+already committed, so a broken SIEM never undoes the write.
+Privacy-aware payload — free-text `details` is dropped, only
+structured `detailsJson` ships; actor is opaque `userId` +
+`actorType`, never email.
 
 **C.5 — Server-side rich-text sanitisation.** Use
 `sanitizeRichTextHtml` / `sanitizePlainText` /

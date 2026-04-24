@@ -1875,13 +1875,13 @@ model TenantSecuritySettings {
   /// Null = unlimited (legacy behaviour).
   maxConcurrentSessions       Int?
   /// Epic C.4 — outbound audit-event streaming.
-  /// `auditWebhookUrl`: HTTPS endpoint the audit streamer POSTs batched
+  /// `auditStreamUrl`: HTTPS endpoint the audit streamer POSTs batched
   /// audit events to. Null disables streaming.
-  /// `auditWebhookSecretEncrypted`: HMAC-SHA256 secret used to sign
+  /// `auditStreamSecretEncrypted`: HMAC-SHA256 secret used to sign
   /// each batch. Stored encrypted via the field-encryption manifest
   /// (added to `ENCRYPTED_FIELDS.TenantSecuritySettings`).
-  auditWebhookUrl             String?
-  auditWebhookSecretEncrypted String?
+  auditStreamUrl              String?
+  auditStreamSecretEncrypted  String?
   createdAt                   DateTime  @default(now())
   updatedAt                   DateTime  @updatedAt
   mfaFailClosed               Boolean   @default(false)

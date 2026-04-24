@@ -1,9 +1,9 @@
 /**
  * Epic C.4 — outbound audit-event streaming.
  *
- * Forwards every committed audit entry to a tenant-configured webhook
- * (typically a SIEM ingest endpoint — Splunk HEC, Datadog Logs, an
- * S3-backed Lambda, etc.). Three things make this safe to put in front
+ * Forwards every committed audit entry to a tenant-configured stream
+ * endpoint (typically a SIEM ingest endpoint — Splunk HEC, Datadog Logs,
+ * an S3-backed Lambda, etc.). Three things make this safe to put in front
  * of the audit writer:
  *
  *   1. **Out-of-band.** `streamAuditEvent` enqueues the event into a
@@ -76,7 +76,7 @@ export interface StreamedAuditEvent {
     occurredAt: string;
 }
 
-export interface AuditWebhookPayload {
+export interface AuditStreamPayload {
     /** Schema version — increment on breaking shape changes. */
     schemaVersion: 1;
     /** Tenant the entire batch belongs to (per-tenant batches). */
@@ -105,52 +105,52 @@ const USER_AGENT = 'Inflect-Audit-Stream/1';
 
 // ─── Tenant config resolver (overridable for tests) ────────────────
 
-export interface TenantWebhookConfig {
+export interface TenantStreamConfig {
     url: string;
     secret: string;
 }
 
 /**
- * Resolve a tenant's audit-webhook config. Returns null when streaming
+ * Resolve a tenant's audit-stream config. Returns null when streaming
  * is disabled for this tenant. Lazy-imports prisma + the tenant
  * key-manager so a unit test can stub the resolver without dragging
  * the whole DB layer in.
  */
-async function defaultResolveTenantWebhookConfig(
+async function defaultResolveTenantStreamConfig(
     tenantId: string,
-): Promise<TenantWebhookConfig | null> {
+): Promise<TenantStreamConfig | null> {
     const { prisma } = await import('@/lib/prisma');
     const settings = await prisma.tenantSecuritySettings.findUnique({
         where: { tenantId },
         select: {
-            auditWebhookUrl: true,
-            auditWebhookSecretEncrypted: true,
+            auditStreamUrl: true,
+            auditStreamSecretEncrypted: true,
         },
     });
-    if (!settings?.auditWebhookUrl || !settings.auditWebhookSecretEncrypted) {
+    if (!settings?.auditStreamUrl || !settings.auditStreamSecretEncrypted) {
         return null;
     }
     // Field-encryption middleware decrypts on read, so the value here
     // is already plaintext. (See `encrypted-fields.ts` manifest.)
     return {
-        url: settings.auditWebhookUrl,
-        secret: settings.auditWebhookSecretEncrypted,
+        url: settings.auditStreamUrl,
+        secret: settings.auditStreamSecretEncrypted,
     };
 }
 
-let resolveTenantWebhookConfig:
-    (tenantId: string) => Promise<TenantWebhookConfig | null> =
-    defaultResolveTenantWebhookConfig;
+let resolveTenantStreamConfig:
+    (tenantId: string) => Promise<TenantStreamConfig | null> =
+    defaultResolveTenantStreamConfig;
 
 /**
  * Test-only seam — swap in a deterministic resolver. Production code
  * should never call this (and there's no public re-export from a
  * barrel file, so app-layer code can't reach it accidentally).
  */
-export function __setTenantWebhookConfigResolver(
-    fn: ((tenantId: string) => Promise<TenantWebhookConfig | null>) | null,
+export function __setTenantStreamConfigResolver(
+    fn: ((tenantId: string) => Promise<TenantStreamConfig | null>) | null,
 ): void {
-    resolveTenantWebhookConfig = fn ?? defaultResolveTenantWebhookConfig;
+    resolveTenantStreamConfig = fn ?? defaultResolveTenantStreamConfig;
 }
 
 // ─── HTTP transport (overridable for tests) ────────────────────────
@@ -301,7 +301,7 @@ async function flushTenant(tenantId: string): Promise<void> {
             buf.events = [];
             if (batch.length === 0) return;
 
-            const config = await resolveTenantWebhookConfig(tenantId);
+            const config = await resolveTenantStreamConfig(tenantId);
             if (!config) {
                 // Streaming disabled for this tenant — events are
                 // silently dropped (still in the audit table; not lost).
@@ -325,10 +325,10 @@ async function flushTenant(tenantId: string): Promise<void> {
 
 async function deliverBatch(
     tenantId: string,
-    config: TenantWebhookConfig,
+    config: TenantStreamConfig,
     batch: StreamedAuditEvent[],
 ): Promise<void> {
-    const payload: AuditWebhookPayload = {
+    const payload: AuditStreamPayload = {
         schemaVersion: 1,
         tenantId,
         sentAt: new Date().toISOString(),

@@ -1,5 +1,5 @@
 /**
- * Unit tests for `src/app-layer/events/audit-webhook.ts` (Epic C.4).
+ * Unit tests for `src/app-layer/events/audit-stream.ts` (Epic C.4).
  *
  * Covers:
  *   - payload shape (schema, signature, no PII echo)
@@ -18,11 +18,11 @@ import {
     streamAuditEvent,
     flushAllAuditStreams,
     __setStreamPost,
-    __setTenantWebhookConfigResolver,
+    __setTenantStreamConfigResolver,
     __resetAuditStreamForTests,
     type StreamedAuditEvent,
-    type AuditWebhookPayload,
-} from '@/app-layer/events/audit-webhook';
+    type AuditStreamPayload,
+} from '@/app-layer/events/audit-stream';
 
 // ─── Test harness ──────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ beforeEach(() => {
         return nextPostResult;
     });
 
-    __setTenantWebhookConfigResolver(async (tenantId) => {
+    __setTenantStreamConfigResolver(async (tenantId) => {
         if (tenantId === 'tenant-1') {
             return { url: 'https://siem.example/ingest', secret: 'shhh-1' };
         }
@@ -83,18 +83,18 @@ beforeEach(() => {
 afterEach(() => {
     __resetAuditStreamForTests();
     __setStreamPost(null);
-    __setTenantWebhookConfigResolver(null);
+    __setTenantStreamConfigResolver(null);
 });
 
 // ─── Payload shape ─────────────────────────────────────────────────
 
-describe('audit-webhook — payload shape', () => {
+describe('audit-stream — payload shape', () => {
     it('builds a v1 envelope with tenantId, sentAt, count, events[]', async () => {
         streamAuditEvent(makeEvent());
         await flushAllAuditStreams();
 
         expect(capturedPosts).toHaveLength(1);
-        const body = JSON.parse(capturedPosts[0].body) as AuditWebhookPayload;
+        const body = JSON.parse(capturedPosts[0].body) as AuditStreamPayload;
         expect(body.schemaVersion).toBe(1);
         expect(body.tenantId).toBe('tenant-1');
         expect(body.count).toBe(1);
@@ -112,7 +112,7 @@ describe('audit-webhook — payload shape', () => {
             detailsJson: { category: 'access', event: 'authz_denied', method: 'POST' },
         }));
         await flushAllAuditStreams();
-        const body = JSON.parse(capturedPosts[0].body) as AuditWebhookPayload;
+        const body = JSON.parse(capturedPosts[0].body) as AuditStreamPayload;
         const ev = body.events[0];
         expect(ev.detailsJson).toEqual({
             category: 'access',
@@ -126,7 +126,7 @@ describe('audit-webhook — payload shape', () => {
     it('does not echo email or other PII — only opaque userId', async () => {
         streamAuditEvent(makeEvent({ userId: 'user-1' }));
         await flushAllAuditStreams();
-        const body = JSON.parse(capturedPosts[0].body) as AuditWebhookPayload;
+        const body = JSON.parse(capturedPosts[0].body) as AuditStreamPayload;
         const ev = body.events[0];
         expect(ev.userId).toBe('user-1');
         expect(Object.prototype.hasOwnProperty.call(ev, 'email')).toBe(false);
@@ -136,7 +136,7 @@ describe('audit-webhook — payload shape', () => {
 
 // ─── HMAC signing ──────────────────────────────────────────────────
 
-describe('audit-webhook — HMAC signing', () => {
+describe('audit-stream — HMAC signing', () => {
     it('signs the body with the tenant secret using sha256= prefix', async () => {
         streamAuditEvent(makeEvent());
         await flushAllAuditStreams();
@@ -178,7 +178,7 @@ describe('audit-webhook — HMAC signing', () => {
 
 // ─── Batching ──────────────────────────────────────────────────────
 
-describe('audit-webhook — batching', () => {
+describe('audit-stream — batching', () => {
     it('flushes immediately when the per-tenant buffer reaches 100 events', async () => {
         for (let i = 0; i < 99; i++) {
             streamAuditEvent(makeEvent({ id: `e${i}` }));
@@ -193,7 +193,7 @@ describe('audit-webhook — batching', () => {
         await flushAllAuditStreams();
 
         expect(capturedPosts).toHaveLength(1);
-        const body = JSON.parse(capturedPosts[0].body) as AuditWebhookPayload;
+        const body = JSON.parse(capturedPosts[0].body) as AuditStreamPayload;
         expect(body.count).toBe(100);
     });
 
@@ -205,7 +205,7 @@ describe('audit-webhook — batching', () => {
 
         expect(capturedPosts).toHaveLength(2);
         for (const p of capturedPosts) {
-            const body = JSON.parse(p.body) as AuditWebhookPayload;
+            const body = JSON.parse(p.body) as AuditStreamPayload;
             for (const ev of body.events) {
                 expect(ev.tenantId).toBe(body.tenantId);
             }
@@ -227,7 +227,7 @@ describe('audit-webhook — batching', () => {
 
 // ─── Tenant config gating ──────────────────────────────────────────
 
-describe('audit-webhook — tenant config gating', () => {
+describe('audit-stream — tenant config gating', () => {
     it('drops the batch silently when no webhook is configured', async () => {
         streamAuditEvent(makeEvent({ tenantId: 'tenant-without-webhook' }));
         await flushAllAuditStreams();
@@ -243,7 +243,7 @@ describe('audit-webhook — tenant config gating', () => {
 
 // ─── Fail-safe ─────────────────────────────────────────────────────
 
-describe('audit-webhook — fail-safe behaviour', () => {
+describe('audit-stream — fail-safe behaviour', () => {
     it('does not throw when the POST returns non-2xx', async () => {
         nextPostResult = { ok: false, status: 502, statusText: 'Bad Gateway' };
         streamAuditEvent(makeEvent());
@@ -273,7 +273,7 @@ describe('audit-webhook — fail-safe behaviour', () => {
         streamAuditEvent(makeEvent({ id: 'e2' }));
         await flushAllAuditStreams();
         expect(capturedPosts).toHaveLength(1);
-        const body = JSON.parse(capturedPosts[0].body) as AuditWebhookPayload;
+        const body = JSON.parse(capturedPosts[0].body) as AuditStreamPayload;
         expect(body.events).toHaveLength(1);
         expect(body.events[0].id).toBe('e2');
     });

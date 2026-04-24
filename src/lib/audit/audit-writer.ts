@@ -229,7 +229,7 @@ export async function appendAuditEntry(input: AppendAuditInput, client?: PrismaC
         // chain; loading it here keeps the cold-start cost off the
         // happy path for tenants that don't use streaming.
         const { streamAuditEvent } = await import(
-            '@/app-layer/events/audit-webhook'
+            '@/app-layer/events/audit-stream'
         );
         streamAuditEvent({
             id: result.id,

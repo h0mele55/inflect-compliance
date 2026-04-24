@@ -54,7 +54,7 @@ afterAll(async () => {
     // actually loaded by the suite — pure-mock tests skip this.
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const mod = require('@/app-layer/events/audit-webhook') as {
+        const mod = require('@/app-layer/events/audit-stream') as {
             __resetAuditStreamForTests?: () => void;
         };
         mod.__resetAuditStreamForTests?.();
