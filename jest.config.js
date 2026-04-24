@@ -148,7 +148,16 @@ const jsdomProject = {
 
 module.exports = {
     projects: [nodeProject, jsdomProject],
-    forceExit: true,
+    // forceExit DELIBERATELY OFF — Jest exits naturally once the
+    // disconnect-after-suite hook in tests/setup/disconnect-after-suite.ts
+    // has closed the prisma + bullmq + audit-stream singletons. With
+    // forceExit:true Jest emits the "A worker process has failed to
+    // exit gracefully" warning even when there's no real leak (just
+    // handles that close slightly past the default grace window).
+    // Without it the run is ~30% slower but the warning goes away
+    // and a real future leak will hang CI immediately, surfacing it
+    // for diagnosis instead of getting masked.
+    forceExit: false,
     // Coverage settings apply across the projects; the node suite carries
     // the backend layer, the jsdom suite carries the UI primitives.
     collectCoverageFrom: [
