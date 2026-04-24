@@ -389,10 +389,73 @@ files with staged secrets still get scanned.
 runbook (verification commands, rollback procedures, how to add a
 new DEK-lifecycle verb to `tenant-key-manager`).
 
+### Access Control & Tenant Onboarding (Epic 1)
+
+Closes the audit's GAP-01 (Critical): OAuth sign-in no longer
+silently grants ADMIN on the oldest tenant. Authentication and
+tenant membership are now orthogonal — sign-in alone authenticates
+the user; tenant access requires an explicit grant via one of the
+allowlisted paths.
+
+**Role model.** The `Role` enum now has five values:
+`OWNER | ADMIN | EDITOR | READER | AUDITOR`. OWNER is strictly
+superior to ADMIN — it gains `admin.tenant_lifecycle` (delete
+tenant, rotate DEK, transfer ownership) and `admin.owner_management`
+(invite/remove OWNERs, assign OWNER role). ADMIN has every other
+admin flag but explicitly denies those two. The `PermissionSet`
+resolution in `src/lib/permissions.ts` enforces the distinction at
+compile time; `getPermissionsForRole('ADMIN').admin.tenant_lifecycle`
+is `false` by type.
+
+**Membership creation is explicit.** Only three paths can write a
+`TenantMembership` row today:
+(a) `redeemInvite` in `src/app-layer/usecases/tenant-invites.ts` —
+token-bound, email-bound, atomically consumed via an `updateMany`
+with `acceptedAt IS NULL AND expiresAt > now()` predicate. A leaked
+token is burnt on email mismatch.
+(b) `createTenantWithOwner` in `src/app-layer/usecases/tenant-lifecycle.ts` —
+platform-admin tenant bootstrap, gated by `PLATFORM_ADMIN_API_KEY`
+(constant-time compared via `verifyPlatformApiKey`).
+(c) `/api/auth/register` — credentials self-service signup (AUTH_TEST_MODE-gated).
+Plus the legitimate SSO + SCIM provisioning paths. Every site is
+allowlisted in `tests/guardrails/no-auto-join.test.ts` with a
+one-line reason; a fourth-not-listed site fails CI.
+
+**Middleware tenant-access gate.** `/t/:slug/**` and
+`/api/t/:slug/**` require the JWT's `tenantSlug` claim to match the
+URL's slug. Mismatch → `/no-tenant` (web) or `403 no_tenant_access`
+(API). Uses the JWT claim only — no per-request DB hit. Carve-outs
+for `/invite/<token>`, `/api/invites/**`, and `/no-tenant` itself.
+Logic lives in `src/lib/auth/guard.ts::checkTenantAccess`.
+
+**Last-OWNER protection — two layers.** Usecase layer
+(`updateTenantMemberRole`, `deactivateTenantMember`) counts ACTIVE
+OWNERs and throws `forbidden('Cannot demote/deactivate the last
+OWNER...')`. DB trigger `tenant_membership_last_owner_guard` is the
+backstop — raises SQLSTATE P0001 on any UPDATE or DELETE that would
+leave a tenant with zero ACTIVE OWNERs, catching bypass attempts
+(raw `deleteMany`, code paths that forget the check). The two-step
+`transferTenantOwnership` flow uses this: promote the new OWNER
+first (count=2), then demote the old (count=1, trigger satisfied).
+
+**Invitation flow.** Admin POSTs to `/api/t/:slug/admin/invites` →
+`createInviteToken` creates a 256-bit base64url token with 7-day
+expiry. User clicks `/invite/<token>` → preview page → "Sign in to
+accept" sets a 10-min HttpOnly cookie and redirects to `/login`.
+After OAuth, the signIn callback reads the cookie and calls
+`redeemInvite`. Step 1 (atomic claim) commits standalone so
+Step 2 (email binding) can burn the invite on mismatch without
+rolling back the claim — leaked tokens are unusable on first failed
+attempt.
+
+**See `docs/epic-1-access-control.md`** for the Epic 1 operator
+runbook (verification commands, rollback procedures, how to add a
+new tenant-membership creation path).
+
 ### RBAC & Permissions
 
 - `src/lib/permissions.ts` — `PermissionSet` (granular UI flags) resolved from the user's role
-- Built-in roles: `OWNER`, `ADMIN`, `EDITOR`, `VIEWER`, `AUDITOR` (Prisma enum `Role`)
+- Built-in roles: `OWNER`, `ADMIN`, `EDITOR`, `READER`, `AUDITOR` (Prisma enum `Role`)
 - Custom roles: `TenantCustomRole` model with `permissionsJson` overrides, referenced via `TenantMembership.customRoleId`
 - `appPermissions` on `RequestContext` is already custom-role–aware
 
