@@ -266,6 +266,29 @@ explicitly marked legacy/fallback in its own docstring.
 runbook (verification commands, rollback procedures, the five
 self-service security carve-outs, the asymmetric-RLS rationale).
 
+### Epic E.3 — Graceful shutdown
+
+On a rolling deploy the process receives SIGTERM. Without a drain
+handler, three observability surfaces lose data: per-tenant
+audit-stream buffers (irreversible — events never reach the SIEM),
+OTel span batches still in the `BatchSpanProcessor`, and Sentry
+errors still in the transport queue. Epic E.3 adds a single
+registration point that drains all three in the order most-to-least
+critical for audit correctness: audit buffers first, then OTel,
+then Sentry.
+
+The handler lives in `src/lib/observability/shutdown.ts`
+(`installShutdownHandlers`). Each stage is `Promise.race`'d against
+its per-stage budget from `src/lib/observability/shutdown-budget.ts`
+so a slow exporter can never block the process past the container's
+grace period (k8s default 30 s). The three stage budgets
+(3 s + 2 s + 2 s = 7 s) fit under the 20 s ceiling that leaves
+the rest for Next.js's own HTTP-drain handler running in parallel.
+The handler never calls `process.exit` — `next start` owns the
+process lifecycle. Registration happens in
+`src/instrumentation.ts::register()`, after all `init*` calls, and
+is idempotent under HMR via a module-level flag.
+
 ### RBAC & Permissions
 
 - `src/lib/permissions.ts` — `PermissionSet` (granular UI flags) resolved from the user's role

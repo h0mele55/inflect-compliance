@@ -25,6 +25,7 @@ export async function register() {
         );
         const { installRlsTripwire } = await import('@/lib/db/rls-middleware');
         const { prisma } = await import('@/lib/prisma');
+        const { installShutdownHandlers } = await import('@/lib/observability/shutdown');
         await initTelemetry();
         initSentry();
         // Wire the automation bus to the BullMQ queue so domain
@@ -34,6 +35,10 @@ export async function register() {
         // under HMR. Installed here (not in `prisma.ts`) to avoid a
         // circular import with `db/rls-middleware.ts`.
         installRlsTripwire(prisma);
+        // Register SIGTERM/SIGINT handlers that drain audit-stream
+        // buffers, OTel exporters, and Sentry transport before the
+        // process exits. Idempotent under HMR.
+        installShutdownHandlers();
     }
 }
 
