@@ -32,6 +32,30 @@ model Tenant {
   /// "use the global KEK directly" (current behaviour) or generate a
   /// DEK lazily on first use.
   encryptedDek              String?
+  /// Epic B — previous wrapped DEK, retained during a per-tenant DEK
+  /// rotation. Envelope: identical to `encryptedDek` — `v1:base64(...)`
+  /// produced by `wrapDek()` from `src/lib/security/tenant-keys.ts`.
+  ///
+  /// Lifecycle: non-NULL only while a per-tenant DEK rotation is in
+  /// flight (i.e. after a new DEK has been written to `encryptedDek`
+  /// but before the background re-encryption job has finished
+  /// rewriting every ciphertext that carried the old DEK). Once all
+  /// v2:<old-dek>:... ciphertexts have been re-encrypted under the new
+  /// DEK, the job clears this column back to NULL.
+  ///
+  /// Read-fallback: `getTenantDek` will try `encryptedDek` first and,
+  /// on AES-GCM authentication failure, fall back to
+  /// `previousEncryptedDek` — mirroring the master-KEK dual-key
+  /// fallback in `decryptField`. (This fallback is reserved for the
+  /// real implementation; the current `rotateTenantDek` stub throws.)
+  ///
+  /// Invariant: `previousEncryptedDek` must not equal `encryptedDek`
+  /// when non-NULL. Equality would make the old and new DEKs
+  /// indistinguishable on the decrypt path (silent key mixing). A DB
+  /// CHECK constraint (`Tenant_previousEncryptedDek_differs`) enforces
+  /// this at the storage layer so a rotation bug cannot silently
+  /// produce identical values in both columns.
+  previousEncryptedDek      String?
   createdAt                 DateTime                     @default(now())
   updatedAt                 DateTime                     @updatedAt
   assets                    Asset[]

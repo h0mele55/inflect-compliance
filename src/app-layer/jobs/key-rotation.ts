@@ -46,6 +46,10 @@
  *     re-encrypting every v2 ciphertext). That's a separate
  *     higher-privilege operation that requires a dedicated schema
  *     column to hold both old and new wrapped DEKs atomically.
+ *     See `rotateTenantDek` in `src/lib/security/tenant-key-manager.ts`
+ *     — stubbed today with a runbook-carrying error, pending real
+ *     implementation. The `previousEncryptedDek` schema column this
+ *     stub reserves is now in place.
  *   - Master-key material distribution. The operator still sets
  *     `DATA_ENCRYPTION_KEY` / `DATA_ENCRYPTION_KEY_PREVIOUS`
  *     outside the application.

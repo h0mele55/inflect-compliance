@@ -120,11 +120,19 @@ DEK) envelope — the middleware dispatches per-value on read.
 
 Master-KEK rotation: set `DATA_ENCRYPTION_KEY_PREVIOUS` alongside
 the new primary. `decryptField` falls back transparently. Admins
-trigger per-tenant rotation via
+trigger the v1→v2 re-encryption sweep via
 `POST /api/t/{slug}/admin/key-rotation`, which enqueues the
-background job in `src/app-layer/jobs/key-rotation.ts`. When every
-tenant reports zero `v1:` rows under the old key, remove
-`DATA_ENCRYPTION_KEY_PREVIOUS` from env.
+background job in `src/app-layer/jobs/key-rotation.ts`. The job
+re-encrypts every `v1:` ciphertext under the new primary KEK and
+re-wraps the per-tenant DEK. When every tenant reports zero `v1:`
+rows under the old key, remove `DATA_ENCRYPTION_KEY_PREVIOUS` from
+env.
+
+Per-tenant DEK rotation (generating a fresh DEK for a single
+compromised tenant without touching the global KEK) is reserved at
+`rotateTenantDek` in `src/lib/security/tenant-key-manager.ts` —
+stubbed today. The `Tenant.previousEncryptedDek` column is in place
+so the real implementation can land without a schema change.
 
 **See `docs/epic-b-encryption.md`** for deployment order,
 rotation runbook, observability signals, rollback procedure, and

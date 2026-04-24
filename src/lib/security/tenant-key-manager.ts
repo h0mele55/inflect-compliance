@@ -22,6 +22,12 @@
  *   - `clearTenantDekCache(tenantId?)` / `getTenantDekCacheSize()`
  *     — observability + invalidation hooks for rotation.
  *
+ *   - `rotateTenantDek(tenantId)` — per-tenant DEK rotation stub
+ *     (stub — throws; see body). Reserves the API surface and the
+ *     `Tenant.previousEncryptedDek` schema column for the real
+ *     implementation. Today callers receive a runbook-carrying error
+ *     pointing at the current master-KEK workaround.
+ *
  * ## Cache semantics
  *
  * The cache is an in-process `Map` of `tenantId → Buffer`, bounded
@@ -246,6 +252,44 @@ export function clearTenantDekCache(tenantId?: string): void {
 /** Observability — current cache size. Useful for metrics. */
 export function getTenantDekCacheSize(): number {
     return dekCache.size;
+}
+
+/**
+ * Rotate a tenant's Data Encryption Key.
+ *
+ * When implemented: generates a fresh 32-byte DEK, writes it to
+ * `Tenant.encryptedDek`, moves the prior wrapped value into
+ * `Tenant.previousEncryptedDek`, and enqueues a background job that
+ * re-encrypts every ciphertext carrying the v2:<tenant-dek>:...
+ * envelope under the new DEK. On completion, clears
+ * previousEncryptedDek.
+ *
+ * === NOT YET IMPLEMENTED ===
+ *
+ * Workaround for a suspected tenant-DEK compromise today
+ * (master-KEK rotation path, Epic B):
+ *
+ *   1. Generate a new 32-byte key. Set env DATA_ENCRYPTION_KEY=<new>
+ *      and DATA_ENCRYPTION_KEY_PREVIOUS=<old>, redeploy.
+ *   2. For each tenant (or just the compromised one):
+ *      `POST /api/t/<slug>/admin/key-rotation` — enqueues the
+ *      master-KEK rotation job which re-encrypts every v1 ciphertext
+ *      under the new primary KEK and re-wraps the per-tenant DEK.
+ *   3. When the job reports zero v1 rows for every tenant, remove
+ *      DATA_ENCRYPTION_KEY_PREVIOUS from env and redeploy.
+ *
+ * See docs/epic-b-encryption.md for the full runbook.
+ */
+export async function rotateTenantDek(tenantId: string): Promise<never> {
+    // Reference the arg so TypeScript sees it as intentional.
+    void tenantId;
+    throw new Error(
+        'rotateTenantDek: per-tenant DEK rotation is not implemented. ' +
+        'Workaround: set DATA_ENCRYPTION_KEY_PREVIOUS=<old>, ' +
+        'DATA_ENCRYPTION_KEY=<new>, redeploy, then POST ' +
+        '/api/t/<slug>/admin/key-rotation to re-encrypt under the new KEK. ' +
+        'See docs/epic-b-encryption.md.',
+    );
 }
 
 // ─── Test-only helpers ──────────────────────────────────────────────
