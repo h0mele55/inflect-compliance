@@ -69,7 +69,16 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
     }
 
     // ─── Usecases ───
-    const USECASE_ALLOWLIST: string[] = ['sso.ts', 'mfa.ts', 'mfa-enrollment.ts', 'mfa-challenge.ts', 'session-security.ts', 'webhook-processor.ts', 'scim-users.ts', 'framework.ts', 'audit-hardening.ts'];
+    const USECASE_ALLOWLIST: string[] = [
+        'sso.ts', 'mfa.ts', 'mfa-enrollment.ts', 'mfa-challenge.ts',
+        'session-security.ts', 'webhook-processor.ts', 'scim-users.ts',
+        'framework.ts', 'audit-hardening.ts',
+        // Epic 1, PR 3 — redeemInvite and previewInviteByToken operate without
+        // a tenant-scoped RequestContext (the caller is not yet a tenant member),
+        // so they use the global prisma client directly. RLS policies are
+        // bypassed intentionally here since the user has no tenant session.
+        'tenant-invites.ts',
+    ];
 
     const usecases = readFilesInDir(path.join(SRC_ROOT, 'app-layer/usecases'));
 

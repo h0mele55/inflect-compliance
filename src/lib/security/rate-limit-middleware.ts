@@ -327,5 +327,7 @@ export {
     EMAIL_DISPATCH_LIMIT,
     MFA_VERIFY_LIMIT,
     MFA_ENROLL_VERIFY_LIMIT,
+    TENANT_INVITE_CREATE_LIMIT,
+    INVITE_REDEEM_LIMIT,
 } from './rate-limit';
 export type { RateLimitConfig, RateLimitResult } from './rate-limit';

@@ -193,6 +193,15 @@ export const ROUTE_PERMISSIONS: readonly RoutePermissionRule[] = [
             'SSO provider configuration — provider list, upsert, ' +
             'enable/enforce toggles, deletion. All ADMIN-only.',
     },
+
+    // ── Tenant invite management (Epic 1, PR 3) ──────────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/invites(\\/.*)?$`),
+        permission: 'admin.members',
+        note:
+            'Creating, listing, and revoking pending tenant invites. ' +
+            'Changes who can join the tenant — gated under admin.members.',
+    },
 ] as const;
 
 // ─── Resolver ───────────────────────────────────────────────────────

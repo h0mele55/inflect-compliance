@@ -91,6 +91,13 @@ export class RateLimitedError extends AppError {
     }
 }
 
+export class GoneError extends AppError {
+    constructor(message: string = 'Gone') {
+        super(message, 'GONE', 410, true);
+        this.name = 'GoneError';
+    }
+}
+
 export class InternalError extends AppError {
     constructor(message: string = 'Internal Server Error') {
         super(message, 'INTERNAL', 500, false);
@@ -146,6 +153,9 @@ export const conflict = (message: string = 'Conflict') =>
 
 export const rateLimited = (message: string = 'Too many requests') =>
     new RateLimitedError(message);
+
+export const gone = (message: string = 'Gone') =>
+    new GoneError(message);
 
 export const internal = (message: string = 'Internal Server Error') =>
     new InternalError(message);

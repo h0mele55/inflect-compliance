@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/security/permission-middleware';
-import {
-    listTenantMembers,
-    inviteTenantMember,
-    listPendingInvites,
-} from '@/app-layer/usecases/tenant-admin';
+import { listTenantMembers } from '@/app-layer/usecases/tenant-admin';
+import { createInviteToken, listPendingInvites } from '@/app-layer/usecases/tenant-invites';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 
 const InviteMemberSchema = z.object({
     email: z.string().email('Valid email required'),
-    role: z.enum(['OWNER', 'ADMIN', 'EDITOR', 'AUDITOR', 'READER']),
+    role: z.enum(['OWNER', 'ADMIN', 'EDITOR', 'AUDITOR', 'READER'] as const),
 });
 
 export const GET = withApiErrorHandling(
@@ -32,7 +29,8 @@ export const POST = withApiErrorHandling(
     requirePermission('admin.members', async (req: NextRequest, _routeArgs, ctx) => {
         const body = await req.json();
         const input = InviteMemberSchema.parse(body);
-        const result = await inviteTenantMember(ctx, input);
-        return NextResponse.json<any>(result, { status: 201 });
+        const result = await createInviteToken(ctx, input);
+        // Response always returns the invite (no more 'added'/'reactivated' branch).
+        return NextResponse.json<any>({ invite: result.invite, url: result.url }, { status: 201 });
     }),
 );

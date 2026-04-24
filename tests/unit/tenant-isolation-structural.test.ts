@@ -74,6 +74,12 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
             'layout.tsx',        // Root layout
             'global-error.tsx',  // Global error boundary
             'audit',             // Public auditor share view (/audit/shared/[token])
+            // Epic 1, PR 3 — invite preview page (sign-in gated, any tenant).
+            // User is not yet a member of the target tenant — cannot go under /t/.
+            'invite',
+            // Epic 1, PR 3 — landing for authenticated users with no active membership.
+            // PR 4 wires middleware to redirect here when JWT has no tenantId.
+            'no-tenant',
         ]);
 
         // Get immediate children of app/ that are page directories
@@ -119,7 +125,15 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
         const apiDir = path.join(SRC_ROOT, 'app', 'api');
 
         // Auth routes are allowed at the root level
-        const ALLOWED_API_DIRS = new Set(['admin', 'auth', 't', 'risk-templates', 'audit', 'staging', 'health', 'livez', 'readyz', 'stripe', 'security', 'csp-report', 'storage', 'integrations', 'scim']);
+        const ALLOWED_API_DIRS = new Set([
+            'admin', 'auth', 't', 'risk-templates', 'audit', 'staging',
+            'health', 'livez', 'readyz', 'stripe', 'security', 'csp-report',
+            'storage', 'integrations', 'scim',
+            // Epic 1, PR 3 — public invite preview + redemption endpoints.
+            // These routes are intentionally outside /api/t/[tenantSlug] because
+            // the caller is not yet a tenant member and has no tenantId in scope.
+            'invites',
+        ]);
 
         // Legacy routes are allowed as documented thin wrappers
         // that delegate to getLegacyCtx → usecases (kept for backward compat)

@@ -44,6 +44,9 @@ const ADMIN_ONLY_ROUTES = [
     'admin/api-keys/[keyId]/route.ts',
     'admin/key-rotation/route.ts',
     'admin/sessions/route.ts',
+    // Epic 1, PR 3 — token-redemption invite flow (admin invite management)
+    'admin/invites/route.ts',
+    'admin/invites/[inviteId]/route.ts',
 
     // Billing routes (admin-only)
     'billing/checkout/route.ts',

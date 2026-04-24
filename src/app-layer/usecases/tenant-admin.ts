@@ -22,7 +22,6 @@ import {
 import { logEvent } from '../events/audit';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest, forbidden } from '@/lib/errors/types';
-import { randomBytes } from 'crypto';
 import type { Role } from '@prisma/client';
 
 // ─── Valid roles for assignment ───
@@ -78,148 +77,19 @@ export async function listTenantMembers(ctx: RequestContext) {
     }));
 }
 
-// ─── Invite Member ───
+// ─── Invite Member (DEPRECATED — use createInviteToken from tenant-invites.ts) ───
+//
+// This thin wrapper exists purely for backward-compatibility while callers
+// are updated. The old "existing user → direct ACTIVE membership" path has
+// been REMOVED — every membership must now go through redeemInvite.
 
 export async function inviteTenantMember(
     ctx: RequestContext,
     input: { email: string; role: Role }
 ) {
-    assertCanManageMembers(ctx);
-
-    if (!VALID_ROLES.includes(input.role)) {
-        throw badRequest(`Invalid role: ${input.role}`);
-    }
-
-    return runInTenantContext(ctx, async (db) => {
-        // Check if user already exists with this email
-        const existingUser = await db.user.findUnique({
-            where: { email: input.email.toLowerCase().trim() },
-        });
-
-        if (existingUser) {
-            // Check for existing membership
-            const existingMembership = await db.tenantMembership.findUnique({
-                where: {
-                    tenantId_userId: {
-                        tenantId: ctx.tenantId,
-                        userId: existingUser.id,
-                    },
-                },
-            });
-
-            if (existingMembership) {
-                if (existingMembership.status === 'ACTIVE') {
-                    throw badRequest('User is already an active member of this tenant.');
-                }
-                if (existingMembership.status === 'DEACTIVATED') {
-                    // Reactivate
-                    const reactivated = await db.tenantMembership.update({
-                        where: { id: existingMembership.id },
-                        data: {
-                            status: 'ACTIVE',
-                            role: input.role,
-                            deactivatedAt: null,
-                            invitedByUserId: ctx.userId,
-                            invitedAt: new Date(),
-                        },
-                        include: { user: { select: { id: true, name: true, email: true } } },
-                    });
-
-                    await logEvent(db, ctx, {
-                        action: 'MEMBER_REACTIVATED',
-                        entityType: 'TenantMembership',
-                        entityId: reactivated.id,
-                        details: `Reactivated member: ${input.email} as ${input.role}`,
-                        detailsJson: {
-                            category: 'entity_lifecycle',
-                            entityName: 'TenantMembership',
-                            operation: 'updated',
-                            changedFields: ['status', 'role'],
-                            after: { status: 'ACTIVE', role: input.role },
-                            summary: `Reactivated member: ${input.email}`,
-                        },
-                    });
-
-                    return { type: 'reactivated' as const, membership: reactivated };
-                }
-            }
-
-            // Create new membership for existing user
-            const membership = await db.tenantMembership.create({
-                data: {
-                    tenantId: ctx.tenantId,
-                    userId: existingUser.id,
-                    role: input.role,
-                    status: 'ACTIVE',
-                    invitedByUserId: ctx.userId,
-                    invitedAt: new Date(),
-                },
-                include: { user: { select: { id: true, name: true, email: true } } },
-            });
-
-            await logEvent(db, ctx, {
-                action: 'MEMBER_ADDED',
-                entityType: 'TenantMembership',
-                entityId: membership.id,
-                details: `Added member: ${input.email} as ${input.role}`,
-                detailsJson: {
-                    category: 'entity_lifecycle',
-                    entityName: 'TenantMembership',
-                    operation: 'created',
-                    after: { email: input.email, role: input.role, status: 'ACTIVE' },
-                    summary: `Added member: ${input.email} as ${input.role}`,
-                },
-            });
-
-            return { type: 'added' as const, membership };
-        }
-
-        // User doesn't exist — create invite token
-        const token = randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-        // Upsert invite (replace existing pending invite for same email)
-        const invite = await db.tenantInvite.upsert({
-            where: {
-                tenantId_email: {
-                    tenantId: ctx.tenantId,
-                    email: input.email.toLowerCase().trim(),
-                },
-            },
-            create: {
-                tenantId: ctx.tenantId,
-                email: input.email.toLowerCase().trim(),
-                role: input.role,
-                token,
-                invitedById: ctx.userId,
-                expiresAt,
-            },
-            update: {
-                role: input.role,
-                token,
-                invitedById: ctx.userId,
-                expiresAt,
-                revokedAt: null,
-                acceptedAt: null,
-            },
-        });
-
-        await logEvent(db, ctx, {
-            action: 'MEMBER_INVITED',
-            entityType: 'TenantInvite',
-            entityId: invite.id,
-            details: `Invited ${input.email} as ${input.role}`,
-            detailsJson: {
-                category: 'entity_lifecycle',
-                entityName: 'TenantInvite',
-                operation: 'created',
-                after: { email: input.email, role: input.role, expiresAt: expiresAt.toISOString() },
-                summary: `Invited ${input.email} as ${input.role}`,
-            },
-        });
-
-        return { type: 'invited' as const, invite };
-    });
+    const { createInviteToken } = await import('./tenant-invites');
+    const result = await createInviteToken(ctx, input);
+    return { type: 'invited' as const, invite: result.invite, url: result.url };
 }
 
 // ─── Update Member Role ───
@@ -425,62 +295,16 @@ export async function getTenantAdminSettings(ctx: RequestContext) {
     });
 }
 
-// ─── List Pending Invites ───
+// ─── List Pending Invites (DEPRECATED — use listPendingInvites from tenant-invites.ts) ───
 
 export async function listPendingInvites(ctx: RequestContext) {
-    assertCanViewAdminSettings(ctx);
-
-    return runInTenantContext(ctx, (db) =>
-        db.tenantInvite.findMany({
-            where: {
-                tenantId: ctx.tenantId,
-                acceptedAt: null,
-                revokedAt: null,
-                expiresAt: { gt: new Date() },
-            },
-            include: {
-                invitedBy: { select: { id: true, name: true } },
-            },
-            orderBy: { createdAt: 'desc' },
-        })
-    );
+    const { listPendingInvites: listInvites } = await import('./tenant-invites');
+    return listInvites(ctx);
 }
 
-// ─── Revoke Invite ───
+// ─── Revoke Invite (DEPRECATED — use revokeInvite from tenant-invites.ts) ───
 
 export async function revokeInvite(ctx: RequestContext, inviteId: string) {
-    assertCanManageMembers(ctx);
-
-    return runInTenantContext(ctx, async (db) => {
-        const invite = await db.tenantInvite.findFirst({
-            where: {
-                id: inviteId,
-                tenantId: ctx.tenantId,
-                acceptedAt: null,
-                revokedAt: null,
-            },
-        });
-
-        if (!invite) throw notFound('Invite not found or already accepted/revoked.');
-
-        const revoked = await db.tenantInvite.update({
-            where: { id: inviteId },
-            data: { revokedAt: new Date() },
-        });
-
-        await logEvent(db, ctx, {
-            action: 'INVITE_REVOKED',
-            entityType: 'TenantInvite',
-            entityId: revoked.id,
-            details: `Revoked invite for ${invite.email}`,
-            detailsJson: {
-                category: 'entity_lifecycle',
-                entityName: 'TenantInvite',
-                operation: 'deleted',
-                summary: `Revoked invite for ${invite.email}`,
-            },
-        });
-
-        return revoked;
-    });
+    const { revokeInvite: revoke } = await import('./tenant-invites');
+    return revoke(ctx, { inviteId });
 }

@@ -224,6 +224,35 @@ export const TENANT_CREATE_LIMIT: RateLimitConfig = {
     lockoutMs: 60 * 60 * 1000,
 };
 
+/**
+ * Tenant invite creation: 20 per hour per tenant.
+ *
+ * Threat model: a compromised ADMIN account flooding the TenantInvite
+ * table (storage abuse) or sending phishing invites at scale. 20/hr is
+ * comfortable for legitimate batch onboarding while creating a tight
+ * audit trail for abuse. Keyed by (tenant, IP) so a multi-browser
+ * attacker with one session still burns the same budget.
+ */
+export const TENANT_INVITE_CREATE_LIMIT: RateLimitConfig = {
+    maxAttempts: 20,
+    windowMs: 60 * 60 * 1000,
+};
+
+/**
+ * Invite preview / redemption: 10 per minute per IP.
+ *
+ * Threat model: token brute-force on the preview/redeem endpoints.
+ * The 32-byte base64url token space is 2^256, so enumeration is
+ * impossible in practice — this limit adds a defence-in-depth layer
+ * and rate-stamps the audit trail so anomalous redemption patterns
+ * are visible in logs. 10/min is comfortable for a user tabbing
+ * between invite emails.
+ */
+export const INVITE_REDEEM_LIMIT: RateLimitConfig = {
+    maxAttempts: 10,
+    windowMs: 60 * 1000,
+};
+
 // ═══════════════════════════════════════════════════════════════════
 // Progressive rate limit — Epic A.3 auth brute-force protection
 // ═══════════════════════════════════════════════════════════════════
