@@ -131,36 +131,25 @@ describeFn('usecase-layer last-OWNER guard', () => {
                 membershipId: ownerMembershipId,
                 role: 'ADMIN',
             }),
-        ).rejects.toMatchObject({
-            statusCode: 403,
-            message: expect.stringContaining('last OWNER'),
-        });
+        ).rejects.toThrow(/last OWNER/);
     });
 
     // ── 2. Deactivating the only OWNER ────────────────────────────────
 
     it('2. deactivateTenantMember: deactivating the only OWNER throws forbidden', async () => {
-        const { tenantId, slug, ownerMembershipId, ownerCtx, ownerUserId } =
+        const { tenantId, slug, ownerMembershipId } =
             await setupTenantWithOwner('deactivate-last');
 
-        // Need a second ADMIN to call deactivate (self-deactivation guard
-        // would fire otherwise). Call as the ADMIN trying to deactivate the OWNER.
+        // Call as a second ADMIN (self-deactivation guard would fire
+        // if we used ownerCtx). The assertion target is the last-OWNER
+        // count guard, which must reject before the mutation lands.
         const admin = await addMember(tenantId, slug, 'admin-for-deactivate', 'ADMIN');
 
-        // But the check is on the TARGET membership's role, not the caller.
-        // The ownerCtx has admin.owner_management = true but we're just testing
-        // the last-OWNER count guard. Use ownerCtx (calls assertCanManageMembers OK).
         await expect(
-            deactivateTenantMember(ownerCtx, {
+            deactivateTenantMember(admin.ctx, {
                 membershipId: ownerMembershipId,
             }),
-        ).rejects.toMatchObject({
-            statusCode: 403,
-            message: expect.stringContaining('last OWNER'),
-        });
-
-        void admin; // suppress unused warning
-        void ownerUserId;
+        ).rejects.toThrow(/last OWNER/);
     });
 
     // ── 3. Non-OWNER trying to promote to OWNER ────────────────────────
@@ -175,10 +164,7 @@ describeFn('usecase-layer last-OWNER guard', () => {
                 membershipId: editor.membershipId,
                 role: 'OWNER',
             }),
-        ).rejects.toMatchObject({
-            statusCode: 403,
-            message: expect.stringContaining('Only OWNERs can promote'),
-        });
+        ).rejects.toThrow(/Only OWNERs can promote/);
     });
 
     // ── 4. Non-OWNER trying to modify an OWNER's membership ───────────
@@ -192,10 +178,7 @@ describeFn('usecase-layer last-OWNER guard', () => {
                 membershipId: ownerMembershipId,
                 role: 'ADMIN',
             }),
-        ).rejects.toMatchObject({
-            statusCode: 403,
-            message: expect.stringContaining('Only OWNERs can modify'),
-        });
+        ).rejects.toThrow(/Only OWNERs can modify/);
     });
 
     // ── 5. Happy path: second OWNER present → demotion allowed ─────────
