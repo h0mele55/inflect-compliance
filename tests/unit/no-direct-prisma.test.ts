@@ -78,6 +78,11 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
         // so they use the global prisma client directly. RLS policies are
         // bypassed intentionally here since the user has no tenant session.
         'tenant-invites.ts',
+        // Epic 1, PR 2 — createTenantWithOwner + transferTenantOwnership run
+        // under platform-admin auth with NO user RequestContext. Tenant is
+        // being created or its ownership is changing; RLS doesn't apply
+        // (Tenant itself is not in TENANT_SCOPED_MODELS).
+        'tenant-lifecycle.ts',
     ];
 
     const usecases = readFilesInDir(path.join(SRC_ROOT, 'app-layer/usecases'));

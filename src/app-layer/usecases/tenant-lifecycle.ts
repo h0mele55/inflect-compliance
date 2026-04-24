@@ -165,7 +165,9 @@ export async function createTenantWithOwner(
 // ─── transferTenantOwnership ─────────────────────────────────────────
 
 export interface TransferTenantOwnershipInput {
-    tenantId: string;
+    /** Either tenantId OR tenantSlug is required. */
+    tenantId?: string;
+    tenantSlug?: string;
     currentOwnerUserId: string;
     newOwnerEmail: string;
 }
@@ -191,6 +193,23 @@ export async function transferTenantOwnership(
 ): Promise<TransferTenantOwnershipResult> {
     const email = input.newOwnerEmail.trim().toLowerCase();
 
+    // Accept either tenantId or tenantSlug. If slug, resolve inside the
+    // usecase so route handlers never touch prisma directly.
+    let tenantId: string | undefined = input.tenantId;
+    if (!tenantId && input.tenantSlug) {
+        const tenant = await prisma.tenant.findUnique({
+            where: { slug: input.tenantSlug },
+            select: { id: true },
+        });
+        if (!tenant) {
+            throw new NotFoundError(`Tenant not found: ${input.tenantSlug}`);
+        }
+        tenantId = tenant.id;
+    }
+    if (!tenantId) {
+        throw new ValidationError('Either tenantId or tenantSlug is required.');
+    }
+
     // 1. Resolve the new owner's User row.
     const newOwnerUser = await prisma.user.findUnique({
         where: { email },
@@ -203,7 +222,7 @@ export async function transferTenantOwnership(
     // 2. Verify the new owner is an ACTIVE member of this tenant.
     const newMembership = await prisma.tenantMembership.findFirst({
         where: {
-            tenantId: input.tenantId,
+            tenantId: tenantId,
             userId: newOwnerUser.id,
             status: 'ACTIVE',
         },
@@ -225,7 +244,7 @@ export async function transferTenantOwnership(
     // 3. Find the current owner membership.
     const currentMembership = await prisma.tenantMembership.findFirst({
         where: {
-            tenantId: input.tenantId,
+            tenantId: tenantId,
             userId: input.currentOwnerUserId,
             role: 'OWNER',
             status: 'ACTIVE',
@@ -252,7 +271,7 @@ export async function transferTenantOwnership(
 
     // 5. Audit both sides.
     await appendAuditEntry({
-        tenantId: input.tenantId,
+        tenantId: tenantId,
         userId: input.currentOwnerUserId,
         actorType: 'PLATFORM_ADMIN',
         entity: 'TenantMembership',
@@ -270,7 +289,7 @@ export async function transferTenantOwnership(
 
     logger.info('tenant-lifecycle.ownership_transferred', {
         component: 'tenant-lifecycle',
-        tenantId: input.tenantId,
+        tenantId: tenantId,
         fromUserId: input.currentOwnerUserId,
         toUserId: newOwnerUser.id,
     });

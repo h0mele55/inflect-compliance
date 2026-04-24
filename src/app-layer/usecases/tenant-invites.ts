@@ -300,63 +300,72 @@ export async function redeemInvite(input: {
     userId: string;
     userEmail: string;
 }): Promise<RedeemResult> {
-    // We collect the fields needed for the post-commit audit call and
-    // return them from the $transaction, then fire the audit outside.
-    const txResult = await prisma.$transaction(async (tx) => {
-        // ── Step 1: atomic claim ──────────────────────────────────────
-        // updateMany with the liveness predicates is the "test-and-set":
-        // the first caller whose WHERE matches wins count=1; subsequent
-        // callers (same token, concurrent) see acceptedAt already set
-        // and get count=0.
-        const claim = await tx.tenantInvite.updateMany({
-            where: {
-                token: input.token,
-                acceptedAt: null,
-                revokedAt: null,
-                expiresAt: { gt: new Date() },
-            },
-            data: { acceptedAt: new Date() },
-        });
+    // Step 1 runs standalone so that email-mismatch (step 3) BURNS the
+    // invite — the throw in step 3 must NOT roll back the claim. If we
+    // put everything in a single $transaction, Prisma would undo the
+    // acceptedAt write on throw, and a token leak could be recycled.
 
-        if (claim.count !== 1) {
-            // Look up why for a precise error message.
-            const inv = await tx.tenantInvite.findUnique({
-                where: { token: input.token },
-                select: { acceptedAt: true, revokedAt: true, expiresAt: true },
-            });
-            if (!inv) throw notFound('Invite not found');
-            if (inv.revokedAt) throw gone('Invite has been revoked');
-            if (inv.expiresAt < new Date()) throw gone('Invite has expired');
-            if (inv.acceptedAt) throw gone('Invite has already been redeemed');
-            throw internal('Invite redemption race condition');
-        }
+    // ── Step 1: atomic claim (standalone commit) ─────────────────────
+    // updateMany with the liveness predicates is the "test-and-set":
+    // the first caller whose WHERE matches wins count=1; subsequent
+    // callers (same token, concurrent) see acceptedAt already set
+    // and get count=0.
+    const claim = await prisma.tenantInvite.updateMany({
+        where: {
+            token: input.token,
+            acceptedAt: null,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+        },
+        data: { acceptedAt: new Date() },
+    });
 
-        // ── Step 2: re-fetch to get all needed fields ─────────────────
-        const invite = await tx.tenantInvite.findUnique({
+    if (claim.count !== 1) {
+        // Look up why for a precise error message.
+        const inv = await prisma.tenantInvite.findUnique({
             where: { token: input.token },
-            select: {
-                id: true,
-                tenantId: true,
-                email: true,
-                role: true,
-                invitedById: true,
-            },
+            select: { acceptedAt: true, revokedAt: true, expiresAt: true },
         });
-        if (!invite) throw internal('Invariant: invite disappeared mid-redemption');
+        if (!inv) throw notFound('Invite not found');
+        if (inv.revokedAt) throw gone('Invite has been revoked');
+        if (inv.expiresAt < new Date()) throw gone('Invite has expired');
+        if (inv.acceptedAt) throw gone('Invite has already been redeemed');
+        throw internal('Invite redemption race condition');
+    }
 
-        // ── Step 3: email binding ─────────────────────────────────────
-        // If the redeemer's email doesn't match the invite email, the
-        // invite is now burnt (acceptedAt is already set — leave it so
-        // the same token cannot be recycled). The inviter must re-invite.
-        if (
-            invite.email.toLowerCase().trim() !==
-            input.userEmail.toLowerCase().trim()
-        ) {
-            throw forbidden(
-                'Invite email does not match signed-in user. ' +
-                    'Ask your admin to send a new invite to your email address.',
-            );
-        }
+    // ── Step 2: re-fetch to get all needed fields ─────────────────
+    const invite = await prisma.tenantInvite.findUnique({
+        where: { token: input.token },
+        select: {
+            id: true,
+            tenantId: true,
+            email: true,
+            role: true,
+            invitedById: true,
+        },
+    });
+    if (!invite) throw internal('Invariant: invite disappeared mid-redemption');
+
+    // ── Step 3: email binding ─────────────────────────────────────
+    // If the redeemer's email doesn't match the invite email, the
+    // invite IS NOW BURNT (acceptedAt committed in Step 1). Leave it
+    // so a leaked token cannot be recycled by the real invitee or
+    // anyone else. The inviter must issue a fresh invite.
+    if (
+        invite.email.toLowerCase().trim() !==
+        input.userEmail.toLowerCase().trim()
+    ) {
+        throw forbidden(
+            'Invite email does not match signed-in user. ' +
+                'Ask your admin to send a new invite to your email address.',
+        );
+    }
+
+    // ── Step 4 onwards run inside a $transaction so that the
+    //   membership upsert + return data are consistent. If the
+    //   transaction fails, acceptedAt from Step 1 is STILL committed
+    //   (invite is burnt), which is the safe failure mode.
+    const txResult = await prisma.$transaction(async (tx) => {
 
         // ── Step 4: upsert membership ─────────────────────────────────
         const membership = await tx.tenantMembership.upsert({

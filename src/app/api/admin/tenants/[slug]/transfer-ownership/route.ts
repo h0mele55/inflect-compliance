@@ -14,7 +14,6 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { verifyPlatformApiKey, PlatformAdminError } from '@/lib/auth/platform-admin';
 import { transferTenantOwnership } from '@/app-layer/usecases/tenant-lifecycle';
 import { z } from 'zod';
-import prisma from '@/lib/prisma';
 
 const Body = z.object({
     currentOwnerUserId: z.string().min(1),
@@ -38,20 +37,10 @@ export const POST = withApiErrorHandling(
         const { slug } = await ctx.params;
         const body = Body.parse(await req.json());
 
-        // Resolve tenant by slug.
-        const tenant = await prisma.tenant.findUnique({
-            where: { slug },
-            select: { id: true },
-        });
-        if (!tenant) {
-            return NextResponse.json(
-                { error: `Tenant not found: ${slug}` },
-                { status: 404 },
-            );
-        }
-
+        // Slug resolution happens inside the usecase so the route layer
+        // never touches prisma directly (no-direct-prisma guardrail).
         const result = await transferTenantOwnership({
-            tenantId: tenant.id,
+            tenantSlug: slug,
             currentOwnerUserId: body.currentOwnerUserId,
             newOwnerEmail: body.newOwnerEmail,
         });

@@ -28,9 +28,9 @@ export function makeRequestContext(
         role: r,
         permissions: {
             canRead: true,
-            canWrite: r === 'ADMIN' || r === 'EDITOR',
-            canAdmin: r === 'ADMIN',
-            canAudit: r === 'ADMIN' || r === 'AUDITOR',
+            canWrite: r === 'OWNER' || r === 'ADMIN' || r === 'EDITOR',
+            canAdmin: r === 'OWNER' || r === 'ADMIN',
+            canAudit: r === 'OWNER' || r === 'ADMIN' || r === 'AUDITOR',
             canExport: r !== 'READER',
         },
         appPermissions: getPermissionsForRole(r),
