@@ -53,7 +53,10 @@ const CAPS: Record<string, number> = {
     // the existing NextResponse.json<any>(...) convention across the codebase.
     '<any>': 500,
     'useState<any>': 26,
-    'as any': 277,
+    // Epic 1 R-1/R-5: +3 for src/auth.config.ts (token.memberships /
+    // token.role mapping into session.user — NextAuth v5 beta types
+    // don't yet expose these custom JWT fields cleanly without casts).
+    'as any': 280,
     '// @ts-ignore': 2,
 };
 
