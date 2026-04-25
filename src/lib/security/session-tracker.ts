@@ -85,8 +85,10 @@ function pickUserAgent(headers: Headers | null): string | null {
 async function readRequestHeaders(): Promise<Headers | null> {
     try {
         const mod = await import('next/headers');
-        // `headers()` returns a `ReadonlyHeaders` (subset of Headers).
-        return mod.headers() as unknown as Headers;
+        // GAP-05 — Next 15 made `headers()` async. The function returns
+        // `Promise<ReadonlyHeaders>`; we await it before casting.
+        const h = await mod.headers();
+        return h as unknown as Headers;
     } catch {
         return null;
     }

@@ -95,6 +95,26 @@ export function withApiErrorHandling<Context = any>(
     options: ApiWrapperOptions = {},
 ) {
     return async (req: NextRequest, ctx: Context): Promise<NextResponse | Response> => {
+        // ── GAP-05: Next 15 async-params transparent await ──
+        // Next 15 made `params` a Promise. Most route handlers in this
+        // codebase wrap their inner handler in `withApiErrorHandling`
+        // and access `params.id` synchronously — that worked under
+        // Next 14 but logs a deprecation warning under Next 15 and
+        // throws under Next 16. Resolving the params promise here
+        // (transparently to the inner handler) keeps the 250+ existing
+        // call sites correct without churn. The inner handler still
+        // types `params` as the sync object — at runtime it is one.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ctxObj = ctx as any;
+        if (
+            ctxObj &&
+            typeof ctxObj === 'object' &&
+            ctxObj.params &&
+            typeof ctxObj.params.then === 'function'
+        ) {
+            const resolvedParams = await ctxObj.params;
+            ctx = { ...ctxObj, params: resolvedParams } as Context;
+        }
         const requestId = req.headers.get('x-request-id') || generateRequestId();
         const route = req.nextUrl.pathname;
         const method = req.method;

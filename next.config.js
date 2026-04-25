@@ -15,32 +15,37 @@ require('node:events').EventEmitter.defaultMaxListeners = Math.max(
 const withNextIntl = createNextIntlPlugin('./src/i18n.ts');
 
 const defaultOptions = {
-    // Other experimental or default options
+    // GAP-05 — Next 15 promoted `serverComponentsExternalPackages`
+    // out of `experimental` and renamed it to `serverExternalPackages`.
+    // The list itself is unchanged from the v14 era; these packages
+    // use native deps (worker_threads, native HTTP clients, dynamic
+    // require) that don't survive Next's webpack bundling.
+    serverExternalPackages: [
+        'pdfkit',
+        // Pino & transports — use native worker_threads / dynamic require
+        'pino',
+        'pino-pretty',
+        'thread-stream',
+        // OpenTelemetry — heavy native instrumentation modules
+        '@opentelemetry/api',
+        '@opentelemetry/resources',
+        '@opentelemetry/sdk-trace-node',
+        '@opentelemetry/sdk-metrics',
+        '@opentelemetry/exporter-trace-otlp-http',
+        '@opentelemetry/exporter-metrics-otlp-http',
+        '@opentelemetry/semantic-conventions',
+        // Sentry — optional error reporting
+        '@sentry/nextjs',
+        '@sentry/node',
+        // AWS SDK — native HTTP client, credential resolution
+        '@aws-sdk/client-s3',
+        '@aws-sdk/s3-request-presigner',
+    ],
     experimental: {
+        // optimizePackageImports remains experimental in Next 15.
         optimizePackageImports: [
             'lucide-react',
             '@tanstack/react-query',
-        ],
-        serverComponentsExternalPackages: [
-            'pdfkit',
-            // Pino & transports — use native worker_threads / dynamic require
-            'pino',
-            'pino-pretty',
-            'thread-stream',
-            // OpenTelemetry — heavy native instrumentation modules
-            '@opentelemetry/api',
-            '@opentelemetry/resources',
-            '@opentelemetry/sdk-trace-node',
-            '@opentelemetry/sdk-metrics',
-            '@opentelemetry/exporter-trace-otlp-http',
-            '@opentelemetry/exporter-metrics-otlp-http',
-            '@opentelemetry/semantic-conventions',
-            // Sentry — optional error reporting
-            '@sentry/nextjs',
-            '@sentry/node',
-            // AWS SDK — native HTTP client, credential resolution
-            '@aws-sdk/client-s3',
-            '@aws-sdk/s3-request-presigner',
         ],
     },
     async headers() {
