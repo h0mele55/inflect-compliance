@@ -110,6 +110,10 @@ services:
       STORAGE_PROVIDER: s3
       FILE_STORAGE_ROOT: /data/uploads
       UPLOAD_DIR: /data/uploads
+      # GAP-03 — staging runs NODE_ENV=production and is treated as
+      # production for encryption-at-rest. Boot will exit(1) if this
+      # is unset.
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?DATA_ENCRYPTION_KEY is required for staging (NODE_ENV=production). Generate with: openssl rand -base64 48}
     volumes:
       - staging-uploads:/data/uploads
     healthcheck:

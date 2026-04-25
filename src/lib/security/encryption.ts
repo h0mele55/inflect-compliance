@@ -21,6 +21,7 @@
  */
 import crypto from 'crypto';
 import { logger } from '@/lib/observability/logger';
+import { DEV_FALLBACK_DATA_ENCRYPTION_KEY } from './encryption-constants';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -78,13 +79,14 @@ function getRawKeyMaterial(): string {
         );
     }
 
-    // Dev/test fallback — deterministic so tests are reproducible
-    const devKey = 'inflect-dev-encryption-key-not-for-production-use!!';
+    // Dev/test fallback — deterministic so tests are reproducible.
+    // GAP-03 — the value is shared from `encryption-constants.ts` so
+    // env validation + the startup hook can reject this exact string
+    // when NODE_ENV=production.
     if (nodeEnv !== 'test') {
-        // Lazy require to avoid circular module init issues
         logger.warn('Using development fallback encryption key', { component: 'encryption' });
     }
-    return devKey;
+    return DEV_FALLBACK_DATA_ENCRYPTION_KEY;
 }
 
 /**

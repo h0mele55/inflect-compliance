@@ -77,4 +77,90 @@ describe('Environment Variable Validation', () => {
         }
         expect(result.success).toBe(true);
     });
+
+    // ─── GAP-03: DATA_ENCRYPTION_KEY production enforcement ──────────
+    //
+    // The schema-level superRefine on DATA_ENCRYPTION_KEY enforces the
+    // production-required + not-equal-to-dev-fallback contract. These
+    // tests run the env loader in a child process under
+    // NODE_ENV=production and assert the failure modes the audit
+    // identified as GAP-03.
+
+    it('rejects NODE_ENV=production when DATA_ENCRYPTION_KEY is unset', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'production',
+            DATA_ENCRYPTION_KEY: undefined,
+            // Provide everything else so we isolate the encryption-key path.
+            STORAGE_PROVIDER: 'local',
+        });
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('DATA_ENCRYPTION_KEY');
+        expect(result.error).toContain('REQUIRED in production');
+        // Regression: a refactor that makes the field optional in
+        // production again would silently undo GAP-03. The audit
+        // flagged this exact regression class.
+    });
+
+    it('rejects NODE_ENV=production when DATA_ENCRYPTION_KEY equals the documented dev fallback', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'production',
+            // Keep this string in sync with `encryption-constants.ts`.
+            // We hard-code it here (rather than import) because runEnvScript
+            // spawns a child process — the constant isn't available in
+            // shell env at that point.
+            DATA_ENCRYPTION_KEY: 'inflect-dev-encryption-key-not-for-production-use!!',
+            STORAGE_PROVIDER: 'local',
+        });
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('DATA_ENCRYPTION_KEY');
+        expect(result.error).toContain('dev fallback');
+        // Regression: a misconfigured prod deploy with NODE_ENV=production
+        // but DATA_ENCRYPTION_KEY accidentally set to the well-known dev
+        // string would silently encrypt customer data with a key that
+        // is committed in this repo. Refusing to boot is the only safe
+        // outcome.
+    });
+
+    it('rejects NODE_ENV=production when DATA_ENCRYPTION_KEY is shorter than 32 chars', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'production',
+            DATA_ENCRYPTION_KEY: 'too-short',
+            STORAGE_PROVIDER: 'local',
+        });
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('DATA_ENCRYPTION_KEY');
+        expect(result.error).toContain('at least 32 characters');
+    });
+
+    it('passes when DATA_ENCRYPTION_KEY is unset under NODE_ENV=test (dev/test ergonomics preserved)', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'test',
+            DATA_ENCRYPTION_KEY: undefined,
+        });
+        // The dev fallback in the encryption module + the optional()
+        // schema mean test/dev environments must continue to boot
+        // without a key. A regression here would force every contributor
+        // and every test runner to set DATA_ENCRYPTION_KEY.
+        expect(result.success).toBe(true);
+    });
+
+    it('passes when DATA_ENCRYPTION_KEY is unset under NODE_ENV=development', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'development',
+            DATA_ENCRYPTION_KEY: undefined,
+        });
+        expect(result.success).toBe(true);
+    });
+
+    it('passes when production has a real ≥32-char key (happy path)', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'production',
+            DATA_ENCRYPTION_KEY: 'a-real-production-key-at-least-32-chars-long-deterministic',
+            STORAGE_PROVIDER: 'local',
+        });
+        if (!result.success) {
+            console.error(result.error);
+        }
+        expect(result.success).toBe(true);
+    });
 });

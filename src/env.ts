@@ -1,5 +1,6 @@
 import { createEnv } from '@t3-oss/env-nextjs';
 import { z } from 'zod';
+import { DEV_FALLBACK_DATA_ENCRYPTION_KEY } from '@/lib/security/encryption-constants';
 
 export const env = createEnv({
     /**
@@ -70,8 +71,44 @@ export const env = createEnv({
         AV_SCAN_MODE: z.enum(["strict", "permissive", "disabled"]).default("strict"),
         CLAMAV_HOST: z.string().optional(),                  // ClamAV daemon host (e.g. clamav:3310)
 
-        // Data Protection (Epic 8)
-        DATA_ENCRYPTION_KEY: z.string().min(32, "DATA_ENCRYPTION_KEY must be at least 32 characters").optional(),
+        // Data Protection (Epic 8) — GAP-03 enforcement.
+        //
+        // Schema layer: optional() carries the *shape* (string ≥32 chars
+        // when present). The production-required + dev-fallback-rejection
+        // contract is enforced by the per-field superRefine() below,
+        // which reads the same `process.env.NODE_ENV` the schema is
+        // about to validate. Two-stage so the field-level error message
+        // points at DATA_ENCRYPTION_KEY rather than a top-level object
+        // refinement that prints the whole env shape.
+        DATA_ENCRYPTION_KEY: z
+            .string()
+            .min(32, "DATA_ENCRYPTION_KEY must be at least 32 characters")
+            .optional()
+            .superRefine((val, ctx) => {
+                // GAP-03 — production cannot boot without an encryption
+                // key. Read NODE_ENV from process.env directly because
+                // the parsed `env.NODE_ENV` is not yet available at
+                // refine time (zod parses fields independently).
+                if (process.env.NODE_ENV !== 'production') return;
+                if (!val) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message:
+                            'DATA_ENCRYPTION_KEY is REQUIRED in production. ' +
+                            'Generate with: openssl rand -base64 48',
+                    });
+                    return;
+                }
+                if (val === DEV_FALLBACK_DATA_ENCRYPTION_KEY) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message:
+                            'DATA_ENCRYPTION_KEY equals the documented dev ' +
+                            'fallback. Refusing to boot — generate a real ' +
+                            'key with: openssl rand -base64 48',
+                    });
+                }
+            }),
         // Epic B.3 — master KEK rotation. When set, the old key is used
         // as a decrypt fallback for any ciphertext the new primary KEK
         // can't read. Encryption always uses DATA_ENCRYPTION_KEY
