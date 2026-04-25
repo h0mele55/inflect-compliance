@@ -191,6 +191,8 @@ async function ensureTenantMembershipFromInvite(
 
 async function readInviteTokenFromCookies(): Promise<string | null> {
     try {
+        // GAP-05 — Next 15 made `cookies()` async (Promise<ReadonlyCookies>).
+        // The `await cookies()` call below already aligns with that contract.
         const { cookies } = await import('next/headers');
         const cookieStore = await cookies();
         return cookieStore.get('inflect_invite_token')?.value ?? null;

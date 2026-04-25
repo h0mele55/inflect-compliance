@@ -68,7 +68,11 @@ function classifyEndpoint(pathname: string): EndpointTier {
  * Also appends a hash of the User-Agent to mitigate NAT/shared-IP blocking (if Web Crypto is enabled).
  */
 async function getClientKey(req: NextRequest): Promise<string> {
-    let ip = req.ip || req.headers.get('x-forwarded-for') || '127.0.0.1';
+    // GAP-05 — Next 15 removed `req.ip`. Read x-forwarded-for as the
+    // canonical edge-runtime client-IP source. Local-dev fallback is
+    // 127.0.0.1 — the request comes through the dev server which
+    // doesn't set the header.
+    let ip = req.headers.get('x-forwarded-for') || '127.0.0.1';
 
     if (ip.includes(',')) {
         ip = ip.split(',')[0].trim();

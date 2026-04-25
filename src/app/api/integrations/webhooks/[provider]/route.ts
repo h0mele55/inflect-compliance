@@ -25,13 +25,11 @@ import { processIncomingWebhook } from '@/app-layer/usecases/webhook-processor';
 import { logger } from '@/lib/observability/logger';
 
 interface RouteParams {
-    params: { provider: string };
+    params: Promise<{ provider: string }>;
 }
 
-export async function POST(
-    req: NextRequest,
-    { params }: RouteParams
-): Promise<NextResponse> {
+export async function POST(req: NextRequest, props: RouteParams): Promise<NextResponse> {
+    const params = await props.params;
     const { provider } = params;
 
     if (!provider || typeof provider !== 'string') {

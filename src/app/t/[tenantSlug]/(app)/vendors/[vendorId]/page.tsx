@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { formatDate } from '@/lib/format-date';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, use } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
@@ -34,7 +34,8 @@ const VENDOR_LINK_RELATION_OPTIONS: ComboboxOption[] = [
 
 type Tab = 'overview' | 'documents' | 'assessments' | 'links' | 'bundles' | 'subprocessors';
 
-export default function VendorDetailPage({ params }: { params: { tenantSlug: string; vendorId: string } }) {
+export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: string; vendorId: string }> }) {
+    const params = use(props.params);
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
     const { permissions, role } = useTenantContext();

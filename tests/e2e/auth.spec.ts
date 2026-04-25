@@ -66,8 +66,14 @@ test.describe('Authentication Flow', () => {
         await doLogin(page);
 
         const cookies = await context.cookies();
+        // GAP-04 — NextAuth v4 uses `next-auth.*` cookie prefix, v5
+        // used `authjs.*`. The codebase is on v4 since 2026-04-25;
+        // accept both names so a future v5-stable upgrade doesn't
+        // immediately break this test.
         const sessionCookie = cookies.find(
             (c: Cookie) =>
+                c.name === 'next-auth.session-token' ||
+                c.name === '__Secure-next-auth.session-token' ||
                 c.name === 'authjs.session-token' ||
                 c.name === '__Secure-authjs.session-token'
         );

@@ -10,14 +10,27 @@ import {
 /** NextAuth handlers are request-dependent — never statically generate. */
 export const dynamic = 'force-dynamic';
 
-// GAP-04 — v4 returns a single handler function. We split GET/POST so
-// we can wrap POST with the LOGIN_LIMIT check while leaving GET (CSRF
-// tokens, provider list, session reads) at zero overhead.
+// GAP-04 + GAP-05 — v4 returns a single handler function that expects
+// `(req, { params: { nextauth: string[] } })` for App Router catch-all
+// routes. Under Next 15 the framework now passes `params` as a Promise
+// (`Promise<{ nextauth: string[] }>`); NextAuth v4's internals
+// destructure `params.nextauth` synchronously and crash with
+// `Cannot destructure property 'nextauth' of 'a.query' as it is
+// undefined` when handed the Promise.
+//
+// We pre-resolve the Promise here and pass the sync object to the v4
+// handler. This is the canonical Next 15 + v4 compat pattern and
+// preserves the LOGIN_LIMIT rate-limit wrap on POST.
 const handler = NextAuth(authOptions);
 
+type RouteContext = { params: Promise<{ nextauth: string[] }> };
+
 // GET is for CSRF tokens, provider list, and session reads — not a
-// brute-forceable surface, so we leave it untouched.
-export const GET = handler;
+// brute-forceable surface, so no rate limit.
+export async function GET(req: NextRequest, ctx: RouteContext) {
+    const params = await ctx.params;
+    return handler(req, { params });
+}
 
 /**
  * POST carries every sign-in / sign-out / callback flow. This is the
@@ -36,7 +49,7 @@ export const GET = handler;
  * layer and the one that actually shares the in-memory counter with
  * the rest of the rate-limited API surface.
  */
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest, ctx: RouteContext) {
     if (!isRateLimitBypassed()) {
         const { response } = enforceRateLimit(req, {
             scope: 'login',
@@ -45,5 +58,6 @@ export async function POST(req: NextRequest) {
         if (response) return response;
     }
 
-    return handler(req);
+    const params = await ctx.params;
+    return handler(req, { params });
 }

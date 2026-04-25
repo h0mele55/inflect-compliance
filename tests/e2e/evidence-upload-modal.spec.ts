@@ -59,7 +59,11 @@ test.describe('Epic 54 — Evidence upload modal', () => {
         // Reload to reset any Radix focus-trap state from the prior
         // serial-mode test before clicking the open-modal button.
         await page.reload({ waitUntil: 'domcontentloaded' });
-        const openBtn = page.locator('#upload-evidence-btn');
+        // GAP-05 — Next 15 + Vaul drawer leaves a residual portal copy
+        // of the page DOM in serial-mode tests after the previous test
+        // closes a modal. Using .first() targets the live page button
+        // (the residual is a non-interactive backdrop).
+        const openBtn = page.locator('#upload-evidence-btn').first();
         await openBtn.waitFor({ state: 'visible', timeout: 15_000 });
         await page.waitForLoadState('networkidle').catch(() => {});
         await openBtn.click();
@@ -76,7 +80,7 @@ test.describe('Epic 54 — Evidence upload modal', () => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/evidence`);
         await page.reload({ waitUntil: 'domcontentloaded' });
-        const openBtn2 = page.locator('#upload-evidence-btn');
+        const openBtn2 = page.locator('#upload-evidence-btn').first();
         await openBtn2.waitFor({ state: 'visible', timeout: 15_000 });
         await page.waitForLoadState('networkidle').catch(() => {});
         await openBtn2.click();
@@ -120,7 +124,7 @@ test.describe('Epic 54 — Evidence upload modal', () => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/evidence`);
         await page.reload({ waitUntil: 'domcontentloaded' });
-        const openBtn3 = page.locator('#upload-evidence-btn');
+        const openBtn3 = page.locator('#upload-evidence-btn').first();
         await openBtn3.waitFor({ state: 'visible', timeout: 15_000 });
         await page.waitForLoadState('networkidle').catch(() => {});
         await openBtn3.click();
@@ -158,7 +162,8 @@ test.describe('Epic 54 — Add text evidence modal', () => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/evidence`);
         await page.reload({ waitUntil: 'domcontentloaded' });
-        const textBtn = page.locator('#add-text-evidence-btn');
+        // Same Next 15 + Vaul portal-residual pattern as above.
+        const textBtn = page.locator('#add-text-evidence-btn').first();
         await textBtn.waitFor({ state: 'visible', timeout: 15_000 });
         await page.waitForLoadState('networkidle').catch(() => {});
         await textBtn.click();
@@ -179,7 +184,7 @@ test.describe('Epic 54 — Add text evidence modal', () => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/evidence`);
         await page.reload({ waitUntil: 'domcontentloaded' });
-        const textBtn2 = page.locator('#add-text-evidence-btn');
+        const textBtn2 = page.locator('#add-text-evidence-btn').first();
         await textBtn2.waitFor({ state: 'visible', timeout: 15_000 });
         await page.waitForLoadState('networkidle').catch(() => {});
         await textBtn2.click();

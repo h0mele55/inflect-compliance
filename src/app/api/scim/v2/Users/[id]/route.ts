@@ -19,9 +19,10 @@ import {
     type ScimCreateUserInput,
 } from '@/app-layer/usecases/scim-users';
 
-type RouteContext = { params: { id: string } };
+type RouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(req: NextRequest, { params }: RouteContext) {
+export async function GET(req: NextRequest, props: RouteContext) {
+    const params = await props.params;
     try {
         const ctx = await authenticateScimRequest(req);
         const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
@@ -45,7 +46,8 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     }
 }
 
-export async function PATCH(req: NextRequest, { params }: RouteContext) {
+export async function PATCH(req: NextRequest, props: RouteContext) {
+    const params = await props.params;
     try {
         const ctx = await authenticateScimRequest(req);
         const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
@@ -78,7 +80,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     }
 }
 
-export async function PUT(req: NextRequest, { params }: RouteContext) {
+export async function PUT(req: NextRequest, props: RouteContext) {
+    const params = await props.params;
     try {
         const ctx = await authenticateScimRequest(req);
         const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
@@ -111,7 +114,8 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     }
 }
 
-export async function DELETE(req: NextRequest, { params }: RouteContext) {
+export async function DELETE(req: NextRequest, props: RouteContext) {
+    const params = await props.params;
     try {
         const ctx = await authenticateScimRequest(req);
 

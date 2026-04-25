@@ -1,6 +1,6 @@
 'use client';
 import { formatDate } from '@/lib/format-date';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, use } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
@@ -12,7 +12,10 @@ const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral', IN_REVIEW: 'badge-warning', APPROVED: 'badge-success', REJECTED: 'badge-danger',
 };
 
-export default function AssessmentPage({ params }: { params: { tenantSlug: string; vendorId: string; assessmentId: string } }) {
+export default function AssessmentPage(
+    props: { params: Promise<{ tenantSlug: string; vendorId: string; assessmentId: string }> }
+) {
+    const params = use(props.params);
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
     const { permissions, role } = useTenantContext();
