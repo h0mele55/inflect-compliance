@@ -216,6 +216,41 @@ Postgres does not support dropping an enum value without recreating
 the type. Leave the enum value; no rows use it after PR 2's inverse
 migration.
 
+## Accepted residual risks (documented decisions)
+
+The Epic 1 security validation enumerated 8 residual risks (R-1
+through R-8). Five are closed by code (R-1 via JWT memberships array
++ tenant picker; R-3 email_verified check; R-4 platform-key rotation;
+R-5 E2E spec; R-6 production Redis-required startup check). Three
+are accepted with the following written rationale:
+
+**R-2 — Invite cookie carries the token unencrypted.** The cookie is
+`HttpOnly`, `SameSite=Lax`, `Secure` in production, with a 10-minute
+TTL and single-use semantics. TLS protects in transit. Encrypting
+the cookie value with a server-side secret would not change the
+threat model — an on-path attacker who has broken TLS already has
+much bigger problems. Accepted as-is. Tightening would add
+complexity without security gain.
+
+**R-7 — Bootstrap script must run once in production.**
+`scripts/bootstrap-tenant-owners.ts` promotes the oldest ACTIVE
+ADMIN per tenant to OWNER. It's idempotent (re-running is a no-op
+on tenants that already have an OWNER) and emits an audit-chained
+`ROLE_PROMOTED_TO_OWNER` entry per promotion. **Operator action:**
+run `npm run db:bootstrap-owners` against prod once after deploying
+PRs 1–2. Not a code closure — operational checklist item only.
+
+**R-8 — CSRF-style invite acceptance is benign.** A malicious site
+that links to `/api/invites/<attacker-token>/start-signin` could
+trick an authenticated user into accepting an invite addressed to
+their own email. Worst case: the user gets added to a tenant they
+didn't request. They can leave via deactivate. The attack does NOT
+escalate privileges, leak data, or compromise other tenants. Adding
+a CSRF token tied to the preview page would close R-8 mechanically
+but at the cost of breaking the preview-then-sign-in flow (the
+token would be tied to the preview-page session, which the
+post-OAuth session no longer has). Accepted as-is.
+
 ## Adding a new tenant-membership creation path (for future contributors)
 
 The `tests/guardrails/no-auto-join.test.ts` guardrail enforces that
