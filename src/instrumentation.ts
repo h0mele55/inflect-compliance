@@ -58,17 +58,16 @@ export async function register() {
             }
         }
 
-        // Bump EventEmitter cap so undici's keep-alive socket pooling
-        // doesn't trigger spurious MaxListenersExceededWarning lines for
-        // the per-socket unpipe/error/close/finish listeners that
-        // accumulate across pooled requests. Default is 10 — every test
-        // run was producing dozens of these warnings under serial-mode
-        // E2E pressure with no actual leak (sockets get reused and the
-        // listeners are torn down when the request stream finishes).
-        const { EventEmitter } = await import('node:events');
-        if (EventEmitter.defaultMaxListeners < 50) {
-            EventEmitter.defaultMaxListeners = 50;
-        }
+        // GAP-05 — Next 15's bundler resolves `await import('node:events')`
+        // to a Module namespace where `EventEmitter` lives at .default
+        // rather than as a named export, so the previous destructure
+        // here threw `Cannot read properties of undefined (reading
+        // 'defaultMaxListeners')` and the entire instrumentation hook
+        // unhandled-rejected on every request. The EventEmitter cap is
+        // already raised at config-load time in next.config.js (top-
+        // level require, no bundler involved); this duplicate raise was
+        // belt-and-suspenders for very early bootstrap, redundant once
+        // next.config.js runs. Removed entirely.
 
         const { initTelemetry } = await import('@/lib/observability/instrumentation');
         const { initSentry } = await import('@/lib/observability/sentry');
