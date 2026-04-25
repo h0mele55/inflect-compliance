@@ -42,7 +42,7 @@ jest.mock('@/app-layer/repositories/EvidenceBundleRepository', () => ({
 }));
 
 jest.mock('@/lib/security/sanitize', () => ({
-    sanitizePlainText: jest.fn((s: string) => `SANITISED(${s})`),
+    sanitizePlainText: jest.fn((s: string | null | undefined) => `SANITISED(${s})`),
 }));
 
 jest.mock('@/app-layer/automation', () => ({
@@ -81,7 +81,7 @@ const mockLog = logEvent as jest.MockedFunction<typeof logEvent>;
 
 beforeEach(() => {
     jest.clearAllMocks();
-    mockSanitize.mockImplementation((s: string) => `SANITISED(${s})`);
+    mockSanitize.mockImplementation((s: string | null | undefined) => `SANITISED(${s})`);
     mockCreate.mockResolvedValue({
         id: 'i1', key: 'ISSUE-1', title: 'X', severity: 'HIGH',
         status: 'OPEN', assigneeUserId: null,

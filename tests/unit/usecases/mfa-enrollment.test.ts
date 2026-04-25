@@ -236,7 +236,7 @@ describe('removeMfaEnrollment', () => {
         // Regression: an admin in tenant A whose request is forged to
         // target a user in tenant B would, without this scope, reach
         // cross-tenant. The check ensures the deleteMany is bounded.
-        expect(args.where).toHaveProperty('tenantId', 't1');
+        expect(args?.where).toHaveProperty('tenantId', 't1');
     });
 
     it('returns removed:false when nothing matched', async () => {

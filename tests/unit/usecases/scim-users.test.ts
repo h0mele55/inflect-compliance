@@ -67,6 +67,7 @@ const mockAppendAudit = appendAuditEntry as jest.MockedFunction<typeof appendAud
 const scimCtx = (tenantId = 'tenant-1') => ({
     tenantId,
     tokenLabel: 'okta-prod',
+    tokenId: 'tok-1',
 });
 
 beforeEach(() => {

@@ -86,7 +86,8 @@ beforeEach(() => {
     // Default to feature-gate + rate-limit pass.
     mockEnforceGate.mockImplementation(() => undefined);
     mockCheckRateLimit.mockImplementation(() => undefined);
-    mockSanitiseInput.mockImplementation((x: unknown) => x);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockSanitiseInput.mockImplementation((x: any) => x);
 });
 
 describe('generateRiskSuggestions — pre-AI controls', () => {

@@ -375,7 +375,7 @@ describe('handleIncomingWebhook', () => {
 
     it('marks the event "ignored" when no webhook provider is registered', async () => {
         mockWebhookCreate.mockResolvedValueOnce({ id: 'evt-1' } as never);
-        mockGetWebhookProvider.mockReturnValue(undefined);
+        mockGetWebhookProvider.mockReturnValue(null);
 
         const result = await handleIncomingWebhook('tenant-1', 'unknown-provider', {
             headers: {}, body: {},

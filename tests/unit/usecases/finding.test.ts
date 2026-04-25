@@ -30,7 +30,7 @@ jest.mock('@/app-layer/repositories/FindingRepository', () => ({
 }));
 
 jest.mock('@/lib/security/sanitize', () => ({
-    sanitizePlainText: jest.fn((s: string) => `SANITISED(${s})`),
+    sanitizePlainText: jest.fn((s: string | null | undefined) => `SANITISED(${s})`),
 }));
 
 jest.mock('../../../src/app-layer/events/audit', () => ({
@@ -51,7 +51,7 @@ const mockLog = logEvent as jest.MockedFunction<typeof logEvent>;
 
 beforeEach(() => {
     jest.clearAllMocks();
-    mockSanitize.mockImplementation((s: string) => `SANITISED(${s})`);
+    mockSanitize.mockImplementation((s: string | null | undefined) => `SANITISED(${s})`);
     mockCreate.mockResolvedValue({ id: 'find-1', title: 'SANITISED(Risk found)' } as never);
 });
 

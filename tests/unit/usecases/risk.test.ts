@@ -43,7 +43,7 @@ jest.mock('@/app-layer/repositories/RiskTemplateRepository', () => ({
 }));
 
 jest.mock('@/lib/security/sanitize', () => ({
-    sanitizePlainText: jest.fn((s: string) => `SANITISED(${s})`),
+    sanitizePlainText: jest.fn((s: string | null | undefined) => `SANITISED(${s})`),
 }));
 
 jest.mock('@/lib/risk-scoring', () => ({
@@ -85,7 +85,7 @@ const mockLog = logEvent as jest.MockedFunction<typeof logEvent>;
 
 beforeEach(() => {
     jest.clearAllMocks();
-    mockSanitize.mockImplementation((s: string) => `SANITISED(${s})`);
+    mockSanitize.mockImplementation((s: string | null | undefined) => `SANITISED(${s})`);
     mockScore.mockReturnValue(9);
     mockCreate.mockResolvedValue({ id: 'r1', title: 'SANITISED(t)' } as never);
     mockUpdate.mockResolvedValue({ id: 'r1' } as never);

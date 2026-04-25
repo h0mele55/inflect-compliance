@@ -68,6 +68,7 @@ const enrollmentRow = {
     isVerified: true,
     verifiedAt: new Date('2026-04-24T00:00:00Z'),
     lastChallengeAt: null,
+    backupCodesHashJson: null,
     createdAt: new Date('2026-04-24T00:00:00Z'),
     updatedAt: new Date('2026-04-24T00:00:00Z'),
 };

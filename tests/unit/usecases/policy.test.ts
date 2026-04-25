@@ -38,7 +38,7 @@ jest.mock('@/app-layer/repositories/PolicyVersionRepository', () => ({
 
 jest.mock('@/lib/security/sanitize', () => ({
     sanitizePolicyContent: jest.fn((_type: string, s: string) => `SANITISED(${s})`),
-    sanitizePlainText: jest.fn((s: string) => s),
+    sanitizePlainText: jest.fn((s: string | null | undefined) => s),
 }));
 
 jest.mock('../../../src/app-layer/events/audit', () => ({

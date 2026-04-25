@@ -22,7 +22,6 @@
 
 jest.mock('@/app-layer/services/export-service', () => ({
     exportTenantData: jest.fn(),
-    serializeBundle: jest.fn(),
 }));
 
 jest.mock('@/app-layer/services/import-service', () => ({
@@ -44,22 +43,22 @@ import {
     importBundle,
     importFromBuffer,
 } from '@/app-layer/usecases/data-portability';
-import { exportTenantData, serializeBundle } from '@/app-layer/services/export-service';
+import { exportTenantData } from '@/app-layer/services/export-service';
 import { importTenantData, validateImportEnvelope } from '@/app-layer/services/import-service';
 import { runInTenantContext } from '@/lib/db-context';
 import { makeRequestContext } from '../../helpers/make-context';
 
 const mockExport = exportTenantData as jest.MockedFunction<typeof exportTenantData>;
-const mockSerialize = serializeBundle as jest.MockedFunction<typeof serializeBundle>;
 const mockImport = importTenantData as jest.MockedFunction<typeof importTenantData>;
 const mockValidate = validateImportEnvelope as jest.MockedFunction<typeof validateImportEnvelope>;
 const mockRunInTx = runInTenantContext as jest.MockedFunction<typeof runInTenantContext>;
 
-const sampleEnvelope = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const sampleEnvelope: any = {
     formatVersion: '1.0',
     metadata: { tenantId: 'tenant-A', exportedAt: new Date().toISOString() },
     domains: {},
-} as never;
+};
 
 const successfulExport = {
     envelope: sampleEnvelope,
@@ -78,13 +77,6 @@ const successfulImport = {
 beforeEach(() => {
     jest.clearAllMocks();
     mockExport.mockResolvedValue(successfulExport as never);
-    mockSerialize.mockReturnValue({
-        compressed: true,
-        rawSize: 1000,
-        outputSize: 200,
-        compressionRatio: 5,
-        data: Buffer.from('zip'),
-    } as never);
     mockImport.mockResolvedValue(successfulImport as never);
     mockValidate.mockResolvedValue({ ...successfulImport } as never);
 });
@@ -179,7 +171,8 @@ describe('importBundle — RBAC stricter than export', () => {
             envelope: { ...sampleEnvelope, metadata: { tenantId: 'tenant-SRC' } },
         };
         await importBundle(ctx, req as never);
-        const importArgs = mockImport.mock.calls[0];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const importArgs = mockImport.mock.calls[0] as any[];
         expect(importArgs[1].targetTenantId).toBe('tenant-DEST');
         // Regression: passing through bundle.metadata.tenantId would
         // be a cross-tenant write — exactly the class of bug the
