@@ -48,7 +48,11 @@ const PATTERNS: Pattern[] = [
  * decision and a commit-message rationale.
  */
 const CAPS: Record<string, number> = {
-    ': any': 495,
+    // +2 for bcryptjs interop normalisation `: any` annotations in
+    // src/lib/auth/passwords.ts AND src/lib/auth.ts. Without those casts
+    // the ESM-CJS namespace shape on Node ≥ 22 breaks every credentials
+    // login (verifyPassword silently returns false on TypeError).
+    ': any': 497,
     // Epic 1, PR 3: +4 for new invite admin + public routes that follow
     // the existing NextResponse.json<any>(...) convention across the codebase.
     '<any>': 500,

@@ -87,7 +87,12 @@ describe('No unsafe any — CI Guardrails', () => {
         // Bumped for Epic 23: usecase decomposition redistributed existing any casts across submodule files.
         // Bumped for Epic 51: Dub-ported UI components and design system primitives.
         // Bumped for Epics 52–55: custom roles, API keys, compliance snapshots, lifecycle versioning.
-        const THRESHOLD = 481;
+        // Bumped +2 for bcryptjs ESM/CJS interop normalisation:
+        //   - src/lib/auth/passwords.ts (canonical helper)
+        //   - src/lib/auth.ts (legacy helper)
+        // Each adds one `: any` annotation on the namespace cast — closes the
+        // every-credentials-login-fails regression on Node ≥ 22.
+        const THRESHOLD = 483;
         const violations = grepPattern(srcFiles, /:\s*any\b/);
         if (violations.length > THRESHOLD) {
             fail(`: any count (${violations.length}) exceeds threshold (${THRESHOLD})`);

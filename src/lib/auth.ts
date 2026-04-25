@@ -163,8 +163,18 @@ export async function hasTenantRole(
 
 // ─── Legacy helpers kept for backward compatibility ───
 
+// Same ESM/CJS interop normalisation as src/lib/auth/passwords.ts.
+// Without it, Node ≥ 22 returns the namespace with bcryptjs's exports
+// under `.default`, and `bcrypt.compare` is undefined.
+async function loadBcrypt(): Promise<typeof import('bcryptjs')> {
+    const m = await import('bcryptjs');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ns: any = m;
+    return (ns.default ?? ns) as typeof import('bcryptjs');
+}
+
 export async function hashPassword(password: string): Promise<string> {
-    const bcrypt = await import('bcryptjs');
+    const bcrypt = await loadBcrypt();
     return bcrypt.hash(password, 12);
 }
 
@@ -172,7 +182,7 @@ export async function verifyPassword(
     password: string,
     hash: string
 ): Promise<boolean> {
-    const bcrypt = await import('bcryptjs');
+    const bcrypt = await loadBcrypt();
     return bcrypt.compare(password, hash);
 }
 

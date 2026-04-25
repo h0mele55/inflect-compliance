@@ -84,7 +84,15 @@ run('npx prisma db push --force-reset --accept-data-loss', '3/6a Reset test data
 run('npx tsx prisma/seed.ts', '3/6b Seed test data');
 
 // ── 4. Build ──
-run('npx next build', '4/6  Build Next.js (production)', { NODE_ENV: 'production' });
+// NEXT_IGNORE_INCORRECT_LOCKFILE=1 prevents Next 14 from attempting
+// to "patch" a lockfile missing SWC binaries — that patch path
+// crashes with `Cannot read properties of undefined (reading 'os')`
+// on this machine. The webServer.command in playwright.config.ts
+// already sets the same flag for runtime; the build step needs it too.
+run('npx next build', '4/6  Build Next.js (production)', {
+    NODE_ENV: 'production',
+    NEXT_IGNORE_INCORRECT_LOCKFILE: '1',
+});
 
 // ── 5. Install Playwright browsers ──
 run('npx playwright install chromium', '5/6  Install Playwright browsers');

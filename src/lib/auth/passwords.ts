@@ -23,7 +23,21 @@
  *   is *pure crypto*: plaintext + hash in, boolean out.
  */
 
-const bcryptModule = import('bcryptjs');
+// bcryptjs is published as CommonJS. Node.js's ESM-importing-CJS interop
+// in newer Node versions wraps the exports under `.default` on the
+// dynamic-import namespace; older Node spreads them to the top level.
+// Normalise here so callers can treat the result as the bcrypt module
+// regardless of the host Node's ESM/CJS interop behaviour.
+//
+// Without this fix, `(await import('bcryptjs')).compare` is undefined on
+// Node ≥ 22 when tsx / next compile this file as ESM, and verifyPassword
+// silently returns false for every login attempt — locking out every
+// credentials user.
+const bcryptModule = import('bcryptjs').then((m) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const namespace: any = m;
+    return namespace.default ?? namespace;
+});
 
 /** Current default bcrypt work factor. OWASP 2024 floor for bcrypt is 10. */
 export const BCRYPT_COST = 12;
