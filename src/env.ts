@@ -116,6 +116,13 @@ export const env = createEnv({
         // orchestrator or secret-manager only. When unset, the endpoint
         // returns 503 "Platform admin API not configured".
         PLATFORM_ADMIN_API_KEY: z.string().min(32).optional(),
+
+        // R-4: zero-downtime rotation. During key swap, set this to the
+        // OUTGOING key alongside the new PLATFORM_ADMIN_API_KEY. The
+        // verifier accepts either; once you've confirmed callers use the
+        // new key, drop this from env. Same shape as
+        // DATA_ENCRYPTION_KEY_PREVIOUS.
+        PLATFORM_ADMIN_API_KEY_PREVIOUS: z.string().min(32).optional(),
     },
 
     /**
@@ -196,6 +203,7 @@ export const env = createEnv({
 
         AUDIT_STREAM_RETRY_ENABLED: process.env.AUDIT_STREAM_RETRY_ENABLED,
         PLATFORM_ADMIN_API_KEY: process.env.PLATFORM_ADMIN_API_KEY,
+        PLATFORM_ADMIN_API_KEY_PREVIOUS: process.env.PLATFORM_ADMIN_API_KEY_PREVIOUS,
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

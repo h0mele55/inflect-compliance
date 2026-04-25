@@ -156,8 +156,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
          * Sign-in alone grants authentication, never tenant membership.
          * Uninvited OAuth users land on /no-tenant after this callback.
          */
-        async signIn({ user, account }) {
+        async signIn({ user, account, profile }) {
             if (!account) return true;
+
+            // ── R-3: Defensive email-verified check for OAuth ──
+            // We trust Google / Microsoft / SAML to verify the email
+            // before issuing a token. If a provider explicitly sets
+            // `email_verified: false`, reject the sign-in entirely —
+            // an unverified email could let an attacker redeem an
+            // invite addressed to someone they don't control.
+            //
+            // When `email_verified` is `undefined`, accept. Some
+            // providers (notably Microsoft Entra ID and most SAML
+            // IdPs) don't set this claim at all; rejecting on
+            // missing-claim would break legitimate sign-ins.
+            if (
+                account.provider !== 'credentials' &&
+                profile &&
+                'email_verified' in profile &&
+                profile.email_verified === false
+            ) {
+                edgeLogger.warn('signIn rejected: provider reported email_verified=false', {
+                    component: 'auth',
+                    provider: account.provider,
+                    email: user.email,
+                });
+                return false;
+            }
 
             // Invite token lives in a short-lived HttpOnly cookie set by
             // /api/invites/:token/start-signin before OAuth redirect.

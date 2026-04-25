@@ -38,6 +38,7 @@ describe('No console.* in backend server code', () => {
     const CONSOLE_ALLOWLIST = new Set([
         'lib/observability/edge-logger.ts',   // Edge runtime console adapter
         'lib/api-client.ts',                   // Client-side dev validation
+        'instrumentation.ts',                  // Pre-init bootstrap (R-6 startup abort runs before logger)
     ]);
 
     // Dub-ported modules use console.* by upstream design

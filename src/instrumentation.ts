@@ -6,6 +6,28 @@
 export async function register() {
     // Only initialize on the server (Node.js runtime), not Edge.
     if (process.env.NEXT_RUNTIME === 'nodejs' || !process.env.NEXT_RUNTIME) {
+        // ── R-6: Redis is required in production ──
+        // Rate limits, BullMQ jobs, and caching all degrade silently
+        // when REDIS_URL is unset. In dev/test that's intentional
+        // (graceful fallback). In production it's a security control
+        // failure: the rate-limit middleware that gates login + invite
+        // redemption + email dispatch becomes a no-op.
+        // Fail loudly at startup rather than silently in the audit log.
+        if (
+            process.env.NODE_ENV === 'production' &&
+            !process.env.REDIS_URL &&
+            process.env.RATE_LIMIT_ENABLED !== '0'
+        ) {
+            // eslint-disable-next-line no-console
+            console.error(
+                '[startup] FATAL: REDIS_URL is required in production ' +
+                '(rate limits, jobs, and caching depend on it). ' +
+                'Set REDIS_URL or explicitly disable rate limits with ' +
+                'RATE_LIMIT_ENABLED=0 (NOT recommended in prod).',
+            );
+            process.exit(1);
+        }
+
         // Bump EventEmitter cap so undici's keep-alive socket pooling
         // doesn't trigger spurious MaxListenersExceededWarning lines for
         // the per-socket unpipe/error/close/finish listeners that

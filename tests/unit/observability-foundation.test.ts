@@ -36,6 +36,10 @@ describe('console.* usage guard', () => {
             'lib/observability/edge-logger.ts',
             // Client-side API helper (dev-only zod validation warning)
             'lib/api-client.ts',
+            // Pre-init bootstrap: this is THE file that runs before logger
+            // bootstraps. R-6 startup-abort message uses console.error
+            // because no other sink exists at that point.
+            'instrumentation.ts',
         ]);
 
         // Dub-ported utility files — these use console.* by upstream design

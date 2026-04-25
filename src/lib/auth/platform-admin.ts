@@ -55,30 +55,37 @@ export function verifyPlatformApiKey(req: NextRequest): void {
     }
 
     const provided = req.headers.get(HEADER) ?? '';
-    const expected = env.PLATFORM_ADMIN_API_KEY;
 
-    // Constant-time comparison. Buffers must be the same length for
-    // timingSafeEqual — we compare against the expected length so an
-    // attacker learns nothing from varying the supplied length. If
-    // lengths differ, pad/truncate the provided buffer then force a
-    // mismatch via a known-bad byte injected at a fixed position.
+    // R-4: zero-downtime rotation. Accept either the current key OR
+    // the previous one (when the operator has set it during a
+    // rotation window). Both checks run in constant time; we never
+    // short-circuit even on the first match because timing equality
+    // across keys must hold.
+    const currentMatch = constantTimeKeyMatch(provided, env.PLATFORM_ADMIN_API_KEY);
+    const previousMatch =
+        env.PLATFORM_ADMIN_API_KEY_PREVIOUS !== undefined
+            ? constantTimeKeyMatch(provided, env.PLATFORM_ADMIN_API_KEY_PREVIOUS)
+            : false;
+
+    if (!currentMatch && !previousMatch) {
+        throw new PlatformAdminError(401, 'Unauthorized');
+    }
+}
+
+/**
+ * Constant-time compare provided string against expected key.
+ * Returns true on match, false otherwise. Length differences are
+ * handled by padding so timingSafeEqual still runs uniformly.
+ */
+function constantTimeKeyMatch(provided: string, expected: string): boolean {
     const a = Buffer.alloc(expected.length);
     const b = Buffer.from(expected, 'utf8');
 
-    // Write provided bytes — excess bytes are silently truncated by
-    // Buffer.write; short writes leave the remainder as 0x00.
     a.write(provided, 'utf8');
 
-    // Force a mismatch when lengths differ so the timingSafeEqual
-    // still runs in constant time without giving a length oracle.
     if (provided.length !== expected.length) {
-        // Flip the first byte of `a` so equality is impossible even
-        // if the prefix matches. XOR with 0xFF is guaranteed to differ
-        // from the original for any byte value.
         a[0] = a[0] ^ 0xff;
     }
 
-    if (!timingSafeEqual(a, b)) {
-        throw new PlatformAdminError(401, 'Unauthorized');
-    }
+    return timingSafeEqual(a, b);
 }
