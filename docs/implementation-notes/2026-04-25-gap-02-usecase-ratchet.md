@@ -83,24 +83,31 @@ unchanged. The usecase coverage ratchet is the durable lever for
 GAP-02 specifically; the global will lift naturally as `src/lib/`
 coverage tightens in a future hardening pass.
 
-## Remaining high-risk uncovered usecases
+## Wave 5 (2026-04-25) — addendum
 
-The following usecases scored highly on the GAP-02 risk model
-(auth-sensitive + tenant-scoped + branchy + heavily mutating) but
-are not yet covered by Waves 1-4. Each is a candidate for a Wave 5
-in a future hardening pass:
+Wave 5 closed four files from the original next-tranche list. 66
+new tests across 4 suites, lifting per-path coverage from
+36.29/29.60/47.83 → 40.57/33.73/52.42 (br/fn/lines). Threshold
+ratcheted to 37/30/49/46 in the same commit.
+
+| Closed | File | Tests | Focus |
+|--------|------|------:|-------|
+| ✓ | `control-test.ts` | 17 | Plan/run lifecycle, FAIL → CONTROL_GAP fan-out, sanitisation, fire-and-forget task creation. |
+| ✓ | `tenant-invites.ts` | 21 | Token mint, OWNER guard, atomic claim, email-binding burns leaked tokens. |
+| ✓ | `scim-users.ts` | 18 | ADMIN-block on every SCIM path, tenant scoping, idempotent reactivation. |
+| ✓ | `audit-readiness-scoring.ts` | 9 | Weight invariants, archived-evidence exclusion, CSV export audit emit. |
+
+## Remaining high-risk uncovered usecases (Wave 6+)
+
+Each file is still a candidate for the next hardening pass:
 
 | Usecase | Lines | Why it matters |
 |---------|------:|----------------|
-| `sso.ts` | 565 | SSO assertion validation, IdP metadata import, attribute mapping. Auth surface — bypass = silent tenant join. |
-| `scim-users.ts` | 557 | SCIM user provisioning. Cross-tenant id manipulation = cross-tenant membership grant. |
-| `audit-readiness-scoring.ts` | 543 | Computes the score auditors and CISOs see. A bug here is a wrong number on every dashboard. |
-| `gap-analysis.ts` | 531 | Maps controls to framework requirements. Wrong mapping = false coverage claims. |
+| `sso.ts` | 565 | SSO assertion validation, IdP metadata import, attribute mapping. Auth surface — bypass = silent tenant join. (Partial coverage exists in `sso-usecases.test.ts`; extend.) |
+| `gap-analysis.ts` | 531 | Maps controls to framework requirements. Wrong mapping = false coverage claims. (Partial coverage exists in `gap-analysis-usecase.test.ts`; extend.) |
 | `webhook-processor.ts` | 484 | Inbound webhook dispatcher. Mis-routing = events lost or duplicated. |
 | `editable-lifecycle-usecase.ts` | 479 | Soft-delete / restore / purge fan-out. Wrong scope = cross-tenant delete. |
 | `audit-readiness/packs.ts` | 476 | Pack lifecycle: freeze, share, item snapshot. Frozen-pack mutation = audit-trail corruption. |
-| `control-test.ts` | 475 | Test-plan create / update with sanitisation. Was on the Wave 2 list, deferred. |
-| `tenant-invites.ts` | 436 | Invite token mint / redeem / revoke. Already audit-covered at the redeem path; mint + revoke gaps remain. |
 | `test-hardening.ts` | 377 | Step-locking and result hash chaining. Chain regression = audit-pack corruption. |
 | `onboarding-automation.ts` | 377 | Phase-2 automation actions (framework install, asset import). Idempotency-critical. |
 | `tenant-admin.ts` | 348 | Member role + status mutations. Already partially covered via tenant-lifecycle; member-mutation paths remain. |
@@ -108,5 +115,5 @@ in a future hardening pass:
 | `soa.ts` | 320 | Statement of Applicability — the document that goes to external auditors verbatim. |
 | `custom-roles.ts` | 307 | Custom role permission resolution. Wrong overlay = privilege escalation. |
 
-When a Wave 5 PR lands, this list should shrink and the ratchet
+When a Wave 6 PR lands, this list should shrink and the ratchet
 should be raised again to lock in the gain. Repeat until exhausted.

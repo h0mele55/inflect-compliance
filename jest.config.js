@@ -232,25 +232,30 @@ module.exports = {
             statements: 60,
         },
         // Per-path threshold for the usecase layer — the durable
-        // GAP-02 lever. Raised 2026-04-25 after Waves 1-4 closed:
-        //   17→33  branches
-        //   14→26  functions
-        //   27→45  lines
-        //   24→42  statements
-        // Last observed canonical run (post Waves 1-4):
-        //   branches=36.29%  functions=29.60%
-        //   lines=47.83%     statements≈45%
+        // GAP-02 lever. Raise history (each row = the diff of that
+        // wave; ratchet only goes UP):
+        //   2026-04-22  baseline calibrated to observed reality
+        //                 17/14/27/24  br/fn/lines/stmts
+        //   2026-04-25  Waves 1-4: closed top-20 risk-ranked list
+        //                 → 33/26/45/42
+        //   2026-04-25  Wave 5: scim-users + tenant-invites +
+        //                 control-test + audit-readiness-scoring
+        //                 (66 new tests, 4 files)
+        //                 → 37/30/49/46
+        // Last observed canonical run (post Wave 5):
+        //   branches=40.57%  functions=33.73%
+        //   lines=52.42%     statements≈50%
         // Buffer is ~3% below observed — stays inside the strict-
         // ratchet posture without breaking on parallel-worker jitter.
-        // Next tranche (`sso`, `scim-users`, `audit-readiness-scoring`,
-        // `gap-analysis`, etc.) is documented in the 2026-04-25
-        // implementation note; raise these numbers when those
-        // tranche tests land.
+        // Next tranche: `sso` (existing tests partial — extend),
+        // `audit-readiness/packs`, `webhook-processor`,
+        // `editable-lifecycle-usecase`, `gap-analysis` (extend).
+        // See 2026-04-25 implementation note for the full list.
         './src/app-layer/usecases/': {
-            branches: 33,
-            functions: 26,
-            lines: 45,
-            statements: 42,
+            branches: 37,
+            functions: 30,
+            lines: 49,
+            statements: 46,
         },
         './src/lib/': {
             branches: 48,
