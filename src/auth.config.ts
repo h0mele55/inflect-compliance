@@ -69,6 +69,35 @@ export default {
         error: '/login',
     },
     session: { strategy: 'jwt' },
+    callbacks: {
+        /**
+         * Edge-safe session callback — maps custom JWT token fields into the
+         * session object so middleware (which uses this edge config) can read
+         * `req.auth.user.memberships` for the tenant-access gate.
+         *
+         * Must stay pure (no DB, no Node.js builtins) because this runs in
+         * the Edge Runtime via src/middleware.ts.
+         *
+         * Kept minimal: only the fields the middleware actually needs.
+         * The full session enrichment (role, tenantId, mfaPending, …) lives
+         * in the Node-side session callback in src/auth.ts.
+         */
+        session({ session, token }) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const t = token as any;
+            // Map the memberships array — needed by the middleware tenant-access gate.
+            if (Array.isArray(t.memberships)) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (session.user as any).memberships = t.memberships;
+            }
+            // Map role — needed by the middleware admin-path gate.
+            if (t.role) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (session.user as any).role = t.role;
+            }
+            return session;
+        },
+    },
     cookies: {
         sessionToken: {
             name:

@@ -71,7 +71,8 @@ const authMiddleware = auth(async (req) => {
     if (isAdminPath(pathname)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const role = (req.auth as any)?.user?.role;
-        const ADMIN_ROLES = new Set(['ADMIN']);
+        // OWNER is strictly superior to ADMIN (see CLAUDE.md RBAC section).
+        const ADMIN_ROLES = new Set(['ADMIN', 'OWNER']);
         if (!role || !ADMIN_ROLES.has(role)) {
             if (isApiRoute(pathname)) {
                 return forbiddenJson('Admin access required');
