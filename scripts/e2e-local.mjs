@@ -49,6 +49,16 @@ const env = {
     AUTH_URL: envVars.AUTH_URL || process.env.AUTH_URL || 'http://127.0.0.1:3006',
     PORT: '3006',
     NODE_ENV: 'test',
+    // `next start` resets process.env.NODE_ENV to "production" at
+    // runtime regardless of what cross-env passed in. The Epic B
+    // encryption module reads NODE_ENV at runtime and demands a real
+    // DATA_ENCRYPTION_KEY when it sees "production" — so we provide
+    // a deterministic 32+ char test key here. NOT a real secret;
+    // visible in source so no operator confuses it for prod.
+    DATA_ENCRYPTION_KEY:
+        envVars.DATA_ENCRYPTION_KEY ||
+        process.env.DATA_ENCRYPTION_KEY ||
+        'e2e-deterministic-test-encryption-key-32+-chars',
 };
 
 const uploadDir = env.FILE_STORAGE_ROOT || env.UPLOAD_DIR || join(ROOT, 'tmp', 'test-uploads');
@@ -61,7 +71,13 @@ function run(cmd, label, extraEnv = {}) {
     console.log(`${'═'.repeat(60)}`);
     console.log(`  → ${cmd}\n`);
     try {
-        execSync(cmd, { cwd: ROOT, env: stepEnv, stdio: 'inherit', timeout: 600_000 });
+        // 30-min timeout. The Playwright phase alone runs ~11 min on
+        // `next start` (production mode), and historically ~38 min on
+        // `next dev`. The previous 10-min cap aborted the wrapper
+        // mid-suite even though all tests passed — the playwright
+        // child stayed alive but execSync threw ETIMEDOUT. Generous
+        // budget here covers the full pipeline + retries.
+        execSync(cmd, { cwd: ROOT, env: stepEnv, stdio: 'inherit', timeout: 1_800_000 });
     } catch (err) {
         console.error(`\n❌ FAILED: ${label}`);
         process.exit(1);
@@ -80,7 +96,17 @@ if (!SKIP_DB) {
 
 // ── 2. Generate + Migrate + Seed ──
 run('npx prisma generate', '2/6  Generate Prisma client');
-run('npx prisma db push --force-reset --accept-data-loss', '3/6a Reset test database');
+// `prisma db push --force-reset` was the historical default but it
+// SKIPS migrations entirely — applying schema.prisma directly. That
+// means the RLS-setup migration (which `GRANT`s SELECT/INSERT/UPDATE/
+// DELETE on every table to `app_user`, plus `ALTER DEFAULT PRIVILEGES`
+// for future tables) never runs, and every `runInTenantContext` query
+// fails with `permission denied for schema public`. Use `migrate
+// reset` so the migration history applies in order, then seed.
+//
+// `--skip-seed` because we run the seed step explicitly below — that
+// way seed errors surface in 3/6b rather than hiding inside reset.
+run('npx prisma migrate reset --force --skip-seed', '3/6a Reset test database');
 run('npx tsx prisma/seed.ts', '3/6b Seed test data');
 
 // ── 4. Build ──
@@ -89,9 +115,15 @@ run('npx tsx prisma/seed.ts', '3/6b Seed test data');
 // crashes with `Cannot read properties of undefined (reading 'os')`
 // on this machine. The webServer.command in playwright.config.ts
 // already sets the same flag for runtime; the build step needs it too.
+// NEXT_TEST_MODE=1 routes the build to `.next-test/` (see distDir in
+// next.config.js). The webServer command in playwright.config.ts also
+// sets NEXT_TEST_MODE so `next start` reads from the same distDir; if
+// the build skipped this flag the test server would error
+// `Could not find a production build in the '.next-test' directory`.
 run('npx next build', '4/6  Build Next.js (production)', {
     NODE_ENV: 'production',
     NEXT_IGNORE_INCORRECT_LOCKFILE: '1',
+    NEXT_TEST_MODE: '1',
 });
 
 // ── 5. Install Playwright browsers ──

@@ -11,19 +11,24 @@ export default defineConfig({
     timeout: 180_000,
     fullyParallel: false,
     forbidOnly: isCI,
-    // CI builds and runs against `next start` (production mode) — a fresh
-    // pre-compiled server that handles the full serial suite cleanly, so
-    // 2 retries are just belt-and-braces for remote-infra hiccups.
+    // BOTH CI and local runs use `next start` (production mode) — a
+    // pre-compiled server that handles the full serial suite cleanly.
+    // We previously used `next dev` locally, which JIT-compiles routes
+    // and leaks memory over long sessions. The 30-ish spec serial suite
+    // ran ~38 min and the dev server consistently degraded near the
+    // end (ECONNREFUSED, 30-60s selector timeouts on pages that render
+    // fine in isolation), producing 2-3 spurious failures per run that
+    // 1 retry couldn't recover from because the server stayed slow.
     //
-    // Local runs hit `next dev` (see `webServer.command` below) which JIT-
-    // compiles routes and leaks memory over long sessions. The 30-ish spec
-    // serial suite is long enough (~35 min) that the dev server starts
-    // degrading near the end — symptoms are intermittent ECONNREFUSED /
-    // 30-60s selector timeouts on pages that render fine in isolation.
-    // 1 retry converts those transient server-pressure flakes into a
-    // self-healing run without masking deterministic regressions (a real
-    // bug will fail both the original attempt and the retry).
-    retries: isCI ? 2 : 1,
+    // `scripts/e2e-local.mjs` already runs `next build` before kicking
+    // off Playwright, so the build artifact is always fresh. Direct
+    // `npx playwright test` invocations need a prior `npx next build`
+    // (without it, `next start` errors out with a clear message).
+    //
+    // 2 retries on both — local can still hit transient localhost
+    // races, but production-mode server eliminates the systematic
+    // degradation flakes that were the dominant failure mode.
+    retries: 2,
     workers: 1,
     reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
     use: {
@@ -44,9 +49,11 @@ export default defineConfig({
         // /api/auth/* request — any mismatch causes login redirects to land on
         // the wrong host and surfaces as spurious MissingCSRF / stuck-login
         // failures in Playwright.
-        command: isCI
-            ? `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 AUTH_URL=http://localhost:${port} NEXTAUTH_URL=http://localhost:${port} PORT=${port} npx next start -p ${port}`
-            : `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 AUTH_URL=http://localhost:${port} NEXTAUTH_URL=http://localhost:${port} npx next dev -p ${port}`,
+        // Both CI and local use `next start` (production mode). See the
+        // retries comment above for why local stopped using `next dev`.
+        // PORT must be set explicitly because `next start -p` doesn't
+        // propagate to the env that `auth-config.ts` reads at startup.
+        command: `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 AUTH_URL=http://localhost:${port} NEXTAUTH_URL=http://localhost:${port} PORT=${port} npx next start -p ${port}`,
         port,
         reuseExistingServer: !isCI,
         timeout: 120_000,
