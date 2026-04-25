@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
-import { handlers } from '@/auth';
+import NextAuth from 'next-auth';
+import { authOptions } from '@/auth';
 import {
     enforceRateLimit,
     isRateLimitBypassed,
@@ -9,9 +10,14 @@ import {
 /** NextAuth handlers are request-dependent — never statically generate. */
 export const dynamic = 'force-dynamic';
 
+// GAP-04 — v4 returns a single handler function. We split GET/POST so
+// we can wrap POST with the LOGIN_LIMIT check while leaving GET (CSRF
+// tokens, provider list, session reads) at zero overhead.
+const handler = NextAuth(authOptions);
+
 // GET is for CSRF tokens, provider list, and session reads — not a
 // brute-forceable surface, so we leave it untouched.
-export const { GET } = handlers;
+export const GET = handler;
 
 /**
  * POST carries every sign-in / sign-out / callback flow. This is the
@@ -39,5 +45,5 @@ export async function POST(req: NextRequest) {
         if (response) return response;
     }
 
-    return handlers.POST(req);
+    return handler(req);
 }

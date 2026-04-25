@@ -16,12 +16,14 @@
  * covers only the UI layer which has its own contract.
  */
 
-// NextAuth v5 + its transitive deps ship as ESM. The edge/node auth
-// split makes middleware.ts import `next-auth` directly, so any test
-// (node or jsdom) that touches middleware needs these packages
-// transformed by ts-jest rather than ignored as raw ESM.
-const ESM_TRANSFORM_ALLOW_LIST =
-    'next-auth|@auth/[^/]+|oauth4webapi|jose|preact|preact-render-to-string';
+// GAP-04 — post NextAuth v4 migration the ESM transform allowlist
+// is much shorter. v4 ships as CJS so `next-auth` itself doesn't
+// need transforming. The remaining entries (`jose`, `preact`,
+// `preact-render-to-string`) are kept because they're transitive ESM
+// deps of providers that v4 still pulls in (e.g. JWT signing via
+// jose). `oauth4webapi` and `@auth/*` were v5-specific and can be
+// dropped from the allowlist.
+const ESM_TRANSFORM_ALLOW_LIST = 'jose|preact|preact-render-to-string';
 
 /** @type {import('jest').Config} */
 const nodeProject = {

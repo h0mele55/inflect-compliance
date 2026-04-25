@@ -5,22 +5,14 @@ jest.mock('../../src/lib/rate-limit/authRateLimit', () => ({
     checkAuthRateLimit: jest.fn().mockResolvedValue({ ok: true })
 }));
 
-// Mock next-auth itself so we don't load the ESM module. Middleware
-// instantiates `auth()` from authConfig via `NextAuth(authConfig)` at
-// module scope — this mock replaces that boot-time wiring with a
-// pass-through that lets the middleware's body run normally.
-jest.mock('next-auth', () => ({
-    __esModule: true,
-    default: jest.fn(() => ({
-        auth: (handler: (req: unknown) => unknown) => handler,
-    })),
-}));
-
-// The edge auth config imports @/env — for the CORS-only unit test
-// we don't need real OAuth provider wiring.
-jest.mock('../../src/auth.config', () => ({
-    __esModule: true,
-    default: { providers: [], session: { strategy: 'jwt' }, pages: {} },
+// GAP-04 — v4 migration: middleware now uses `getToken()` directly,
+// not the v5 `auth()` async wrapper. Mock `next-auth/jwt` so the
+// CORS-only unit test doesn't try to verify a real JWT cookie.
+// Returning `null` from getToken is "no auth", which routes through
+// the public-path / unauth branches — fine for CORS preflight tests
+// which exercise the OPTIONS path before auth runs.
+jest.mock('next-auth/jwt', () => ({
+    getToken: jest.fn().mockResolvedValue(null),
 }));
 
 import middleware from '../../src/middleware';

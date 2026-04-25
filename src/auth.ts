@@ -1,22 +1,57 @@
-import NextAuth from 'next-auth';
-import type { NextAuthConfig } from 'next-auth';
+/**
+ * Auth.js (NextAuth v4) configuration — single consolidated module.
+ *
+ * GAP-04 — migrated from `next-auth@5.0.0-beta.30` (where the auth
+ * config was split into edge-safe `auth.config.ts` + node-only
+ * `auth.ts`) to `next-auth@4.24.14` (stable). v4 doesn't need the
+ * edge/node split because the middleware uses `getToken()` directly
+ * rather than the v5 `auth()` async wrapper.
+ *
+ * Exports:
+ *   - `authOptions` — the canonical config consumed by every server-
+ *     side helper that needs the session (`getServerSession(authOptions)`)
+ *     and by the catch-all route handler.
+ *   - `auth` — back-compat alias for `() => getServerSession(authOptions)`
+ *     so the migration doesn't churn the 15 server-component import
+ *     sites in a single PR. The alias has the same return shape as
+ *     v5's `auth()` (Session | null) but is sync-callable from server
+ *     contexts. New code should call `getServerSession(authOptions)`
+ *     directly.
+ *
+ * Architecture preserved from the v5-beta era:
+ *   - JWT session strategy (no Session table writes).
+ *   - PrismaAdapter for the Account-linking + User row lifecycle.
+ *   - Three callbacks: signIn (account linking + invite redemption),
+ *     jwt (MFA + session-tracking + token refresh + sessionVersion),
+ *     session (selective field exposure to client).
+ *   - Module augmentation in `next-auth` (Session.user) and
+ *     `next-auth/jwt` (custom token fields) — eliminates the 8
+ *     `as any` casts the v5-beta type drift required.
+ */
+
+import type { NextAuthOptions, Session, User } from 'next-auth';
+import { getServerSession } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { PrismaAdapter } from '@auth/prisma-adapter';
+import Google from 'next-auth/providers/google';
+// GAP-04 — v5 renamed `azure-ad` → `microsoft-entra-id` to track
+// Microsoft's product rename. v4 still ships under the original name.
+// Same provider, same OAuth endpoints, same scopes.
+import AzureAD from 'next-auth/providers/azure-ad';
+import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import prisma from '@/lib/prisma';
+import { env } from '@/env';
 import { authenticateWithPassword } from '@/lib/auth/credentials';
 import { isTokenExpired, refreshAccessToken } from '@/lib/auth/refresh';
 import type { Role } from '@prisma/client';
-
-import authConfig from './auth.config';
 import { edgeLogger } from '@/lib/observability/edge-logger';
 
-// Note: AUTH_SECRET is required at runtime. Auth.js v5 will
-// throw a descriptive error if it is missing at request time.
+// ─── Type augmentation ──────────────────────────────────────────────
+//
+// GAP-04 — the v5-beta type instability that drove 8 `as any` casts
+// across auth.ts/auth.config.ts/middleware.ts is resolved here by
+// declaring both Session.user AND the JWT shape so middleware +
+// server-component reads are typed end-to-end.
 
-/**
- * Extend Auth.js types for our custom session fields.
- * access_token and refresh_token are NEVER exposed to the client-side session.
- */
 /** One entry per active membership the user holds. */
 export interface MembershipEntry {
     slug: string;
@@ -40,29 +75,68 @@ declare module 'next-auth' {
     }
 }
 
-// JWT already extends Record<string, unknown> in NextAuth v5 (@auth/core),
-// so custom fields like `memberships` can be stored directly without a
-// module augmentation. The MembershipEntry type is used for casting at
-// read sites.
+declare module 'next-auth/jwt' {
+    interface JWT {
+        userId?: string;
+        sessionVersion?: number;
+        sessionVersionCheckedAt?: number;
+        tenantId?: string | null;
+        tenantSlug?: string | null;
+        role?: Role;
+        mfaPending?: boolean;
+        mfaFailClosed?: boolean;
+        memberships?: MembershipEntry[];
+        /** Provider name when the user signed in via OAuth. */
+        provider?: string;
+        accessToken?: string;
+        refreshToken?: string;
+        expiresAt?: number;
+        /** Operational session row id (Epic C.3). */
+        userSessionId?: string;
+        /** Soft-error flag — surfaces `RefreshTokenError` / `SessionRevoked` / `MfaDependencyFailure`. */
+        error?: string;
+    }
+}
 
-// Providers list starts with the edge-safe OAuth providers from
-// auth.config.ts and extends with the Node-only Credentials provider.
-// The edge config can't carry Credentials because authenticateWithPassword
-// transitively imports node:crypto (via security-events.ts hashing) and
-// Prisma — neither of which is resolvable in the Edge Runtime.
-const providers: NextAuthConfig['providers'] = [...authConfig.providers];
-
-// Credentials provider — production-grade email+password auth.
+// ─── Providers ──────────────────────────────────────────────────────
 //
-// Previously gated behind `AUTH_TEST_MODE === '1' || NODE_ENV !== 'production'`
-// on the grounds that the inline bcrypt.compare + no-enumeration-protection
-// implementation wasn't safe to face the internet. The production path now
-// lives in `src/lib/auth/credentials.ts` (account-enumeration-safe, timing-
-// equalised, email-verification-gate-ready, silent-rehash-on-verify) so the
-// provider is always registered. Whether the login UI shows the email/
-// password *form* is a separate orthogonal decision — the login page calls
-// `getProviders()` and renders conditionally (see src/app/login/page.tsx).
-providers.push(
+// Edge-safe providers (Google, MicrosoftEntraID) used to live in a
+// separate `auth.config.ts` because v5's middleware-side `auth()`
+// wrapper bundled the full config into the Edge runtime. v4's
+// middleware uses `getToken()` directly, which only verifies the JWT
+// cookie — providers are never bundled into the Edge bundle. So the
+// split is no longer required.
+
+const providers: NextAuthOptions['providers'] = [
+    Google({
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        authorization: {
+            params: {
+                access_type: 'offline',
+                prompt: 'consent',
+                scope: 'openid email profile',
+            },
+        },
+    }),
+    AzureAD({
+        clientId: env.MICROSOFT_CLIENT_ID,
+        clientSecret: env.MICROSOFT_CLIENT_SECRET,
+        tenantId: env.MICROSOFT_TENANT_ID,
+        authorization: {
+            params: {
+                scope: 'openid email profile offline_access',
+            },
+        },
+    }),
+    // Credentials — production-grade email+password auth.
+    //
+    // The hardened path lives in `src/lib/auth/credentials.ts`
+    // (account-enumeration-safe, timing-equalised, email-verification-
+    // gate-ready, silent-rehash-on-verify). The provider is always
+    // registered; whether the login UI shows the email/password *form*
+    // is a separate decision made in `src/app/login/page.tsx` based on
+    // `getProviders()`.
     Credentials({
         id: 'credentials',
         name: 'Email and password',
@@ -78,10 +152,7 @@ providers.push(
             // NextAuth surfaces any non-null return as a successful sign-in
             // and dispatches the `signIn` + `jwt` callbacks. Returning null
             // collapses every failure reason into the same client-facing
-            // `CredentialsSignin` error — which is exactly the account-
-            // enumeration-safe shape we want. Callers that need the typed
-            // reason (for audit logging, rate-limit reasons) should invoke
-            // authenticateWithPassword directly rather than signIn.
+            // `CredentialsSignin` error — the account-enumeration-safe shape.
             if (!result.ok) return null;
             return {
                 id: result.userId,
@@ -90,22 +161,13 @@ providers.push(
             };
         },
     }),
-);
+];
 
-/**
- * Redeem a tenant-invite token at sign-in time.
- *
- * The token arrives via a cookie set by the `/api/invites/<token>/start-signin`
- * route before the user clicked "sign in to accept".
- *
- * NO-OP when no invite is in flight. That is the point of this function:
- * sign-in alone grants authentication, never tenant membership.
- *
- * Membership is created ONLY via:
- *   1. Token redemption here or through POST /api/invites/:token
- *   2. createTenantWithOwner (platform-admin tenant creation)
- * No other path exists. A guardrail test in PR 5 will enforce this.
- */
+// ─── Invite-redemption helpers ──────────────────────────────────────
+//
+// Sign-in alone grants AUTHENTICATION; tenant membership is created
+// ONLY via redemption of a token-bound invite (Epic 1, GAP-01 closure).
+
 async function ensureTenantMembershipFromInvite(
     userId: string,
     userEmail: string,
@@ -127,15 +189,6 @@ async function ensureTenantMembershipFromInvite(
     }
 }
 
-/**
- * Read the invite token from the `inflect_invite_token` cookie.
- *
- * The cookie is set by `/api/invites/<token>/start-signin` before the user
- * is redirected to /login. It is HttpOnly and expires in 10 min.
- *
- * Returns null if the cookie is absent or if cookies() is unavailable
- * (some NextAuth internal invocations run outside a Request context).
- */
 async function readInviteTokenFromCookies(): Promise<string | null> {
     try {
         const { cookies } = await import('next/headers');
@@ -147,43 +200,36 @@ async function readInviteTokenFromCookies(): Promise<string | null> {
     }
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-    ...authConfig,
-    adapter: PrismaAdapter(prisma) as NextAuthConfig['adapter'],
+// ─── NextAuthOptions ────────────────────────────────────────────────
+
+export const authOptions: NextAuthOptions = {
+    adapter: PrismaAdapter(prisma) as NextAuthOptions['adapter'],
     providers,
+    pages: {
+        signIn: '/login',
+        error: '/login',
+    },
+    session: { strategy: 'jwt' },
+    secret: env.AUTH_SECRET,
     callbacks: {
         /**
-         * signIn callback — runs on EVERY sign-in attempt (not just the
-         * first). Does two things:
+         * signIn — runs on EVERY sign-in attempt. Two responsibilities:
          *
-         *   1. Account linking: if the OAuth email already matches a
-         *      User row created by a different provider, link the new
-         *      OAuth `Account` to the existing User rather than
-         *      creating a duplicate.
+         *   1. Account linking: if the OAuth email matches a User row
+         *      created by a different provider, link the new OAuth
+         *      `Account` to the existing User rather than creating a
+         *      duplicate.
          *
-         *   2. Invite redemption: if an `inflect_invite_token` cookie is
-         *      present (set by /api/invites/:token/start-signin before the
-         *      user was redirected to /login), redeem it to create a
-         *      TenantMembership. NO auto-join without an invite — this is
-         *      the GAP-01 closure.
+         *   2. Invite redemption: if an `inflect_invite_token` cookie
+         *      is present (set by /api/invites/:token/start-signin),
+         *      redeem it to create a TenantMembership.
          *
-         * Sign-in alone grants authentication, never tenant membership.
-         * Uninvited OAuth users land on /no-tenant after this callback.
+         * Sign-in alone grants AUTHENTICATION, not tenant membership.
          */
         async signIn({ user, account, profile }) {
             if (!account) return true;
 
-            // ── R-3: Defensive email-verified check for OAuth ──
-            // We trust Google / Microsoft / SAML to verify the email
-            // before issuing a token. If a provider explicitly sets
-            // `email_verified: false`, reject the sign-in entirely —
-            // an unverified email could let an attacker redeem an
-            // invite addressed to someone they don't control.
-            //
-            // When `email_verified` is `undefined`, accept. Some
-            // providers (notably Microsoft Entra ID and most SAML
-            // IdPs) don't set this claim at all; rejecting on
-            // missing-claim would break legitimate sign-ins.
+            // R-3: defensive email-verified check for OAuth.
             if (
                 account.provider !== 'credentials' &&
                 profile &&
@@ -193,16 +239,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 edgeLogger.warn('signIn rejected: provider reported email_verified=false', {
                     component: 'auth',
                     provider: account.provider,
-                    email: user.email,
+                    email: user.email ?? undefined,
                 });
                 return false;
             }
 
-            // Invite token lives in a short-lived HttpOnly cookie set by
-            // /api/invites/:token/start-signin before OAuth redirect.
             const inviteToken = await readInviteTokenFromCookies();
 
-            // ── 1. Account linking for OAuth (not credentials) ──
+            // 1. Account linking for OAuth (not credentials).
             if (account.provider !== 'credentials' && user.email) {
                 const existingUser = await prisma.user.findUnique({
                     where: { email: user.email },
@@ -235,8 +279,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                             },
                         });
                     }
-                    // Invite redemption uses the EXISTING user id, not the OAuth-
-                    // payload user.id. Use existingUser.id for that.
                     await ensureTenantMembershipFromInvite(
                         existingUser.id,
                         user.email,
@@ -246,7 +288,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 }
             }
 
-            // ── 2. Invite redemption (no auto-join) ──
+            // 2. Invite redemption (no auto-join).
             if (user.id && user.email) {
                 await ensureTenantMembershipFromInvite(
                     user.id,
@@ -258,13 +300,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
 
         /**
-         * JWT callback: enrich token with our custom fields.
-         * Handles token refresh for OAuth providers.
+         * jwt — enrich the token with custom fields, handle OAuth
+         * token refresh, and gate MFA + sessionVersion + Epic C.3
+         * session tracking.
          */
         async jwt({ token, user, account }) {
-            // Initial sign in
+            // Initial sign in.
             if (account && user) {
-                // Look up our internal user by email
                 const dbUser = await prisma.user.findUnique({
                     where: { email: token.email! },
                     include: {
@@ -283,37 +325,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     token.sessionVersion = dbUser.sessionVersion;
 
                     // R-1: store ALL active memberships so the middleware can allow
-                    // any slug the user is a member of. Routes look up the
-                    // currently-active membership by URL slug from this array.
+                    // any slug the user is a member of.
                     token.memberships = dbUser.tenantMemberships.map((m) => ({
                         slug: m.tenant.slug,
                         role: m.role,
                         tenantId: m.tenantId,
                     }));
 
-                    // Backward-compat: keep tenantId/tenantSlug/role as the "primary"
-                    // membership (oldest by createdAt). Code that hasn't been updated
-                    // to use memberships[] continues to read these.
-                    const memberships = token.memberships as MembershipEntry[];
-                    const primary = memberships[0];
+                    // Backward-compat: keep tenantId/tenantSlug/role as the
+                    // "primary" membership (oldest by createdAt).
+                    const primary = token.memberships[0];
                     if (primary) {
                         token.tenantId = primary.tenantId;
                         token.tenantSlug = primary.slug;
                         token.role = primary.role;
                     } else {
-                        // No membership — user has no tenant access yet
                         token.tenantId = null;
                         token.tenantSlug = null;
-                        token.role = 'READER' as Role;
+                        token.role = 'READER';
                     }
                 } else {
-                    token.userId = user.id!;
-                    token.role = 'READER' as Role;
+                    token.userId = user.id;
+                    token.role = 'READER';
                     token.sessionVersion = 0;
                     token.memberships = [];
                 }
 
-                // Store provider tokens for refresh (server-side JWT only)
                 if (account.provider !== 'credentials') {
                     token.provider = account.provider;
                     token.accessToken = (account.access_token as string) ?? undefined;
@@ -321,10 +358,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     token.expiresAt = (account.expires_at as number) ?? undefined;
                 }
 
-                // ── MFA enforcement check ──
-                // Determine if MFA challenge is needed based on tenant policy
+                // ── MFA enforcement ──
                 token.mfaPending = false;
-                const activeTenantId = (token.tenantId as string) || null;
+                const activeTenantId = token.tenantId ?? null;
                 if (activeTenantId) {
                     try {
                         const secSettings = await prisma.tenantSecuritySettings.findUnique({
@@ -332,16 +368,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                         });
                         const policy = secSettings?.mfaPolicy ?? 'DISABLED';
                         const failClosed = secSettings?.mfaFailClosed ?? false;
-
-                        // Cache fail-closed setting in token for subsequent requests
                         token.mfaFailClosed = failClosed;
 
                         if (policy === 'REQUIRED' || policy === 'OPTIONAL') {
-                            // Check if user has a verified MFA enrollment
                             const enrollment = await prisma.userMfaEnrollment.findUnique({
                                 where: {
                                     userId_tenantId_type: {
-                                        userId: token.userId as string,
+                                        userId: token.userId!,
                                         tenantId: activeTenantId,
                                         type: 'TOTP',
                                     },
@@ -349,18 +382,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                             });
 
                             if (policy === 'REQUIRED') {
-                                // REQUIRED: always challenge (enrolled+verified → challenge code;
-                                // not enrolled → redirect to enrollment)
                                 token.mfaPending = true;
                             } else if (policy === 'OPTIONAL' && enrollment?.isVerified) {
-                                // OPTIONAL: only challenge if user has voluntarily enrolled
                                 token.mfaPending = true;
                             }
                         }
                     } catch {
-                        // MFA dependency failure (DB outage, lookup error)
-                        // Fail-closed: deny access when tenant has opted in
-                        // Fail-open (default): allow through for availability
                         if (token.mfaFailClosed) {
                             token.mfaPending = true;
                             token.error = 'MfaDependencyFailure';
@@ -368,33 +395,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     }
                 }
 
-                // Epic C.3 — record an operational session row so the
-                // server can later list/revoke this specific session.
-                // Best-effort; a DB failure here logs but does not
-                // block sign-in (see session-tracker.ts).
+                // ── Epic C.3 — record operational session row ──
                 try {
                     const { recordNewSession } = await import(
                         '@/lib/security/session-tracker'
                     );
-                    // NextAuth defaults the JWT max-age to 30 days; we
-                    // mirror that here. If the auth.config maxAge ever
-                    // changes, plumb it through `token.expires` instead.
                     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
                     const recorded = await recordNewSession({
-                        userId: token.userId as string,
-                        tenantId: (token.tenantId as string) ?? null,
+                        userId: token.userId!,
+                        tenantId: token.tenantId ?? null,
                         expiresAt: new Date(Date.now() + THIRTY_DAYS_MS),
                     });
                     token.userSessionId = recorded.sessionId;
                 } catch {
-                    // Already swallowed in the helper; nothing left to do.
+                    // Already swallowed in the helper.
                 }
 
                 return token;
             }
 
-            // Epic C.3 — verify the session still exists + isn't revoked.
-            // Throttled `lastActiveAt` write happens inside the helper.
+            // ── Subsequent requests ──
+
+            // Epic C.3 — verify session row still exists + isn't revoked.
             if (typeof token.userSessionId === 'string' && token.userSessionId) {
                 try {
                     const { verifyAndTouchSession } = await import(
@@ -409,22 +431,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 } catch {
                     // Helper already logs; fail-open on telemetry-side
                     // failures so a transient DB blip doesn't sign every
-                    // user out. The classic sessionVersion check below
-                    // is still in force as a backstop.
+                    // user out.
                 }
             }
 
-            // Subsequent requests — check if OAuth token needs refresh
+            // OAuth token refresh.
             if (
                 token.provider &&
                 token.expiresAt &&
                 token.refreshToken &&
-                isTokenExpired(token.expiresAt as number)
+                isTokenExpired(token.expiresAt)
             ) {
                 try {
                     const refreshed = await refreshAccessToken(
-                        token.provider as string,
-                        token.refreshToken as string
+                        token.provider,
+                        token.refreshToken,
                     );
 
                     token.accessToken = refreshed.accessToken;
@@ -432,14 +453,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     if (refreshed.refreshToken) {
                         token.refreshToken = refreshed.refreshToken;
                     }
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    delete (token as any).error;
+                    delete token.error;
 
-                    // Update stored tokens in the database Account record
                     await prisma.account.updateMany({
                         where: {
-                            userId: token.userId as string,
-                            provider: token.provider as string,
+                            userId: token.userId!,
+                            provider: token.provider,
                         },
                         data: {
                             access_token: refreshed.accessToken,
@@ -449,20 +468,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                                 : {}),
                         },
                     });
-                } catch (error) {
+                } catch {
                     edgeLogger.error('Token refresh failed, forcing reauth', { component: 'auth' });
                     token.error = 'RefreshTokenError';
                 }
             }
 
-            // Check MFA challenge completion: if mfaPending, see if user completed challenge
+            // MFA challenge completion check.
             if (token.mfaPending === true && token.userId && token.tenantId) {
                 try {
                     const enrollment = await prisma.userMfaEnrollment.findUnique({
                         where: {
                             userId_tenantId_type: {
-                                userId: token.userId as string,
-                                tenantId: token.tenantId as string,
+                                userId: token.userId,
+                                tenantId: token.tenantId,
                                 type: 'TOTP',
                             },
                         },
@@ -470,45 +489,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     });
 
                     if (enrollment?.lastChallengeAt) {
-                        // Challenge was completed — check it's after token creation
-                        const tokenIat = (token.iat as number) || 0;
+                        const tokenIat = (token.iat as number | undefined) ?? 0;
                         const challengeTime = Math.floor(enrollment.lastChallengeAt.getTime() / 1000);
                         if (challengeTime >= tokenIat) {
                             token.mfaPending = false;
                         }
                     }
                 } catch {
-                    // MFA challenge completion check failed
-                    // Fail-closed: keep mfaPending=true (deny access)
-                    // Fail-open (default): don't block access
                     if (token.mfaFailClosed) {
-                        // mfaPending remains true — access is denied
                         token.error = 'MfaDependencyFailure';
                     } else {
-                        // Fail open — allow through
                         token.mfaPending = false;
                     }
                 }
             }
 
+            // Throttled sessionVersion check (5-minute interval).
             if (typeof token.sessionVersion === 'number' && token.userId) {
-                // Throttle: only re-check session version every 5 minutes to avoid
-                // a Prisma DB call on every single middleware-intercepted request.
                 const SESSION_CHECK_INTERVAL = 300; // seconds
                 const now = Math.floor(Date.now() / 1000);
-                const lastChecked = (token.sessionVersionCheckedAt as number) || 0;
+                const lastChecked = token.sessionVersionCheckedAt ?? 0;
                 if (now - lastChecked >= SESSION_CHECK_INTERVAL) {
                     try {
                         const currentUser = await prisma.user.findUnique({
-                            where: { id: token.userId as string },
+                            where: { id: token.userId },
                             select: { sessionVersion: true },
                         });
-                        if (currentUser && currentUser.sessionVersion > (token.sessionVersion as number)) {
+                        if (currentUser && currentUser.sessionVersion > token.sessionVersion) {
                             return { ...token, error: 'SessionRevoked' };
                         }
                         token.sessionVersionCheckedAt = now;
                     } catch {
-                        // If session version check fails, don't invalidate the session — fail open
+                        // Fail open on telemetry-side failures.
                     }
                 }
             }
@@ -517,20 +529,58 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         },
 
         /**
-         * Session callback: expose ONLY safe fields to the client.
+         * session — expose ONLY safe fields to the client.
          * NEVER include accessToken or refreshToken.
          */
         async session({ session, token }) {
             if (token) {
-                session.user.id = token.userId as string ?? token.sub!;
-                session.user.tenantId = (token.tenantId as string) ?? null;
-                session.user.role = (token.role as Role) ?? 'READER';
-                session.user.mfaPending = (token.mfaPending as boolean) ?? false;
-                // R-1: expose memberships array to the client session so the
-                // tenant picker can render the list without a DB hit.
-                session.user.memberships = (token.memberships as MembershipEntry[] | undefined) ?? [];
+                session.user.id = token.userId ?? token.sub!;
+                session.user.tenantId = token.tenantId ?? null;
+                session.user.role = token.role ?? 'READER';
+                session.user.mfaPending = token.mfaPending ?? false;
+                session.user.memberships = token.memberships ?? [];
             }
             return session;
         },
     },
-});
+};
+
+// ─── Server-side session helper ─────────────────────────────────────
+//
+// Back-compat alias for v5's `auth()` so the 15+ server-component
+// import sites don't all need to update in this PR. The name + return
+// shape match v5: `Session | null`. Internally it calls v4's
+// `getServerSession(authOptions)`.
+//
+// New code should call `getServerSession(authOptions)` directly to
+// make the dependency explicit at each call site.
+
+export async function auth(): Promise<Session | null> {
+    return getServerSession(authOptions);
+}
+
+// Re-export `getServerSession` for ergonomics.
+export { getServerSession };
+
+// ─── Server-side signOut shim ───────────────────────────────────────
+//
+// v5 exported a server-side `signOut()` from the NextAuth() return.
+// v4 does not — sign-out is a client-side `next-auth/react` flow OR a
+// direct DELETE of the session cookie. The two server components that
+// call `signOut()` (no-tenant page, tenant-picker page) use it to log
+// the user out before showing a "you don't have access" UI. We
+// preserve that behavior by providing a thin server-side helper that
+// redirects to the canonical NextAuth signout page.
+//
+// Returns a redirect Response that the page should `return`.
+export async function signOut(options?: {
+    redirectTo?: string;
+}): Promise<void> {
+    const { redirect } = await import('next/navigation');
+    const target = options?.redirectTo ?? '/login';
+    // NextAuth's signout endpoint clears the cookie and then redirects
+    // to `callbackUrl`. Hitting it from a server component this way
+    // matches the v5 behavior — the user lands at `target` with no
+    // active session. `redirect()` throws and never returns.
+    redirect(`/api/auth/signout?callbackUrl=${encodeURIComponent(target)}`);
+}

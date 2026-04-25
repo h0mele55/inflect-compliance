@@ -489,7 +489,11 @@ All structured logging, tracing, and metrics flow through `src/lib/observability
 
 ### Auth
 
-NextAuth 5 (beta) is configured in `src/auth.ts`. Providers: Google OAuth, Microsoft Entra ID, SAML (via `src/app/api/auth/sso/`), and Credentials. The JWT carries `tenantId`, `role`, and MFA state. Token refresh logic lives in `src/lib/auth/refresh.ts`.
+NextAuth v4.24.14 (stable) is configured in `src/auth.ts`. Providers: Google OAuth, Microsoft Entra ID (via the v4 `azure-ad` provider — same OAuth endpoints, Microsoft renamed the product), SAML (via `src/app/api/auth/sso/`), and Credentials. The JWT carries `tenantId`, `role`, `mfaPending`, `memberships[]`, and the Epic C.3 `userSessionId`. Token refresh logic lives in `src/lib/auth/refresh.ts`.
+
+**GAP-04 — type augmentation pattern.** `src/auth.ts` declares two module augmentations: `next-auth` for `Session.user` (id/tenantId/role/mfaPending/memberships) and `next-auth/jwt` for the full JWT shape (every custom field the codebase stores). Middleware reads typed `token.role` / `token.memberships` directly via `getToken({ req, secret })`. There are zero `as any` casts in the auth-critical path; the structural guardrail at `tests/guardrails/auth-stack-pinning.test.ts` fails CI if any are reintroduced.
+
+**Compat shims.** `auth()` returns `Session | null` (alias for `getServerSession(authOptions)`) and `signOut({ redirectTo })` redirects to `/api/auth/signout?callbackUrl=…`. Both keep the 15+ server-component import sites stable across the v5→v4 migration. New code should import `getServerSession(authOptions)` directly to make the dependency explicit at each call site.
 
 ### Environment Validation
 

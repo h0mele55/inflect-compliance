@@ -1,17 +1,78 @@
 # Authentication
 
-Inflect's auth stack is NextAuth v5 (beta) with a Prisma adapter and a
-JWT session strategy. Three provider paths share one session shape:
+Inflect's auth stack is **NextAuth v4.24.14 (stable)** with the
+`@next-auth/prisma-adapter@1.0.7` Prisma adapter and a JWT session
+strategy. Provider paths share one session shape:
 
 | Provider | Files | Session shape |
 |---|---|---|
 | Credentials (email + password) | `src/lib/auth/credentials.ts`, `src/lib/auth/passwords.ts`, `src/lib/auth/credential-rate-limit.ts` | JWT with `userId`, `tenantId`, `role` |
 | Google OAuth | `src/auth.ts` | Same JWT shape, tenant resolved post-signIn |
-| Microsoft Entra ID | `src/auth.ts` | Same JWT shape |
+| Microsoft Entra ID (via v4's `azure-ad` provider — same OAuth endpoints, Microsoft renamed the product to "Entra ID") | `src/auth.ts` | Same JWT shape |
+| SAML/SSO | `src/app/api/auth/sso/` | Same JWT shape, tenant resolved via SAML attribute |
 
 This doc is the operator-facing reference for the credentials path. For
 a deeper architectural rationale, see
-`docs/implementation-notes/2026-04-22-auth-*.md`.
+`docs/implementation-notes/2026-04-22-auth-*.md` (early hardening) and
+`docs/implementation-notes/2026-04-25-gap-04-nextauth-v4-migration.md`
+(v5-beta → v4 migration).
+
+> [!IMPORTANT]
+> **GAP-04 — production stack.** This codebase migrated off
+> `next-auth@5.0.0-beta.30` to `4.24.14` (stable) on 2026-04-25.
+> Both `next-auth` and `@next-auth/prisma-adapter` are pinned exactly
+> in `package.json`; silent drift is blocked by lockfile + a
+> structural guardrail at `tests/guardrails/auth-stack-pinning.test.ts`.
+
+## Type augmentation — extending Session and JWT safely
+
+The codebase stores 15+ custom fields on the JWT (memberships, MFA
+state, session-tracker id, OAuth refresh tokens, sessionVersion). Two
+module augmentations in `src/auth.ts` declare these once so every
+read site is statically typed end-to-end:
+
+```ts
+declare module 'next-auth' {
+    interface Session { user: { id, email, tenantId, role, mfaPending, memberships, … } }
+}
+declare module 'next-auth/jwt' {
+    interface JWT { userId, sessionVersion, tenantId, role, memberships, mfaPending, … }
+}
+```
+
+To add a new field, declare it in BOTH augmentations (if it's
+client-facing) or just in `JWT` (if it's server-only — accessToken,
+refreshToken, mfaFailClosed, error). The middleware reads
+`token.role` / `token.memberships` directly with full type safety.
+
+**There are zero `as any` casts in the auth-critical path** — the
+v5-beta-era 8 casts were eliminated as part of GAP-04. The
+guardrail at `tests/guardrails/auth-stack-pinning.test.ts` fails CI
+if a future PR reintroduces them in `src/auth.ts`,
+`src/middleware.ts`, or `src/app/api/auth/[...nextauth]/route.ts`.
+
+## Server-side helpers
+
+| Helper | Where to use | What it does |
+|--------|--------------|--------------|
+| `getServerSession(authOptions)` | New code, all server contexts | The canonical v4 helper. Returns `Session \| null`. |
+| `auth()` | Existing 15+ server-component sites | Back-compat shim for the v5 export name. Internally calls `getServerSession(authOptions)`. New code should not use it. |
+| `signOut({ redirectTo })` | The 2 pages that log a user out before showing a "no access" UI | Server-side shim for v5's `signOut`. Redirects to `/api/auth/signout?callbackUrl=…`. |
+| `next-auth/react.signIn` / `signOut` | Client components | The standard NextAuth client API. Unchanged from v5. |
+
+## Middleware enforcement
+
+`src/middleware.ts` reads the JWT directly via `getToken({ req,
+secret: env.AUTH_SECRET })` and applies five gates:
+
+1. Public-path allowlist (login, auth callbacks, static, etc.)
+2. Unauth → `401 JSON` for API routes, `redirect(/login?next=…)` for pages
+3. Admin-path role check (ADMIN ∪ OWNER) + Sec-Fetch-Site cross-site CSRF guard
+4. MFA enforcement when `token.mfaPending === true` and the path is not
+   in the MFA-allowed list (challenge / enrollment / signout)
+5. Tenant-access gate — the URL slug must appear in `token.memberships`
+
+All gate decisions read from the JWT — zero DB hits per request.
 
 ## Credentials flow
 
