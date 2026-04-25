@@ -124,15 +124,15 @@ const authMiddleware = auth(async (req) => {
     }
 
     // ── 5. Tenant-access gate ──
-    // Verify the JWT's tenantSlug matches the URL's :slug segment.
-    // No DB hit — the JWT claim is the authority. O(1) per request.
-    // Carve-outs (public paths, /no-tenant, /invite/*, /api/invites/*)
+    // R-1: check whether the URL slug appears in the user's memberships array.
+    // No DB hit — the JWT claim is the authority. O(memberships) per request.
+    // Carve-outs (public paths, /no-tenant, /tenants, /invite/*, /api/invites/*)
     // are already handled by isPublicPath() above.
     if (isTenantPath(pathname)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const session = req.auth as any;
-        const jwtTenantSlug = session?.tenantSlug as string | null | undefined;
-        const gateResult = checkTenantAccess(pathname, jwtTenantSlug);
+        const memberships = session?.user?.memberships as Array<{ slug: string }> | null | undefined;
+        const gateResult = checkTenantAccess(pathname, memberships);
 
         if (gateResult === 'no_tenant_access') {
             if (isApiRoute(pathname)) {

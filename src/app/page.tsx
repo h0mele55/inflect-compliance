@@ -13,12 +13,6 @@ export default async function Home() {
         redirect('/login');
     }
 
-    const defaultMembership = await getDefaultTenantForUser(session.user.id);
-
-    if (defaultMembership) {
-        redirect(`/t/${defaultMembership.tenant.slug}/dashboard`);
-    }
-
-    // No tenant membership — redirect to login with error
-    redirect('/login');
+    // R-1: send to /tenants picker which handles 0/1/>1 memberships correctly.
+    redirect('/tenants');
 }

@@ -11,6 +11,7 @@ const PUBLIC_PATH_PREFIXES = [
     '/login',
     '/register',
     '/no-tenant',        // Landing page for uninvited users — must not gate-loop
+    '/tenants',          // R-1: tenant picker — must be reachable before active-tenant is set
     '/invite/',          // Invite preview page — public so unauthenticated users can see invite details
     '/api/auth',         // Auth.js callbacks, session, csrf, providers
     '/api/invites/',     // Invite redemption API (public) + start-signin cookie setter
@@ -181,20 +182,24 @@ export function extractTenantSlugFromPath(pathname: string): string | null {
 }
 
 /**
- * Pure gate function: check whether a JWT tenant slug is allowed to access
- * the given path. Extracted as a pure function so it can be unit-tested
+ * Pure gate function: check whether a user's memberships array allows access
+ * to the given path. Extracted as a pure function so it can be unit-tested
  * without Next.js framework machinery.
+ *
+ * R-1: `memberships` replaces the old single-slug `jwtTenantSlug` parameter.
+ * A user is allowed through to `/t/:slug/...` if ANY of their memberships
+ * contains a matching slug.
  *
  * Returns:
  *   'allow'             — pass through
- *   'no_tenant_access'  — authed user has no tenant membership at all
- *   'cross_tenant'      — authed user's tenant does not match the URL slug
+ *   'no_tenant_access'  — authed user has no tenant memberships at all
+ *   'cross_tenant'      — the URL slug is not in any of the user's memberships
  */
 export type TenantGateResult = 'allow' | 'no_tenant_access' | 'cross_tenant';
 
 export function checkTenantAccess(
     pathname: string,
-    jwtTenantSlug: string | null | undefined,
+    memberships: ReadonlyArray<{ slug: string }> | null | undefined,
 ): TenantGateResult {
     // Only gate tenant-scoped routes.
     const urlSlug = extractTenantSlugFromPath(pathname);
@@ -204,7 +209,7 @@ export function checkTenantAccess(
     // Already checked upstream in isPublicPath, but be defensive.
     if (isPublicPath(pathname)) return 'allow';
 
-    if (!jwtTenantSlug) return 'no_tenant_access';
-    if (jwtTenantSlug !== urlSlug) return 'cross_tenant';
+    if (!memberships || memberships.length === 0) return 'no_tenant_access';
+    if (!memberships.some((m) => m.slug === urlSlug)) return 'cross_tenant';
     return 'allow';
 }

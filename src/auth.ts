@@ -17,6 +17,13 @@ import { edgeLogger } from '@/lib/observability/edge-logger';
  * Extend Auth.js types for our custom session fields.
  * access_token and refresh_token are NEVER exposed to the client-side session.
  */
+/** One entry per active membership the user holds. */
+export interface MembershipEntry {
+    slug: string;
+    role: Role;
+    tenantId: string;
+}
+
 declare module 'next-auth' {
     interface Session {
         user: {
@@ -27,9 +34,16 @@ declare module 'next-auth' {
             tenantId?: string | null;
             role: Role;
             mfaPending?: boolean;
+            /** R-1: all active memberships, for the tenant picker and middleware gate. */
+            memberships?: MembershipEntry[];
         };
     }
 }
+
+// JWT already extends Record<string, unknown> in NextAuth v5 (@auth/core),
+// so custom fields like `memberships` can be stored directly without a
+// module augmentation. The MembershipEntry type is used for casting at
+// read sites.
 
 // Providers list starts with the edge-safe OAuth providers from
 // auth.config.ts and extends with the Node-only Credentials provider.
@@ -255,9 +269,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     where: { email: token.email! },
                     include: {
                         tenantMemberships: {
+                            where: { status: 'ACTIVE' },
                             orderBy: { createdAt: 'asc' },
-                            take: 1,
-                            include: { tenant: true },
+                            include: {
+                                tenant: { select: { slug: true, id: true } },
+                            },
                         },
                     },
                 });
@@ -265,12 +281,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 if (dbUser) {
                     token.userId = dbUser.id;
                     token.sessionVersion = dbUser.sessionVersion;
-                    // Resolve from TenantMembership (sole authority)
-                    const defaultMembership = dbUser.tenantMemberships[0];
-                    if (defaultMembership) {
-                        token.tenantId = defaultMembership.tenantId;
-                        token.tenantSlug = defaultMembership.tenant?.slug ?? null;
-                        token.role = defaultMembership.role;
+
+                    // R-1: store ALL active memberships so the middleware can allow
+                    // any slug the user is a member of. Routes look up the
+                    // currently-active membership by URL slug from this array.
+                    token.memberships = dbUser.tenantMemberships.map((m) => ({
+                        slug: m.tenant.slug,
+                        role: m.role,
+                        tenantId: m.tenantId,
+                    }));
+
+                    // Backward-compat: keep tenantId/tenantSlug/role as the "primary"
+                    // membership (oldest by createdAt). Code that hasn't been updated
+                    // to use memberships[] continues to read these.
+                    const memberships = token.memberships as MembershipEntry[];
+                    const primary = memberships[0];
+                    if (primary) {
+                        token.tenantId = primary.tenantId;
+                        token.tenantSlug = primary.slug;
+                        token.role = primary.role;
                     } else {
                         // No membership — user has no tenant access yet
                         token.tenantId = null;
@@ -281,6 +310,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     token.userId = user.id!;
                     token.role = 'READER' as Role;
                     token.sessionVersion = 0;
+                    token.memberships = [];
                 }
 
                 // Store provider tokens for refresh (server-side JWT only)
@@ -496,6 +526,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 session.user.tenantId = (token.tenantId as string) ?? null;
                 session.user.role = (token.role as Role) ?? 'READER';
                 session.user.mfaPending = (token.mfaPending as boolean) ?? false;
+                // R-1: expose memberships array to the client session so the
+                // tenant picker can render the list without a DB hit.
+                session.user.memberships = (token.memberships as MembershipEntry[] | undefined) ?? [];
             }
             return session;
         },

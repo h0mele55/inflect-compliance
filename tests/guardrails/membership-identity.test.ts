@@ -215,8 +215,10 @@ describe('Auth resolves identity from membership', () => {
         const combined = credentialsContent + '\n' + authContent;
         // Must include membership in the identity resolution path
         expect(combined).toContain('tenantMemberships');
-        // Must derive role from membership (via JWT or callback)
-        expect(combined).toMatch(/membership\?\.role|defaultMembership\.role|membership\.role/);
+        // Must derive role from membership (via JWT or callback).
+        // R-1: auth.ts now builds memberships[] using m.role inside .map();
+        // m.role is unambiguously membership-derived, so allow that pattern too.
+        expect(combined).toMatch(/membership\?\.role|defaultMembership\.role|membership\.role|m\.role/);
     });
 
     it('me endpoint resolves from membership', () => {

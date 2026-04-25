@@ -72,33 +72,43 @@ describe('isPublicPath — new carve-outs', () => {
     });
 });
 
+/**
+ * R-1: checkTenantAccess now takes memberships: ReadonlyArray<{slug}> instead
+ * of a single string slug. The following tests have been updated to pass the
+ * new array shape. All prior behaviours are preserved — the semantic is the
+ * same, just the input is an array of one (previously a scalar).
+ */
 describe('checkTenantAccess', () => {
-    it('allows when jwtTenantSlug matches URL slug', () => {
-        expect(checkTenantAccess('/t/acme/dashboard', 'acme')).toBe('allow');
+    it('allows when memberships array contains the URL slug', () => {
+        expect(checkTenantAccess('/t/acme/dashboard', [{ slug: 'acme' }])).toBe('allow');
     });
 
-    it('allows API path when jwtTenantSlug matches URL slug', () => {
-        expect(checkTenantAccess('/api/t/acme/risks', 'acme')).toBe('allow');
+    it('allows API path when memberships array contains the URL slug', () => {
+        expect(checkTenantAccess('/api/t/acme/risks', [{ slug: 'acme' }])).toBe('allow');
     });
 
-    it('returns no_tenant_access when user has no tenantSlug (null)', () => {
+    it('returns no_tenant_access when memberships is null', () => {
         expect(checkTenantAccess('/t/acme/dashboard', null)).toBe('no_tenant_access');
     });
 
-    it('returns no_tenant_access when user has no tenantSlug (undefined)', () => {
+    it('returns no_tenant_access when memberships is undefined', () => {
         expect(checkTenantAccess('/t/acme/dashboard', undefined)).toBe('no_tenant_access');
     });
 
-    it('returns no_tenant_access for API path when user has no tenantSlug', () => {
-        expect(checkTenantAccess('/api/t/acme/risks', null)).toBe('no_tenant_access');
+    it('returns no_tenant_access when memberships is an empty array', () => {
+        expect(checkTenantAccess('/t/acme/dashboard', [])).toBe('no_tenant_access');
     });
 
-    it('returns cross_tenant when jwtTenantSlug does not match URL slug', () => {
-        expect(checkTenantAccess('/t/beta/dashboard', 'acme')).toBe('cross_tenant');
+    it('returns no_tenant_access for API path when memberships is empty', () => {
+        expect(checkTenantAccess('/api/t/acme/risks', [])).toBe('no_tenant_access');
     });
 
-    it('returns cross_tenant for API path with mismatched slug', () => {
-        expect(checkTenantAccess('/api/t/beta/risks', 'acme')).toBe('cross_tenant');
+    it('returns cross_tenant when URL slug is not in memberships', () => {
+        expect(checkTenantAccess('/t/beta/dashboard', [{ slug: 'acme' }])).toBe('cross_tenant');
+    });
+
+    it('returns cross_tenant for API path with slug not in memberships', () => {
+        expect(checkTenantAccess('/api/t/beta/risks', [{ slug: 'acme' }])).toBe('cross_tenant');
     });
 
     it('returns allow for /no-tenant (non-tenant path)', () => {

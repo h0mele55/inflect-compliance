@@ -80,6 +80,9 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
             // Epic 1, PR 3 — landing for authenticated users with no active membership.
             // PR 4 wires middleware to redirect here when JWT has no tenantId.
             'no-tenant',
+            // Epic 1, R-1 — tenant picker: user selects which of their memberships to enter.
+            // Must be root-level (not under /t/) because the user hasn't chosen a tenant yet.
+            'tenants',
         ]);
 
         // Get immediate children of app/ that are page directories

@@ -18,7 +18,9 @@ type VerifyStatus = 'verified' | 'invalid' | 'expired';
 function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
+    // R-1: default post-sign-in destination is /tenants so the picker logic
+    // takes over (0 → /no-tenant, 1 → direct, >1 → picker list).
+    const callbackUrl = searchParams?.get('callbackUrl') || '/tenants';
     const verifyStatusParam = searchParams?.get('verifyStatus');
     const verifyStatus: VerifyStatus | null =
         verifyStatusParam === 'verified' ||
