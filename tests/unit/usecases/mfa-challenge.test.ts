@@ -38,7 +38,7 @@ jest.mock('../../../src/app-layer/events/audit', () => ({
 }));
 
 jest.mock('@/env', () => ({
-    env: { AUTH_SECRET: 'test-auth-secret-32-chars-or-more-xx' },
+    env: { AUTH_SECRET: 'test-auth-secret-32-chars-or-more-xx' }, // pragma: allowlist secret — placeholder so totp encryption module loads under test
 }));
 
 import { verifyMfaChallenge } from '@/app-layer/usecases/mfa-challenge';

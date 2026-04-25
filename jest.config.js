@@ -167,31 +167,90 @@ module.exports = {
         '!src/**/types.ts',
     ],
     coveragePathIgnorePatterns: ['/node_modules/', '/.next/', '/tests/'],
+    // ─── Coverage ratchet ────────────────────────────────────────────
+    //
+    //  Why this is a ratchet, not a target.
+    //  The thresholds below are the CURRENT FLOOR, not aspirational
+    //  numbers. The single rule: when you add tests that raise the
+    //  observed coverage, lift the floor in the same PR so the gain
+    //  is locked in. Never lower a floor to "make CI green" — that
+    //  is the failure mode the audit caught (GAP-02). Either add the
+    //  test that restores the lost coverage, or revert the change
+    //  that lost it.
+    //
+    //  How to raise.
+    //  Run `npx jest --coverage --runInBand` locally (or wait for
+    //  the CI coverage job to print the summary on your PR) and set
+    //  each per-path floor to ~3% below the freshly observed number.
+    //  The 3% buffer absorbs run-to-run jitter from parallel-worker
+    //  scheduling and the occasional skipped suite. Pick the same
+    //  buffer across metrics so the ratchet moves uniformly.
+    //
+    //  How to add a new gated path.
+    //  Drop a new key (`'./src/<area>/'`) and run coverage to seed
+    //  the floor. The path-prefix match is ~exact: trailing slash
+    //  matters. Only add a path if the area has reached a coverage
+    //  worth defending — otherwise the floor is noise.
+    //
+    //  Why we do not enforce stricter globals.
+    //  The global `collectCoverageFrom` globs cover both the
+    //  hot-path business logic (app-layer + usecases) and the long
+    //  tail of `src/lib/` utilities, scripts, and instrumentation
+    //  helpers. Many of those are shipped intentionally without
+    //  unit tests (one-shot migration scripts, CLI entry points).
+    //  Tightening the global to match raw averages would penalise
+    //  legitimate utility code; tightening per-path to areas that
+    //  matter is the durable lever.
+    //
+    //  What kinds of usecase tests count for the floor.
+    //  The Wave 1-4 tests (`docs/implementation-notes/2026-04-25-
+    //  gap-02-usecase-ratchet.md`) establish the contract:
+    //    - assertCanRead/Write/Admin gates on every privileged path
+    //    - sanitisation of every free-text field BEFORE persistence
+    //      (Epic D.2 / C.5) — render-time only is not sufficient
+    //    - cross-tenant id rejection (notFound on a cross-tenant
+    //      lookup, not silent acceptance)
+    //    - audit emission per state change (action + entityType)
+    //    - notFound paths exercised
+    //    - idempotency where applicable (e.g. archive/unarchive)
+    //    - load-bearing transition ordering (e.g. promote-before-
+    //      demote in tenant-ownership transfer)
+    //  Each test should name the regression class it protects in a
+    //  comment so the next reader can judge whether a refactor is
+    //  weakening a guard.
     coverageThreshold: {
         // Global floor. Lowered 60→55 on branches + 60→58 on functions
         // (2026-04-22) to match observed coverage after the Epic 57-60
         // wave added a lot of new UI primitive code that the jsdom
         // suite covers but the node suite's `coverageFrom` globs don't.
-        // Ratchet semantic: raise when tests land, never lower.
+        // Held at this level until a future hardening pass tightens
+        // `src/lib/` coverage — see implementation note 2026-04-25.
         global: {
             branches: 55,
             functions: 58,
             lines: 60,
             statements: 60,
         },
-        // Per-path thresholds reflect CURRENT floor, not aspirational
-        // target. The 2026-04-22 recalibration matched these values
-        // to the actual observed coverage after the Epic 57-60 wave,
-        // because the pre-existing 55/60/60/60 values were unmet — CI
-        // was failing on coverage for weeks without anyone raising a
-        // PR to add tests. Ratchet semantic: these numbers can only
-        // go UP (i.e. if you add tests that raise coverage, lift the
-        // floor so the gain is locked in). Do NOT lower them.
+        // Per-path threshold for the usecase layer — the durable
+        // GAP-02 lever. Raised 2026-04-25 after Waves 1-4 closed:
+        //   17→33  branches
+        //   14→26  functions
+        //   27→45  lines
+        //   24→42  statements
+        // Last observed canonical run (post Waves 1-4):
+        //   branches=36.29%  functions=29.60%
+        //   lines=47.83%     statements≈45%
+        // Buffer is ~3% below observed — stays inside the strict-
+        // ratchet posture without breaking on parallel-worker jitter.
+        // Next tranche (`sso`, `scim-users`, `audit-readiness-scoring`,
+        // `gap-analysis`, etc.) is documented in the 2026-04-25
+        // implementation note; raise these numbers when those
+        // tranche tests land.
         './src/app-layer/usecases/': {
-            branches: 17,
-            functions: 14,
-            lines: 27,
-            statements: 24,
+            branches: 33,
+            functions: 26,
+            lines: 45,
+            statements: 42,
         },
         './src/lib/': {
             branches: 48,

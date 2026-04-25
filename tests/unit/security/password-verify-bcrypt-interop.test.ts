@@ -23,7 +23,7 @@ import { verifyPassword as verifyPasswordLegacy } from '@/lib/auth';
 
 describe('verifyPassword bcryptjs interop (regression guard)', () => {
     let knownHash: string;
-    const KNOWN_PASSWORD = 'CorrectHorseBatteryStaple-2026';
+    const KNOWN_PASSWORD = 'CorrectHorseBatteryStaple-2026'; // pragma: allowlist secret — fixed test password for bcryptjs interop regression guard
 
     beforeAll(async () => {
         // Hash with our canonical helper so the test is self-bootstrapping
