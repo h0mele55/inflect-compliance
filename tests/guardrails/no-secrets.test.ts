@@ -90,11 +90,6 @@ const REPO_BASELINE: readonly KnownHit[] = [
     // like assignments. They are not real secrets.
     { file: '.env.example', pattern: 'Hardcoded Password Assignment', reason: 'Developer-onboarding placeholders.' },
 
-    // CI workflow file — uses placeholder/synthetic values for
-    // documentation. Real CI secrets live in GitHub Actions secrets,
-    // never in YAML.
-    { file: '.github/workflows/ci.yml', pattern: 'Hardcoded Password Assignment', reason: 'CI workflow uses synthetic placeholder values; real secrets are in Actions secrets.' },
-
     // Test setup + integration/unit fixtures: every entry below is a
     // synthetic test value (auth secret stubs, encryption keys for
     // unit tests, hardcoded test passwords for credential flows).

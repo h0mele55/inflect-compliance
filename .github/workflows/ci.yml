@@ -323,6 +323,11 @@ jobs:
       DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DIRECT_DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      # `next start` startup gate refuses to boot in prod mode without REDIS_URL.
+      # CI does not run a Redis service; rate limits are not exercised by the
+      # e2e suite (auth + UI flow, not 429 backpressure), so the documented
+      # escape hatch is correct here.
+      RATE_LIMIT_ENABLED: "0"
 
     services:
       postgres:
