@@ -1,12 +1,5 @@
-import NextAuth from 'next-auth';
-import authConfig from '@/auth.config';
-import { NextResponse } from 'next/server';
-
-// Edge-safe `auth()` wrapper. Instantiated from the edge-only config
-// so middleware's webpack bundle never transitively pulls Prisma,
-// bcrypt, or node:crypto (which don't resolve in the Edge Runtime).
-// See src/auth.config.ts for the full rationale.
-const { auth } = NextAuth(authConfig);
+import { NextResponse, type NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 import { checkAuthRateLimit } from '@/lib/rate-limit/authRateLimit';
 import { env } from '@/env';
 import {
@@ -26,7 +19,21 @@ import { resolveCorsConfig, isOriginAllowed, applyCorsHeaders, CORS_PREFLIGHT_HE
 import { shouldBlockAdminRequest } from '@/lib/security/admin-session-guard';
 
 /**
- * Edge middleware: centralized auth guard + CSP for ALL routes.
+ * GAP-04 — Edge middleware: centralized auth guard + CSP for ALL routes.
+ *
+ * v4 migration: switched from the v5 `auth(async (req) => …)` async
+ * wrapper (which bundled the full NextAuth config into the Edge
+ * runtime) to the v4 `getToken()` direct JWT verification path. This
+ * has three benefits:
+ *
+ *   1. The Edge bundle no longer needs the `auth.config.ts`
+ *      edge/node split — middleware just verifies the JWT cookie,
+ *      same as in v5 but without the wrapper indirection.
+ *   2. Token fields are typed via the `next-auth/jwt` module
+ *      augmentation in `src/auth.ts`. The 4 `as any` casts that v5's
+ *      loose `req.auth` typing required are now typed accesses.
+ *   3. `getToken()` is sync-callable from Edge functions and avoids
+ *      v5-beta-specific runtime issues with the `auth()` wrapper.
  *
  * CSP flow:
  *   1. Generate cryptographic nonce per request
@@ -44,9 +51,7 @@ import { shouldBlockAdminRequest } from '@/lib/security/admin-session-guard';
  *   └──────────────────┴───────────────┴──────────────────────────┘
  */
 
-
-
-const authMiddleware = auth(async (req) => {
+async function authMiddleware(req: NextRequest): Promise<NextResponse> {
     const { pathname } = req.nextUrl;
 
     // ── 1. Allow public paths (login, auth callbacks, static, etc.) ──
@@ -54,8 +59,15 @@ const authMiddleware = auth(async (req) => {
         return NextResponse.next();
     }
 
-    // ── 2. Unauthenticated? ──
-    if (!req.auth) {
+    // ── 2. Verify JWT cookie ──
+    // v4 — `getToken()` reads + verifies the JWT cookie set by NextAuth.
+    // Returns null if no cookie / bad signature / expired.
+    const token = await getToken({
+        req,
+        secret: env.AUTH_SECRET,
+    });
+
+    if (!token) {
         if (isApiRoute(pathname)) {
             return unauthorizedJson();
         }
@@ -63,25 +75,24 @@ const authMiddleware = auth(async (req) => {
         const host = req.headers.get('host') || req.nextUrl.host;
         const origin = `${proto}://${host}`;
         return NextResponse.redirect(
-            buildLoginRedirect(origin, pathname)
+            buildLoginRedirect(origin, pathname),
         );
     }
 
     // ── 3. Admin-only paths ──
     if (isAdminPath(pathname)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const role = (req.auth as any)?.user?.role;
+        const role = token.role;
         // OWNER is strictly superior to ADMIN (see CLAUDE.md RBAC section).
         const ADMIN_ROLES = new Set(['ADMIN', 'OWNER']);
         if (!role || !ADMIN_ROLES.has(role)) {
             if (isApiRoute(pathname)) {
                 return forbiddenJson('Admin access required');
             }
-            
+
             // Allow the request to proceed to the App Router.
-            // The Server Component guard in `admin/layout.tsx` will 
+            // The Server Component guard in `admin/layout.tsx` will
             // safely capture this and render the `<ForbiddenPage>`.
-            // (Avoiding NextResponse.redirect(dashboardUrl) here prevents a known Next.js 14 dev server crash 
+            // (Avoiding NextResponse.redirect(dashboardUrl) here prevents a known Next.js 14 dev server crash
             // where 307-redirecting an HTML request back to the browser's currently active URL causes an Edge Runtime panic).
             return NextResponse.next();
         }
@@ -101,9 +112,7 @@ const authMiddleware = auth(async (req) => {
 
     // ── 4. MFA enforcement ──
     if (isTenantPath(pathname) && !isMfaAllowedPath(pathname)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const session = req.auth as any;
-        const mfaPending = session?.user?.mfaPending === true;
+        const mfaPending = token.mfaPending === true;
 
         if (mfaPending) {
             // Extract tenant slug from path: /t/:slug/... or /api/t/:slug/...
@@ -115,7 +124,6 @@ const authMiddleware = auth(async (req) => {
                 return forbiddenJson('MFA verification required');
             }
 
-            // Redirect to MFA challenge page
             if (tenantSlug) {
                 const mfaUrl = new URL(`/t/${tenantSlug}/auth/mfa`, req.nextUrl.origin);
                 mfaUrl.searchParams.set('next', pathname);
@@ -127,12 +135,8 @@ const authMiddleware = auth(async (req) => {
     // ── 5. Tenant-access gate ──
     // R-1: check whether the URL slug appears in the user's memberships array.
     // No DB hit — the JWT claim is the authority. O(memberships) per request.
-    // Carve-outs (public paths, /no-tenant, /tenants, /invite/*, /api/invites/*)
-    // are already handled by isPublicPath() above.
     if (isTenantPath(pathname)) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const session = req.auth as any;
-        const memberships = session?.user?.memberships as Array<{ slug: string }> | null | undefined;
+        const memberships = token.memberships;
         const gateResult = checkTenantAccess(pathname, memberships);
 
         if (gateResult === 'no_tenant_access') {
@@ -158,10 +162,16 @@ const authMiddleware = auth(async (req) => {
 
     // ── 6. Authenticated and authorized → proceed ──
     return NextResponse.next();
-});
+}
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default async function middleware(req: any, ctx: any): Promise<NextResponse> {
+export default async function middleware(
+    req: NextRequest,
+    // Optional 2nd arg kept for back-compat with the v5 wrapper signature
+    // and existing test fixtures that call `middleware(req, {})`. Unused
+    // by the v4 implementation — the JWT is read via `getToken({ req })`.
+    _ctx?: unknown,
+): Promise<NextResponse> {
+    void _ctx;
     const { pathname } = req.nextUrl;
 
     // ── CSP Nonce — generated once per request ──
@@ -203,8 +213,7 @@ export default async function middleware(req: any, ctx: any): Promise<NextRespon
 
     // ── Rate Limit Auth Endpoints ──
     if (pathname.startsWith('/api/auth/')) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rlResult = await checkAuthRateLimit(req as any);
+        const rlResult = await checkAuthRateLimit(req);
         if (!rlResult.ok && rlResult.response) {
             return rlResult.response;
         }
@@ -212,17 +221,13 @@ export default async function middleware(req: any, ctx: any): Promise<NextRespon
 
     // ── Auth API routes bypass ──
     // /api/auth/* routes are public and self-authenticating (they manage their
-    // own session/CSRF handling). They also get invoked twice through NextAuth's
-    // `reqWithEnvURL()` if the session wrapper runs here — once in this
-    // middleware and once in the downstream route handler — which can disturb
-    // the request body stream. Skip the session-checking wrapper entirely.
-    let authRes: Response | undefined;
+    // own session/CSRF handling). Skip the JWT-checking middleware path
+    // entirely so the request body stream isn't disturbed.
+    let authRes: NextResponse | undefined;
     if (pathname.startsWith('/api/auth/')) {
         authRes = NextResponse.next();
     } else {
-        const result = await authMiddleware(req, ctx);
-        // auth() callback may return void; treat as pass-through
-        authRes = result ?? undefined;
+        authRes = await authMiddleware(req);
     }
 
     // If auth returned a redirect (3xx) or error (4xx/5xx), use it directly.
@@ -232,7 +237,7 @@ export default async function middleware(req: any, ctx: any): Promise<NextRespon
     //
     // For /api/auth/ routes we must NOT pass { request: { headers } } because
     // Next.js re-creates the Request to apply header overrides, which can
-    // interfere with the NextAuth body-parsing path. API routes don't need the
+    // interfere with NextAuth's body-parsing path. API routes don't need the
     // x-csp-nonce request header anyway.
     const isAuthApi = pathname.startsWith('/api/auth/');
     const isPassThrough = !authRes
@@ -240,14 +245,7 @@ export default async function middleware(req: any, ctx: any): Promise<NextRespon
 
     let res: NextResponse;
     if (!isPassThrough && authRes) {
-        // authRes is a redirect/error Response — wrap as NextResponse if needed
-        res = authRes instanceof NextResponse
-            ? authRes
-            : new NextResponse(authRes.body, {
-                status: authRes.status,
-                statusText: authRes.statusText,
-                headers: authRes.headers,
-            });
+        res = authRes;
     } else if (isAuthApi) {
         res = NextResponse.next();
     } else {
