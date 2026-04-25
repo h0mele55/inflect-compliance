@@ -43,7 +43,7 @@
 
 | Variable | Required | Default | When to set |
 |---|---|---|---|
-| `DATA_ENCRYPTION_KEY` | Prod: **yes** (≥32 chars). Dev/CI: falls back to deterministic dev key with a warn log. | — | Set once in every environment. Must be identical across replicas. |
+| `DATA_ENCRYPTION_KEY` | **REQUIRED** in production (≥32 chars). Dev: dev-fallback + WARN log. Test: dev-fallback (silent). | — | Production boot exits 1 if missing, too short, or equal to the dev-fallback string. Three independent checks — zod schema (`src/env.ts`), startup hook (`src/instrumentation.ts` + `scripts/worker.ts` + `scripts/scheduler.ts`), and Compose `:?error` syntax — each refuses to start the process. Set once in every prod environment, identical across replicas, distinct between staging and prod. |
 | `DATA_ENCRYPTION_KEY_PREVIOUS` | Optional (≥32 chars) | unset | Set ONLY during a master-key rotation. When set, `decryptField` tries primary, then falls back to previous on auth-tag failure. **Remove after the rotation job reports zero remaining v1 rows.** |
 
 `AUTH_TEST_MODE` / `RATE_LIMIT_ENABLED` don't affect the encryption layer directly — they gate the Epic A middleware this system integrates with.

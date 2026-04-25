@@ -44,6 +44,41 @@ if (!REDIS_URL) {
     process.exit(1);
 }
 
+// ─── GAP-03: production encryption-key fail-fast ───────────────────
+//
+// The Next.js server runs this check via `src/instrumentation.ts`,
+// but BullMQ workers are a separate process — they bootstrap straight
+// from this file and never load the instrumentation hook. Without a
+// mirror check here, a worker process can boot in production with no
+// encryption key, sit idle, and crash on the FIRST job that touches
+// an encrypted column (Finding.description, Risk.treatmentNotes,
+// PolicyVersion.contentText, …). Same blast-radius as the lazy-throw
+// failure mode the audit flagged on the web tier, just shifted to
+// background processing.
+//
+// Imports are dynamic so the worker doesn't pull the encryption
+// module unless we're in production.
+if (process.env.NODE_ENV === 'production') {
+    (async () => {
+        const { checkProductionEncryptionKey, runEncryptionSentinel } =
+            await import('../src/lib/security/startup-encryption-check');
+
+        const config = checkProductionEncryptionKey(process.env);
+        if (!config.ok) {
+            log.fatal('[startup] FATAL: ' + config.reason);
+            process.exit(1);
+        }
+
+        const sentinel = await runEncryptionSentinel();
+        if (!sentinel.ok) {
+            log.fatal('[startup] FATAL: ' + sentinel.reason);
+            process.exit(1);
+        }
+
+        log.info('encryption key check passed (presence + sentinel round-trip)');
+    })();
+}
+
 function createWorkerConnection(): Redis {
     return new Redis(REDIS_URL!, {
         maxRetriesPerRequest: null,

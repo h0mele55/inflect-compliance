@@ -51,7 +51,7 @@ curl http://localhost:3000/api/health | jq .
 | `MICROSOFT_CLIENT_ID` | ✅ | OAuth provider |
 | `MICROSOFT_CLIENT_SECRET` | ✅ | OAuth provider |
 | `UPLOAD_DIR` | ✅ | Set to `/data/uploads` (Docker) |
-| `DATA_ENCRYPTION_KEY` | ✅ (prod) | ≥32 chars, `openssl rand -base64 48`. See [encryption docs](encryption-data-protection.md) |
+| `DATA_ENCRYPTION_KEY` | ✅ **REQUIRED** in production | ≥32 chars, `openssl rand -base64 48`. **Production startup exits 1 if missing, too short, or equal to the documented dev fallback.** Both the Next.js app server and the BullMQ worker enforce this. See [encryption docs](encryption-data-protection.md). |
 | `CORS_ALLOWED_ORIGINS` | Optional | Comma-separated origins |
 
 ## Docker Compose (Self-hosted / VPS)

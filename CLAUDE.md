@@ -118,6 +118,30 @@ existing tenants get one via `scripts/generate-tenant-deks.ts`.
 Ciphertexts carry `v1:` (global KEK, legacy) or `v2:` (per-tenant
 DEK) envelope — the middleware dispatches per-value on read.
 
+**GAP-03 — production fail-fast.** The master KEK is REQUIRED in
+production. Three independent checks each refuse to start a prod
+process whose `DATA_ENCRYPTION_KEY` is missing, shorter than 32
+chars, or equal to the documented dev fallback:
+
+  1. zod schema in `src/env.ts` — fires at module load, `superRefine`
+     on the field reads `process.env.NODE_ENV` directly.
+  2. startup hook in `src/instrumentation.ts` (web) +
+     `scripts/worker.ts` (BullMQ worker) + `scripts/scheduler.ts`
+     (deploy-time scheduler) — exits 1 with `[startup] FATAL: …`.
+     The web tier additionally runs an encrypt → decrypt sentinel
+     to catch keys that pass structural checks but break HKDF/AES.
+  3. Compose `:?error` syntax in `docker-compose.prod.yml` /
+     `docker-compose.staging.yml` / `deploy/docker-compose.prod.yml`
+     — aborts container start before the app process is spawned.
+
+Dev gets the in-source fallback key (`encryption-constants.ts`) with
+a WARN log on every server start; test gets the same fallback
+silently. The fallback is well-known + refused in prod, not secret.
+The runtime + structural enforcement is unit-tested in
+`tests/unit/security/startup-encryption-check.test.ts` +
+`tests/unit/env.test.ts`, and the wiring across all five surfaces
+is locked by `tests/guardrails/encryption-key-enforcement.test.ts`.
+
 Master-KEK rotation: set `DATA_ENCRYPTION_KEY_PREVIOUS` alongside
 the new primary. `decryptField` falls back transparently. Admins
 trigger the v1→v2 re-encryption sweep via

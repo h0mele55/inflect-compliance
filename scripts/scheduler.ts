@@ -45,6 +45,28 @@ if (!REDIS_URL) {
     process.exit(1);
 }
 
+// ─── GAP-03: production encryption-key fail-fast ───────────────────
+//
+// The scheduler is short-lived (runs once on deploy, exits) and does
+// not itself decrypt any column — it only registers BullMQ
+// repeatable jobs. But it shares the prod-deploy pipeline with the
+// long-running worker, so a missing or bad key here is a strong
+// signal that the worker will fail too. Refusing to register
+// schedules in that state surfaces the misconfiguration on the
+// deploy that introduces it, not three jobs later.
+if (process.env.NODE_ENV === 'production') {
+    (async () => {
+        const { checkProductionEncryptionKey } = await import(
+            '../src/lib/security/startup-encryption-check'
+        );
+        const config = checkProductionEncryptionKey(process.env);
+        if (!config.ok) {
+            log.fatal('[startup] FATAL: ' + config.reason);
+            process.exit(1);
+        }
+    })();
+}
+
 async function main() {
     const args = process.argv.slice(2);
     const listOnly = args.includes('--list');

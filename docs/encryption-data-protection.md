@@ -43,13 +43,36 @@
 
 ### Key management
 
-| Variable | Purpose | Generation |
-|---|---|---|
-| `DATA_ENCRYPTION_KEY` | Master key for AES-256-GCM + HMAC | `openssl rand -base64 48` |
+| Variable | Purpose | Generation | Required? |
+|---|---|---|---|
+| `DATA_ENCRYPTION_KEY` | Master key for AES-256-GCM + HMAC | `openssl rand -base64 48` | **Yes** in production. Boot exits 1 if missing, too short (<32 chars), or equal to the dev fallback. |
+| `DATA_ENCRYPTION_KEY_PREVIOUS` | Decrypt fallback during master-KEK rotation | `openssl rand -base64 48` | Optional. Set ONLY during a rotation; remove once the rotation job reports zero remaining v1 rows under the previous key. |
 
 > [!CAUTION]
 > Losing `DATA_ENCRYPTION_KEY` means **permanent data loss** for all encrypted columns.
 > Rotate responsibly — the backfill script re-encrypts existing data under a new key.
+
+> [!IMPORTANT]
+> **GAP-03 — production fail-fast.** Three independent checks refuse to
+> start a production process without a valid key:
+>
+> 1. **Zod schema** (`src/env.ts`) — module-load validation rejects
+>    missing, too-short, and dev-fallback values when `NODE_ENV=production`.
+> 2. **Startup hook** — Next.js (`src/instrumentation.ts`), BullMQ worker
+>    (`scripts/worker.ts`), and the deploy-time scheduler
+>    (`scripts/scheduler.ts`) all run the same check + the web tier
+>    additionally runs an encrypt → decrypt sentinel round-trip. Each
+>    `process.exit(1)` with `[startup] FATAL: …` on failure.
+> 3. **Compose** — every prod compose file (`docker-compose.prod.yml`,
+>    `docker-compose.staging.yml`, `deploy/docker-compose.prod.yml`)
+>    uses `${DATA_ENCRYPTION_KEY:?…}` so `docker compose up` aborts
+>    before the container is even created.
+>
+> Dev/test environments use the documented in-source fallback
+> (`src/lib/security/encryption-constants.ts`) so contributors do not
+> need to manage this var locally. The fallback string is published in
+> source intentionally — its security property is "refused in prod",
+> not "secret".
 
 ---
 
