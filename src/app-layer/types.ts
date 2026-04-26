@@ -1,5 +1,5 @@
-import type { Role } from '@prisma/client';
-import type { PermissionSet } from '@/lib/permissions';
+import type { Role, OrgRole } from '@prisma/client';
+import type { PermissionSet, OrgPermissionSet } from '@/lib/permissions';
 
 export interface RequestContext {
     /** Unique request identifier for log correlation */
@@ -44,4 +44,39 @@ export interface PaginatedResult<T> {
         limit: number;
         hasMore: boolean;
     };
+}
+
+/**
+ * Hub-and-spoke organization request context (Epic O-2).
+ *
+ * Resolved by `getOrgCtx({ orgSlug }, req)` for routes under
+ * `/api/org/[orgSlug]/*`. Distinct from `RequestContext` (which is
+ * tenant-scoped) — a single request resolves to ONE of the two,
+ * never both. Drill-down from portfolio → tenant detail re-resolves
+ * as `RequestContext` via the auto-provisioned AUDITOR membership,
+ * where the existing per-tenant permission system takes over.
+ *
+ * `permissions` is derived from `orgRole` via `getOrgPermissions(...)`
+ * at resolution time so callers can read flags directly without an
+ * extra helper call. This mirrors how `RequestContext.permissions` /
+ * `appPermissions` are pre-derived.
+ */
+export interface OrgContext {
+    /** Unique request identifier for log correlation */
+    requestId: string;
+
+    /** The authenticated user ID */
+    userId: string;
+
+    /** The resolved organization ID */
+    organizationId: string;
+
+    /** The resolved organization slug (from the route) */
+    orgSlug: string;
+
+    /** The user's role within this organization */
+    orgRole: OrgRole;
+
+    /** Pre-derived org permission flags */
+    permissions: OrgPermissionSet;
 }

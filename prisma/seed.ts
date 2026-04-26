@@ -62,6 +62,94 @@ async function main() {
     });
     console.log('✅ Tenant memberships created');
 
+    // ─── Hub-and-spoke organization layer (Epic O-1) ───
+    //
+    // Default org "Acme Corp" parented over the acme-corp tenant.
+    // Demonstrates the full hub-and-spoke shape:
+    //   1. Organization (parent) ← linked tenant
+    //   2. CISO user as ORG_ADMIN
+    //   3. Auto-provisioned AUDITOR membership in every child tenant,
+    //      with `provisionedByOrgId` set so the (future) Epic O-2
+    //      deprovision usecase can distinguish auto-created from
+    //      manually-granted memberships.
+    //
+    // Slugs live in separate tables (Organization vs Tenant) so they
+    // could share names; we deliberately use distinct slugs (`acme-org`
+    // vs `acme-corp`) to avoid confusion in URL paths.
+    //
+    // Idempotent: every step uses upsert + the natural unique key.
+    const organization = await prisma.organization.upsert({
+        where: { slug: 'acme-org' },
+        update: {},
+        create: { name: 'Acme Corp', slug: 'acme-org' },
+    });
+    console.log('✅ Organization:', organization.name);
+
+    // Link the existing acme-corp tenant to the org (no-op on re-run
+    // because writing the same FK is idempotent).
+    await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: { organizationId: organization.id },
+    });
+    console.log('✅ Tenant linked to organization');
+
+    // CISO is the canonical ORG_ADMIN — sees every child tenant as
+    // AUDITOR via the auto-provisioning fan-out below.
+    const ciso = await prisma.user.upsert({
+        where: { email: 'ciso@acme.com' },
+        update: {},
+        create: { email: 'ciso@acme.com', passwordHash: pwd, name: 'Carla CISO' },
+    });
+
+    await prisma.orgMembership.upsert({
+        where: {
+            organizationId_userId: {
+                organizationId: organization.id,
+                userId: ciso.id,
+            },
+        },
+        update: {},
+        create: {
+            organizationId: organization.id,
+            userId: ciso.id,
+            role: 'ORG_ADMIN',
+        },
+    });
+    console.log('✅ Org membership created (CISO as ORG_ADMIN)');
+
+    // Auto-provisioned AUDITOR fan-out. In production this is the
+    // job of `provisionOrgAdminToTenants` (Epic O-2); the seed
+    // inlines the equivalent rows so the deployed dev/test DB has a
+    // realistic post-provisioning state immediately. `provisionedByOrgId`
+    // is set so the deprovision usecase will recognise these rows as
+    // auto-created when ORG_ADMIN is removed.
+    const orgTenants = await prisma.tenant.findMany({
+        where: { organizationId: organization.id },
+        select: { id: true },
+    });
+    let provisioned = 0;
+    for (const t of orgTenants) {
+        const result = await prisma.tenantMembership.upsert({
+            where: { tenantId_userId: { tenantId: t.id, userId: ciso.id } },
+            // Update path runs only if the row exists from a prior seed.
+            // We refresh `provisionedByOrgId` so a pre-existing manual
+            // membership of CISO would NOT be overwritten — only the
+            // auto-created row carries the org id. (In practice this
+            // seed creates the membership from scratch.)
+            update: {},
+            create: {
+                tenantId: t.id,
+                userId: ciso.id,
+                role: 'AUDITOR',
+                provisionedByOrgId: organization.id,
+            },
+        });
+        if (result.provisionedByOrgId === organization.id) provisioned++;
+    }
+    console.log(
+        `✅ Auto-provisioned AUDITOR memberships in ${provisioned} tenant(s)`,
+    );
+
     // ─── Seed clauses ───
     const clauseData = [
         { number: '4', title: 'Context of the Organization', sortOrder: 4 },

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getSessionOrThrow } from '@/lib/auth';
 import { resolveTenantContext } from '@/lib/tenant-context';
-import { RequestContext } from './types';
+import { RequestContext, OrgContext } from './types';
 import { randomUUID } from 'crypto';
 import { mergeRequestContext } from '@/lib/observability/context';
 import {
@@ -9,7 +9,9 @@ import {
     isApiKeyToken,
     verifyApiKey,
 } from '@/lib/auth/api-key-auth';
-import { unauthorized } from '@/lib/errors/types';
+import { badRequest, forbidden, notFound, unauthorized } from '@/lib/errors/types';
+import prisma from '@/lib/prisma';
+import { getOrgPermissions } from '@/lib/permissions';
 
 /**
  * Generates or extracts a request ID.
@@ -91,6 +93,85 @@ export async function getLegacyCtx(req?: NextRequest): Promise<RequestContext> {
         role: ctx.role,
         permissions: ctx.permissions,
         appPermissions: ctx.appPermissions,
+    };
+}
+
+// ─── Hub-and-spoke organization context (Epic O-2) ──────────────────
+
+/**
+ * Builds an `OrgContext` for organization-scoped routes
+ * (`/api/org/[orgSlug]/*`).
+ *
+ * Resolution order:
+ *   1. Authenticate the user via the existing session helper. NOT API
+ *      key — org-scoped routes are user-driven (CISO portfolio + admin
+ *      operations); machine-to-machine API keys are tenant-scoped and
+ *      have no place at the org layer.
+ *   2. Look up the Organization row by slug. 404 if missing.
+ *   3. Look up the OrgMembership for (org, user). 403 if absent —
+ *      access denied without leaking which org slug exists. Note that
+ *      the 404 from step 2 does leak existence; that mirrors how
+ *      `getTenantCtx` behaves and keeps the failure modes consistent
+ *      across the two scopes.
+ *   4. Pre-derive `permissions` via `getOrgPermissions(role)` so
+ *      callers can read flags directly without an extra helper call.
+ *
+ * Side effect: enriches the observability AsyncLocalStorage so logs
+ * and traces emitted downstream automatically include `userId`.
+ *
+ * Failure shape:
+ *   - `unauthorized` (401) — no session
+ *   - `badRequest`   (400) — missing/empty slug
+ *   - `notFound`     (404) — org slug doesn't exist
+ *   - `forbidden`    (403) — user is not a member of the org
+ */
+export async function getOrgCtx(
+    params: { orgSlug: string },
+    req?: NextRequest,
+): Promise<OrgContext> {
+    const session = await getSessionOrThrow();
+    const requestId = getRequestId(req);
+
+    const orgSlug = (params.orgSlug ?? '').trim();
+    if (!orgSlug) {
+        throw badRequest('Missing organization slug');
+    }
+
+    const org = await prisma.organization.findUnique({
+        where: { slug: orgSlug },
+        select: { id: true, slug: true },
+    });
+    if (!org) {
+        throw notFound(`Organization '${orgSlug}' not found`);
+    }
+
+    const membership = await prisma.orgMembership.findUnique({
+        where: {
+            organizationId_userId: {
+                organizationId: org.id,
+                userId: session.userId,
+            },
+        },
+        select: { role: true },
+    });
+    if (!membership) {
+        // Generic message — never echo the slug or hint at the
+        // distinction between "you're not a member" and "you signed
+        // in with the wrong account". Either is uncomfortable to act
+        // on for a real user, but neither leaks anything beyond the
+        // 404 above.
+        throw forbidden('Access to this organization is not permitted');
+    }
+
+    mergeRequestContext({ userId: session.userId });
+
+    return {
+        requestId,
+        userId: session.userId,
+        organizationId: org.id,
+        orgSlug: org.slug,
+        orgRole: membership.role,
+        permissions: getOrgPermissions(membership.role),
     };
 }
 

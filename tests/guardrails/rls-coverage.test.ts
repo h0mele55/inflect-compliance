@@ -31,6 +31,31 @@ import { prismaTestClient } from '../helpers/db';
 import type { PrismaClient } from '@prisma/client';
 import { TENANT_SCOPED_MODELS } from '@/lib/db/rls-middleware';
 
+// Epic O-1 — hub-and-spoke organization layer.
+//
+// `Organization` and `OrgMembership` are user-scoped, NOT tenant-
+// scoped (no `tenantId` column on either). They live on a parallel
+// RLS axis keyed on `app.user_id`:
+//
+//   * Organization                       → `org_isolation`
+//                                          USING EXISTS(membership)
+//   * OrgMembership                      → `org_membership_self_isolation`
+//                                          USING (userId = current user)
+//
+// Both also carry the canonical `superuser_bypass` and
+// `FORCE ROW LEVEL SECURITY` so the `postgres`-role privileged paths
+// (org CRUD API, auto-provisioning, seeds, migrations) work
+// unchanged. See migration 20260426060000_add_organization_layer_rls.
+//
+// Each entry maps the model name → the policy name we expect to
+// find on its row in pg_policies. Using a Map (not a Set) so a
+// future third org-scoped table can have its own policy name
+// without needing yet another structural exception.
+const ORG_SCOPED_MODELS: ReadonlyMap<string, string> = new Map([
+    ['Organization', 'org_isolation'],
+    ['OrgMembership', 'org_membership_self_isolation'],
+]);
+
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 
 describeFn('Guardrail: RLS coverage (pg_policies ↔ schema)', () => {
@@ -259,6 +284,123 @@ describeFn('Guardrail: RLS coverage (pg_policies ↔ schema)', () => {
                 `allow_all policies detected — these provide ZERO tenant ` +
                     `isolation and must be replaced with EXISTS-based policies:\n  ` +
                     violators.map((p) => `${p.tablename}.${p.policyname}`).join('\n  ')
+            );
+        }
+    });
+
+    // ─── Epic O-1 — organization-layer RLS ─────────────────────────
+
+    test('every org-scoped model has its named isolation policy', () => {
+        const missing: Array<{ model: string; policy: string }> = [];
+        for (const [model, expectedPolicy] of ORG_SCOPED_MODELS) {
+            const names = policiesFor(model);
+            if (!names.includes(expectedPolicy)) {
+                missing.push({ model, policy: expectedPolicy });
+            }
+        }
+        if (missing.length > 0) {
+            throw new Error(
+                `Org-layer RLS gap — ${missing.length} org-scoped model(s) lack ` +
+                    `their isolation policy. Ship/restore the relevant CREATE ` +
+                    `POLICY in prisma/migrations/20260426060000_add_organization_layer_rls:\n  ` +
+                    missing
+                        .map((m) => `${m.model} → policy '${m.policy}'`)
+                        .join('\n  '),
+            );
+        }
+    });
+
+    test('every org-scoped model has a superuser_bypass policy', () => {
+        const missing: string[] = [];
+        for (const model of ORG_SCOPED_MODELS.keys()) {
+            const names = policiesFor(model);
+            if (!names.includes('superuser_bypass')) {
+                missing.push(model);
+            }
+        }
+        if (missing.length > 0) {
+            throw new Error(
+                `Org-layer superuser_bypass gap — ${missing.length} model(s) lack ` +
+                    `'superuser_bypass'. Without it, the org-create API, auto-` +
+                    `provisioning service, seeds, and migrations are blocked by ` +
+                    `FORCE ROW LEVEL SECURITY. Add to each:\n  ` +
+                    missing.map((m) => `'${m}'`).join(', ') +
+                    `\n\nCanonical: superuser_bypass USING (current_setting('role') != 'app_user')`,
+            );
+        }
+    });
+
+    test('every org-scoped model has FORCE ROW LEVEL SECURITY enabled', () => {
+        const missing: string[] = [];
+        for (const model of ORG_SCOPED_MODELS.keys()) {
+            if (!forcedTables.has(model)) {
+                missing.push(model);
+            }
+        }
+        if (missing.length > 0) {
+            throw new Error(
+                `Org-layer FORCE RLS gap — ${missing.length} org-scoped table(s) ` +
+                    `aren't FORCING RLS. Without FORCE, the table owner ` +
+                    `(postgres) bypasses RLS unconditionally and the bypass-by-` +
+                    `role design collapses. Ship:\n  ` +
+                    missing
+                        .map((m) => `ALTER TABLE "${m}" FORCE ROW LEVEL SECURITY;`)
+                        .join('\n  '),
+            );
+        }
+    });
+
+    test('org-scoped and tenant-scoped sets are disjoint', () => {
+        // Two different isolation axes — a model being on both lists
+        // would mean its policies are keyed on both `app.tenant_id`
+        // AND `app.user_id`, which Postgres OR's together permissively
+        // and weakens the guarantee of either. If a future model
+        // legitimately needs both axes, that's a deliberate hybrid
+        // design and should land its own policy strategy + test.
+        const overlap: string[] = [];
+        for (const model of ORG_SCOPED_MODELS.keys()) {
+            if (TENANT_SCOPED_MODELS.has(model)) {
+                overlap.push(model);
+            }
+        }
+        if (overlap.length > 0) {
+            throw new Error(
+                `Isolation-axis overlap — ${overlap.length} model(s) appear in ` +
+                    `BOTH ORG_SCOPED_MODELS and TENANT_SCOPED_MODELS:\n  ` +
+                    overlap.join('\n  ') +
+                    `\n\nThis is almost certainly an accident — the two axes are ` +
+                    `keyed on different session variables (app.user_id vs ` +
+                    `app.tenant_id) and combining them via Postgres's permissive ` +
+                    `OR weakens both. Pick one axis per model.`,
+            );
+        }
+    });
+
+    test('ORG_SCOPED_MODELS sanity: every named policy actually carries a USING clause', () => {
+        // Defence-in-depth — if a "simplification" PR drops the USING
+        // clause from an org-isolation policy and replaces it with
+        // USING(true), the named-policy presence assertion above still
+        // passes but the isolation property is gone. Assert non-null
+        // qual on every named org policy so that path is closed.
+        const broken: Array<{ model: string; policy: string }> = [];
+        for (const [model, expectedPolicy] of ORG_SCOPED_MODELS) {
+            const row = policies.find(
+                (p) => p.tablename === model && p.policyname === expectedPolicy,
+            );
+            if (!row) continue; // missing-policy is caught by the prior test
+            if (!row.qual || row.qual.trim() === 'true') {
+                broken.push({ model, policy: expectedPolicy });
+            }
+        }
+        if (broken.length > 0) {
+            throw new Error(
+                `Org-layer USING-clause gap — ${broken.length} policy(ies) lost ` +
+                    `their isolation predicate (USING null or true):\n  ` +
+                    broken
+                        .map((b) => `${b.model}.${b.policy}`)
+                        .join('\n  ') +
+                    `\n\nRestore the canonical EXISTS / userId predicate from ` +
+                    `prisma/migrations/20260426060000_add_organization_layer_rls.`,
             );
         }
     });
