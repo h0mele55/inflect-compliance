@@ -1,0 +1,152 @@
+'use client';
+
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
+import { Paperclip } from 'lucide-react';
+
+import { ListPageShell } from '@/components/layout/ListPageShell';
+import { DataTable, createColumns } from '@/components/ui/table';
+import { TableEmptyState } from '@/components/ui/table/table-empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { formatDate } from '@/lib/format-date';
+import type { OverdueEvidenceRow } from '@/app-layer/schemas/portfolio';
+
+interface Props {
+    rows: OverdueEvidenceRow[];
+}
+
+const STATUS_VARIANTS: Record<OverdueEvidenceRow['status'], 'pending' | 'info' | 'error'> = {
+    DRAFT: 'pending',
+    SUBMITTED: 'info',
+    REJECTED: 'error',
+};
+
+function OverdueBadge({ days }: { days: number }) {
+    // 30+ days → critical, 7+ → warning, otherwise pending.
+    const variant = days >= 30 ? 'error' : days >= 7 ? 'warning' : 'pending';
+    return (
+        <StatusBadge variant={variant}>
+            {days}d overdue
+        </StatusBadge>
+    );
+}
+
+export function EvidenceTable({ rows }: Props) {
+    const [sortBy, setSortBy] = useState<string>('daysOverdue');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+    const sorted = useMemo(() => {
+        const copy = [...rows];
+        copy.sort((a, b) => {
+            const dir = sortOrder === 'asc' ? 1 : -1;
+            switch (sortBy) {
+                case 'tenantName':
+                    return dir * a.tenantName.localeCompare(b.tenantName);
+                case 'title':
+                    return dir * a.title.localeCompare(b.title);
+                case 'status':
+                    return dir * a.status.localeCompare(b.status);
+                case 'nextReviewDate':
+                    return dir * (new Date(a.nextReviewDate).getTime() - new Date(b.nextReviewDate).getTime());
+                case 'daysOverdue':
+                default:
+                    return dir * (a.daysOverdue - b.daysOverdue) || a.tenantName.localeCompare(b.tenantName);
+            }
+        });
+        return copy;
+    }, [rows, sortBy, sortOrder]);
+
+    const columns = useMemo(
+        () =>
+            createColumns<OverdueEvidenceRow>([
+                {
+                    id: 'tenantName',
+                    header: 'Tenant',
+                    cell: ({ row }) => (
+                        <span
+                            className="text-xs font-medium text-content-muted"
+                            data-testid={`org-evidence-tenant-${row.original.tenantSlug}`}
+                        >
+                            {row.original.tenantName}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'title',
+                    header: 'Evidence',
+                    cell: ({ row }) => (
+                        <Link
+                            href={row.original.drillDownUrl}
+                            className="font-medium text-content-emphasis hover:text-content-info hover:underline"
+                            data-testid={`org-evidence-link-${row.original.evidenceId}`}
+                        >
+                            {row.original.title}
+                        </Link>
+                    ),
+                },
+                {
+                    id: 'daysOverdue',
+                    header: 'Overdue',
+                    cell: ({ row }) => <OverdueBadge days={row.original.daysOverdue} />,
+                },
+                {
+                    id: 'status',
+                    header: 'Status',
+                    cell: ({ row }) => (
+                        <StatusBadge variant={STATUS_VARIANTS[row.original.status]}>
+                            {row.original.status}
+                        </StatusBadge>
+                    ),
+                },
+                {
+                    id: 'nextReviewDate',
+                    header: 'Review due',
+                    cell: ({ row }) => (
+                        <span className="text-xs text-content-subtle tabular-nums">
+                            {formatDate(row.original.nextReviewDate)}
+                        </span>
+                    ),
+                },
+            ]),
+        [],
+    );
+
+    return (
+        <ListPageShell>
+            <ListPageShell.Header>
+                <div>
+                    <h1 className="text-2xl font-semibold text-content-emphasis">
+                        Overdue Evidence
+                    </h1>
+                    <p className="text-sm text-content-muted mt-1">
+                        {rows.length} evidence item{rows.length === 1 ? '' : 's'} past review across the portfolio
+                    </p>
+                </div>
+            </ListPageShell.Header>
+            <ListPageShell.Body>
+                <DataTable<OverdueEvidenceRow>
+                    fillBody
+                    data={sorted}
+                    columns={columns}
+                    getRowId={(r) => r.evidenceId}
+                    sortableColumns={['tenantName', 'title', 'daysOverdue', 'status', 'nextReviewDate']}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    onSortChange={(p) => {
+                        if (p.sortBy) setSortBy(p.sortBy);
+                        if (p.sortOrder) setSortOrder(p.sortOrder);
+                    }}
+                    resourceName={(plural) => (plural ? 'evidence items' : 'evidence item')}
+                    emptyState={
+                        <TableEmptyState
+                            title="No overdue evidence"
+                            description="Every non-approved evidence item is within its review window across this organization's tenants."
+                            icon={<Paperclip className="size-10" />}
+                        />
+                    }
+                    data-testid="org-evidence-table"
+                />
+            </ListPageShell.Body>
+        </ListPageShell>
+    );
+}

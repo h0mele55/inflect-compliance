@@ -1,0 +1,148 @@
+'use client';
+
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
+
+import { ListPageShell } from '@/components/layout/ListPageShell';
+import { DataTable, createColumns } from '@/components/ui/table';
+import { TableEmptyState } from '@/components/ui/table/table-empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { formatDate } from '@/lib/format-date';
+import type { CriticalRiskRow } from '@/app-layer/schemas/portfolio';
+
+interface Props {
+    rows: CriticalRiskRow[];
+}
+
+const STATUS_VARIANTS: Record<CriticalRiskRow['status'], 'error' | 'warning' | 'info'> = {
+    OPEN: 'error',
+    MITIGATING: 'warning',
+    ACCEPTED: 'info',
+};
+
+function ScorePill({ score }: { score: number }) {
+    // ≥ 20 critical (red), 15-19 high (warning).
+    const variant = score >= 20 ? 'error' : 'warning';
+    return <StatusBadge variant={variant}>{score}</StatusBadge>;
+}
+
+export function RisksTable({ rows }: Props) {
+    const [sortBy, setSortBy] = useState<string>('inherentScore');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+    const sorted = useMemo(() => {
+        const copy = [...rows];
+        copy.sort((a, b) => {
+            const dir = sortOrder === 'asc' ? 1 : -1;
+            switch (sortBy) {
+                case 'tenantName':
+                    return dir * a.tenantName.localeCompare(b.tenantName);
+                case 'title':
+                    return dir * a.title.localeCompare(b.title);
+                case 'status':
+                    return dir * a.status.localeCompare(b.status);
+                case 'updatedAt':
+                    return dir * (new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+                case 'inherentScore':
+                default:
+                    return dir * (a.inherentScore - b.inherentScore) || a.tenantName.localeCompare(b.tenantName);
+            }
+        });
+        return copy;
+    }, [rows, sortBy, sortOrder]);
+
+    const columns = useMemo(
+        () =>
+            createColumns<CriticalRiskRow>([
+                {
+                    id: 'tenantName',
+                    header: 'Tenant',
+                    cell: ({ row }) => (
+                        <span
+                            className="text-xs font-medium text-content-muted"
+                            data-testid={`org-risk-tenant-${row.original.tenantSlug}`}
+                        >
+                            {row.original.tenantName}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'title',
+                    header: 'Risk',
+                    cell: ({ row }) => (
+                        <Link
+                            href={row.original.drillDownUrl}
+                            className="font-medium text-content-emphasis hover:text-content-info hover:underline"
+                            data-testid={`org-risk-link-${row.original.riskId}`}
+                        >
+                            {row.original.title}
+                        </Link>
+                    ),
+                },
+                {
+                    id: 'inherentScore',
+                    header: 'Score',
+                    cell: ({ row }) => <ScorePill score={row.original.inherentScore} />,
+                },
+                {
+                    id: 'status',
+                    header: 'Status',
+                    cell: ({ row }) => (
+                        <StatusBadge variant={STATUS_VARIANTS[row.original.status]}>
+                            {row.original.status}
+                        </StatusBadge>
+                    ),
+                },
+                {
+                    id: 'updatedAt',
+                    header: 'Updated',
+                    cell: ({ row }) => (
+                        <span className="text-xs text-content-subtle tabular-nums">
+                            {formatDate(row.original.updatedAt)}
+                        </span>
+                    ),
+                },
+            ]),
+        [],
+    );
+
+    return (
+        <ListPageShell>
+            <ListPageShell.Header>
+                <div>
+                    <h1 className="text-2xl font-semibold text-content-emphasis">
+                        Critical Risks
+                    </h1>
+                    <p className="text-sm text-content-muted mt-1">
+                        {rows.length} critical risk{rows.length === 1 ? '' : 's'} (score ≥ 15, not closed) across the portfolio
+                    </p>
+                </div>
+            </ListPageShell.Header>
+            <ListPageShell.Body>
+                <DataTable<CriticalRiskRow>
+                    fillBody
+                    data={sorted}
+                    columns={columns}
+                    getRowId={(r) => r.riskId}
+                    sortableColumns={['tenantName', 'title', 'inherentScore', 'status', 'updatedAt']}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    onSortChange={(p) => {
+                        if (p.sortBy) setSortBy(p.sortBy);
+                        if (p.sortOrder) setSortOrder(p.sortOrder);
+                    }}
+                    resourceName={(plural) => (plural ? 'risks' : 'risk')}
+                    emptyState={
+                        <TableEmptyState
+                            title="No critical risks"
+                            description="No risk with inherent score ≥ 15 is currently open across this organization's tenants."
+                            icon={<AlertTriangle className="size-10" />}
+                        />
+                    }
+                    data-testid="org-risks-table"
+                />
+            </ListPageShell.Body>
+        </ListPageShell>
+    );
+}

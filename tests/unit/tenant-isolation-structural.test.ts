@@ -83,6 +83,12 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
             // Epic 1, R-1 — tenant picker: user selects which of their memberships to enter.
             // Must be root-level (not under /t/) because the user hasn't chosen a tenant yet.
             'tenants',
+            // Epic O-4 — hub-and-spoke org layer. Pages under /org/[orgSlug]
+            // resolve OrgContext (NOT RequestContext) and operate above the
+            // tenant scope. Drill-down navigations from the portfolio still
+            // route into /t/{tenantSlug}/... where standard tenant
+            // isolation applies.
+            'org',
         ]);
 
         // Get immediate children of app/ that are page directories
