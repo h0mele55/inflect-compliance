@@ -38,20 +38,73 @@
  * across the suite.
  */
 import { test, expect } from '@playwright/test';
-import { loginAndGetTenant, safeGoto, waitForHydration } from './e2e-utils';
+import { type Page } from '@playwright/test';
+import { safeGoto, waitForHydration } from './e2e-utils';
 
 const CISO = { email: 'ciso@acme.com', password: 'password123' };
 const ORG_SLUG = 'acme-org';
 const SEED_TENANT = 'acme-corp';
-const UNIQUE = Date.now().toString(36).slice(-6);
-const NEW_TENANT_SLUG = `e2e-portfolio-${UNIQUE}`;
-const NEW_TENANT_NAME = `E2E Portfolio Tenant ${UNIQUE}`;
+
+/**
+ * CISO-aware login helper.
+ *
+ * `loginAndGetTenant` from `e2e-utils` only succeeds when the user
+ * has a single TenantMembership (post-login redirect lands directly
+ * on `/t/{slug}/dashboard`). Once test G creates a 2nd tenant, the
+ * CISO has two memberships and post-login lands on the `/tenants`
+ * picker. This helper handles both cases — single-tenant fast path
+ * and multi-tenant picker — and returns the seeded tenant slug.
+ */
+async function loginAsCiso(page: Page, preferredTenant = SEED_TENANT): Promise<string> {
+    await safeGoto(page, '/login', { timeout: 90_000 });
+
+    const credentialsForm = page.locator('#credentials-form');
+    const emailInput = credentialsForm.locator('input[type="email"][name="email"]');
+    await emailInput.waitFor({ state: 'visible', timeout: 30_000 });
+
+    // Wait for React hydration so onSubmit is wired up.
+    await page.waitForFunction(() => {
+        const form = document.querySelector('form');
+        return form && Object.keys(form).some(k => k.startsWith('__reactEvents') || k.startsWith('__reactFiber'));
+    }, { timeout: 30_000 });
+
+    await emailInput.fill(CISO.email);
+    await credentialsForm.locator('input[type="password"]').fill(CISO.password);
+    await credentialsForm.locator('button[type="submit"]').click();
+
+    // Post-login lands on either `/t/{slug}/dashboard` (single
+    // membership) or `/tenants` (picker). Wait for either, then
+    // pivot to the preferred tenant if we hit the picker.
+    await page.waitForURL(
+        (url) =>
+            /\/t\/[^/]+\/dashboard/.test(url.pathname) ||
+            url.pathname === '/tenants',
+        { waitUntil: 'domcontentloaded', timeout: 60_000 },
+    );
+
+    if (page.url().includes('/tenants')) {
+        const link = page.locator(`a[href="/t/${preferredTenant}/dashboard"]`).first();
+        await link.waitFor({ state: 'visible', timeout: 30_000 });
+        await link.click();
+        await page.waitForURL(new RegExp(`/t/${preferredTenant}/dashboard`), {
+            waitUntil: 'domcontentloaded',
+            timeout: 30_000,
+        });
+    }
+
+    // Verify the tenant chrome rendered.
+    await page.locator('aside').first().waitFor({ state: 'visible', timeout: 30_000 });
+
+    const match = new URL(page.url()).pathname.match(/^\/t\/([^/]+)\//);
+    if (!match) throw new Error('Could not extract tenant slug from ' + page.url());
+    return match[1];
+}
 
 test.describe('CISO portfolio journey (Epic O-4)', () => {
     test.describe.configure({ mode: 'serial' });
 
     test('A — login as CISO and land on the auto-provisioned AUDITOR tenant', async ({ page }) => {
-        const slug = await loginAndGetTenant(page, CISO);
+        const slug = await loginAsCiso(page);
         // CISO's only seeded TenantMembership is acme-corp/AUDITOR.
         expect(slug).toBe(SEED_TENANT);
 
@@ -62,7 +115,7 @@ test.describe('CISO portfolio journey (Epic O-4)', () => {
     });
 
     test('B — portfolio overview renders four stat cards + drill-down CTAs + tenant list', async ({ page }) => {
-        await loginAndGetTenant(page, CISO);
+        await loginAsCiso(page);
         await safeGoto(page, `/org/${ORG_SLUG}`);
 
         await expect(
@@ -86,7 +139,7 @@ test.describe('CISO portfolio journey (Epic O-4)', () => {
     });
 
     test('C — controls drill-down lists rows with tenant attribution', async ({ page }) => {
-        await loginAndGetTenant(page, CISO);
+        await loginAsCiso(page);
         await safeGoto(page, `/org/${ORG_SLUG}/controls`);
 
         // Either rows or the empty state — both prove the page rendered
@@ -109,7 +162,7 @@ test.describe('CISO portfolio journey (Epic O-4)', () => {
     });
 
     test('D — risks drill-down → click row → land on /t/acme-corp/risks/{id}', async ({ page }) => {
-        await loginAndGetTenant(page, CISO);
+        await loginAsCiso(page);
         await safeGoto(page, `/org/${ORG_SLUG}/risks`);
         await expect(page.locator('#org-risks-table')).toBeVisible({
             timeout: 30_000,
@@ -146,7 +199,7 @@ test.describe('CISO portfolio journey (Epic O-4)', () => {
     });
 
     test('E — overdue evidence list renders with tenant attribution or empty state', async ({ page }) => {
-        await loginAndGetTenant(page, CISO);
+        await loginAsCiso(page);
         await safeGoto(page, `/org/${ORG_SLUG}/evidence`);
         await expect(page.locator('#org-evidence-table')).toBeVisible({
             timeout: 30_000,
@@ -166,7 +219,7 @@ test.describe('CISO portfolio journey (Epic O-4)', () => {
     });
 
     test('F — read-only invariant: AUDITOR cannot create tenant-level records', async ({ page }) => {
-        await loginAndGetTenant(page, CISO);
+        await loginAsCiso(page);
         await safeGoto(page, `/t/${SEED_TENANT}/risks`);
 
         // Wait for the tenant chrome to come up.
@@ -182,23 +235,27 @@ test.describe('CISO portfolio journey (Epic O-4)', () => {
     });
 
     test('G — CISO creates a 2nd tenant via /org/{slug}/tenants/new', async ({ page }) => {
-        await loginAndGetTenant(page, CISO);
+        // Generate the slug INSIDE the test so each Playwright retry
+        // gets a fresh value. Module-level UNIQUE persists across
+        // retries within the same worker, and a retry would collide
+        // with the slug the previous attempt already committed.
+        const attemptUnique =
+            Date.now().toString(36).slice(-6) +
+            Math.floor(Math.random() * 1000).toString(36);
+        const attemptSlug = `e2e-portfolio-${attemptUnique}`;
+        const attemptName = `E2E Portfolio Tenant ${attemptUnique}`;
+
+        await loginAsCiso(page);
         await safeGoto(page, `/org/${ORG_SLUG}/tenants/new`);
 
         await expect(
             page.locator('[data-testid="org-new-tenant-form"]'),
         ).toBeVisible({ timeout: 30_000 });
 
-        await page.fill(
-            '[data-testid="org-new-tenant-name"]',
-            NEW_TENANT_NAME,
-        );
+        await page.fill('[data-testid="org-new-tenant-name"]', attemptName);
         // The slug field auto-fills from the name; replace with a
         // collision-proof slug for repeat runs.
-        await page.fill(
-            '[data-testid="org-new-tenant-slug"]',
-            NEW_TENANT_SLUG,
-        );
+        await page.fill('[data-testid="org-new-tenant-slug"]', attemptSlug);
         // "Choose later" — keeps the post-create redirect to a stable
         // surface that doesn't depend on the framework catalog.
         await page.click('[data-testid="org-new-tenant-framework-later"]');
@@ -210,8 +267,8 @@ test.describe('CISO portfolio journey (Epic O-4)', () => {
         // yet, so middleware bounces on /t/* — that's a known pre-Epic-
         // O-4 limitation. We only need to confirm the row was actually
         // created, which we verify on the org tenants list.
-        await page.waitForURL(/\/(?:t|org|no-tenant)\b/, { timeout: 30_000 }).catch(() => {
-            /* the URL may settle on an error or no-tenant — fine */
+        await page.waitForURL(/\/(?:t|org|no-tenant|tenants)\b/, { timeout: 30_000 }).catch(() => {
+            /* the URL may settle on an error or picker — fine */
         });
 
         await safeGoto(page, `/org/${ORG_SLUG}/tenants`);
@@ -219,14 +276,12 @@ test.describe('CISO portfolio journey (Epic O-4)', () => {
             timeout: 30_000,
         });
         await expect(
-            page.locator(
-                `[data-testid="org-tenant-link-${NEW_TENANT_SLUG}"]`,
-            ),
+            page.locator(`[data-testid="org-tenant-link-${attemptSlug}"]`),
         ).toBeVisible({ timeout: 15_000 });
     });
 
     test('H — OrgSwitcher pivots from portfolio context into a tenant workspace', async ({ page }) => {
-        await loginAndGetTenant(page, CISO);
+        await loginAsCiso(page);
         await safeGoto(page, `/org/${ORG_SLUG}`);
 
         // Sidebar must be hydrated before the popover trigger fires.
