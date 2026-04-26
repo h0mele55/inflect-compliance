@@ -221,6 +221,7 @@ model User {
   id                            String                       @id @default(cuid())
   email                         String                       @unique
   passwordHash                  String?
+  passwordChangedAt             DateTime?
   name                          String?
   emailVerified                 DateTime?
   image                         String?
@@ -279,6 +280,7 @@ model User {
   vendorBundlesCreated          VendorEvidenceBundle[]       @relation("EvidenceBundleCreator")
   apiKeysCreated                TenantApiKey[]               @relation("ApiKeyCreator")
   userSessions                  UserSession[]                @relation("UserSessionOwner")
+  passwordResetTokens           PasswordResetToken[]
 }
 
 model Account {
@@ -362,6 +364,33 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+// GAP-06 — password-reset token storage. The raw token is generated at
+// issue time, included in the reset email (URL query param), and never
+// persisted in plaintext. Only `tokenHash` (sha256 hex of the raw token)
+// hits the DB so a leaked dump can't grant instant account access.
+//
+// User-scoped, NOT tenant-scoped (a user has one password across all
+// tenant memberships). Sits outside RLS — see the rls-coverage guardrail
+// exception list.
+//
+// Single-use is enforced by the atomic-claim pattern on `usedAt`:
+//   updateMany WHERE tokenHash = ? AND usedAt IS NULL AND expiresAt > NOW()
+// First caller wins; concurrent attempts get count=0.
+model PasswordResetToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  requestIp  String?
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Clause {

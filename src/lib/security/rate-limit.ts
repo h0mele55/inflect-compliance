@@ -210,6 +210,67 @@ export const EMAIL_DISPATCH_LIMIT: RateLimitConfig = {
 };
 
 /**
+ * GAP-06 — forgot-password initiation: 5 per hour per IP.
+ *
+ * Threat model: email-bombing a victim by spamming reset links. Same
+ * shape as EMAIL_DISPATCH_LIMIT (and could be aliased), but exposed
+ * separately so a future operator who decides forgot-password should
+ * be tighter (e.g. 3/hour) doesn't have to reason about magic-link
+ * collateral damage.
+ *
+ * IP-only by design — keying by email would itself become an
+ * enumeration oracle (different responses for "throttled" vs
+ * "no such email"). Anti-enumeration in the route handler relies on
+ * uniform timing and uniform response shape across both branches;
+ * the rate limiter must not break that property.
+ *
+ * No lockout: a hard lockout on this endpoint creates a DoS vector
+ * (attacker burns the lockout for legitimate users on a shared NAT).
+ */
+export const FORGOT_PASSWORD_LIMIT: RateLimitConfig = {
+    maxAttempts: 5,
+    windowMs: 60 * 60 * 1000,
+};
+
+/**
+ * GAP-06 — reset-password completion: 10 per 15 min + 15 min lockout.
+ *
+ * Threat model: online brute-force on the 256-bit reset token. The
+ * entropy already makes the attack infeasible at the cryptographic
+ * layer; this preset is defence-in-depth against scanners and
+ * accidental floods. Same shape as LOGIN_LIMIT — exposed separately
+ * so future tightening (or relaxation, if lockout-DoS becomes a
+ * concern) doesn't move both flows in lockstep.
+ *
+ * Keyed by IP. Per-token keying would weaken the limiter against an
+ * attacker rotating tokens; per-IP catches scanning patterns.
+ */
+export const PASSWORD_RESET_LIMIT: RateLimitConfig = {
+    maxAttempts: 10,
+    windowMs: 15 * 60 * 1000,
+    lockoutMs: 15 * 60 * 1000,
+};
+
+/**
+ * GAP-06 — authenticated password change: 10 per 15 min + 15 min lockout.
+ *
+ * Threat model: brute-forcing the current-password verification on a
+ * compromised session. Per-userId keying via the wrapper's getUserId
+ * resolver isolates abuse from one user account so a shared-NAT
+ * office doesn't trigger another user's quota.
+ *
+ * The usecase additionally applies LOGIN_PROGRESSIVE_POLICY on
+ * wrong-current-password attempts (3 → 5s, 5 → 30s, 10 → 15min
+ * lockout) keyed `change-pw:${userId}`, so the wrapper limit is the
+ * outer ceiling; progressive friction kicks in earlier.
+ */
+export const PASSWORD_CHANGE_LIMIT: RateLimitConfig = {
+    maxAttempts: 10,
+    windowMs: 15 * 60 * 1000,
+    lockoutMs: 15 * 60 * 1000,
+};
+
+/**
  * Platform-admin tenant creation: 5 per hour per calling IP.
  *
  * Threat model: a leaked PLATFORM_ADMIN_API_KEY being used to spin up

@@ -141,6 +141,85 @@ export async function revokeAllTenantSessions(
     return { usersAffected: result.count };
 }
 
+// ─── Revoke Other Sessions (preserve current) ───────────────────────
+
+/**
+ * Variant of {@link revokeUserSessions} used by the authenticated
+ * password-change flow. Bumps `sessionVersion` so every JWT pegged to
+ * the prior version is force-invalidated, then explicitly revokes every
+ * `UserSession` row for this user EXCEPT the one identified by
+ * `currentUserSessionId` — that row is kept active and its associated
+ * device stays signed in.
+ *
+ * UX rationale: forcing logout on the device the user just used to
+ * change their password adds friction without a security upside (the
+ * same user already proved possession of the current password ~2s
+ * earlier). Other devices ARE revoked because a current-password
+ * compromise might have produced sessions elsewhere.
+ *
+ * Note: bumping `sessionVersion` would normally invalidate the current
+ * JWT too on the next request. The caller is responsible for issuing
+ * a fresh cookie (or letting NextAuth's JWT callback refresh on next
+ * touch). Without that step, the user's next request still 401s.
+ */
+export async function revokeOtherUserSessions(
+    ctx: RequestContext,
+    currentUserSessionId: string | null | undefined,
+): Promise<SessionRevocationResult> {
+    const updated = await prisma.user.update({
+        where: { id: ctx.userId },
+        data: { sessionVersion: { increment: 1 } },
+        select: { id: true, sessionVersion: true },
+    });
+
+    if (currentUserSessionId) {
+        // Mark every OTHER row revoked. We don't fail the path if this
+        // errors — the sessionVersion bump is the load-bearing kill
+        // switch; per-row revocation is for clean audit-trail granularity.
+        try {
+            await prisma.userSession.updateMany({
+                where: {
+                    userId: ctx.userId,
+                    revokedAt: null,
+                    NOT: { id: currentUserSessionId },
+                },
+                data: {
+                    revokedAt: new Date(),
+                    revokedReason: 'password-changed',
+                },
+            });
+        } catch { /* best-effort */ }
+    } else {
+        // No current session id resolved (e.g. cookie-only legacy path).
+        // Fall back to revoking everything; caller will re-auth on next
+        // request.
+        try {
+            await prisma.userSession.updateMany({
+                where: { userId: ctx.userId, revokedAt: null },
+                data: {
+                    revokedAt: new Date(),
+                    revokedReason: 'password-changed',
+                },
+            });
+        } catch { /* best-effort */ }
+    }
+
+    try {
+        await logEvent(prisma, ctx, {
+            action: 'OTHER_SESSIONS_REVOKED_PASSWORD_CHANGE',
+            entityType: 'User',
+            entityId: ctx.userId,
+            details: `Other sessions revoked on password change. New sessionVersion: ${updated.sessionVersion}`,
+            detailsJson: { category: 'access', operation: 'session_revoked', detail: 'password-changed' },
+        });
+    } catch { /* audit best-effort */ }
+
+    return {
+        userId: updated.id,
+        newSessionVersion: updated.sessionVersion,
+    };
+}
+
 // ─── Get Session Version ────────────────────────────────────────────
 
 /**

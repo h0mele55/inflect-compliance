@@ -35,7 +35,22 @@ const HIBP_REQUIRED_ROUTES: ReadonlyArray<{
         file: 'src/app/api/auth/register/route.ts',
         field: 'password',
     },
-    // Future password-change / reset / recovery routes add themselves here.
+    // GAP-06 — password lifecycle routes. Each accepts a `newPassword`
+    // (reset-password / change-password) or initiates a flow that ends
+    // in one (forgot-password). Reset + change apply HIBP at the route
+    // boundary for early reject; the forgot-password initiation does
+    // not set a password (no HIBP needed there) but is intentionally
+    // NOT listed below because the structural scan would still flag it
+    // as wanting a password field.
+    {
+        file: 'src/app/api/auth/reset-password/route.ts',
+        field: 'newPassword',
+    },
+    {
+        file: 'src/app/api/t/[tenantSlug]/account/password/route.ts',
+        field: 'newPassword',
+    },
+    // Future password-recovery routes add themselves here.
 ];
 
 // ── helpers ────────────────────────────────────────────────────────────────

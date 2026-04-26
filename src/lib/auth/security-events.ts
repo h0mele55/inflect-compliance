@@ -47,6 +47,13 @@ export const AUTH_ACTIONS = {
     LOGIN_EMAIL_VERIFICATION_REQUIRED: 'AUTH_LOGIN_EMAIL_VERIFICATION_REQUIRED',
     EMAIL_VERIFICATION_ISSUED: 'AUTH_EMAIL_VERIFICATION_ISSUED',
     EMAIL_VERIFIED: 'AUTH_EMAIL_VERIFIED',
+    // GAP-06 — password lifecycle.
+    PASSWORD_RESET_REQUESTED: 'AUTH_PASSWORD_RESET_REQUESTED',
+    PASSWORD_RESET_REQUESTED_UNKNOWN_TARGET: 'AUTH_PASSWORD_RESET_REQUESTED_UNKNOWN_TARGET',
+    PASSWORD_RESET_COMPLETED: 'AUTH_PASSWORD_RESET_COMPLETED',
+    PASSWORD_RESET_FAILED: 'AUTH_PASSWORD_RESET_FAILED',
+    PASSWORD_CHANGED: 'AUTH_PASSWORD_CHANGED',
+    PASSWORD_CHANGE_FAILED: 'AUTH_PASSWORD_CHANGE_FAILED',
 } as const;
 
 export type AuthActionValue = (typeof AUTH_ACTIONS)[keyof typeof AUTH_ACTIONS];
@@ -233,6 +240,166 @@ export async function recordEmailVerificationIssued(params: {
         tenantId,
         email: params.email,
         method: 'credentials',
+        requestId: params.requestId,
+    });
+}
+
+// ── Password lifecycle (GAP-06) ────────────────────────────────────────
+//
+// Five recorders, all symmetric: pino log first (so we always have a
+// trace even if the audit write fails), then a hash-chained audit row
+// when we can resolve a tenant. The audit row uses `category: 'custom'`
+// with a nested `auth` block so the streamer's privacy posture (drop
+// free-text `details`, ship `detailsJson`) carries through unchanged.
+
+export async function recordPasswordResetRequested(params: {
+    userId: string;
+    email: string;
+    requestId?: string;
+    tenantId?: string | null;
+}): Promise<void> {
+    const identifierHash = hashEmailForLog(params.email);
+    logger.info('auth password reset requested', {
+        component: 'auth',
+        event: 'password_reset_requested',
+        userId: params.userId,
+        identifierHash,
+        requestId: params.requestId,
+    });
+    const tenantId = params.tenantId ?? (await resolvePrimaryTenantId(params.userId));
+    if (!tenantId) return;
+    await writeAudit({
+        action: AUTH_ACTIONS.PASSWORD_RESET_REQUESTED,
+        userId: params.userId,
+        tenantId,
+        email: params.email,
+        method: 'credentials',
+        requestId: params.requestId,
+    });
+}
+
+/**
+ * Forgot-password fired against an email that has no matching User (or
+ * a User with no passwordHash, e.g. OAuth-only accounts). Logged so SREs
+ * see attempt volume; never produces an audit row (no tenant to attribute
+ * to). The hashed identifier lets log pipelines count per-target without
+ * leaking the raw email.
+ */
+export async function recordPasswordResetRequestedUnknownTarget(params: {
+    email: string;
+    requestId?: string;
+}): Promise<void> {
+    logger.info('auth password reset requested (unknown target)', {
+        component: 'auth',
+        event: 'password_reset_requested_unknown_target',
+        identifierHash: hashEmailForLog(params.email),
+        requestId: params.requestId,
+    });
+}
+
+export async function recordPasswordResetCompleted(params: {
+    userId: string;
+    email: string;
+    requestId?: string;
+    tenantId?: string | null;
+}): Promise<void> {
+    const identifierHash = hashEmailForLog(params.email);
+    logger.info('auth password reset completed', {
+        component: 'auth',
+        event: 'password_reset_completed',
+        userId: params.userId,
+        identifierHash,
+        requestId: params.requestId,
+    });
+    const tenantId = params.tenantId ?? (await resolvePrimaryTenantId(params.userId));
+    if (!tenantId) return;
+    await writeAudit({
+        action: AUTH_ACTIONS.PASSWORD_RESET_COMPLETED,
+        userId: params.userId,
+        tenantId,
+        email: params.email,
+        method: 'credentials',
+        requestId: params.requestId,
+    });
+}
+
+export async function recordPasswordResetFailed(params: {
+    /** May be null when the token doesn't resolve to a user. */
+    userId: string | null;
+    email: string | null;
+    reason: 'invalid_token' | 'expired_token' | 'used_token' | 'breached_password' | 'policy_rejected';
+    requestId?: string;
+}): Promise<void> {
+    logger.warn('auth password reset failed', {
+        component: 'auth',
+        event: 'password_reset_failed',
+        reason: params.reason,
+        userId: params.userId ?? undefined,
+        identifierHash: params.email ? hashEmailForLog(params.email) : undefined,
+        requestId: params.requestId,
+    });
+    if (!params.userId || !params.email) return;
+    const tenantId = await resolvePrimaryTenantId(params.userId);
+    if (!tenantId) return;
+    await writeAudit({
+        action: AUTH_ACTIONS.PASSWORD_RESET_FAILED,
+        userId: params.userId,
+        tenantId,
+        email: params.email,
+        method: 'credentials',
+        reason: params.reason,
+        requestId: params.requestId,
+    });
+}
+
+export async function recordPasswordChanged(params: {
+    userId: string;
+    email: string;
+    tenantId: string;
+    requestId?: string;
+}): Promise<void> {
+    const identifierHash = hashEmailForLog(params.email);
+    logger.info('auth password changed', {
+        component: 'auth',
+        event: 'password_changed',
+        userId: params.userId,
+        tenantId: params.tenantId,
+        identifierHash,
+        requestId: params.requestId,
+    });
+    await writeAudit({
+        action: AUTH_ACTIONS.PASSWORD_CHANGED,
+        userId: params.userId,
+        tenantId: params.tenantId,
+        email: params.email,
+        method: 'credentials',
+        requestId: params.requestId,
+    });
+}
+
+export async function recordPasswordChangeFailed(params: {
+    userId: string;
+    email: string;
+    tenantId: string;
+    reason: 'wrong_current' | 'breached_password' | 'policy_rejected' | 'oauth_only';
+    requestId?: string;
+}): Promise<void> {
+    logger.warn('auth password change failed', {
+        component: 'auth',
+        event: 'password_change_failed',
+        reason: params.reason,
+        userId: params.userId,
+        tenantId: params.tenantId,
+        identifierHash: hashEmailForLog(params.email),
+        requestId: params.requestId,
+    });
+    await writeAudit({
+        action: AUTH_ACTIONS.PASSWORD_CHANGE_FAILED,
+        userId: params.userId,
+        tenantId: params.tenantId,
+        email: params.email,
+        method: 'credentials',
+        reason: params.reason,
         requestId: params.requestId,
     });
 }

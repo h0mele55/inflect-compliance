@@ -50,7 +50,12 @@ function classifyEndpoint(pathname: string): EndpointTier {
     if (
         pathname.startsWith('/api/auth/signin') ||
         pathname.startsWith('/api/auth/callback') ||
-        pathname.startsWith('/api/auth/signout')
+        pathname.startsWith('/api/auth/signout') ||
+        // GAP-06 — token-bearing password lifecycle surfaces. Same tier
+        // as signin because both exercise password material and must
+        // carry the same per-IP volumetric ceiling.
+        pathname.startsWith('/api/auth/forgot-password') ||
+        pathname.startsWith('/api/auth/reset-password')
     ) {
         return 'high';
     }
