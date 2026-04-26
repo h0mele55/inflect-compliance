@@ -169,6 +169,110 @@ exclusively through NextAuth. `AuthLoginSchema` is gone from
   expired rows on every write. `pruneExpiredVerificationTokens()` is
   also exported for cron/job wiring if issuance ever becomes infrequent
 
+## Password lifecycle (GAP-06)
+
+Three flows close the credentials lifecycle. Implementation:
+`src/app-layer/usecases/password.ts`. Routes:
+`src/app/api/auth/forgot-password/route.ts`,
+`src/app/api/auth/reset-password/route.ts`,
+`src/app/api/t/[tenantSlug]/account/password/route.ts`.
+
+### Forgot-password (unauthenticated)
+
+`POST /api/auth/forgot-password { email }` → always `200 { ok, message }`,
+regardless of whether the email maps to a user.
+
+- **Anti-enumeration.** Three branches (real user, OAuth-only user,
+  unknown email) converge on the same response shape and a uniform
+  800ms wall-clock floor (`FORGOT_PASSWORD_MIN_DURATION_MS` in
+  `password.ts`). The fake branches run a `dummyVerify` to match
+  CPU shape. Locked by `tests/unit/password-anti-enumeration.test.ts`.
+- **Token storage.** `PasswordResetToken { tokenHash, userId, expiresAt,
+  usedAt, requestIp }`. The raw 32-byte hex token only exists in memory
+  on the issue side and consume side; only `sha256(rawToken)` lands
+  in the DB. Lifetime: 30 minutes. Each new issuance invalidates the
+  user's prior outstanding tokens in the same transaction.
+- **Rate limit.** `FORGOT_PASSWORD_LIMIT` (5/hour, per-IP, no lockout).
+  IP-only by design — keying by email would itself be an enumeration
+  oracle.
+
+### Reset-password (token-bound)
+
+`POST /api/auth/reset-password { token, newPassword }` →
+`200 ok` / `400 bad_request` (HIBP/policy) / `410 gone` (invalid,
+expired, used).
+
+- **Atomic single-use claim.** `updateMany WHERE tokenHash = ? AND
+  usedAt IS NULL AND expiresAt > NOW()`. Concurrent claims with the
+  same raw token resolve to exactly one winner; locked by
+  `tests/integration/password-reset-flow.test.ts` (5-way concurrent
+  claim test).
+- **HIBP applied early at the route layer + again in the usecase as
+  backstop** for direct callers. Failed HIBP / policy does NOT burn
+  the token — the user can retry with a different password using the
+  same link.
+- **Side effects on success.** Update `passwordHash` +
+  `passwordChangedAt`; bump `User.sessionVersion` (force-revoke every
+  existing JWT); delete every other reset token for the user; mark
+  every `UserSession` row revoked with `revokedReason='password-reset'`.
+  The user must sign in fresh.
+- **Rate limit.** `PASSWORD_RESET_LIMIT` (10/15min + 15min lockout,
+  per-IP).
+
+### Change-password (authenticated)
+
+`PUT /api/t/[tenantSlug]/account/password { currentPassword, newPassword }`.
+Self-service — any active tenant member can change their own password.
+The path is tenant-scoped because the UI lives at `/t/:slug/account/...`,
+but the underlying password is user-scoped.
+
+- **Verifies current password** with progressive lockout (
+  `LOGIN_PROGRESSIVE_POLICY` keyed `change-pw:${userId}` — 3 fails →
+  5s, 5 → 30s, 10 → 15min lockout). Lockout response burns dummy
+  bcrypt time so the wall clock can't distinguish it from a real
+  verify.
+- **Rejects same-as-current** explicitly (different error than
+  policy/HIBP) so the UI can surface a clearer message.
+- **HIBP** at the route + usecase, same shape as reset.
+- **Side effects on success.** Update `passwordHash` +
+  `passwordChangedAt`; bump `sessionVersion`; revoke every OTHER
+  `UserSession` row with `revokedReason='password-changed'` —
+  **the current device's row is preserved** so the user stays signed
+  in (forcing logout on the device the user just used adds friction
+  with no security upside, since the user already proved possession
+  of the current password ~2s earlier).
+- **Rate limit.** `PASSWORD_CHANGE_LIMIT` (10/15min + 15min lockout)
+  keyed by `userId` so a shared-NAT office doesn't burn another
+  user's quota.
+
+### MFA + OAuth posture
+
+| | Reset | Change |
+|---|---|---|
+| TOTP enrolment | **Preserved.** Next login still requires MFA challenge if enabled. | Preserved. |
+| OAuth refresh tokens | Untouched (independent factor). | Untouched. |
+
+> [!IMPORTANT]
+> **MFA is intentionally not cleared on password reset.** Doing
+> otherwise would mean a single email-account compromise (the recovery
+> factor) defeats the entire 2FA system. A user who has lost both
+> their password AND their MFA device must contact support — that's
+> a separate "MFA recovery" flow not in scope for GAP-06.
+
+### Operator runbook
+
+- **HIBP outage.** Both reset and change paths fail-open via
+  `password-check.ts:159` — log line `password-check.<reason>` with
+  `skipped: true`. The set-password completes; the breach screen is
+  bypassed for the duration. No alert needed unless outages are
+  prolonged.
+- **Token table maintenance.** `pruneExpiredPasswordResetTokens()` is
+  idempotent; tokens self-clean during issuance. Add a cron only if
+  the table grows beyond ~10k rows (no current need).
+- **Session-version bump invalidates every JWT.** Users on other
+  devices see a fresh login screen on their next request. Documented
+  via the email body so the experience isn't surprising.
+
 ## Audit event catalog
 
 | Action | When | Tenant attribution |
@@ -179,6 +283,12 @@ exclusively through NextAuth. `AuthLoginSchema` is gone from
 | `AUTH_LOGIN_EMAIL_VERIFICATION_REQUIRED` | Gate on, user unverified | Same |
 | `AUTH_EMAIL_VERIFICATION_ISSUED` | Token written, email queued | Same |
 | `AUTH_EMAIL_VERIFIED` | Token consumed, `emailVerified` set | Same |
+| `AUTH_PASSWORD_RESET_REQUESTED` | Forgot-password fired against a real user | User's primary tenant |
+| `AUTH_PASSWORD_RESET_REQUESTED_UNKNOWN_TARGET` | Forgot-password fired against unknown email | Logger-only — no tenant |
+| `AUTH_PASSWORD_RESET_COMPLETED` | Reset token consumed, password rotated | User's primary tenant |
+| `AUTH_PASSWORD_RESET_FAILED` | Reset rejected (HIBP / policy / bad token) | User's primary tenant when resolved; otherwise logger-only |
+| `AUTH_PASSWORD_CHANGED` | Authenticated change succeeded | The active tenant on `ctx.tenantId` |
+| `AUTH_PASSWORD_CHANGE_FAILED` | Wrong current / HIBP / policy / OAuth-only | Same |
 
 **Unknown-user failures** (email not registered) do **not** write
 audit rows — no tenant to attribute to, and writing every attempt
@@ -202,8 +312,26 @@ for SRE visibility (`event: "login_failure"`, `reason: "unknown_email"`,
 
 | Gate | Key | Limit | Catches |
 |---|---|---|---|
-| Per-IP | SHA-256(ip + UA-hash) | 10 per 60s | Volumetric abuse from one source (any NextAuth endpoint) |
+| Per-IP | SHA-256(ip + UA-hash) | 10 per 60s ('high' tier — `signin`, `callback`, `signout`, `forgot-password`, `reset-password`) | Volumetric abuse from one source |
 | Per-email | SHA-256(lowercased email) | 5 per 15-min sliding window | Credential stuffing across rotated IPs |
+
+### Password lifecycle presets (GAP-06)
+
+Defined in `src/lib/security/rate-limit.ts`. Wrapper-applied via
+`withApiErrorHandling`'s `rateLimit` option. Locked to specific routes
+by `tests/guardrails/password-route-hardening.test.ts` so future PRs
+can't silently swap them.
+
+| Preset | Route | Shape | Keying |
+|---|---|---|---|
+| `FORGOT_PASSWORD_LIMIT` | `POST /api/auth/forgot-password` | 5/hour, no lockout | IP-only (per-email keying would leak enumeration) |
+| `PASSWORD_RESET_LIMIT` | `POST /api/auth/reset-password` | 10/15min + 15min lockout | IP |
+| `PASSWORD_CHANGE_LIMIT` | `PUT /api/t/:slug/account/password` | 10/15min + 15min lockout | IP + userId (resolved via `getUserId` from JWT) |
+
+The change-password usecase additionally applies
+`LOGIN_PROGRESSIVE_POLICY` on wrong-current-password attempts (3 → 5s,
+5 → 30s, 10 → 15min lockout) keyed `change-pw:${userId}`. The wrapper
+preset is the outer ceiling; progressive friction kicks in earlier.
 
 ### Operator kill switches
 

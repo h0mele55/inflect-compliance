@@ -113,12 +113,33 @@ the wrapper is `src/lib/security/rate-limit-middleware.ts`.
 equalised via `dummyVerify` so lockout is indistinguishable from
 wrong-password. Signup rejects known-breached passwords via
 `checkPasswordAgainstHIBP` (k-anonymity, fail-open on HIBP outage).
-Password change / reset routes do not exist yet; when they land,
-wire HIBP the same way.
+
+**GAP-06 — password lifecycle.** Three flows close the credentials
+lifecycle: `POST /api/auth/forgot-password`,
+`POST /api/auth/reset-password`,
+`PUT /api/t/:slug/account/password`. Single-use 30-min reset tokens
+in `PasswordResetToken` (sha256-hashed at rest; raw tokens never
+persist); atomic single-use claim via `updateMany WHERE usedAt IS
+NULL AND expiresAt > NOW()`. Forgot-password is enumeration-safe
+(uniform 200 + 800ms wall-clock floor regardless of branch). Reset
++ change both apply HIBP at the route layer with the usecase as
+backstop; ratchet at `tests/guardrails/hibp-coverage.test.ts` is
+now load-bearing — a new password-shaped Zod field anywhere under
+`src/app/api/**/route.ts` fails CI unless registered. Named rate-
+limit presets (`FORGOT_PASSWORD_LIMIT`, `PASSWORD_RESET_LIMIT`,
+`PASSWORD_CHANGE_LIMIT`) are locked to specific routes by
+`tests/guardrails/password-route-hardening.test.ts`. Successful
+reset bumps `sessionVersion` and revokes every `UserSession` row;
+successful change does the same but PRESERVES the current device's
+row. MFA enrolment is intentionally NOT cleared on reset — see
+`docs/auth.md` § "Password lifecycle (GAP-06)".
 
 **See `docs/epic-a-security.md`** for the unified operator runbook
-(verification commands, rollback procedure, observability signals)
-and `docs/rls-tenant-isolation.md` for the RLS deep dive.
+(verification commands, rollback procedure, observability signals),
+`docs/auth.md` for the credentials-flow + password-lifecycle
+reference, and `docs/rls-tenant-isolation.md` for the RLS deep dive.
+The full GAP-06 design lives in
+`docs/implementation-notes/2026-04-26-gap-06-password-lifecycle.md`.
 
 ### Field Encryption (Epic B)
 
@@ -377,9 +398,11 @@ user-chosen password MUST import AND call
 `HIBP_REQUIRED_ROUTES` list (today: just `auth/register`) paired
 with a structural scan of `src/app/api/**/route.ts` for
 password-shaped Zod fields. An in-memory mutation regression proof
-confirms the detector catches removals. Vacuously passes today —
-the first password-change / reset / recovery route forced to
-register is the point.
+confirms the detector catches removals. **Load-bearing as of
+GAP-06 (2026-04-26)** — registers `/api/auth/register`,
+`/api/auth/reset-password`, and
+`/api/t/:slug/account/password`; the structural scan now actively
+catches a future password-handling route that forgets to wire HIBP.
 
 **See `docs/epic-e-observability.md`** for the Epic E operator
 runbook (verification commands, rollback procedures, how to add a
