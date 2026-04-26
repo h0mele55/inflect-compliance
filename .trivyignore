@@ -1,0 +1,21 @@
+# Trivy CVE exemptions — narrow, per-CVE, with written reason + upgrade plan.
+# Each entry MUST include the CVE id, the affected package path, the reason
+# the exemption is safe today, and the trigger that retires the exemption.
+#
+# Adding entries here is a structural escape hatch for the Trivy gate. Use
+# sparingly: prefer fixing the dep over ignoring it.
+
+# CVE-2026-33671 — picomatch < 4.0.4 RegEx DoS
+#   Affected path:  usr/local/lib/node_modules/npm/node_modules/picomatch (v4.0.3)
+#   Why exempt:     The picomatch instance flagged here is bundled INSIDE
+#                   the npm CLI that ships with the node:22-bookworm base
+#                   image — it's not in our application's dependency tree
+#                   (our app's picomatch is pinned to ^4.0.4 via the
+#                   `overrides` block in package.json). The CLI is invoked
+#                   only at build time; the running container does not
+#                   exec npm against untrusted patterns. App-level
+#                   reachability is zero.
+#   Upgrade plan:   Resolved when the Node base image ships an npm CLI
+#                   that pins picomatch >= 4.0.4 (or 3.0.2 / 2.3.2). The
+#                   next Node image refresh PR removes this entry.
+CVE-2026-33671

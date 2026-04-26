@@ -33,11 +33,15 @@ test.describe('Epic 54 — Create Control modal', () => {
     test('clicking + New Control opens the modal without navigating away', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls`);
+        // Reload to shake off any Radix/Vaul portal residue from a
+        // prior describe block in the serial-mode run. Mirrors the
+        // pattern in the rest of this file's tests.
+        await page.reload({ waitUntil: 'domcontentloaded' });
         // Wait for the new-control-btn to be hydrated — without the
         // networkidle gate the click can race the React event-handler
         // attach in `next dev` and be dropped, leaving the modal closed.
         // Same defensive pattern as the other tests in this describe.
-        const newBtn = page.locator('#new-control-btn');
+        const newBtn = page.locator('#new-control-btn').first();
         await newBtn.waitFor({ state: 'visible', timeout: 15_000 });
         await page.waitForLoadState('networkidle').catch(() => {});
         const listUrl = page.url();
@@ -60,7 +64,7 @@ test.describe('Epic 54 — Create Control modal', () => {
         // Reload to shake off any Radix overlay state left over from
         // the previous test in this serial describe block.
         await page.reload({ waitUntil: 'domcontentloaded' });
-        const newBtn = page.locator('#new-control-btn');
+        const newBtn = page.locator('#new-control-btn').first();
         await newBtn.waitFor({ state: 'visible', timeout: 15_000 });
         await page.waitForLoadState('networkidle').catch(() => {});
         await newBtn.click();
@@ -80,7 +84,7 @@ test.describe('Epic 54 — Create Control modal', () => {
         // Wait for the new-control-btn to be hydrated — without this
         // the click can race the React event-handler attach and be
         // dropped, leaving the modal closed.
-        const newBtn = page.locator('#new-control-btn');
+        const newBtn = page.locator('#new-control-btn').first();
         await newBtn.waitFor({ state: 'visible', timeout: 15_000 });
         await page.waitForLoadState('networkidle').catch(() => {});
         await newBtn.click();
@@ -101,7 +105,7 @@ test.describe('Epic 54 — Create Control modal', () => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls`);
         await page.reload({ waitUntil: 'domcontentloaded' });
-        const newBtn2 = page.locator('#new-control-btn');
+        const newBtn2 = page.locator('#new-control-btn').first();
         await newBtn2.waitFor({ state: 'visible', timeout: 15_000 });
         await page.waitForLoadState('networkidle').catch(() => {});
         await newBtn2.click();

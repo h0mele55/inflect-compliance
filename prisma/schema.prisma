@@ -16,6 +16,13 @@ model Tenant {
   id                        String                       @id @default(cuid())
   name                      String
   slug                      String                       @unique
+  /// Hub-and-spoke parent (Epic O-1). Nullable for backward compatibility:
+  /// existing tenants migrated before the organization layer landed have
+  /// no parent. New tenants created via `/api/org/{slug}/tenants` are
+  /// always linked. ON DELETE SET NULL so removing an org doesn't take
+  /// its tenants with it — orphaned tenants behave like the legacy
+  /// pre-org model.
+  organizationId            String?
   industry                  String?
   scope                     String?
   context                   String?
@@ -131,6 +138,59 @@ model Tenant {
   auditorPackAccesses       AuditorPackAccess[]
   // PolicyControlLink denormalisation (single-table follow-on).
   policyControlLinks        PolicyControlLink[]
+  // Hub-and-spoke (Epic O-1).
+  organization              Organization?                @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+}
+
+// Hub-and-spoke organization layer (Epic O-1).
+//
+// An Organization is the parent of N tenants (typical: 100 solution-
+// owner tenants per CISO portfolio). Org-level members come in two
+// roles: ORG_ADMIN (CISO-class — gets auto-provisioned AUDITOR
+// membership in every child tenant via the Epic O-2 service) and
+// ORG_READER (portfolio-only, no per-tenant access).
+//
+// Slug is unique across the whole system, parallel to Tenant.slug.
+// URL paths are `/org/{slug}` and `/t/{slug}` — the namespaces don't
+// collide because the prefixes differ.
+model Organization {
+  id          String           @id @default(cuid())
+  name        String
+  slug        String           @unique
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  tenants     Tenant[]
+  memberships OrgMembership[]
+  provisionedTenantMemberships TenantMembership[] @relation("OrgProvisionedTenantMemberships")
+}
+
+// Per-user, per-org role assignment.
+//
+// Two roles in the OrgRole enum: ORG_ADMIN, ORG_READER. ADMIN
+// becoming a member triggers the Epic O-2 auto-provisioning service
+// which creates an AUDITOR `TenantMembership` in every child tenant
+// (idempotent — skips users who already have a manual membership).
+//
+// Removing an ORG_ADMIN triggers the deprovisioning service which
+// deletes only auto-created memberships (the ones with
+// `provisionedByOrgId` matching this org); manually-granted
+// memberships are preserved.
+model OrgMembership {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrgRole      @default(ORG_READER)
+  createdAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
 }
 
 model TenantOnboarding {
@@ -196,25 +256,43 @@ model TenantApiKey {
 }
 
 model TenantMembership {
-  id              String            @id @default(cuid())
-  tenantId        String
-  userId          String
-  role            Role              @default(READER)
-  customRoleId    String? /// Optional FK to TenantCustomRole for granular overrides
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  deactivatedAt   DateTime?
-  invitedAt       DateTime?
-  invitedByUserId String?
-  status          MembershipStatus  @default(ACTIVE)
-  customRole      TenantCustomRole? @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
-  invitedBy       User?             @relation("MembershipInviter", fields: [invitedByUserId], references: [id])
-  tenant          Tenant            @relation(fields: [tenantId], references: [id])
-  user            User              @relation(fields: [userId], references: [id])
+  id                 String            @id @default(cuid())
+  tenantId           String
+  userId             String
+  role               Role              @default(READER)
+  customRoleId       String? /// Optional FK to TenantCustomRole for granular overrides
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  deactivatedAt      DateTime?
+  invitedAt          DateTime?
+  invitedByUserId    String?
+  status             MembershipStatus  @default(ACTIVE)
+  /// Hub-and-spoke (Epic O-1). When non-NULL, this membership was
+  /// auto-created by the org auto-provisioning service in response to
+  /// the user gaining ORG_ADMIN on the named Organization. The
+  /// deprovisioning service deletes ONLY rows with this column set,
+  /// so manually-granted ADMIN/EDITOR/READER/AUDITOR memberships
+  /// survive an ORG_ADMIN removal.
+  ///
+  /// NULL = manually created (the historical default, preserved for
+  /// every membership that existed before the org layer landed).
+  ///
+  /// ON DELETE SET NULL on the Organization FK so deleting the parent
+  /// org doesn't delete the auto-provisioned memberships — they
+  /// transition to "manually created" semantics and are kept.
+  /// (The deprovision usecase is the canonical cleanup path; the FK
+  /// rule is referential-integrity defence-in-depth.)
+  provisionedByOrgId String?
+  customRole         TenantCustomRole? @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  invitedBy          User?             @relation("MembershipInviter", fields: [invitedByUserId], references: [id])
+  tenant             Tenant            @relation(fields: [tenantId], references: [id])
+  user               User              @relation(fields: [userId], references: [id])
+  provisionedByOrg   Organization?     @relation("OrgProvisionedTenantMemberships", fields: [provisionedByOrgId], references: [id], onDelete: SetNull)
 
   @@unique([tenantId, userId])
   @@index([tenantId, status])
   @@index([customRoleId])
+  @@index([provisionedByOrgId])
 }
 
 model User {
@@ -279,6 +357,7 @@ model User {
   vendorBundlesCreated          VendorEvidenceBundle[]       @relation("EvidenceBundleCreator")
   apiKeysCreated                TenantApiKey[]               @relation("ApiKeyCreator")
   userSessions                  UserSession[]                @relation("UserSessionOwner")
+  orgMemberships                OrgMembership[]
 }
 
 model Account {
@@ -2080,6 +2159,25 @@ enum Role {
   EDITOR
   READER
   AUDITOR
+}
+
+/// Hub-and-spoke organization roles (Epic O-1).
+///
+/// Distinct from `Role` (which scopes per-tenant permissions). Org
+/// roles scope portfolio-level access:
+///
+///   - ORG_ADMIN — manage the organization (create tenants, add/remove
+///     org members, view portfolio dashboard, drill into individual
+///     tenants). Triggers AUDITOR auto-provisioning into every child
+///     tenant via the Epic O-2 service. CISO-class identity.
+///
+///   - ORG_READER — portfolio-only. Sees org summary cards but is NOT
+///     auto-provisioned into child tenants. Can be elevated to
+///     ORG_ADMIN later, at which point provisioning fans out
+///     idempotently.
+enum OrgRole {
+  ORG_ADMIN
+  ORG_READER
 }
 
 enum MembershipStatus {

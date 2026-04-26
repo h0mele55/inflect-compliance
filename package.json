@@ -187,5 +187,8 @@
   },
   "lint-staged": {
     "*": "bash scripts/detect-secrets.sh"
+  },
+  "overrides": {
+    "picomatch": "^4.0.4"
   }
 }

@@ -1,4 +1,4 @@
-import type { Role } from '@prisma/client';
+import type { Role, OrgRole } from '@prisma/client';
 
 export type PermissionSet = {
     controls: { view: boolean; create: boolean; edit: boolean };
@@ -145,6 +145,100 @@ export function getPermissionsForRole(role: Role): PermissionSet {
                 reports: { view: true, export: false },
                 admin: { view: false, manage: false, members: false, sso: false, scim: false, tenant_lifecycle: false, owner_management: false },
             };
+    }
+}
+
+// ─── Hub-and-spoke organization permissions (Epic O-2) ────────────────────
+//
+// Org-level permissions are deliberately KEPT SEPARATE from the tenant-
+// level `PermissionSet` rather than nested inside it. The two govern
+// different domains: tenant `PermissionSet` controls per-tenant
+// resource access (controls, evidence, risks, etc.); `OrgPermissionSet`
+// controls portfolio-level access (the org dashboard, tenant lifecycle
+// under the org, org member management).
+//
+// They never mix: a request resolves EITHER `RequestContext` (tenant
+// scope, via `getTenantCtx`) OR `OrgContext` (org scope, via
+// `getOrgCtx`) — never both at the same time. The drill-down from
+// portfolio → tenant detail re-resolves as `RequestContext` against
+// the auto-provisioned AUDITOR membership, where the existing
+// per-tenant permissions take over.
+
+/**
+ * Portfolio-level permissions for a hub-and-spoke organization.
+ *
+ *   - canViewPortfolio  — see the org dashboard summary cards
+ *                         (snapshot aggregates across child tenants).
+ *   - canDrillDown      — open per-tenant detail rows from the
+ *                         portfolio. ORG_ADMIN only — relies on the
+ *                         auto-provisioned AUDITOR `TenantMembership`
+ *                         in every child tenant; ORG_READER doesn't
+ *                         get that auto-provisioning, so even if the
+ *                         UI hint were `true` they'd 403 at the
+ *                         tenant RLS layer.
+ *   - canExportReports  — CSV/PDF export of portfolio summary +
+ *                         non-performing items. Available to both
+ *                         org roles; the export only contains data
+ *                         the role can see (snapshot data for both;
+ *                         drill-down content for ORG_ADMIN only).
+ *   - canManageTenants  — create new tenants under the org, link
+ *                         existing tenants. ORG_ADMIN only.
+ *   - canManageMembers  — add / remove / role-change org members.
+ *                         ORG_ADMIN only.
+ */
+export type OrgPermissionSet = {
+    canViewPortfolio: boolean;
+    canDrillDown: boolean;
+    canExportReports: boolean;
+    canManageTenants: boolean;
+    canManageMembers: boolean;
+};
+
+/**
+ * Maps an OrgRole to its concrete permission booleans.
+ *
+ * The role-to-permission mapping is intentionally hard-coded (no
+ * custom-role overrides at the org layer in v1) — org membership
+ * roles are simple by design, and any future complexity is better
+ * addressed by adding new roles than by per-org policy blobs.
+ */
+export function getOrgPermissions(role: OrgRole): OrgPermissionSet {
+    switch (role) {
+        case 'ORG_ADMIN':
+            return {
+                canViewPortfolio: true,
+                canDrillDown: true,
+                canExportReports: true,
+                canManageTenants: true,
+                canManageMembers: true,
+            };
+        case 'ORG_READER':
+            return {
+                // Portfolio summary only — no per-tenant drill-down,
+                // no management. Future portfolio-only personas (e.g.
+                // a board member who needs read-only attestation
+                // visibility) slot in here.
+                canViewPortfolio: true,
+                canDrillDown: false,
+                canExportReports: true,
+                canManageTenants: false,
+                canManageMembers: false,
+            };
+        default: {
+            // Defensive — Prisma's enum is closed, so the runtime
+            // should never reach here. Returning the zero-permission
+            // bag matches the fail-closed posture of every other
+            // permission helper in this file.
+            const _exhaustive: never = role;
+            void _exhaustive;
+            return {
+                canViewPortfolio: false,
+                canDrillDown: false,
+                canExportReports: false,
+                canManageTenants: false,
+                canManageMembers: false,
+            };
+        }
     }
 }
 

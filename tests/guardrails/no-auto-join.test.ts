@@ -83,6 +83,32 @@ const ALLOWLISTED_MEMBERSHIP_SITES: ReadonlyArray<AllowlistedSite> = [
             'the SCIM token itself is tenant-scoped and authorised by ' +
             'admin.scim. Audit-chained as SCIM_USER_PROVISIONED.',
     },
+    {
+        file: 'src/app-layer/usecases/org-provisioning.ts',
+        reason:
+            'Epic O-2 hub-and-spoke ORG_ADMIN auto-provisioning. ' +
+            'Fan-out creates AUDITOR (read-only) memberships in every ' +
+            'tenant under the org, tagged with provisionedByOrgId so ' +
+            'deprovisionOrgAdmin can distinguish auto-created from ' +
+            'manually-granted rows. createMany with skipDuplicates ' +
+            'preserves any pre-existing manual membership; the role ' +
+            'is hard-coded to AUDITOR (never higher). Audit emission ' +
+            'happens at the calling org-level API route, where the ' +
+            'OrgContext is in scope.',
+    },
+    {
+        file: 'src/app-layer/usecases/org-tenants.ts',
+        reason:
+            'Epic O-2 createTenantUnderOrg. Creates the OWNER ' +
+            'TenantMembership for the user authorised on the OrgContext ' +
+            '(canManageTenants gate enforced at the route layer). ' +
+            'Creator is the ORG_ADMIN making the call — the OWNER row ' +
+            'is manually granted (provisionedByOrgId NULL) so it ' +
+            'survives the creator\'s potential later removal as ' +
+            'ORG_ADMIN. After the transaction commits, ' +
+            'provisionAllOrgAdminsToTenant fans AUDITOR rows for OTHER ' +
+            'org-admins via the already-allowlisted provisioning service.',
+    },
 ];
 
 const MEMBERSHIP_CREATION_PATTERN = /\btenantMembership\.(create|upsert|createMany)\b/;

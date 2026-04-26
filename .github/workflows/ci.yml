@@ -328,6 +328,11 @@ jobs:
       # e2e suite (auth + UI flow, not 429 backpressure), so the documented
       # escape hatch is correct here.
       RATE_LIMIT_ENABLED: "0"
+      # GAP-03 startup sentinel — the encryption-key check refuses to boot
+      # in prod mode without a >=32-char DATA_ENCRYPTION_KEY. Same synthetic
+      # CI-only value other jobs in this workflow use (lines 128, 209) so
+      # ciphertexts written by one job decrypt under another.
+      DATA_ENCRYPTION_KEY: ci-test-data-encryption-key-32-chars-or-more-deterministic-x
 
     services:
       postgres:
@@ -582,6 +587,11 @@ jobs:
       # Next.js 14 → 15.5 migration cleared the Next 14.x HIGH
       # findings. Lowering this gate again requires a written
       # rationale tied to specific CVEs + an upgrade plan.
+      #
+      # `.trivyignore` carries narrow per-CVE exemptions with reasons
+      # (currently: CVE-2026-33671 in the bundled npm CLI's picomatch,
+      # not exploitable from app code; tracked for upgrade in the
+      # next Node base-image bump).
       - name: "Gate: Trivy vulnerability scan (critical+high)"
         uses: aquasecurity/trivy-action@0.35.0
         with:
@@ -591,6 +601,7 @@ jobs:
           severity: "CRITICAL,HIGH"
           ignore-unfixed: true
           vuln-type: "os,library"
+          trivyignores: ".trivyignore"
 
       # ── SARIF upload for GitHub Security tab (informational) ──
       - name: "Trivy SARIF report (all severities)"
