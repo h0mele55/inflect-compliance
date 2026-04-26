@@ -367,7 +367,7 @@ function CoverageBar({ percent, rag }: { percent: number | null; rag: RagBadge |
               ? 'bg-amber-500'
               : rag === 'RED'
                 ? 'bg-rose-500'
-                : 'bg-slate-400';
+                : 'bg-border-emphasis';
     return (
         <div className="mt-1 h-1.5 rounded-full bg-bg-muted overflow-hidden">
             <div
