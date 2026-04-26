@@ -136,6 +136,14 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
             // These routes are intentionally outside /api/t/[tenantSlug] because
             // the caller is not yet a tenant member and has no tenantId in scope.
             'invites',
+            // Epic O-1/O-2 — hub-and-spoke organization layer. Org
+            // routes resolve `OrgContext` (NOT `RequestContext`) and
+            // operate above the tenant scope. The cross-tenant drill-
+            // down inside these routes still goes through
+            // `withTenantDb(tid, …)` per-tenant — RLS is preserved.
+            // See `src/app-layer/usecases/portfolio.ts` security
+            // invariant comment for the full argument.
+            'org',
         ]);
 
         // Legacy routes are allowed as documented thin wrappers

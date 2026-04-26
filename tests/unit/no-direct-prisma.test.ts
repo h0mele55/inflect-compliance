@@ -83,6 +83,26 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
         // being created or its ownership is changing; RLS doesn't apply
         // (Tenant itself is not in TENANT_SCOPED_MODELS).
         'tenant-lifecycle.ts',
+        // Epic O-2 — org-layer usecases. Organization + OrgMembership are
+        // user-scoped (org_isolation policy keyed on app.user_id), NOT
+        // tenant-scoped — they're not in TENANT_SCOPED_MODELS. The
+        // provisioning service crosses tenant boundaries by design (one
+        // ORG_ADMIN add fans out to N tenants); cross-tenant fan-out goes
+        // through createMany/deleteMany under the postgres role. The
+        // tenant-scoped portion of `org-tenants.ts` (the OWNER membership
+        // for the new tenant) runs in the same transaction as the tenant
+        // creation itself — there's no pre-existing tenant ctx to switch
+        // into, same pattern as `tenant-lifecycle.ts` above.
+        'org-members.ts',
+        'org-provisioning.ts',
+        'org-tenants.ts',
+        // Epic O-3 — portfolio aggregation uses `runInGlobalContext` for
+        // ComplianceSnapshot reads (org-wide aggregates, no business data)
+        // and switches to per-tenant `withTenantDb(tid, ...)` for drill-
+        // downs. The cross-tenant fan-out can't fit `runInTenantContext`'s
+        // single-tenant RequestContext shape — the WITH_TENANT_DB_ALLOWLIST
+        // entry below covers that side.
+        'portfolio.ts',
     ];
 
     const usecases = readFilesInDir(path.join(SRC_ROOT, 'app-layer/usecases'));
@@ -102,7 +122,16 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
     // ─── Usecases must use runInTenantContext, not raw withTenantDb ───
     // Exception: background-job modules that accept raw tenantId (no RequestContext)
     // legitimately use the lower-level withTenantDb wrapper. RLS is still enforced.
-    const WITH_TENANT_DB_ALLOWLIST = ['evidence-maintenance.ts'];
+    const WITH_TENANT_DB_ALLOWLIST = [
+        'evidence-maintenance.ts',
+        // Epic O-3 — cross-tenant drill-down loops over the org's tenants,
+        // running each per-tenant query inside `withTenantDb(tid, ...)`.
+        // RLS is preserved per-call (the CISO's auto-provisioned AUDITOR
+        // membership is what grants read access). Can't use
+        // `runInTenantContext` because that expects a single tenant id
+        // on the RequestContext — drill-down is many tenants.
+        'portfolio.ts',
+    ];
 
     for (const file of usecases) {
         if (WITH_TENANT_DB_ALLOWLIST.includes(file.name)) continue;
@@ -115,7 +144,17 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
 
     // ─── ALL route handlers (tenant-scoped + legacy) ───
     // Auth routes are explicitly excluded — they handle registration/login with global tables
-    const ROUTE_DIR_ALLOWLIST = ['auth', 'health', 'staging', 'scim', 'integrations'];
+    const ROUTE_DIR_ALLOWLIST = [
+        'auth', 'health', 'staging', 'scim', 'integrations',
+        // Epic O-1/O-2 — org routes operate at the org-management plane,
+        // above tenant scope. They legitimately query the global prisma
+        // for Organization + OrgMembership rows (user-scoped, not
+        // tenant-scoped — see org_isolation policy). Cross-tenant
+        // drill-down INSIDE these routes still uses withTenantDb per-
+        // tenant — see `src/app-layer/usecases/portfolio.ts` security-
+        // invariant block.
+        'org',
+    ];
 
     const apiDir = path.join(SRC_ROOT, 'app/api');
     const allRouteFiles = walkDir(apiDir).filter((f) => f.endsWith('route.ts'));
