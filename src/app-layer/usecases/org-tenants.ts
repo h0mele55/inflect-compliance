@@ -1,0 +1,149 @@
+/**
+ * Epic O-2 — tenant creation under an organization.
+ *
+ * Composes:
+ *   1. `prisma.tenant.create` with `organizationId` set + a freshly-
+ *      generated DEK (mirrors `createTenantWithDek`).
+ *   2. OWNER `TenantMembership` for the creator (the user named on the
+ *      OrgContext that authorised the request).
+ *   3. `TenantOnboarding` row (matches the platform-admin
+ *      `createTenantWithOwner` shape).
+ *   4. After the transaction commits — `provisionAllOrgAdminsToTenant`
+ *      so every existing ORG_ADMIN of the org gets an AUDITOR
+ *      membership in the new tenant.
+ *
+ * The creator's OWNER membership has `provisionedByOrgId = NULL` —
+ * it's manually granted, not auto-provisioned. If the creator is later
+ * removed as ORG_ADMIN, `deprovisionOrgAdmin` will NOT touch their
+ * OWNER row (the predicate requires `provisionedByOrgId === orgId`).
+ *
+ * The provision call's skipDuplicates ignores the creator's pre-
+ * existing OWNER row — it's a no-op for that user. Other ORG_ADMINs
+ * get fresh AUDITOR rows.
+ */
+
+import { Prisma } from '@prisma/client';
+
+import prisma from '@/lib/prisma';
+import { generateAndWrapDek } from '@/lib/security/tenant-keys';
+import { provisionAllOrgAdminsToTenant } from './org-provisioning';
+import { ConflictError } from '@/lib/errors/types';
+import type { OrgContext } from '@/app-layer/types';
+import { logger } from '@/lib/observability/logger';
+
+export interface CreateTenantUnderOrgInput {
+    name: string;
+    slug: string;
+}
+
+export interface CreateTenantUnderOrgResult {
+    tenant: { id: string; slug: string; name: string };
+    /** Number of ORG_ADMINs auto-provisioned into the new tenant. The
+     *  creator's OWNER row is excluded (skipped on the unique
+     *  constraint), so this count covers the OTHER admins. */
+    provisionedAdmins: number;
+}
+
+/**
+ * Create a tenant linked to the org named on `ctx`. The caller must
+ * have already passed the `canManageTenants` permission check at the
+ * route layer.
+ */
+export async function createTenantUnderOrg(
+    ctx: OrgContext,
+    input: CreateTenantUnderOrgInput,
+): Promise<CreateTenantUnderOrgResult> {
+    const name = input.name.trim();
+    const slug = input.slug.trim().toLowerCase();
+
+    let tenantId = '';
+    let tenantName = name;
+    let tenantSlug = slug;
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            const { wrapped } = generateAndWrapDek();
+            const tenant = await tx.tenant.create({
+                data: {
+                    name,
+                    slug,
+                    organizationId: ctx.organizationId,
+                    encryptedDek: wrapped,
+                },
+                select: { id: true, name: true, slug: true },
+            });
+            tenantId = tenant.id;
+            tenantName = tenant.name;
+            tenantSlug = tenant.slug;
+
+            // OWNER membership for the creator. provisionedByOrgId is
+            // intentionally NOT set here — this is a manually-granted
+            // membership that survives the creator's potential later
+            // removal from ORG_ADMIN status.
+            await tx.tenantMembership.create({
+                data: {
+                    tenantId: tenant.id,
+                    userId: ctx.userId,
+                    role: 'OWNER',
+                    status: 'ACTIVE',
+                },
+            });
+
+            await tx.tenantOnboarding.create({
+                data: { tenantId: tenant.id },
+            });
+        });
+    } catch (err) {
+        // Translate the Prisma unique-violation on Tenant.slug into a
+        // friendlier 409. Other Prisma errors bubble as-is for the API
+        // wrapper to render.
+        if (
+            err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === 'P2002'
+        ) {
+            throw new ConflictError(
+                `A tenant with slug '${slug}' already exists`,
+            );
+        }
+        throw err;
+    }
+
+    // Auto-provision OTHER ORG_ADMINs into the new tenant. The creator
+    // already has OWNER (higher than AUDITOR) — skipDuplicates skips
+    // them. Other admins get AUDITOR rows tagged with provisionedByOrgId.
+    let provisionedAdmins = 0;
+    try {
+        const result = await provisionAllOrgAdminsToTenant(
+            ctx.organizationId,
+            tenantId,
+        );
+        provisionedAdmins = result.created;
+    } catch (err) {
+        // Provisioning failure is logged but doesn't roll back the
+        // tenant creation — the tenant is real and usable; the missing
+        // AUDITOR rows can be backfilled by re-running provisioning
+        // (it's idempotent). Operator visibility via the structured log.
+        logger.warn('org-tenants.provision_after_create_failed', {
+            component: 'org-tenants',
+            organizationId: ctx.organizationId,
+            tenantId,
+            requestId: ctx.requestId,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+
+    logger.info('org-tenants.created', {
+        component: 'org-tenants',
+        organizationId: ctx.organizationId,
+        tenantId,
+        slug: tenantSlug,
+        creatorUserId: ctx.userId,
+        provisionedAdmins,
+        requestId: ctx.requestId,
+    });
+
+    return {
+        tenant: { id: tenantId, name: tenantName, slug: tenantSlug },
+        provisionedAdmins,
+    };
+}
