@@ -7,11 +7,13 @@ import {
     isApiRoute,
     isAdminPath,
     isTenantPath,
+    isOrgPath,
     isMfaAllowedPath,
     buildLoginRedirect,
     unauthorizedJson,
     forbiddenJson,
     checkTenantAccess,
+    checkOrgAccess,
 } from '@/lib/auth/guard';
 import { generateNonce, buildCspHeader, CSP_NONCE_HEADER, CSP_REPORT_PATH, CSP_REPORT_GROUP, getCspHeaderName, isCspReportOnly } from '@/lib/security/csp';
 import { applySecurityHeaders } from '@/lib/security/headers';
@@ -156,6 +158,35 @@ async function authMiddleware(req: NextRequest): Promise<NextResponse> {
                     { status: 403 },
                 );
             }
+            return NextResponse.redirect(new URL('/no-tenant', req.nextUrl.origin));
+        }
+    }
+
+    // ── 5b. Org-access gate (GAP O4-1) ──
+    // Mirror of the tenant gate, keyed on `token.orgMemberships`.
+    // Same anti-enumeration posture as `getOrgCtx` / `getOrgServerContext`:
+    // both `no_org_access` and `cross_org` collapse to a single
+    // external response (notFound for pages, 404 JSON for API). The
+    // gate-result string distinguishes them for ops via the standard
+    // request-id correlation; nothing leaks to the caller.
+    //
+    // No DB hit — the JWT claim is the authority. The `orgMemberships`
+    // array is populated by the JWT callback in `src/auth.ts` at
+    // sign-in time. Page-level (`getOrgServerContext`) and API-level
+    // (`getOrgCtx`) checks remain in place as defense-in-depth — this
+    // is the early-rejection layer, not a replacement.
+    if (isOrgPath(pathname)) {
+        const gateResult = checkOrgAccess(pathname, token.orgMemberships);
+        if (gateResult !== 'allow') {
+            if (isApiRoute(pathname)) {
+                return NextResponse.json(
+                    { error: 'not_found' },
+                    { status: 404 },
+                );
+            }
+            // 404 surface — route to the same landing page non-members
+            // see today via the layout's `notFound()` collapse, so a
+            // probing user can't tell whether the slug exists.
             return NextResponse.redirect(new URL('/no-tenant', req.nextUrl.origin));
         }
     }

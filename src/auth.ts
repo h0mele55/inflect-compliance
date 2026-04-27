@@ -59,6 +59,19 @@ export interface MembershipEntry {
     tenantId: string;
 }
 
+/**
+ * One entry per active OrgMembership the user holds. Mirrors
+ * `MembershipEntry` for the hub-and-spoke organization layer.
+ * Threaded through the JWT so middleware can gate `/org/:slug/*`
+ * routes against the user's org memberships in O(1) per request
+ * with no DB hit — same pattern as the tenant access gate.
+ */
+export interface OrgMembershipEntry {
+    slug: string;
+    role: 'ORG_ADMIN' | 'ORG_READER';
+    organizationId: string;
+}
+
 declare module 'next-auth' {
     interface Session {
         user: {
@@ -71,6 +84,8 @@ declare module 'next-auth' {
             mfaPending?: boolean;
             /** R-1: all active memberships, for the tenant picker and middleware gate. */
             memberships?: MembershipEntry[];
+            /** Org-layer memberships, for the org-route middleware gate. */
+            orgMemberships?: OrgMembershipEntry[];
         };
     }
 }
@@ -86,6 +101,7 @@ declare module 'next-auth/jwt' {
         mfaPending?: boolean;
         mfaFailClosed?: boolean;
         memberships?: MembershipEntry[];
+        orgMemberships?: OrgMembershipEntry[];
         /** Provider name when the user signed in via OAuth. */
         provider?: string;
         accessToken?: string;
@@ -319,6 +335,14 @@ export const authOptions: NextAuthOptions = {
                                 tenant: { select: { slug: true, id: true } },
                             },
                         },
+                        orgMemberships: {
+                            orderBy: { createdAt: 'asc' },
+                            include: {
+                                organization: {
+                                    select: { slug: true, id: true },
+                                },
+                            },
+                        },
                     },
                 });
 
@@ -332,6 +356,15 @@ export const authOptions: NextAuthOptions = {
                         slug: m.tenant.slug,
                         role: m.role,
                         tenantId: m.tenantId,
+                    }));
+
+                    // GAP O4-1: same pattern for the org-layer memberships
+                    // so the middleware can gate `/org/:slug/*` against the
+                    // user's org membership list with no DB hit.
+                    token.orgMemberships = dbUser.orgMemberships.map((m) => ({
+                        slug: m.organization.slug,
+                        role: m.role,
+                        organizationId: m.organizationId,
                     }));
 
                     // Backward-compat: keep tenantId/tenantSlug/role as the
@@ -351,6 +384,7 @@ export const authOptions: NextAuthOptions = {
                     token.role = 'READER';
                     token.sessionVersion = 0;
                     token.memberships = [];
+                    token.orgMemberships = [];
                 }
 
                 if (account.provider !== 'credentials') {
@@ -541,6 +575,7 @@ export const authOptions: NextAuthOptions = {
                 session.user.role = token.role ?? 'READER';
                 session.user.mfaPending = token.mfaPending ?? false;
                 session.user.memberships = token.memberships ?? [];
+                session.user.orgMemberships = token.orgMemberships ?? [];
             }
             return session;
         },
