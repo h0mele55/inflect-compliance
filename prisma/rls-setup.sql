@@ -624,6 +624,54 @@ DROP POLICY IF EXISTS allow_all ON "PolicyVersion";
 -- FrameworkMapping                                      → global by design (cross-tenant mapping)
 
 -- ═══════════════════════════════════════════════════════════════════
+-- 4b) Organization layer — user-scoped (Epic O-1)
+-- ═══════════════════════════════════════════════════════════════════
+-- `Organization` and `OrgMembership` aren't tenant-scoped — neither
+-- carries a `tenantId` column, so the tenant_isolation regime keyed on
+-- `current_setting('app.tenant_id')` doesn't fit. They live on a
+-- parallel RLS axis keyed on `app.user_id`:
+--
+--   * Organization → `org_isolation` — visible to an app_user iff
+--     they hold an OrgMembership in this org.
+--   * OrgMembership → `org_membership_self_isolation` — each user
+--     reads only their own membership rows. The admin "list all
+--     members of my org" UI runs through the global Prisma client
+--     (postgres role); that surface is permission-gated at the API
+--     layer, not by RLS.
+--
+-- The `app_user` policies are USING-only (no WITH CHECK). Under
+-- FORCE ROW LEVEL SECURITY an `app_user` can read its own org rows
+-- but never INSERT or UPDATE — privileged paths (org-create API,
+-- invite redemption, auto-provisioning, seeds, migrations) all run
+-- as `postgres` and pass through the canonical `superuser_bypass`
+-- added by the loop in section 5 below.
+--
+-- Idempotent — safe to re-run. Mirrors
+-- prisma/migrations/20260426060000_add_organization_layer_rls.
+
+-- ─── Organization ────────────────────────────────────────────────
+ALTER TABLE "Organization" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Organization" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS org_isolation ON "Organization";
+CREATE POLICY org_isolation ON "Organization"
+    USING (
+        EXISTS (
+            SELECT 1
+            FROM "OrgMembership" om
+            WHERE om."organizationId" = "Organization".id
+              AND om."userId" = current_setting('app.user_id', true)::text
+        )
+    );
+
+-- ─── OrgMembership ───────────────────────────────────────────────
+ALTER TABLE "OrgMembership" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "OrgMembership" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS org_membership_self_isolation ON "OrgMembership";
+CREATE POLICY org_membership_self_isolation ON "OrgMembership"
+    USING ("userId" = current_setting('app.user_id', true)::text);
+
+
+-- ═══════════════════════════════════════════════════════════════════
 -- GLOBAL TABLES (no RLS needed)
 -- ═══════════════════════════════════════════════════════════════════
 -- Tenant              — root entity, looked up by slug before context set
