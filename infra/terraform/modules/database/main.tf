@@ -174,9 +174,9 @@ resource "aws_db_instance" "this" {
   apply_immediately          = var.apply_immediately
 
   # HA + protection
-  multi_az            = var.multi_az
-  deletion_protection = var.deletion_protection
-  skip_final_snapshot = var.skip_final_snapshot
+  multi_az                  = var.multi_az
+  deletion_protection       = var.deletion_protection
+  skip_final_snapshot       = var.skip_final_snapshot
   final_snapshot_identifier = var.skip_final_snapshot ? null : "${var.name_prefix}-db-final-${formatdate("YYYYMMDDHHmmss", timestamp())}"
 
   # Observability

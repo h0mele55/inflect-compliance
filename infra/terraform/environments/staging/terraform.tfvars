@@ -15,8 +15,8 @@ additional_tags = {
 }
 
 # ── VPC (staging cost-saver overrides) ──
-vpc_az_count           = 2     # min for RDS multi-AZ-ready subnet group
-vpc_single_nat_gateway = true  # one NAT shared across AZs (~$32/mo savings per missing AZ)
+vpc_az_count           = 2    # min for RDS multi-AZ-ready subnet group
+vpc_single_nat_gateway = true # one NAT shared across AZs (~$32/mo savings per missing AZ)
 
 # ── Database (staging tradeoffs — accept lower HA + faster teardown) ──
 db_instance_class           = "db.t4g.small"

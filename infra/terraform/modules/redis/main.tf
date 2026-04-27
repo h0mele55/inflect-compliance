@@ -66,7 +66,10 @@ resource "aws_vpc_security_group_ingress_rule" "redis_from_app" {
 # Family is hardcoded redis7 — engine_version validation enforces
 # the major-version match.
 resource "aws_elasticache_parameter_group" "this" {
-  name_prefix = "${var.name_prefix}-redis7-"
+  # ElastiCache parameter groups don't support name_prefix — must use
+  # name directly. Most parameter changes apply in-place (no recreate
+  # of the parameter group itself), so the static name is fine.
+  name        = "${var.name_prefix}-redis7"
   family      = "redis7"
   description = "Redis 7 parameter group for ${var.name_prefix}"
 
@@ -79,10 +82,6 @@ resource "aws_elasticache_parameter_group" "this" {
   }
 
   tags = var.tags
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 # ── AUTH token (random_password → Secrets Manager) ───────────────────
