@@ -50,6 +50,7 @@ export function MembersTable({ orgSlug, currentUserId, rows }: Props) {
 
     const [addOpen, setAddOpen] = useState(false);
     const [removeTarget, setRemoveTarget] = useState<MemberRow | null>(null);
+    const [roleTarget, setRoleTarget] = useState<MemberRow | null>(null);
 
     const columns = useMemo(
         () =>
@@ -98,23 +99,17 @@ export function MembersTable({ orgSlug, currentUserId, rows }: Props) {
                         const isSelf = row.original.userId === currentUserId;
                         return (
                             <div className="flex justify-end gap-1.5">
-                                {/*
-                                  Role-change action is intentionally
-                                  not yet wired here — it requires the
-                                  PUT /api/org/{slug}/members endpoint
-                                  delivered by the role-change PR. The
-                                  current API supports POST + DELETE
-                                  only, and a remove-and-readd
-                                  workaround would create a brief
-                                  deprovisioning window for ORG_ADMINs.
-                                  Tracked separately; UI flips to PUT
-                                  in a follow-up once that endpoint
-                                  lands.
-                                */}
-                                <Tooltip content="Role-change action will activate when the role-change API is deployed">
+                                <Tooltip
+                                    content={
+                                        isSelf
+                                            ? 'You cannot change your own role'
+                                            : `Change role for ${row.original.user.email}`
+                                    }
+                                >
                                     <button
                                         type="button"
-                                        disabled
+                                        disabled={isSelf}
+                                        onClick={() => setRoleTarget(row.original)}
                                         className="btn btn-ghost btn-sm"
                                         data-testid={`org-member-role-${row.original.userId}`}
                                     >
@@ -216,6 +211,16 @@ export function MembersTable({ orgSlug, currentUserId, rows }: Props) {
                 onClose={() => setRemoveTarget(null)}
                 onSuccess={useCallback(() => {
                     setRemoveTarget(null);
+                    router.refresh();
+                }, [router])}
+            />
+
+            <ChangeRoleModal
+                orgSlug={orgSlug}
+                target={roleTarget}
+                onClose={() => setRoleTarget(null)}
+                onSuccess={useCallback(() => {
+                    setRoleTarget(null);
                     router.refresh();
                 }, [router])}
             />
@@ -521,6 +526,223 @@ function RemoveMemberModal({
                         onClick={onConfirm}
                         data-testid="org-remove-member-confirm"
                         text={submitting ? 'Removing…' : 'Remove'}
+                    />
+                </Modal.Actions>
+            </Modal.Footer>
+        </Modal>
+    );
+}
+
+// ── Change role ──────────────────────────────────────────────────────
+
+interface ChangeRoleModalProps {
+    orgSlug: string;
+    target: MemberRow | null;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+function ChangeRoleModal({
+    orgSlug,
+    target,
+    onClose,
+    onSuccess,
+}: ChangeRoleModalProps) {
+    // Cache the chosen role independently of the target prop so the
+    // radio's controlled state survives re-renders while the modal
+    // is open. Defaults to "the OTHER role" so the obvious action
+    // is also the one the user came here to do.
+    const [chosen, setChosen] = useState<MemberRow['role'] | null>(null);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const open = target !== null;
+
+    // When a new target opens, default the radio to the opposite role
+    // (the typical operator intent: open this dialog to flip).
+    if (target && chosen === null) {
+        setChosen(target.role === 'ORG_ADMIN' ? 'ORG_READER' : 'ORG_ADMIN');
+    }
+
+    const close = () => {
+        setError(null);
+        setSubmitting(false);
+        setChosen(null);
+        onClose();
+    };
+
+    const onConfirm = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!target || !chosen) return;
+        setSubmitting(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/org/${orgSlug}/members`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ userId: target.userId, role: chosen }),
+            });
+            if (!res.ok) {
+                let message = `Failed to change role (${res.status}).`;
+                try {
+                    const body = (await res.json()) as { error?: { message?: string } };
+                    if (body?.error?.message) message = body.error.message;
+                } catch {
+                    /* not JSON */
+                }
+                setError(message);
+                setSubmitting(false);
+                return;
+            }
+            onSuccess();
+            // Reset cached chosen role so the next open recomputes
+            // the default.
+            setChosen(null);
+        } catch (err) {
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : 'Unexpected error changing role.',
+            );
+            setSubmitting(false);
+        }
+    };
+
+    const isPromotion = target?.role === 'ORG_READER' && chosen === 'ORG_ADMIN';
+    const isDemotion = target?.role === 'ORG_ADMIN' && chosen === 'ORG_READER';
+    const isNoOp = target !== null && chosen !== null && target.role === chosen;
+
+    return (
+        <Modal showModal={open} setShowModal={(o) => (o ? null : close())}>
+            <Modal.Header title="Change member role" />
+            <Modal.Body>
+                <form
+                    id="org-change-role-form"
+                    onSubmit={onConfirm}
+                    noValidate
+                    className="space-y-4"
+                    data-testid="org-change-role-form"
+                >
+                    {target && (
+                        <p className="text-sm text-content-default">
+                            Change role for{' '}
+                            <span className="font-medium text-content-emphasis">
+                                {target.user.name ?? target.user.email}
+                            </span>
+                            .
+                        </p>
+                    )}
+
+                    <fieldset className="space-y-2">
+                        <legend className="text-sm font-medium text-content-emphasis">
+                            New role
+                        </legend>
+                        {(['ORG_ADMIN', 'ORG_READER'] as const).map((opt) => {
+                            const id = `org-change-role-${opt}`;
+                            const checked = chosen === opt;
+                            return (
+                                <label
+                                    key={opt}
+                                    htmlFor={id}
+                                    className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                                        checked
+                                            ? 'border-border-emphasis bg-bg-subtle'
+                                            : 'border-border-subtle hover:bg-bg-muted'
+                                    }`}
+                                >
+                                    <input
+                                        id={id}
+                                        type="radio"
+                                        name="role"
+                                        value={opt}
+                                        checked={checked}
+                                        onChange={() => setChosen(opt)}
+                                        className="mt-0.5"
+                                        data-testid={id}
+                                    />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-content-emphasis">
+                                            {ROLE_LABEL[opt]}
+                                        </p>
+                                        <p className="text-xs text-content-muted">
+                                            {opt === 'ORG_ADMIN'
+                                                ? 'Manages tenants + members. Auto-provisioned as AUDITOR in every child tenant.'
+                                                : 'Sees the portfolio summary. No tenant drill-down access.'}
+                                        </p>
+                                    </div>
+                                </label>
+                            );
+                        })}
+                    </fieldset>
+
+                    {/*
+                      Provisioning side-effect callouts — make the
+                      cross-tenant fan-out / fan-in effects of the
+                      role change visible BEFORE the user commits.
+                      The atomic role-change usecase does the full
+                      provisioning in one transaction; the operator
+                      should know that's what's about to happen.
+                    */}
+                    {isPromotion && (
+                        <div
+                            className="flex gap-2 rounded-lg border border-border-info bg-bg-info/30 p-3 text-content-info text-xs"
+                            role="status"
+                            data-testid="org-change-role-promotion-callout"
+                        >
+                            <Shield className="size-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                            <p>
+                                Promoting to ORG_ADMIN will also create an
+                                AUDITOR membership for this user in every
+                                child tenant of the organization.
+                            </p>
+                        </div>
+                    )}
+                    {isDemotion && (
+                        <div
+                            className="flex gap-2 rounded-lg border border-border-warning bg-bg-warning/30 p-3 text-content-warning text-xs"
+                            role="status"
+                            data-testid="org-change-role-demotion-callout"
+                        >
+                            <AlertTriangle className="size-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                            <p>
+                                Demoting to ORG_READER will remove the
+                                auto-provisioned AUDITOR membership from
+                                every child tenant. Manually-granted
+                                tenant memberships are preserved.
+                            </p>
+                        </div>
+                    )}
+
+                    {error && (
+                        <p
+                            className="text-sm text-content-error"
+                            role="alert"
+                            data-testid="org-change-role-error"
+                        >
+                            {error}
+                        </p>
+                    )}
+                </form>
+            </Modal.Body>
+            <Modal.Footer>
+                <Modal.Actions>
+                    <button
+                        type="button"
+                        onClick={close}
+                        className="btn btn-ghost btn-sm"
+                        data-testid="org-change-role-cancel"
+                    >
+                        Cancel
+                    </button>
+                    <Button
+                        type="submit"
+                        form="org-change-role-form"
+                        variant="primary"
+                        loading={submitting}
+                        disabled={submitting || isNoOp || chosen === null}
+                        data-testid="org-change-role-submit"
+                        text={submitting ? 'Saving…' : 'Save role'}
                     />
                 </Modal.Actions>
             </Modal.Footer>

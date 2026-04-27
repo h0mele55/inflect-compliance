@@ -75,20 +75,53 @@ describe('GAP O4-2 — org members page structural contract', () => {
         expect(src).toMatch(/<Modal\b/);
     });
 
-    it('add + remove flows POST and DELETE to /api/org/{slug}/members (matches existing API contract)', () => {
+    it('add + remove + role-change flows hit /api/org/{slug}/members with the right HTTP verbs', () => {
         const src = read(CLIENT_PATH);
         // POST add
         expect(src).toMatch(/method:\s*['"]POST['"]/);
         expect(src).toMatch(/`\/api\/org\/\$\{orgSlug\}\/members`/);
-        // The body must serialise both `userEmail` and `role` keys.
-        // Tolerates shorthand-object property syntax (`role` alone)
-        // OR explicit `role: value`.
         expect(src).toMatch(
             /JSON\.stringify\(\s*\{[^}]*\buserEmail\b[^}]*\brole\b[^}]*\}\s*\)/,
+        );
+        // PUT role-change (atomic — the legacy remove-and-readd
+        // workaround would create a brief deprovisioning window).
+        expect(src).toMatch(/method:\s*['"]PUT['"]/);
+        expect(src).toMatch(
+            /JSON\.stringify\(\s*\{[^}]*\buserId\b[^}]*\brole\b[^}]*\}\s*\)/,
         );
         // DELETE remove
         expect(src).toMatch(/method:\s*['"]DELETE['"]/);
         expect(src).toMatch(/\/members\?userId=\$\{encodeURIComponent\(target\.userId\)\}/);
+    });
+
+    it('role-change UI surfaces provisioning side effects to the operator BEFORE commit', () => {
+        // Promotion to ORG_ADMIN fans AUDITOR rows out into every
+        // child tenant; demotion fans them in. The modal MUST tell
+        // the operator that's what happens — no surprises.
+        const src = read(CLIENT_PATH);
+        expect(src).toMatch(/org-change-role-promotion-callout/);
+        expect(src).toMatch(/org-change-role-demotion-callout/);
+        // Promotion callout names the AUDITOR fan-out.
+        expect(src).toMatch(/AUDITOR\s+membership[\s\S]*?every[\s\S]*?child\s+tenant/i);
+    });
+
+    it('role-change submit is disabled on no-op transitions', () => {
+        // Same role chosen as current → submit disabled. Mirrors
+        // the API's `transition: 'noop'` branch — the UI shouldn't
+        // round-trip a no-op.
+        const src = read(CLIENT_PATH);
+        expect(src).toMatch(/disabled=\{[^}]*isNoOp[^}]*\}/);
+    });
+
+    it('self-role-change is disabled (cannot change your own role from this UI)', () => {
+        const src = read(CLIENT_PATH);
+        // The change-role action button must disable when the row's
+        // userId equals the current user's. Same posture as
+        // self-removal — UX guard; the last-admin invariant is
+        // also enforced server-side.
+        expect(src).toMatch(
+            /onClick=\{\(\)\s*=>\s*setRoleTarget[\s\S]*?disabled=\{isSelf\}/,
+        );
     });
 
     it('self-removal is disabled (cannot remove your own membership from this UI)', () => {
@@ -121,10 +154,19 @@ describe('GAP O4-2 — org members page structural contract', () => {
             'org-remove-member-confirm',
             'org-remove-member-cancel',
             'org-member-remove-',
+            'org-member-role-',
             'org-member-name-',
+            'org-change-role-form',
+            'org-change-role-submit',
+            'org-change-role-cancel',
         ]) {
             expect(src).toContain(id);
         }
+        // Per-role radios — id is built from a template literal
+        // `org-change-role-${opt}` then assigned via `data-testid={id}`.
+        // The template-literal source covers both ORG_ADMIN and
+        // ORG_READER option keys.
+        expect(src).toMatch(/`org-change-role-\$\{opt\}`/);
     });
 
     it('after a successful mutation, the page refreshes (router.refresh)', () => {
