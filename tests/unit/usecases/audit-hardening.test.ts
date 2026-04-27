@@ -106,7 +106,11 @@ describe('storeExportArtifact', () => {
             .mockImplementationOnce(async (_ctx, fn) => fn({} as never));
     }
 
-    it('rejects EDITOR — assertCanFreezePack is ADMIN-only', async () => {
+    it('rejects EDITOR — assertCanFreezePack is OWNER/ADMIN-only', async () => {
+        // Matcher accepts both old ("Only ADMIN ...") and new ("Only OWNER
+        // or ADMIN ...") forms — the test is about EDITOR being denied,
+        // not the exact wording. Epic 1 added OWNER as a strict superset
+        // of ADMIN, which extended the message accordingly.
         await expect(
             storeExportArtifact(
                 makeRequestContext('EDITOR'),
@@ -115,7 +119,7 @@ describe('storeExportArtifact', () => {
                 'export.csv',
                 'text/csv',
             ),
-        ).rejects.toThrow(/Only ADMIN/);
+        ).rejects.toThrow(/(?:OWNER|ADMIN)/);
     });
 
     it('rejects READER and AUDITOR', async () => {
