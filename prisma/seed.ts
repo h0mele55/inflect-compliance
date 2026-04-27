@@ -1,20 +1,21 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
+import { createTenantWithOwner } from '@/app-layer/usecases/tenant-lifecycle';
 
 const prisma = new PrismaClient();
 
 async function main() {
     console.log('🌱 Seeding Inflect Compliance database...');
 
-    // ─── Tenant ───
-    const tenant = await prisma.tenant.upsert({
-        where: { slug: 'acme-corp' },
-        update: {},
-        create: { name: 'Acme Corp', slug: 'acme-corp', industry: 'Technology', maxRiskScale: 5 },
-    });
-    console.log('✅ Tenant:', tenant.name);
-
     // ─── Users (no role/tenantId — membership is sole authority) ───
+    //
+    // Pre-create the admin user BEFORE calling `createTenantWithOwner`
+    // below. The usecase upserts the owner email (find-or-create); when
+    // it finds an existing row it reuses it without overwriting fields.
+    // Pre-creating with the password hash + name preserves credentials
+    // login + the friendly display name on the OWNER user that the
+    // production tenant-creation path otherwise leaves blank.
     const pwd = await bcrypt.hash('password123', 10);
 
     const admin = await prisma.user.upsert({
@@ -39,12 +40,57 @@ async function main() {
     });
     console.log('✅ Users created');
 
-    // ─── Tenant Memberships (authoritative roles) ───
-    await prisma.tenantMembership.upsert({
-        where: { tenantId_userId: { tenantId: tenant.id, userId: admin.id } },
-        update: {},
-        create: { tenantId: tenant.id, userId: admin.id, role: 'ADMIN' },
+    // ─── Tenant (production path: createTenantWithOwner) ───
+    //
+    // GAP-07 alignment — the seed used to call `prisma.tenant.upsert`
+    // directly + manually grant `role: 'ADMIN'`, which diverged from the
+    // production tenant-creation path in two important ways:
+    //
+    //   1. No wrapped DEK was generated, so encrypted-field writes against
+    //      the seed tenant silently fell back to v1 (global KEK) instead
+    //      of v2 (per-tenant DEK) — masking real-world encryption shape
+    //      in dev / E2E.
+    //   2. The first membership was ADMIN, not OWNER — diverging from the
+    //      role model where every tenant must have ≥ 1 ACTIVE OWNER
+    //      (enforced by the `tenant_membership_last_owner_guard` trigger).
+    //
+    // Now the seed routes through the canonical
+    // `createTenantWithOwner` usecase — same path used by the
+    // platform-admin `POST /api/admin/tenants` route. Idempotent:
+    // checked before calling so re-runs against an existing dev DB
+    // don't error on the unique slug.
+    let tenant = await prisma.tenant.findUnique({
+        where: { slug: 'acme-corp' },
     });
+    if (!tenant) {
+        const result = await createTenantWithOwner({
+            name: 'Acme Corp',
+            slug: 'acme-corp',
+            ownerEmail: admin.email,
+            requestId: `seed-${randomUUID()}`,
+        });
+        tenant = await prisma.tenant.findUnique({
+            where: { id: result.tenant.id },
+        });
+    }
+    if (!tenant) {
+        throw new Error('seed: failed to create or load acme-corp tenant');
+    }
+
+    // Apply the seed-only fields (`industry`, `maxRiskScale`) that
+    // `createTenantWithOwner` doesn't take — purely cosmetic on the
+    // dev tenant; production sets these via subsequent usecases.
+    await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: { industry: 'Technology', maxRiskScale: 5 },
+    });
+    console.log('✅ Tenant:', tenant.name, '(OWNER:', admin.email + ')');
+
+    // ─── Tenant Memberships (non-owner roles) ───
+    //
+    // The OWNER membership for `admin` was created atomically inside
+    // `createTenantWithOwner` above. Only the non-owner fixtures land
+    // here.
     await prisma.tenantMembership.upsert({
         where: { tenantId_userId: { tenantId: tenant.id, userId: editor.id } },
         update: {},
