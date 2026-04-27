@@ -113,13 +113,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pre-flight: gracefully skip the plan when AWS_ROLE_TO_ASSUME
+      # isn't configured yet. The first PR that lands the workflow runs
+      # before the operator has had a chance to wire OIDC trust + GitHub
+      # Environment secrets. This keeps the job green and posts a
+      # helpful comment instead of a confusing "Could not load credentials"
+      # failure. Once the secret is set, this step is a no-op and the
+      # plan runs normally.
+      - name: Check OIDC configured
+        id: check_oidc
+        env:
+          AWS_ROLE: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+        run: |
+          if [ -z "${AWS_ROLE}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::AWS_ROLE_TO_ASSUME is not set for the ${{ matrix.environment }} GitHub Environment. Skipping plan. See docs/infrastructure.md § Day-1 setup."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Terraform
+        if: steps.check_oidc.outputs.configured == 'true'
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ${{ env.TF_VERSION }}
           terraform_wrapper: false
 
       - name: Configure AWS credentials (OIDC)
+        if: steps.check_oidc.outputs.configured == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
@@ -127,6 +148,7 @@ jobs:
           role-session-name: gh-tf-plan-${{ matrix.environment }}-${{ github.run_id }}
 
       - name: Terraform init
+        if: steps.check_oidc.outputs.configured == 'true'
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           terraform init \
@@ -135,6 +157,7 @@ jobs:
 
       - name: Terraform plan
         id: plan
+        if: steps.check_oidc.outputs.configured == 'true'
         working-directory: ${{ env.TF_WORKING_DIR }}
         # Capture exit code so we can comment on PRs even when the plan
         # itself surfaces a diff that fails (-detailed-exitcode = 2).
@@ -174,22 +197,40 @@ jobs:
           PLAN_DIR: ${{ env.TF_WORKING_DIR }}
           ENV_NAME: ${{ matrix.environment }}
           PLAN_EXITCODE: ${{ steps.plan.outputs.exitcode }}
+          OIDC_CONFIGURED: ${{ steps.check_oidc.outputs.configured }}
         with:
           script: |
             const fs = require('fs');
             const env = process.env.ENV_NAME;
             const marker = `<!-- terraform-plan:${env} -->`;
             const exitcode = process.env.PLAN_EXITCODE || '?';
-            const status =
-              exitcode === '0' ? '✅ No changes' :
-              exitcode === '2' ? '🟡 Changes pending' :
-              '❌ Plan failed';
+            const oidcConfigured = process.env.OIDC_CONFIGURED === 'true';
+            const status = !oidcConfigured
+              ? '⚠️ Skipped — `AWS_ROLE_TO_ASSUME` not configured for this environment'
+              : exitcode === '0' ? '✅ No changes'
+              : exitcode === '2' ? '🟡 Changes pending'
+              : '❌ Plan failed';
 
             let plan = '(plan output unavailable)';
-            try {
-              plan = fs.readFileSync(`${process.env.PLAN_DIR}/plan.truncated.txt`, 'utf8');
-            } catch (e) {
-              plan = `(could not read plan output: ${e.message})`;
+            if (!oidcConfigured) {
+              plan = [
+                'Plans on PRs activate once the operator configures the OIDC trust.',
+                '',
+                'Setup steps (one-time, per environment, in repo Settings → Environments):',
+                '',
+                '  1. Create the GitHub Environment named exactly `' + env + '`.',
+                '  2. Add the secret `AWS_ROLE_TO_ASSUME` = ARN of the IAM role for this env.',
+                '  3. (production only) Add ≥ 1 required reviewer.',
+                '  4. Set up the AWS-side IAM role + OIDC trust per docs/infrastructure.md § Day-1 setup.',
+                '',
+                'Once configured, this comment will populate with the actual plan diff on the next PR push.',
+              ].join('\n');
+            } else {
+              try {
+                plan = fs.readFileSync(`${process.env.PLAN_DIR}/plan.truncated.txt`, 'utf8');
+              } catch (e) {
+                plan = `(could not read plan output: ${e.message})`;
+              }
             }
 
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
@@ -236,6 +277,17 @@ jobs:
         if: always()
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
+          if [ "${{ steps.check_oidc.outputs.configured }}" != "true" ]; then
+            {
+              echo "## Plan: ${{ matrix.environment }}"
+              echo ""
+              echo "**Skipped** — \`AWS_ROLE_TO_ASSUME\` not configured."
+              echo ""
+              echo "Configure the secret in repo Settings → Environments → ${{ matrix.environment }}."
+              echo "See docs/infrastructure.md § Day-1 setup for the full IAM/OIDC trust setup."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           {
             echo "## Plan: ${{ matrix.environment }}"
             echo ""
