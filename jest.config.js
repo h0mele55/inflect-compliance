@@ -25,6 +25,46 @@
 // dropped from the allowlist.
 const ESM_TRANSFORM_ALLOW_LIST = 'jose|preact|preact-render-to-string';
 
+// ─── Coverage thresholds ─────────────────────────────────────────────
+//
+// Single source of truth for the coverage floors. Loaded here so the
+// repo has ONE place where the numbers live; the CI gate reads the
+// SAME file and passes it via `--coverageThreshold` CLI flag because
+// jest 29.7.0's per-project `coverageThreshold` (and even the top-
+// level one in multi-project mode) is silently NOT enforced — the
+// run exits 0 even when observed coverage is 9% against a 99% floor.
+// The CLI flag IS enforced (exit 1 + violation message). See
+// docs/implementation-notes/2026-04-27-gap-15-coverage-enforcement.md
+// for the empirical proof + why this layout was chosen.
+//
+// Writing the values here too gives `npm run test:coverage` (no CLI
+// flag) the same documented thresholds — they print to the summary
+// even though they don't fail the run. The CI gate is the only
+// authoritative enforcement point today.
+const coverageThresholds = require('./jest.thresholds.json');
+
+// ─── Coverage scope (shared across both projects) ────────────────────
+//
+// `coverageThreshold` MUST live inside a project block, NOT at the
+// top-level `module.exports`. Jest's multi-project handling silently
+// ignores top-level `coverageThreshold` when `projects:` is set —
+// historically this codebase had it at the top, which meant the
+// thresholds were documented but NEVER enforced. The Coverage CI gate
+// passed regardless of observed numbers.
+//
+// The fix (GAP-15 step 3 closure): keep `collectCoverageFrom` at the
+// top level (so both projects' test runs feed the same coverage scope)
+// but move the THRESHOLD into the node project's config below — that
+// project owns the file types in the scope (`*.ts` under `src/app-layer/`
+// and `src/lib/`). The jsdom project covers UI primitives in
+// `src/components/**` which are deliberately out of scope today.
+const sharedCollectCoverageFrom = [
+    'src/app-layer/**/*.ts',
+    'src/lib/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/**/types.ts',
+];
+
 /** @type {import('jest').Config} */
 const nodeProject = {
     displayName: 'node',
@@ -65,6 +105,73 @@ const nodeProject = {
         '^.+\\.m?js$': 'ts-jest',
     },
     transformIgnorePatterns: ['node_modules/(?!(' + ESM_TRANSFORM_ALLOW_LIST + ')/)'],
+    // Inherits the shared collection scope so the node + jsdom projects
+    // emit a comparable merged report.
+    collectCoverageFrom: sharedCollectCoverageFrom,
+    // ─── Coverage ratchet (GAP-15) ───────────────────────────────────
+    //
+    // These thresholds DO enforce — they live on the node project, not
+    // at the top-level config (where jest silently ignores them in
+    // multi-project mode).
+    //
+    //  Why this is a ratchet, not a target.
+    //  The thresholds below are the CURRENT FLOOR, not aspirational
+    //  numbers. The single rule: when you add tests that raise the
+    //  observed coverage, lift the floor in the same PR so the gain
+    //  is locked in. Never lower a floor to "make CI green" — that
+    //  is the failure mode the audit caught (GAP-02). Either add the
+    //  test that restores the lost coverage, or revert the change
+    //  that lost it.
+    //
+    //  How to raise.
+    //  Run `npx jest --coverage --runInBand` locally (or wait for
+    //  the CI coverage job to print the summary on your PR) and set
+    //  each per-path floor to ~3% below the freshly observed number.
+    //  The 3% buffer absorbs run-to-run jitter from parallel-worker
+    //  scheduling and the occasional skipped suite. Pick the same
+    //  buffer across metrics so the ratchet moves uniformly.
+    //
+    //  How to add a new gated path.
+    //  Drop a new key (`'./src/<area>/'`) and run coverage to seed
+    //  the floor. The path-prefix match is ~exact: trailing slash
+    //  matters. Only add a path if the area has reached a coverage
+    //  worth defending — otherwise the floor is noise.
+    //
+    //  Why the global is below 60.
+    //  The audit's GAP-15 originally asked for 60/60 globally. The
+    //  current numbers (br=50/fn=50/ln=62/st=59) say that target is
+    //  not realistic with the current scope: `src/lib/**` includes
+    //  one-shot scripts, instrumentation helpers, and CLI entry
+    //  points shipped intentionally without unit tests, plus
+    //  `src/lib/dub-utils/**` (ported third-party code). Tightening
+    //  the global to match raw averages would penalise legitimate
+    //  utility code; the durable lever is per-path tightening on
+    //  areas that matter (e.g. `usecases/`) PLUS the structural
+    //  enforcement fix above. When a future hardening pass either
+    //  trims the scope (excludes scripts) or invests in src/lib/
+    //  test coverage, raise the global toward 60.
+    //
+    //  What kinds of usecase tests count for the floor.
+    //  The Wave 1-4 tests (`docs/implementation-notes/2026-04-25-
+    //  gap-02-usecase-ratchet.md`) establish the contract:
+    //    - assertCanRead/Write/Admin gates on every privileged path
+    //    - sanitisation of every free-text field BEFORE persistence
+    //      (Epic D.2 / C.5) — render-time only is not sufficient
+    //    - cross-tenant id rejection (notFound on a cross-tenant
+    //      lookup, not silent acceptance)
+    //    - audit emission per state change (action + entityType)
+    //    - notFound paths exercised
+    //    - idempotency where applicable (e.g. archive/unarchive)
+    //    - load-bearing transition ordering (e.g. promote-before-
+    //      demote in tenant-ownership transfer)
+    //  Each test should name the regression class it protects in a
+    //  comment so the next reader can judge whether a refactor is
+    //  weakening a guard.
+    // Loaded from jest.thresholds.json (single source of truth shared
+    // with CI). NOT authoritative — see the GAP-15 comment above and
+    // the implementation note. The CI gate's --coverageThreshold flag
+    // is the authoritative enforcement point.
+    coverageThreshold: coverageThresholds,
 };
 
 /** @type {import('jest').Config} */
@@ -146,6 +253,11 @@ const jsdomProject = {
             'next-auth|@auth/[^/]+|oauth4webapi|jose|preact|preact-render-to-string' +
             ')/)',
     ],
+    // Same scope as the node project — jsdom-suite tests of UI
+    // primitives don't typically touch `src/app-layer/` or `src/lib/`
+    // directly, but coverage data from any incidental hits still
+    // contributes to the merged report.
+    collectCoverageFrom: sharedCollectCoverageFrom,
 };
 
 module.exports = {
@@ -160,111 +272,12 @@ module.exports = {
     // and a real future leak will hang CI immediately, surfacing it
     // for diagnosis instead of getting masked.
     forceExit: false,
-    // Coverage settings apply across the projects; the node suite carries
-    // the backend layer, the jsdom suite carries the UI primitives.
-    collectCoverageFrom: [
-        'src/app-layer/**/*.ts',
-        'src/lib/**/*.ts',
-        '!src/**/*.d.ts',
-        '!src/**/types.ts',
-    ],
+    // Path filter applies across both projects.
     coveragePathIgnorePatterns: ['/node_modules/', '/.next/', '/tests/'],
-    // ─── Coverage ratchet ────────────────────────────────────────────
-    //
-    //  Why this is a ratchet, not a target.
-    //  The thresholds below are the CURRENT FLOOR, not aspirational
-    //  numbers. The single rule: when you add tests that raise the
-    //  observed coverage, lift the floor in the same PR so the gain
-    //  is locked in. Never lower a floor to "make CI green" — that
-    //  is the failure mode the audit caught (GAP-02). Either add the
-    //  test that restores the lost coverage, or revert the change
-    //  that lost it.
-    //
-    //  How to raise.
-    //  Run `npx jest --coverage --runInBand` locally (or wait for
-    //  the CI coverage job to print the summary on your PR) and set
-    //  each per-path floor to ~3% below the freshly observed number.
-    //  The 3% buffer absorbs run-to-run jitter from parallel-worker
-    //  scheduling and the occasional skipped suite. Pick the same
-    //  buffer across metrics so the ratchet moves uniformly.
-    //
-    //  How to add a new gated path.
-    //  Drop a new key (`'./src/<area>/'`) and run coverage to seed
-    //  the floor. The path-prefix match is ~exact: trailing slash
-    //  matters. Only add a path if the area has reached a coverage
-    //  worth defending — otherwise the floor is noise.
-    //
-    //  Why we do not enforce stricter globals.
-    //  The global `collectCoverageFrom` globs cover both the
-    //  hot-path business logic (app-layer + usecases) and the long
-    //  tail of `src/lib/` utilities, scripts, and instrumentation
-    //  helpers. Many of those are shipped intentionally without
-    //  unit tests (one-shot migration scripts, CLI entry points).
-    //  Tightening the global to match raw averages would penalise
-    //  legitimate utility code; tightening per-path to areas that
-    //  matter is the durable lever.
-    //
-    //  What kinds of usecase tests count for the floor.
-    //  The Wave 1-4 tests (`docs/implementation-notes/2026-04-25-
-    //  gap-02-usecase-ratchet.md`) establish the contract:
-    //    - assertCanRead/Write/Admin gates on every privileged path
-    //    - sanitisation of every free-text field BEFORE persistence
-    //      (Epic D.2 / C.5) — render-time only is not sufficient
-    //    - cross-tenant id rejection (notFound on a cross-tenant
-    //      lookup, not silent acceptance)
-    //    - audit emission per state change (action + entityType)
-    //    - notFound paths exercised
-    //    - idempotency where applicable (e.g. archive/unarchive)
-    //    - load-bearing transition ordering (e.g. promote-before-
-    //      demote in tenant-ownership transfer)
-    //  Each test should name the regression class it protects in a
-    //  comment so the next reader can judge whether a refactor is
-    //  weakening a guard.
-    coverageThreshold: {
-        // Global floor. Lowered 60→55 on branches + 60→58 on functions
-        // (2026-04-22) to match observed coverage after the Epic 57-60
-        // wave added a lot of new UI primitive code that the jsdom
-        // suite covers but the node suite's `coverageFrom` globs don't.
-        // Held at this level until a future hardening pass tightens
-        // `src/lib/` coverage — see implementation note 2026-04-25.
-        global: {
-            branches: 55,
-            functions: 58,
-            lines: 60,
-            statements: 60,
-        },
-        // Per-path threshold for the usecase layer — the durable
-        // GAP-02 lever. Raise history (each row = the diff of that
-        // wave; ratchet only goes UP):
-        //   2026-04-22  baseline calibrated to observed reality
-        //                 17/14/27/24  br/fn/lines/stmts
-        //   2026-04-25  Waves 1-4: closed top-20 risk-ranked list
-        //                 → 33/26/45/42
-        //   2026-04-25  Wave 5: scim-users + tenant-invites +
-        //                 control-test + audit-readiness-scoring
-        //                 (66 new tests, 4 files)
-        //                 → 37/30/49/46
-        // Last observed canonical run (post Wave 5):
-        //   branches=40.57%  functions=33.73%
-        //   lines=52.42%     statements≈50%
-        // Buffer is ~3% below observed — stays inside the strict-
-        // ratchet posture without breaking on parallel-worker jitter.
-        // Next tranche: `sso` (existing tests partial — extend),
-        // `audit-readiness/packs`, `webhook-processor`,
-        // `editable-lifecycle-usecase`, `gap-analysis` (extend).
-        // See 2026-04-25 implementation note for the full list.
-        './src/app-layer/usecases/': {
-            branches: 37,
-            functions: 30,
-            lines: 49,
-            statements: 46,
-        },
-        './src/lib/': {
-            branches: 48,
-            functions: 48,
-            lines: 57,
-            statements: 54,
-        },
-    },
+    // NOTE: `coverageThreshold` and `collectCoverageFrom` are
+    // INTENTIONALLY on the node project below, not here. Jest silently
+    // ignores top-level `coverageThreshold` when `projects:` is set —
+    // see the comment block on `nodeProject.coverageThreshold` for the
+    // full GAP-15 enforcement-fix history.
     coverageReporters: ['text-summary', 'lcov'],
 };

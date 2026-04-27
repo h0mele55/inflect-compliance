@@ -252,11 +252,25 @@ jobs:
       - name: Apply Prisma migrations
         run: ./node_modules/.bin/prisma migrate deploy
 
-      # ── Coverage gate: Jest enforces thresholds via jest.config.js ──
-      # jest.config.js coverageThreshold.global: 60% branches/functions/lines/statements
-      # Jest exits non-zero if any threshold is violated — no continue-on-error.
-      - name: "Gate: test coverage ≥ 60%"
-        run: npx jest --coverage --forceExit --runInBand
+      # ── Coverage gate: Jest enforces thresholds via --coverageThreshold ──
+      # The threshold values live in `jest.thresholds.json` (single source
+      # of truth, also referenced by `jest.config.js`). They are passed
+      # via the `--coverageThreshold` CLI flag because jest 29.7.0's
+      # `coverageThreshold` config (top-level OR per-project) is silently
+      # NOT enforced when `projects:` is set — runs exit 0 even on
+      # observed coverage of 9% against a 99% floor. The CLI flag IS
+      # enforced (exit 1 + "coverage threshold ... not met" message).
+      # Empirical evidence + alternative paths considered:
+      # docs/implementation-notes/2026-04-27-gap-15-coverage-enforcement.md
+      #
+      # Current floors (calibrated 2026-04-27, observed − 3% buffer):
+      #   global   branches=56 functions=54 lines=70 statements=69
+      #   usecases branches=37 functions=30 lines=49 statements=46
+      #   lib      branches=48 functions=48 lines=57 statements=54
+      - name: "Gate: test coverage thresholds"
+        run: |
+          npx jest --coverage --forceExit --runInBand \
+            --coverageThreshold "$(cat jest.thresholds.json)"
 
       - name: Upload coverage report
         if: always()
