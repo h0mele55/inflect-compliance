@@ -53,7 +53,10 @@ const PAGES: PageSpec[] = [
         name: 'controls',
         serverPath: 'src/app/org/[orgSlug]/(app)/controls/page.tsx',
         clientPath: 'src/app/org/[orgSlug]/(app)/controls/ControlsTable.tsx',
-        usecase: 'getNonPerformingControls',
+        // Cursor-paginated list usecase. The non-paginated
+        // `getNonPerformingControls` remains for the dashboard
+        // summary card + CSV export.
+        usecase: 'listNonPerformingControls',
         rowLinkPattern: /href=\{row\.original\.drillDownUrl\}/,
         testIds: ['org-controls-table', 'org-control-link-', 'org-control-tenant-'],
         requiresTenantColumn: true,
@@ -62,7 +65,7 @@ const PAGES: PageSpec[] = [
         name: 'risks',
         serverPath: 'src/app/org/[orgSlug]/(app)/risks/page.tsx',
         clientPath: 'src/app/org/[orgSlug]/(app)/risks/RisksTable.tsx',
-        usecase: 'getCriticalRisksAcrossOrg',
+        usecase: 'listCriticalRisksAcrossOrg',
         rowLinkPattern: /href=\{row\.original\.drillDownUrl\}/,
         testIds: ['org-risks-table', 'org-risk-link-', 'org-risk-tenant-'],
         requiresTenantColumn: true,
@@ -71,7 +74,7 @@ const PAGES: PageSpec[] = [
         name: 'evidence',
         serverPath: 'src/app/org/[orgSlug]/(app)/evidence/page.tsx',
         clientPath: 'src/app/org/[orgSlug]/(app)/evidence/EvidenceTable.tsx',
-        usecase: 'getOverdueEvidenceAcrossOrg',
+        usecase: 'listOverdueEvidenceAcrossOrg',
         rowLinkPattern: /href=\{row\.original\.drillDownUrl\}/,
         testIds: ['org-evidence-table', 'org-evidence-link-', 'org-evidence-tenant-'],
         requiresTenantColumn: true,

@@ -13,6 +13,8 @@ import type { CriticalRiskRow } from '@/app-layer/schemas/portfolio';
 
 interface Props {
     rows: CriticalRiskRow[];
+    nextCursor?: string | null;
+    orgSlug?: string;
 }
 
 const STATUS_VARIANTS: Record<CriticalRiskRow['status'], 'error' | 'warning' | 'info'> = {
@@ -27,7 +29,7 @@ function ScorePill({ score }: { score: number }) {
     return <StatusBadge variant={variant}>{score}</StatusBadge>;
 }
 
-export function RisksTable({ rows }: Props) {
+export function RisksTable({ rows, nextCursor, orgSlug }: Props) {
     const [sortBy, setSortBy] = useState<string>('inherentScore');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -142,6 +144,18 @@ export function RisksTable({ rows }: Props) {
                     }
                     data-testid="org-risks-table"
                 />
+                {nextCursor && orgSlug && (
+                    <div className="flex justify-center pt-3">
+                        <Link
+                            href={`/org/${orgSlug}/risks?cursor=${encodeURIComponent(nextCursor)}`}
+                            className="btn btn-secondary btn-sm"
+                            data-testid="org-risks-load-more"
+                            prefetch={false}
+                        >
+                            Load more risks
+                        </Link>
+                    </div>
+                )}
             </ListPageShell.Body>
         </ListPageShell>
     );

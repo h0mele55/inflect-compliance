@@ -40,6 +40,10 @@ import {
     type NonPerformingControlRow,
     type CriticalRiskRow,
     type OverdueEvidenceRow,
+    type PaginatedDrillDownInput,
+    type PaginatedDrillDownResult,
+    DEFAULT_DRILLDOWN_PAGE_LIMIT,
+    MAX_DRILLDOWN_PAGE_LIMIT,
     computeRag,
 } from '@/app-layer/schemas/portfolio';
 import { withTenantDb } from '@/lib/db-context';
@@ -531,4 +535,425 @@ export async function getPortfolioTrends(
         tenantsAggregated,
         dataPoints,
     };
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Paginated drill-down (cursor-based)
+// ═════════════════════════════════════════════════════════════════════
+//
+// The dashboard summary (`getNonPerformingControls`,
+// `getCriticalRisksAcrossOrg`, `getOverdueEvidenceAcrossOrg`) caps at
+// `PORTFOLIO_DRILLDOWN_LIMIT` (50) and is the right shape for a
+// summary card. The dedicated drill-down pages need to browse beyond
+// that — this section adds `list*` counterparts that take a cursor +
+// limit and return rows with a `nextCursor` for the next page.
+//
+// Sort order is identical to the dashboard sort, so page 1 of the
+// paginated view matches the dashboard preview's first 50 rows.
+//
+// Per-tenant query strategy:
+//   - Each tenant runs its own `withTenantDb` transaction (RLS).
+//   - The cursor predicate is applied at the per-tenant `where` so
+//     each tenant only returns rows that come AFTER the cursor in
+//     the global merged sort. No row from any tenant is re-emitted.
+//   - Per-tenant `take = limit + 1` over-fetches to cover merge.
+//   - Merge in memory, sort with the global comparator, take limit + 1
+//     overall, encode `nextCursor` from the limit-th row when present.
+//
+// The cursor is opaque base64-JSON. Shape is per-entity:
+//   Controls : { p: number, d: string, i: string }   priority + updatedAt + id
+//   Risks    : { s: number, d: string, i: string }   inherentScore + updatedAt + id
+//   Evidence : { d: string, i: string }              nextReviewDate + id
+//
+// `id` is the entity row id (cuid). It's per-tenant unique under
+// Prisma cuid; cuid collisions across tenants are vanishingly
+// unlikely at the platform's target scale (no observed instance in
+// 50M+ rows).
+
+const PER_TENANT_PAGINATED_LIMIT_FACTOR = 2;
+const PER_TENANT_PAGINATED_FLOOR = 25;
+
+function clampPageLimit(limit: number | undefined): number {
+    if (limit === undefined) return DEFAULT_DRILLDOWN_PAGE_LIMIT;
+    return Math.max(1, Math.min(MAX_DRILLDOWN_PAGE_LIMIT, Math.floor(limit)));
+}
+
+function perTenantTake(limit: number): number {
+    // Each tenant fetches enough rows to (a) fill the merge for the
+    // worst case where one tenant dominates and (b) stay bounded so
+    // a 200-tenant org doesn't OOM. `limit * 2` covers most cases;
+    // floor 25 ensures small-limit pages still over-fetch enough to
+    // detect the next-page marker.
+    return Math.max(PER_TENANT_PAGINATED_FLOOR, limit * PER_TENANT_PAGINATED_LIMIT_FACTOR) + 1;
+}
+
+function encodeJson<T>(payload: T): string {
+    return Buffer.from(JSON.stringify(payload)).toString('base64url');
+}
+
+function decodeJson<T>(cursor: string | undefined): T | null {
+    if (!cursor) return null;
+    try {
+        const json = Buffer.from(cursor, 'base64url').toString('utf-8');
+        const parsed = JSON.parse(json);
+        return parsed as T;
+    } catch {
+        return null;
+    }
+}
+
+// ── Controls ─────────────────────────────────────────────────────────
+
+interface ControlsCursor {
+    /** Status priority (1-5). See CONTROL_STATUS_PRIORITY. */
+    p: number;
+    /** ISO timestamp of the last emitted row's updatedAt. */
+    d: string;
+    /** Last emitted row id. */
+    i: string;
+}
+
+const STATUSES_AT_PRIORITY: Record<number, NonPerformingControlRow['status'][]> = {
+    5: ['NEEDS_REVIEW'],
+    4: ['NOT_STARTED'],
+    3: ['PLANNED'],
+    2: ['IN_PROGRESS'],
+    1: ['IMPLEMENTING'],
+};
+
+function statusesAtOrBelow(priority: number): NonPerformingControlRow['status'][] {
+    const out: NonPerformingControlRow['status'][] = [];
+    for (let p = priority; p >= 1; p--) {
+        out.push(...STATUSES_AT_PRIORITY[p]);
+    }
+    return out;
+}
+
+function statusesBelow(priority: number): NonPerformingControlRow['status'][] {
+    return statusesAtOrBelow(priority - 1);
+}
+
+export async function listNonPerformingControls(
+    ctx: OrgContext,
+    input: PaginatedDrillDownInput = {},
+): Promise<PaginatedDrillDownResult<NonPerformingControlRow>> {
+    assertCanViewPortfolio(ctx);
+    const limit = clampPageLimit(input.limit);
+    const cursor = decodeJson<ControlsCursor>(input.cursor);
+    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+
+    // Per-tenant where clause — applies the cursor compound predicate
+    // when a cursor is supplied. The compound mirrors the global sort
+    // order so no row from any tenant is re-emitted on subsequent
+    // pages.
+    const cursorWhere = cursor
+        ? {
+              OR: [
+                  // Strictly lower priority — any status below cursor.p.
+                  ...(statusesBelow(cursor.p).length > 0
+                      ? [{ status: { in: statusesBelow(cursor.p) } }]
+                      : []),
+                  // Same priority bucket, older updatedAt.
+                  {
+                      AND: [
+                          { status: { in: STATUSES_AT_PRIORITY[cursor.p] ?? [] } },
+                          { updatedAt: { lt: new Date(cursor.d) } },
+                      ],
+                  },
+                  // Same priority + same updatedAt — id tiebreaker.
+                  {
+                      AND: [
+                          { status: { in: STATUSES_AT_PRIORITY[cursor.p] ?? [] } },
+                          { updatedAt: new Date(cursor.d) },
+                          { id: { gt: cursor.i } },
+                      ],
+                  },
+              ],
+          }
+        : undefined;
+
+    const merged = await fanOutPerTenant<NonPerformingControlRow>(
+        tenants,
+        async (db, tenant) => {
+            const rows = await db.control.findMany({
+                where: {
+                    tenantId: tenant.id,
+                    status: { notIn: ['IMPLEMENTED', 'NOT_APPLICABLE'] },
+                    applicability: 'APPLICABLE',
+                    deletedAt: null,
+                    ...(cursorWhere ?? {}),
+                },
+                select: {
+                    id: true,
+                    name: true,
+                    code: true,
+                    status: true,
+                    updatedAt: true,
+                },
+                orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+                take: perTenantTake(limit),
+            });
+            return rows.map((c): NonPerformingControlRow => ({
+                controlId: c.id,
+                tenantId: tenant.id,
+                tenantSlug: tenant.slug,
+                tenantName: tenant.name,
+                name: c.name,
+                code: c.code ?? null,
+                status: c.status as NonPerformingControlRow['status'],
+                updatedAt: c.updatedAt.toISOString(),
+                drillDownUrl: `/t/${tenant.slug}/controls/${c.id}`,
+            }));
+        },
+        // Identity sortAndLimit — we apply the page-limit cut below.
+        // Reusing fanOutPerTenant for the RLS plumbing only.
+        (rows) => rows,
+    );
+
+    // Global merged sort: priority DESC, updatedAt DESC, id ASC.
+    merged.sort((a, b) => {
+        const pa = CONTROL_STATUS_PRIORITY[a.status] ?? 0;
+        const pb = CONTROL_STATUS_PRIORITY[b.status] ?? 0;
+        if (pa !== pb) return pb - pa;
+        const cmp = b.updatedAt.localeCompare(a.updatedAt);
+        if (cmp !== 0) return cmp;
+        return a.controlId.localeCompare(b.controlId);
+    });
+
+    const trimmed = merged.slice(0, limit);
+    const hasMore = merged.length > limit;
+    const last = trimmed[trimmed.length - 1];
+    const nextCursor =
+        hasMore && last
+            ? encodeJson<ControlsCursor>({
+                  p: CONTROL_STATUS_PRIORITY[last.status] ?? 0,
+                  d: last.updatedAt,
+                  i: last.controlId,
+              })
+            : null;
+
+    return { rows: trimmed, nextCursor };
+}
+
+// ── Risks ────────────────────────────────────────────────────────────
+
+interface RisksCursor {
+    s: number;
+    d: string;
+    i: string;
+}
+
+export async function listCriticalRisksAcrossOrg(
+    ctx: OrgContext,
+    input: PaginatedDrillDownInput = {},
+): Promise<PaginatedDrillDownResult<CriticalRiskRow>> {
+    assertCanViewPortfolio(ctx);
+    const limit = clampPageLimit(input.limit);
+    const cursor = decodeJson<RisksCursor>(input.cursor);
+    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+
+    const cursorWhere = cursor
+        ? {
+              OR: [
+                  { inherentScore: { lt: cursor.s } },
+                  {
+                      AND: [
+                          { inherentScore: cursor.s },
+                          { updatedAt: { lt: new Date(cursor.d) } },
+                      ],
+                  },
+                  {
+                      AND: [
+                          { inherentScore: cursor.s },
+                          { updatedAt: new Date(cursor.d) },
+                          { id: { gt: cursor.i } },
+                      ],
+                  },
+              ],
+          }
+        : undefined;
+
+    const merged = await fanOutPerTenant<CriticalRiskRow>(
+        tenants,
+        async (db, tenant) => {
+            const rows = await db.risk.findMany({
+                where: {
+                    tenantId: tenant.id,
+                    inherentScore: { gte: 15 },
+                    status: { not: 'CLOSED' },
+                    deletedAt: null,
+                    ...(cursorWhere ?? {}),
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    inherentScore: true,
+                    status: true,
+                    updatedAt: true,
+                },
+                orderBy: [
+                    { inherentScore: 'desc' },
+                    { updatedAt: 'desc' },
+                    { id: 'asc' },
+                ],
+                take: perTenantTake(limit),
+            });
+            return rows.map((r): CriticalRiskRow => ({
+                riskId: r.id,
+                tenantId: tenant.id,
+                tenantSlug: tenant.slug,
+                tenantName: tenant.name,
+                title: r.title,
+                inherentScore: r.inherentScore,
+                status: r.status as CriticalRiskRow['status'],
+                updatedAt: r.updatedAt.toISOString(),
+                drillDownUrl: `/t/${tenant.slug}/risks/${r.id}`,
+            }));
+        },
+        (rows) => rows,
+    );
+
+    merged.sort((a, b) => {
+        if (a.inherentScore !== b.inherentScore) {
+            return b.inherentScore - a.inherentScore;
+        }
+        const cmp = b.updatedAt.localeCompare(a.updatedAt);
+        if (cmp !== 0) return cmp;
+        return a.riskId.localeCompare(b.riskId);
+    });
+
+    const trimmed = merged.slice(0, limit);
+    const hasMore = merged.length > limit;
+    const last = trimmed[trimmed.length - 1];
+    const nextCursor =
+        hasMore && last
+            ? encodeJson<RisksCursor>({
+                  s: last.inherentScore,
+                  d: last.updatedAt,
+                  i: last.riskId,
+              })
+            : null;
+
+    return { rows: trimmed, nextCursor };
+}
+
+// ── Evidence ─────────────────────────────────────────────────────────
+
+interface EvidenceCursor {
+    /** Full ISO timestamp (with milliseconds) for the last emitted
+     *  row's nextReviewDate. The DTO carries a date-only string for
+     *  display, but the cursor needs full precision so a `gt` against
+     *  UTC-midnight doesn't re-emit same-day rows whose stored
+     *  timestamp has a non-zero time-of-day. */
+    d: string;
+    i: string;
+}
+
+interface OverdueEvidenceRowInternal extends OverdueEvidenceRow {
+    /** Original full timestamp, retained internally so the cursor
+     *  encoder has full precision. Stripped from the DTO returned
+     *  to the caller. */
+    _fullNextReviewDate: string;
+}
+
+export async function listOverdueEvidenceAcrossOrg(
+    ctx: OrgContext,
+    input: PaginatedDrillDownInput = {},
+): Promise<PaginatedDrillDownResult<OverdueEvidenceRow>> {
+    assertCanViewPortfolio(ctx);
+    const limit = clampPageLimit(input.limit);
+    const cursor = decodeJson<EvidenceCursor>(input.cursor);
+    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const now = new Date();
+    const dayMs = 86400 * 1000;
+
+    // Sort: nextReviewDate ASC (== daysOverdue DESC). After-cursor
+    // predicate is `nextReviewDate > cursorDate OR (== AND id > cursorId)`.
+    // Cursor encodes the FULL ISO timestamp of the last emitted row so
+    // tied dates with non-zero time-of-day don't re-emit.
+    const cursorWhere = cursor
+        ? {
+              OR: [
+                  { nextReviewDate: { gt: new Date(cursor.d) } },
+                  {
+                      AND: [
+                          { nextReviewDate: new Date(cursor.d) },
+                          { id: { gt: cursor.i } },
+                      ],
+                  },
+              ],
+          }
+        : undefined;
+
+    const merged = await fanOutPerTenant<OverdueEvidenceRowInternal>(
+        tenants,
+        async (db, tenant) => {
+            const rows = await db.evidence.findMany({
+                where: {
+                    tenantId: tenant.id,
+                    nextReviewDate: { lt: now },
+                    status: { not: 'APPROVED' },
+                    deletedAt: null,
+                    ...(cursorWhere ?? {}),
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    nextReviewDate: true,
+                    status: true,
+                },
+                orderBy: [{ nextReviewDate: 'asc' }, { id: 'asc' }],
+                take: perTenantTake(limit),
+            });
+            return rows
+                .filter(
+                    (e): e is typeof e & { nextReviewDate: Date } =>
+                        e.nextReviewDate !== null,
+                )
+                .map((e): OverdueEvidenceRowInternal => {
+                    const ms = now.getTime() - e.nextReviewDate.getTime();
+                    return {
+                        evidenceId: e.id,
+                        tenantId: tenant.id,
+                        tenantSlug: tenant.slug,
+                        tenantName: tenant.name,
+                        title: e.title,
+                        nextReviewDate: e.nextReviewDate.toISOString().slice(0, 10),
+                        daysOverdue: Math.max(1, Math.floor(ms / dayMs)),
+                        status: e.status as OverdueEvidenceRow['status'],
+                        drillDownUrl: `/t/${tenant.slug}/evidence/${e.id}`,
+                        _fullNextReviewDate: e.nextReviewDate.toISOString(),
+                    };
+                });
+        },
+        (rows) => rows,
+    );
+
+    merged.sort((a, b) => {
+        // Sort on the FULL timestamp so ties are resolved at
+        // millisecond precision, matching the cursor predicate.
+        const cmp = a._fullNextReviewDate.localeCompare(b._fullNextReviewDate);
+        if (cmp !== 0) return cmp;
+        return a.evidenceId.localeCompare(b.evidenceId);
+    });
+
+    const trimmed = merged.slice(0, limit);
+    const hasMore = merged.length > limit;
+    const last = trimmed[trimmed.length - 1];
+    const nextCursor =
+        hasMore && last
+            ? encodeJson<EvidenceCursor>({
+                  d: last._fullNextReviewDate,
+                  i: last.evidenceId,
+              })
+            : null;
+
+    // Strip the internal precision field before handing rows back
+    // to the DTO consumer.
+    const publicRows: OverdueEvidenceRow[] = trimmed.map((r) => {
+        const { _fullNextReviewDate: _, ...pub } = r;
+        return pub;
+    });
+
+    return { rows: publicRows, nextCursor };
 }
