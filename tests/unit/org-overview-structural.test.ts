@@ -36,28 +36,25 @@ describe('Epic O-4 — portfolio overview structural contract', () => {
         expect(src).toMatch(/}\s*catch\b[\s\S]*?notFound\s*\(\s*\)/);
     });
 
-    it('imports the three portfolio usecases from the app-layer barrel', () => {
+    it('uses the single-fetch orchestrator from the portfolio barrel', () => {
         const src = read();
+        // Locks the shared-fetch optimisation: the page MUST consume
+        // `getPortfolioOverview` (one repo round-trip) instead of three
+        // independent usecases (which fired duplicated `getOrgTenantIds`
+        // × 3 + `getLatestSnapshots` × 2 against the DB).
         expect(src).toMatch(/from\s+['"]@\/app-layer\/usecases\/portfolio['"]/);
-        expect(src).toMatch(/getPortfolioSummary/);
-        expect(src).toMatch(/getPortfolioTenantHealth/);
-        expect(src).toMatch(/getPortfolioTrends/);
+        expect(src).toMatch(/getPortfolioOverview/);
+        // The page MUST NOT fall back to the three separate usecases
+        // — that pattern is the regression class this test guards.
+        expect(src).not.toMatch(/import\s*\{[^}]*getPortfolioSummary[^}]*\}\s*from\s+['"]@\/app-layer\/usecases\/portfolio['"]/);
     });
 
-    it('fetches all three portfolio views in parallel via Promise.all', () => {
-        const src = read();
-        // The three calls must sit inside a single Promise.all — not
-        // sequential awaits. A regression that splits these into three
-        // serial awaits would triple the page TTFB on cold caches.
-        expect(src).toMatch(
-            /Promise\.all\s*\(\s*\[\s*[\s\S]*?getPortfolioSummary[\s\S]*?getPortfolioTenantHealth[\s\S]*?getPortfolioTrends[\s\S]*?\]/,
-        );
-    });
-
-    it('passes a 90-day window to getPortfolioTrends (matches spec default)', () => {
+    it('passes the 90-day trend window to the orchestrator (matches spec default)', () => {
         // Locks the default trend window. Lifting this is fine — but
         // requires updating the test alongside the change.
-        expect(read()).toMatch(/getPortfolioTrends\s*\(\s*ctx\s*,\s*90\s*\)/);
+        expect(read()).toMatch(
+            /getPortfolioOverview\s*\(\s*ctx\s*,\s*\{[^}]*trendDays:\s*90/,
+        );
     });
 
     // ── Section presence ─────────────────────────────────────────────

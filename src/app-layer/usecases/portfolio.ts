@@ -25,6 +25,8 @@
  * invocation.
  */
 
+import type { ComplianceSnapshot } from '@prisma/client';
+
 import type { OrgContext } from '@/app-layer/types';
 import { forbidden } from '@/lib/errors/types';
 import {
@@ -93,21 +95,65 @@ function assertCanViewPortfolio(ctx: OrgContext): void {
     }
 }
 
-// ── getPortfolioSummary ───────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════
+// Shared base-data loader + pure projections
+// ═════════════════════════════════════════════════════════════════════
+//
+// `getPortfolioSummary` and `getPortfolioTenantHealth` both rely on
+// the same two upstream reads:
+//
+//   1. PortfolioRepository.getOrgTenantIds(orgId)
+//   2. PortfolioRepository.getLatestSnapshots(tenantIds)
+//
+// When the overview page calls them in parallel via `Promise.all`,
+// each does its own pair of fetches — 4 identical queries instead of
+// 2. As org size grows that overhead scales linearly with the number
+// of widgets sharing the same upstream.
+//
+// The fix splits each downstream usecase into:
+//
+//   - a pure projection function (snapshots → DTO) that takes the
+//     base data as input
+//   - a thin public usecase that loads the base data once and calls
+//     the projection
+//
+// A new orchestrator `getPortfolioOverview(ctx)` calls the loader
+// ONCE and projects all three DTOs (summary + tenant-health + trends)
+// from the shared upstream. The overview page consumes the
+// orchestrator instead of three independent usecases — net 3 DB
+// queries (tenants + snapshots + trends) regardless of how many
+// downstream DTOs reuse the same base.
+//
+// The standalone usecases stay supported for the API route's
+// per-view dispatch (`view=summary` / `view=health` / `view=trends`)
+// where each request only needs one DTO. Both paths share the same
+// projection logic — projection bugs are a single-source fix.
 
-export async function getPortfolioSummary(
-    ctx: OrgContext,
-): Promise<PortfolioSummary> {
-    assertCanViewPortfolio(ctx);
+interface PortfolioBaseData {
+    /** Every tenant linked to the org, ordered by creation. */
+    tenants: OrgTenantMeta[];
+    /** Latest snapshot per tenant within the 14-day staleness window.
+     *  Tenants with no recent snapshot are omitted — callers detect
+     *  "snapshot pending" by diffing against `tenants`. */
+    snapshots: ComplianceSnapshot[];
+    /** Pre-built tenantId → snapshot map for O(1) lookup downstream. */
+    snapshotsByTenant: Map<string, ComplianceSnapshot>;
+}
 
-    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+async function loadPortfolioBaseData(orgId: string): Promise<PortfolioBaseData> {
+    const tenants = await PortfolioRepository.getOrgTenantIds(orgId);
     const tenantIds = tenants.map((t) => t.id);
     const snapshots = await PortfolioRepository.getLatestSnapshots(tenantIds);
     const snapshotsByTenant = new Map(snapshots.map((s) => [s.tenantId, s]));
+    return { tenants, snapshots, snapshotsByTenant };
+}
 
-    // Aggregate sums across snapshots. Tenants with no snapshot yet
-    // contribute nothing — they show up in the summary as the
-    // `tenants.pending` and `rag.pending` count.
+function projectPortfolioSummary(
+    ctx: OrgContext,
+    base: PortfolioBaseData,
+): PortfolioSummary {
+    const { tenants, snapshots, snapshotsByTenant } = base;
+
     let controlsApplicable = 0;
     let controlsImplemented = 0;
     let risksTotal = 0;
@@ -202,20 +248,10 @@ export async function getPortfolioSummary(
     };
 }
 
-// ── getPortfolioTenantHealth ──────────────────────────────────────────
-
-export async function getPortfolioTenantHealth(
-    ctx: OrgContext,
-): Promise<TenantHealthRow[]> {
-    assertCanViewPortfolio(ctx);
-
-    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
-    const tenantIds = tenants.map((t) => t.id);
-    const snapshots = await PortfolioRepository.getLatestSnapshots(tenantIds);
-    const byTenant = new Map(snapshots.map((s) => [s.tenantId, s]));
-
+function projectPortfolioTenantHealth(base: PortfolioBaseData): TenantHealthRow[] {
+    const { tenants, snapshotsByTenant } = base;
     return tenants.map((t): TenantHealthRow => {
-        const s = byTenant.get(t.id);
+        const s = snapshotsByTenant.get(t.id);
         if (!s) {
             return {
                 tenantId: t.id,
@@ -231,7 +267,6 @@ export async function getPortfolioTenantHealth(
                 rag: null,
             };
         }
-
         const coveragePercent = bpsToPercent(s.controlCoverageBps);
         return {
             tenantId: t.id,
@@ -251,6 +286,57 @@ export async function getPortfolioTenantHealth(
             }),
         };
     });
+}
+
+function clampTrendDays(days: number): number {
+    return Math.min(Math.max(days, 1), 365);
+}
+
+function projectPortfolioTrends(
+    organizationId: string,
+    effectiveDays: number,
+    rows: SnapshotTrendRow[],
+): PortfolioTrend {
+    const rangeEnd = new Date();
+    rangeEnd.setUTCHours(23, 59, 59, 999);
+    const rangeStart = new Date(
+        rangeEnd.getTime() - effectiveDays * 86400 * 1000,
+    );
+    rangeStart.setUTCHours(0, 0, 0, 0);
+
+    const dataPoints = rows.map(trendRowToDataPoint);
+    const tenantsAggregated =
+        rows.length > 0 ? Math.max(...rows.map((r) => r.tenantsContributing)) : 0;
+
+    return {
+        organizationId,
+        daysRequested: effectiveDays,
+        daysAvailable: dataPoints.length,
+        rangeStart: rangeStart.toISOString(),
+        rangeEnd: rangeEnd.toISOString(),
+        tenantsAggregated,
+        dataPoints,
+    };
+}
+
+// ── getPortfolioSummary ───────────────────────────────────────────────
+
+export async function getPortfolioSummary(
+    ctx: OrgContext,
+): Promise<PortfolioSummary> {
+    assertCanViewPortfolio(ctx);
+    const base = await loadPortfolioBaseData(ctx.organizationId);
+    return projectPortfolioSummary(ctx, base);
+}
+
+// ── getPortfolioTenantHealth ──────────────────────────────────────────
+
+export async function getPortfolioTenantHealth(
+    ctx: OrgContext,
+): Promise<TenantHealthRow[]> {
+    assertCanViewPortfolio(ctx);
+    const base = await loadPortfolioBaseData(ctx.organizationId);
+    return projectPortfolioTenantHealth(base);
 }
 
 // ── getPortfolioTrends ────────────────────────────────────────────────
@@ -598,31 +684,69 @@ export async function getPortfolioTrends(
     days: number = 90,
 ): Promise<PortfolioTrend> {
     assertCanViewPortfolio(ctx);
-
-    const effectiveDays = Math.min(Math.max(days, 1), 365);
-    const rangeEnd = new Date();
-    rangeEnd.setUTCHours(23, 59, 59, 999);
-    const rangeStart = new Date(
-        rangeEnd.getTime() - effectiveDays * 86400 * 1000,
-    );
-    rangeStart.setUTCHours(0, 0, 0, 0);
-
+    const effectiveDays = clampTrendDays(days);
     const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
     const tenantIds = tenants.map((t) => t.id);
     const rows = await PortfolioRepository.getSnapshotTrends(tenantIds, effectiveDays);
+    return projectPortfolioTrends(ctx.organizationId, effectiveDays, rows);
+}
 
-    const dataPoints = rows.map(trendRowToDataPoint);
-    const tenantsAggregated = rows.length > 0
-        ? Math.max(...rows.map((r) => r.tenantsContributing))
-        : 0;
+// ── getPortfolioOverview ──────────────────────────────────────────────
+
+export interface PortfolioOverview {
+    summary: PortfolioSummary;
+    tenantHealth: TenantHealthRow[];
+    trends: PortfolioTrend;
+}
+
+export interface GetPortfolioOverviewOptions {
+    /** Trend window in days. Clamped to [1, 365]. Default 90. */
+    trendDays?: number;
+}
+
+/**
+ * Single-fetch orchestrator for the org overview page.
+ *
+ * Loads the base data (tenant list + latest snapshots) ONCE and runs
+ * the trend query in parallel against the same tenant list, then
+ * projects all three DTOs. Replaces the previous `Promise.all([
+ * getPortfolioSummary, getPortfolioTenantHealth, getPortfolioTrends ])`
+ * pattern which fired three independent `getOrgTenantIds` and two
+ * independent `getLatestSnapshots` queries.
+ *
+ * Net DB calls: 3 (tenants × 1, latestSnapshots × 1, trends × 1)
+ * regardless of how many downstream DTOs reuse the same base.
+ *
+ * The standalone `getPortfolioSummary`, `getPortfolioTenantHealth`,
+ * and `getPortfolioTrends` continue to support per-view API
+ * dispatch (`view=summary` / `view=health` / `view=trends`) where
+ * each request only needs one DTO and the shared-fetch saving
+ * doesn't apply.
+ */
+export async function getPortfolioOverview(
+    ctx: OrgContext,
+    options: GetPortfolioOverviewOptions = {},
+): Promise<PortfolioOverview> {
+    assertCanViewPortfolio(ctx);
+    const effectiveDays = clampTrendDays(options.trendDays ?? 90);
+
+    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const tenantIds = tenants.map((t) => t.id);
+
+    const [snapshots, trendRows] = await Promise.all([
+        PortfolioRepository.getLatestSnapshots(tenantIds),
+        PortfolioRepository.getSnapshotTrends(tenantIds, effectiveDays),
+    ]);
+
+    const base: PortfolioBaseData = {
+        tenants,
+        snapshots,
+        snapshotsByTenant: new Map(snapshots.map((s) => [s.tenantId, s])),
+    };
 
     return {
-        organizationId: ctx.organizationId,
-        daysRequested: effectiveDays,
-        daysAvailable: dataPoints.length,
-        rangeStart: rangeStart.toISOString(),
-        rangeEnd: rangeEnd.toISOString(),
-        tenantsAggregated,
-        dataPoints,
+        summary: projectPortfolioSummary(ctx, base),
+        tenantHealth: projectPortfolioTenantHealth(base),
+        trends: projectPortfolioTrends(ctx.organizationId, effectiveDays, trendRows),
     };
 }
