@@ -124,15 +124,26 @@ describe('Epic O-4 — org shell structural contract', () => {
         expect(src).toMatch(/throw new Error\([^)]*OrgProvider/);
     });
 
-    it('getOrgServerContext throws ForbiddenError on missing membership (no slug leak)', () => {
+    it('getOrgServerContext collapses missing-org and non-membership to a single NotFoundError shape', () => {
+        // Anti-enumeration: both paths throw the same NotFoundError
+        // with a generic message that never echoes the slug. ForbiddenError
+        // is no longer used here — its 403 response would have leaked
+        // org existence to non-members.
         const src = read(SERVER_CTX_PATH);
-        expect(src).toMatch(/throw new ForbiddenError/);
-        // Generic message, no slug echo.
-        expect(src).toMatch(/['"]Access to this organization is not permitted['"]/);
+        expect(src).toMatch(/throw\s+externalNotFound\(\)/);
+        expect(src).not.toMatch(/throw new ForbiddenError/);
+        expect(src).toMatch(
+            /['"]Organization not found or access not permitted['"]/,
+        );
     });
 
-    it('getOrgServerContext throws NotFoundError when the org slug does not resolve', () => {
+    it('getOrgServerContext logs an internal reason (org_not_found vs not_a_member)', () => {
+        // Internal observability is preserved even though the external
+        // response is collapsed. Operators reading logs can still
+        // distinguish the two failure modes.
         const src = read(SERVER_CTX_PATH);
-        expect(src).toMatch(/throw new NotFoundError/);
+        expect(src).toMatch(/reason:\s*['"]org_not_found['"]/);
+        expect(src).toMatch(/reason:\s*['"]not_a_member['"]/);
+        expect(src).toMatch(/from\s+['"]@\/lib\/observability\/logger['"]/);
     });
 });

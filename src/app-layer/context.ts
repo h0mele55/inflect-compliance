@@ -9,9 +9,10 @@ import {
     isApiKeyToken,
     verifyApiKey,
 } from '@/lib/auth/api-key-auth';
-import { badRequest, forbidden, notFound, unauthorized } from '@/lib/errors/types';
+import { badRequest, notFound, unauthorized } from '@/lib/errors/types';
 import prisma from '@/lib/prisma';
 import { getOrgPermissions } from '@/lib/permissions';
+import { logger } from '@/lib/observability/logger';
 
 /**
  * Generates or extracts a request ID.
@@ -102,28 +103,49 @@ export async function getLegacyCtx(req?: NextRequest): Promise<RequestContext> {
  * Builds an `OrgContext` for organization-scoped routes
  * (`/api/org/[orgSlug]/*`).
  *
- * Resolution order:
+ * ## Anti-enumeration policy
+ *
+ * Both "this org slug doesn't exist" AND "you're authenticated but
+ * not a member of this org" collapse to the SAME externally-visible
+ * response: `notFound` with a generic message that does NOT echo
+ * the slug. A non-member can therefore never enumerate which org
+ * slugs exist by probing the API and watching for 403 vs 404.
+ *
+ * Mirrors `getOrgServerContext` (the page-side resolver) — same
+ * collapse, same generic message — so the page tree and the API
+ * tree expose identical signal to an attacker.
+ *
+ * Internal observability is preserved via a structured `org-ctx`
+ * log line (level=warn) that distinguishes the two states with a
+ * `reason` field (`org_not_found` vs `not_a_member`). Operators
+ * reading the application logs see the real cause; external callers
+ * only see 404.
+ *
+ * ## Resolution order
  *   1. Authenticate the user via the existing session helper. NOT API
  *      key — org-scoped routes are user-driven (CISO portfolio + admin
  *      operations); machine-to-machine API keys are tenant-scoped and
  *      have no place at the org layer.
- *   2. Look up the Organization row by slug. 404 if missing.
- *   3. Look up the OrgMembership for (org, user). 403 if absent —
- *      access denied without leaking which org slug exists. Note that
- *      the 404 from step 2 does leak existence; that mirrors how
- *      `getTenantCtx` behaves and keeps the failure modes consistent
- *      across the two scopes.
+ *   2. Look up the Organization row by slug.
+ *   3. Look up the OrgMembership for (org, user).
  *   4. Pre-derive `permissions` via `getOrgPermissions(role)` so
  *      callers can read flags directly without an extra helper call.
+ *
+ * Steps 2 and 3 both throw the same `notFound` on failure. Internal
+ * `logger.warn('org-ctx.access_denied', { reason })` distinguishes
+ * the cause for operator diagnostics.
  *
  * Side effect: enriches the observability AsyncLocalStorage so logs
  * and traces emitted downstream automatically include `userId`.
  *
- * Failure shape:
+ * Failure shape (externally visible):
  *   - `unauthorized` (401) — no session
- *   - `badRequest`   (400) — missing/empty slug
- *   - `notFound`     (404) — org slug doesn't exist
- *   - `forbidden`    (403) — user is not a member of the org
+ *   - `badRequest`   (400) — missing/empty slug (caller-side bug, not
+ *                            an enumeration vector — the slug is in
+ *                            the URL path, so an empty value here
+ *                            means the route never matched)
+ *   - `notFound`     (404) — org slug doesn't exist OR user has no
+ *                            membership; collapsed for anti-enumeration
  */
 export async function getOrgCtx(
     params: { orgSlug: string },
@@ -137,12 +159,25 @@ export async function getOrgCtx(
         throw badRequest('Missing organization slug');
     }
 
+    // Generic external message — same string for both "no such org"
+    // and "not a member". The internal log line below carries the
+    // real reason for ops diagnostics.
+    const externalNotFound = () =>
+        notFound('Organization not found or access not permitted');
+
     const org = await prisma.organization.findUnique({
         where: { slug: orgSlug },
         select: { id: true, slug: true },
     });
     if (!org) {
-        throw notFound(`Organization '${orgSlug}' not found`);
+        logger.warn('org-ctx.access_denied', {
+            component: 'org-ctx',
+            reason: 'org_not_found',
+            orgSlug,
+            userId: session.userId,
+            requestId,
+        });
+        throw externalNotFound();
     }
 
     const membership = await prisma.orgMembership.findUnique({
@@ -155,12 +190,15 @@ export async function getOrgCtx(
         select: { role: true },
     });
     if (!membership) {
-        // Generic message — never echo the slug or hint at the
-        // distinction between "you're not a member" and "you signed
-        // in with the wrong account". Either is uncomfortable to act
-        // on for a real user, but neither leaks anything beyond the
-        // 404 above.
-        throw forbidden('Access to this organization is not permitted');
+        logger.warn('org-ctx.access_denied', {
+            component: 'org-ctx',
+            reason: 'not_a_member',
+            orgSlug,
+            organizationId: org.id,
+            userId: session.userId,
+            requestId,
+        });
+        throw externalNotFound();
     }
 
     mergeRequestContext({ userId: session.userId });

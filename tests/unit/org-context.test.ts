@@ -10,7 +10,10 @@
  * Failure-shape contract asserted here:
  *   - badRequest    (400) when slug is empty / whitespace
  *   - notFound      (404) when slug doesn't resolve to an Organization
- *   - forbidden     (403) when slug resolves but the user is not a member
+ *   - notFound      (404) when slug resolves but the user is not a
+ *                   member — collapsed for anti-enumeration. External
+ *                   callers cannot distinguish "no such org" from
+ *                   "not a member".
  *   - unauthorized  (401) when no session — covered by mocking
  *                   getSessionOrThrow to throw, since the resolver
  *                   delegates to it as the very first step.
@@ -37,10 +40,15 @@ jest.mock('@/lib/prisma', () => ({
     },
 }));
 
-// Observability writer is a no-op in tests; no need to assert on it.
+// Observability writers + readers are no-ops in tests. The logger
+// pulls from the AsyncLocalStorage via `getRequestContext`; mock it
+// so the new `logger.warn('org-ctx.access_denied', ...)` calls in
+// the resolver don't trip on unmocked context internals.
 jest.mock('@/lib/observability/context', () => ({
     __esModule: true,
     mergeRequestContext: () => undefined,
+    getRequestContext: () => null,
+    setRequestContext: () => undefined,
 }));
 
 import { getOrgCtx } from '@/app-layer/context';
@@ -138,27 +146,45 @@ describe('Epic O-2 — getOrgCtx', () => {
         expect(orgMembershipFindUniqueMock).not.toHaveBeenCalled();
     });
 
-    it('throws forbidden when the user has no OrgMembership in this org', async () => {
+    it('collapses non-membership to 404 for anti-enumeration (no 403 leak)', async () => {
         happySession();
         orgFindUniqueMock.mockResolvedValue({ id: 'org-1', slug: 'acme-org' });
         orgMembershipFindUniqueMock.mockResolvedValue(null);
 
         await expect(getOrgCtx({ orgSlug: 'acme-org' })).rejects.toMatchObject({
-            status: 403,
+            status: 404,
         });
     });
 
-    it('forbidden message does not echo the slug (no enumeration via error text)', async () => {
+    it('externally-visible 404 message is identical for "no such org" and "not a member"', async () => {
+        // Same caller, two different DB states — same external message.
+        // This is the load-bearing anti-enumeration property: an
+        // attacker cannot probe a slug and learn whether it exists by
+        // diffing the response.
         happySession();
-        orgFindUniqueMock.mockResolvedValue({ id: 'org-1', slug: 'acme-org' });
-        orgMembershipFindUniqueMock.mockResolvedValue(null);
 
+        // Path 1: org slug doesn't resolve at all.
+        orgFindUniqueMock.mockResolvedValueOnce(null);
+        let msgNoOrg = '';
+        try {
+            await getOrgCtx({ orgSlug: 'no-such-org' });
+        } catch (err) {
+            msgNoOrg = (err as Error).message;
+        }
+
+        // Path 2: org exists but caller has no membership.
+        orgFindUniqueMock.mockResolvedValueOnce({ id: 'org-1', slug: 'acme-org' });
+        orgMembershipFindUniqueMock.mockResolvedValueOnce(null);
+        let msgNoMember = '';
         try {
             await getOrgCtx({ orgSlug: 'acme-org' });
-            throw new Error('expected forbidden to throw');
         } catch (err) {
-            expect((err as Error).message).not.toContain('acme-org');
+            msgNoMember = (err as Error).message;
         }
+
+        expect(msgNoOrg).toBe(msgNoMember);
+        expect(msgNoOrg).not.toContain('acme-org');
+        expect(msgNoOrg).not.toContain('no-such-org');
     });
 
     it('looks up the membership using the (organizationId, userId) compound key', async () => {
