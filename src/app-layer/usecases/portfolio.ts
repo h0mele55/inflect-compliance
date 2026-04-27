@@ -43,6 +43,8 @@ import {
     computeRag,
 } from '@/app-layer/schemas/portfolio';
 import { withTenantDb } from '@/lib/db-context';
+import prisma from '@/lib/prisma';
+import { logger } from '@/lib/observability/logger';
 
 // ── Internal helpers ──────────────────────────────────────────────────
 
@@ -318,6 +320,95 @@ async function fanOutPerTenant<TRow>(
     return sortAndLimit(merged);
 }
 
+// ── Auditor fan-out integrity check ───────────────────────────────────
+//
+// Cross-tenant drill-down relies on the org-admin's auto-provisioned
+// AUDITOR `TenantMembership` in every child tenant of the org — the
+// `withTenantDb(tenantId, ...)` callback runs as `app_user` and the
+// per-tenant query gets through RLS BECAUSE the user has SOME
+// membership in that tenant. Without a membership row the per-tenant
+// query returns zero rows and the drill-down silently shows "no
+// issues found", which is dangerously misleading when the real
+// problem is that auto-provisioning got out of sync (manual delete,
+// failed deploy, rare race during tenant creation, etc.).
+//
+// `checkAuditorFanOutIntegrity` runs ONCE before iteration. It:
+//
+//   1. Queries the user's `TenantMembership` rows scoped to the
+//      org's tenants (single indexed read).
+//   2. Diffs against the org tenant list. Tenants the user has NO
+//      membership in are flagged as drift.
+//   3. Emits a structured `portfolio.auditor_fanout_drift` warning
+//      if any drift is found, naming the affected tenant ids so
+//      ops can correlate with the auto-provisioning service logs.
+//   4. Returns the filtered subset of accessible tenants so the
+//      iteration only touches tenants where the user has SOME
+//      membership row — preserving the existing RLS contract while
+//      avoiding "phantom empty" results from inaccessible tenants.
+//
+// The check accepts ANY membership role (not strictly AUDITOR). The
+// auto-provisioning service writes AUDITOR rows tagged with
+// `provisionedByOrgId`, but a CISO who's also been MANUALLY granted
+// OWNER in one tenant has access via that manual row — drill-down
+// works there too, and we shouldn't spuriously warn. Drift is
+// strictly "this user has zero rows for tenant X", not "this user
+// doesn't have an AUDITOR row".
+//
+// Performance: one `findMany` against the indexed
+// `TenantMembership(tenantId, userId)` column. ~1ms regardless of org
+// size; cheap insurance against silent drill-down corruption.
+
+interface AuditorFanOutIntegrityResult {
+    /** Tenants where the current user has SOME TenantMembership.
+     *  Drill-down iterates only these. */
+    accessibleTenants: OrgTenantMeta[];
+    /** Tenant ids in the org where the user has NO TenantMembership.
+     *  Empty when fan-out is healthy. */
+    missingTenantIds: string[];
+}
+
+async function checkAuditorFanOutIntegrity(
+    ctx: OrgContext,
+    tenants: OrgTenantMeta[],
+): Promise<AuditorFanOutIntegrityResult> {
+    if (tenants.length === 0) {
+        return { accessibleTenants: [], missingTenantIds: [] };
+    }
+
+    const tenantIds = tenants.map((t) => t.id);
+    const memberships = await prisma.tenantMembership.findMany({
+        where: {
+            userId: ctx.userId,
+            tenantId: { in: tenantIds },
+        },
+        select: { tenantId: true },
+    });
+    const accessibleSet = new Set(memberships.map((m) => m.tenantId));
+
+    const missingTenantIds = tenantIds.filter((id) => !accessibleSet.has(id));
+    const accessibleTenants = tenants.filter((t) => accessibleSet.has(t.id));
+
+    if (missingTenantIds.length > 0) {
+        logger.warn('portfolio.auditor_fanout_drift', {
+            component: 'portfolio',
+            organizationId: ctx.organizationId,
+            orgSlug: ctx.orgSlug,
+            userId: ctx.userId,
+            requestId: ctx.requestId,
+            totalTenants: tenants.length,
+            accessibleTenants: accessibleTenants.length,
+            missingTenantIds,
+            // Operator hint — the most likely root cause when this
+            // fires for an ORG_ADMIN whose drill-down should be
+            // complete by design.
+            hint:
+                'Auto-provisioned AUDITOR memberships are missing for this user in the listed tenants. Re-run provisionOrgAdminToTenants(orgId, userId) or inspect tenantMembership for manual deletions.',
+        });
+    }
+
+    return { accessibleTenants, missingTenantIds };
+}
+
 // Status priority for the non-performing controls sort. Higher number
 // = more urgent. Locks the visual ordering: NEEDS_REVIEW first
 // (something acted-on but not finished), then NOT_STARTED (forgotten),
@@ -335,9 +426,10 @@ export async function getNonPerformingControls(
 ): Promise<NonPerformingControlRow[]> {
     assertCanViewPortfolio(ctx);
     const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const integrity = await checkAuditorFanOutIntegrity(ctx, tenants);
 
     return fanOutPerTenant<NonPerformingControlRow>(
-        tenants,
+        integrity.accessibleTenants,
         async (db, tenant) => {
             const rows = await db.control.findMany({
                 where: {
@@ -389,9 +481,10 @@ export async function getCriticalRisksAcrossOrg(
 ): Promise<CriticalRiskRow[]> {
     assertCanViewPortfolio(ctx);
     const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const integrity = await checkAuditorFanOutIntegrity(ctx, tenants);
 
     return fanOutPerTenant<CriticalRiskRow>(
-        tenants,
+        integrity.accessibleTenants,
         async (db, tenant) => {
             // "Critical" = inherentScore >= 15 (5×5 matrix top tier) AND
             // still actionable (status != CLOSED). The architecture doc's
@@ -445,11 +538,12 @@ export async function getOverdueEvidenceAcrossOrg(
 ): Promise<OverdueEvidenceRow[]> {
     assertCanViewPortfolio(ctx);
     const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const integrity = await checkAuditorFanOutIntegrity(ctx, tenants);
     const now = new Date();
     const dayMs = 86400 * 1000;
 
     return fanOutPerTenant<OverdueEvidenceRow>(
-        tenants,
+        integrity.accessibleTenants,
         async (db, tenant) => {
             const rows = await db.evidence.findMany({
                 where: {
