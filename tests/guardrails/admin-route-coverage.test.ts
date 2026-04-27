@@ -43,6 +43,7 @@ const ADMIN_ONLY_ROUTES = [
     'admin/api-keys/route.ts',
     'admin/api-keys/[keyId]/route.ts',
     'admin/key-rotation/route.ts',
+    'admin/tenant-dek-rotation/route.ts',
     'admin/sessions/route.ts',
     // Epic 1, PR 3 — token-redemption invite flow (admin invite management)
     'admin/invites/route.ts',

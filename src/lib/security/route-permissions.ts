@@ -142,13 +142,25 @@ export const ROUTE_PERMISSIONS: readonly RoutePermissionRule[] = [
             'credential against the tenant; treat as admin-only.',
     },
 
-    // ── Per-tenant DEK rotation (Epic B) ────────────────────────────
+    // ── Master-KEK rotation (Epic B.3) ──────────────────────────────
     {
         path: new RegExp(`^${T}\\/admin\\/key-rotation(\\/.*)?$`),
         permission: 'admin.manage',
         note:
-            'Triggers per-tenant data-encryption-key rotation. Heavy + ' +
-            'long-running; keep behind admin.manage.',
+            'Re-wraps the tenant DEK + re-encrypts v1 ciphertexts ' +
+            'after the operator stages a new DATA_ENCRYPTION_KEY. ' +
+            'Operator-driven fleet operation; ADMIN tier suffices.',
+    },
+
+    // ── Per-tenant DEK rotation (Epic F.2 follow-up) ────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/tenant-dek-rotation(\\/.*)?$`),
+        permission: 'admin.tenant_lifecycle',
+        note:
+            'Generates a fresh per-tenant DEK + sweeps every v2 ' +
+            'ciphertext under the new key. Response to a per-tenant ' +
+            'compromise — destructive on the timeline that matters ' +
+            'and OWNER-only per the role model in CLAUDE.md.',
     },
 
     // ── Billing (Epic D.3 — was legacy requireAdminCtx) ─────────────

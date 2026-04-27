@@ -4,6 +4,15 @@
 > Epic E. Read the source links below for details; come back here for
 > the architecture summary, verification commands, and rollback
 > procedures.
+>
+> **F.2 status note (2026-04-27).** The reservation has been replaced
+> by a real implementation. `rotateTenantDek` no longer throws — it
+> performs the atomic DEK swap and enqueues a `tenant-dek-rotation`
+> sweep. The schema artefacts (column, CHECK, partial index) and the
+> "schema ships with the migration" rationale below are still
+> accurate; only the function body and the integration test changed.
+> See `docs/implementation-notes/2026-04-27-implement-rotate-tenant-dek.md`
+> for the implementation design + the dual-DEK middleware fallback.
 
 ## Architecture at a glance
 
@@ -50,7 +59,7 @@
 | Layer | Source of truth | Companion tests / guardrails |
 |---|---|---|
 | F.1 | `tests/unit/key-rotation-admin-api.test.ts` — `jest.mock('@/app-layer/context', ...)` block at top | Self-contained (8/8 pass today) |
-| F.2 | `prisma/schema.prisma` (field + docstring), `prisma/migrations/20260424010000_add_tenant_previous_encrypted_dek/migration.sql` (ADD COLUMN + CHECK + partial index), `src/lib/security/tenant-key-manager.ts::rotateTenantDek` | `tests/integration/tenant-dek-rotation-stub.test.ts` (3 tests — stub throws; column queryable; CHECK enforces) |
+| F.2 | `prisma/schema.prisma` (field + docstring), `prisma/migrations/20260424010000_add_tenant_previous_encrypted_dek/migration.sql` (ADD COLUMN + CHECK + partial index), `src/lib/security/tenant-key-manager.ts::rotateTenantDek` | `tests/integration/tenant-dek-rotation.test.ts` (real-impl happy path + double-rotation rejection + CHECK constraint), `tests/unit/tenant-key-manager.rotate.test.ts` (24 unit assertions), `tests/guardrails/tenant-dek-rotation-fallback.test.ts` (7 ratchet assertions on the dual-DEK middleware path) |
 | F.3 | `src/lib/security/route-permissions.ts` (`HttpMethod` union), `src/lib/security/encryption.ts:139` (sentinel comment) | `tests/guardrails/route-permissions-uppercase.test.ts` |
 | F.4 | `SECURITY.md` (GHSA channel), `scripts/detect-secrets.sh` (`--diff-filter=ACMR`) | `tests/unit/security/detect-secrets.test.ts` + `tests/guardrails/no-secrets.test.ts` |
 
