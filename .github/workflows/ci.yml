@@ -466,11 +466,13 @@ jobs:
         run: npm install --legacy-peer-deps
 
       # ── npm audit: BLOCKING on high+ severity (production deps) ──
-      # GAP-05 — restored from `critical` → `high` after the Next.js
-      # 14 → 15.5 migration cleared the Next 14.x advisories
-      # (Image Optimizer DoS, RSC request deserialization). Lowering
-      # this gate again requires a written rationale tied to a
-      # specific advisory + an upgrade plan, NOT a workaround.
+      # `--omit=dev` scans only the runtime dependency tree, so a HIGH
+      # finding here implies an exploitable surface in shipped code.
+      # Lowering this gate (e.g. back to `--audit-level=critical`) is
+      # a regression — `tests/guardrails/security-gate-strictness.test.ts`
+      # fails CI if the gate weakens. If a specific advisory genuinely
+      # cannot be fixed today, add a tracked exemption with a written
+      # rationale + upgrade plan rather than relaxing the global gate.
       - name: "Gate: npm audit (high+ blocks merge)"
         run: npm audit --omit=dev --audit-level=high
 
@@ -583,15 +585,17 @@ jobs:
           load: true
 
       # ── Trivy scan: BLOCKING on CRITICAL,HIGH ──
-      # GAP-05 — restored from CRITICAL → CRITICAL,HIGH after the
-      # Next.js 14 → 15.5 migration cleared the Next 14.x HIGH
-      # findings. Lowering this gate again requires a written
-      # rationale tied to specific CVEs + an upgrade plan.
+      # Container-image scan against OS packages + bundled libraries.
+      # Dropping HIGH from the severity list (CRITICAL-only) is a
+      # regression — `tests/guardrails/security-gate-strictness.test.ts`
+      # fails CI if the gate weakens.
       #
-      # `.trivyignore` carries narrow per-CVE exemptions with reasons
-      # (currently: CVE-2026-33671 in the bundled npm CLI's picomatch,
-      # not exploitable from app code; tracked for upgrade in the
-      # next Node base-image bump).
+      # `.trivyignore` carries narrow per-CVE exemptions with written
+      # reasons + upgrade plans. Exemption entries are the structural
+      # escape hatch; never weaken the global severity threshold.
+      # (Currently: CVE-2026-33671 in the bundled npm CLI's picomatch,
+      # not exploitable from app code; tracked for upgrade in the next
+      # Node base-image bump.)
       - name: "Gate: Trivy vulnerability scan (critical+high)"
         uses: aquasecurity/trivy-action@0.35.0
         with:
