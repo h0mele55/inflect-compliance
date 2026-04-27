@@ -6,19 +6,25 @@
  * `org/[orgSlug]/layout.tsx` into the client `OrgProvider` without
  * dragging Prisma model internals across the server-client boundary.
  *
- * Auth shape:
- *   - Throws `notFoundError` if the org slug doesn't resolve.
- *   - Throws `forbiddenError` if the user has no OrgMembership in
- *     that org.
+ * ## Anti-enumeration policy
  *
- * The thrown errors are caught by the layout's try/catch which routes
- * them to `notFound()` (404 → renders the not-found UI without
- * leaking org existence to non-members).
+ * Both "this org slug doesn't exist" AND "you have no membership in
+ * this org" throw `NotFoundError` with the same generic message that
+ * does NOT echo the slug. The layout's try/catch routes both to
+ * `notFound()`. A non-member cannot tell whether an org exists by
+ * visiting `/org/<slug>` — same external surface as the API-side
+ * `getOrgCtx`.
+ *
+ * Internal observability is preserved via a structured `org-ctx` log
+ * line (level=warn) carrying a `reason` field (`org_not_found` vs
+ * `not_a_member`). Operators reading the application logs see the
+ * real cause; external callers only see 404.
  */
 
 import prisma from '@/lib/prisma';
 import { getOrgPermissions, type OrgPermissionSet } from '@/lib/permissions';
-import { ForbiddenError, NotFoundError } from '@/lib/errors/types';
+import { NotFoundError } from '@/lib/errors/types';
+import { logger } from '@/lib/observability/logger';
 import type { OrgRole } from '@prisma/client';
 
 export interface OrgServerContext {
@@ -37,15 +43,28 @@ export async function getOrgServerContext(params: {
 }): Promise<OrgServerContext> {
     const slug = params.orgSlug.trim();
     if (!slug) {
-        throw new NotFoundError(`Organization not found`);
+        throw new NotFoundError('Organization not found or access not permitted');
     }
+
+    // Generic external message — same string for both "no such org"
+    // and "not a member". The internal log line carries the real
+    // reason for ops diagnostics.
+    const externalNotFound = () =>
+        new NotFoundError('Organization not found or access not permitted');
 
     const org = await prisma.organization.findUnique({
         where: { slug },
         select: { id: true, slug: true, name: true },
     });
     if (!org) {
-        throw new NotFoundError(`Organization '${slug}' not found`);
+        logger.warn('org-ctx.access_denied', {
+            component: 'org-ctx',
+            surface: 'server',
+            reason: 'org_not_found',
+            orgSlug: slug,
+            userId: params.userId,
+        });
+        throw externalNotFound();
     }
 
     const membership = await prisma.orgMembership.findUnique({
@@ -58,9 +77,15 @@ export async function getOrgServerContext(params: {
         select: { role: true },
     });
     if (!membership) {
-        // Generic message — does NOT echo the slug. Same anti-
-        // enumeration posture as `getOrgCtx` in the API layer.
-        throw new ForbiddenError('Access to this organization is not permitted');
+        logger.warn('org-ctx.access_denied', {
+            component: 'org-ctx',
+            surface: 'server',
+            reason: 'not_a_member',
+            orgSlug: slug,
+            organizationId: org.id,
+            userId: params.userId,
+        });
+        throw externalNotFound();
     }
 
     return {
