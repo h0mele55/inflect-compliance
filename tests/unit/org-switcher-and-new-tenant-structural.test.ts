@@ -74,6 +74,26 @@ describe('Epic O-4 — OrgSwitcher structural contract', () => {
         expect(src).toMatch(/aria-label="Switch organization context"/);
         expect(src).toMatch(/role="status"/);
     });
+
+    it('avatar pill derives initials from orgName via formatInitials (no hardcoded "IC")', () => {
+        // The trigger MUST NOT bake the brand initials into the
+        // avatar pill — the pill represents the active org's
+        // identity. Locks both the import + the substitution so a
+        // future "minimal cleanup" PR doesn't quietly reintroduce
+        // "IC".
+        const src = read(SWITCHER);
+        expect(src).toMatch(
+            /import\s+\{\s*formatInitials\s*\}\s+from\s+['"]@\/lib\/format-initials['"]/,
+        );
+        expect(src).toMatch(/formatInitials\(orgName\)/);
+        // Negative: the literal "IC" pill must be gone. Match
+        // ">IC<" between JSX tags so we don't false-positive on
+        // unrelated occurrences of those letters in identifiers.
+        expect(src).not.toMatch(/>\s*IC\s*</);
+        // Stable test-id for the dynamic content lets E2E assert
+        // the rendered initials.
+        expect(src).toContain('org-switcher-avatar-initials');
+    });
 });
 
 describe('Epic O-4 — OrgSidebarNav mounts OrgSwitcher in the header', () => {
