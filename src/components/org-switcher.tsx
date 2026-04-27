@@ -55,6 +55,7 @@ import {
 } from 'lucide-react';
 
 import { Popover } from '@/components/ui/popover';
+import { formatInitials } from '@/lib/format-initials';
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -133,6 +134,12 @@ export function OrgSwitcher({
     const close = useCallback(() => setOpen(false), []);
 
     const tagline = currentKind === 'org' ? 'Portfolio' : 'Workspace';
+
+    // Avatar monogram derived from the active org name. Falls back
+    // to a neutral '?' when the name is empty/whitespace so the
+    // pill never looks broken (the org-server-context guarantees a
+    // non-empty name in practice; this is defence-in-depth).
+    const avatarInitials = formatInitials(orgName) || '?';
 
     // Token-aligned row styling — mirrors Popover.Item visuals while
     // letting us render a real <Link> (so middle-click + keyboard
@@ -251,8 +258,16 @@ export function OrgSwitcher({
                 data-testid="org-switcher-trigger"
                 className="flex w-full items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 hover:bg-bg-muted hover:border-border-subtle transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--brand-emphasis)] to-[var(--brand-default)] flex items-center justify-center flex-shrink-0">
-                    <span className="text-content-inverted text-sm font-bold">IC</span>
+                <div
+                    className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--brand-emphasis)] to-[var(--brand-default)] flex items-center justify-center flex-shrink-0"
+                    aria-hidden="true"
+                >
+                    <span
+                        className="text-content-inverted text-sm font-bold"
+                        data-testid="org-switcher-avatar-initials"
+                    >
+                        {avatarInitials}
+                    </span>
                 </div>
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-content-emphasis truncate">
