@@ -10,5 +10,8 @@ export function assertCanViewFrameworks(ctx: RequestContext) {
 }
 
 export function assertCanInstallFrameworkPack(ctx: RequestContext) {
-    if (ctx.role !== 'ADMIN') throw forbidden('Only ADMIN can install framework packs');
+    // Epic 1 — OWNER is a superset of ADMIN per CLAUDE.md RBAC.
+    if (ctx.role !== 'OWNER' && ctx.role !== 'ADMIN') {
+        throw forbidden('Only OWNER or ADMIN can install framework packs');
+    }
 }

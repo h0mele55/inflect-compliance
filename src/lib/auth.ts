@@ -107,29 +107,40 @@ export function hasMinRole(userRole: Role, minRole: Role): boolean {
 
 // ─── Permission-based helpers ───
 
-/** Can read tenant/scope data (all roles) */
+/**
+ * Can read tenant/scope data (all roles).
+ *
+ * Epic 1 — OWNER is strictly superior to ADMIN per CLAUDE.md's RBAC
+ * section. These five legacy helpers each include OWNER explicitly
+ * because OWNER is the canonical role for every tenant created via
+ * `createTenantWithOwner` (and every seed tenant after the GAP-07
+ * step-6 alignment). The modern `requirePermission(<key>, ...)` path
+ * via `PermissionSet` already treats OWNER correctly (see
+ * `src/lib/permissions.ts::getPermissionsForRole`); these helpers
+ * are the legacy path used by policies + a few admin-style routes.
+ */
 export function canRead(role: Role): boolean {
-    return ['ADMIN', 'EDITOR', 'READER', 'AUDITOR'].includes(role);
+    return ['OWNER', 'ADMIN', 'EDITOR', 'READER', 'AUDITOR'].includes(role);
 }
 
-/** Can write/mutate data (ADMIN, EDITOR) */
+/** Can write/mutate data (OWNER, ADMIN, EDITOR) */
 export function canWrite(role: Role): boolean {
-    return ['ADMIN', 'EDITOR'].includes(role);
+    return ['OWNER', 'ADMIN', 'EDITOR'].includes(role);
 }
 
-/** Can perform admin operations (ADMIN only) */
+/** Can perform admin operations (OWNER, ADMIN) */
 export function canAdmin(role: Role): boolean {
-    return role === 'ADMIN';
+    return role === 'OWNER' || role === 'ADMIN';
 }
 
-/** Can perform audit-specific operations (AUDITOR, ADMIN) */
+/** Can perform audit-specific operations (OWNER, ADMIN, AUDITOR) */
 export function canAudit(role: Role): boolean {
-    return ['ADMIN', 'AUDITOR'].includes(role);
+    return ['OWNER', 'ADMIN', 'AUDITOR'].includes(role);
 }
 
-/** Can export data (ADMIN, EDITOR, AUDITOR) */
+/** Can export data (OWNER, ADMIN, EDITOR, AUDITOR) */
 export function canExport(role: Role): boolean {
-    return ['ADMIN', 'EDITOR', 'AUDITOR'].includes(role);
+    return ['OWNER', 'ADMIN', 'EDITOR', 'AUDITOR'].includes(role);
 }
 
 /** Can edit data — alias for canWrite for backward compat */

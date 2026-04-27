@@ -69,6 +69,7 @@ describe('RBAC Helpers (Chunk 1)', () => {
 
     describe('canRead', () => {
         it('all roles can read', () => {
+            expect(canRead('OWNER')).toBe(true);
             expect(canRead('ADMIN')).toBe(true);
             expect(canRead('EDITOR')).toBe(true);
             expect(canRead('READER')).toBe(true);
@@ -77,7 +78,9 @@ describe('RBAC Helpers (Chunk 1)', () => {
     });
 
     describe('canWrite', () => {
-        it('ADMIN and EDITOR can write', () => {
+        it('OWNER, ADMIN, and EDITOR can write', () => {
+            // OWNER ⊃ ADMIN per CLAUDE.md — every ADMIN gate must accept OWNER.
+            expect(canWrite('OWNER')).toBe(true);
             expect(canWrite('ADMIN')).toBe(true);
             expect(canWrite('EDITOR')).toBe(true);
         });
@@ -89,7 +92,8 @@ describe('RBAC Helpers (Chunk 1)', () => {
     });
 
     describe('canAdmin', () => {
-        it('only ADMIN can admin', () => {
+        it('OWNER and ADMIN can admin (OWNER is strictly superior to ADMIN)', () => {
+            expect(canAdmin('OWNER')).toBe(true);
             expect(canAdmin('ADMIN')).toBe(true);
             expect(canAdmin('EDITOR')).toBe(false);
             expect(canAdmin('READER')).toBe(false);
@@ -98,7 +102,8 @@ describe('RBAC Helpers (Chunk 1)', () => {
     });
 
     describe('canAudit', () => {
-        it('ADMIN and AUDITOR can audit', () => {
+        it('OWNER, ADMIN, and AUDITOR can audit', () => {
+            expect(canAudit('OWNER')).toBe(true);
             expect(canAudit('ADMIN')).toBe(true);
             expect(canAudit('AUDITOR')).toBe(true);
         });
@@ -110,7 +115,8 @@ describe('RBAC Helpers (Chunk 1)', () => {
     });
 
     describe('canExport', () => {
-        it('ADMIN, EDITOR, AUDITOR can export', () => {
+        it('OWNER, ADMIN, EDITOR, and AUDITOR can export', () => {
+            expect(canExport('OWNER')).toBe(true);
             expect(canExport('ADMIN')).toBe(true);
             expect(canExport('EDITOR')).toBe(true);
             expect(canExport('AUDITOR')).toBe(true);
