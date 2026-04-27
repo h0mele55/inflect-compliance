@@ -69,11 +69,19 @@ describe('provisionOrgAdminToTenants', () => {
             { id: 'tenant-2' },
             { id: 'tenant-3' },
         ]);
+        // Pre-query for existing memberships returns empty — all
+        // three tenants are eligible for new rows.
+        tenantMembershipFindManyMock.mockResolvedValue([]);
         tenantMembershipCreateManyMock.mockResolvedValue({ count: 3 });
 
         const result = await provisionOrgAdminToTenants('org-1', 'user-1');
 
-        expect(result).toEqual({ created: 3, skipped: 0, totalConsidered: 3 });
+        expect(result).toEqual({
+            created: 3,
+            skipped: 0,
+            totalConsidered: 3,
+            tenantIds: ['tenant-1', 'tenant-2', 'tenant-3'],
+        });
 
         const arg = tenantMembershipCreateManyMock.mock.calls[0][0];
         expect(arg.skipDuplicates).toBe(true);
@@ -90,18 +98,26 @@ describe('provisionOrgAdminToTenants', () => {
         ]);
     });
 
-    it('reports skipped rows when some (tenantId, userId) pairs already exist', async () => {
+    it('reports skipped rows AND tenantIds = only-newly-created when some pairs already exist', async () => {
         tenantFindManyMock.mockResolvedValue([
             { id: 'tenant-1' },
             { id: 'tenant-2' },
             { id: 'tenant-3' },
         ]);
-        // skipDuplicates returned a smaller count → 1 row already existed.
+        // Pre-query: tenant-2 already has a membership for this user.
+        tenantMembershipFindManyMock.mockResolvedValue([
+            { tenantId: 'tenant-2' },
+        ]);
         tenantMembershipCreateManyMock.mockResolvedValue({ count: 2 });
 
         const result = await provisionOrgAdminToTenants('org-1', 'user-1');
 
-        expect(result).toEqual({ created: 2, skipped: 1, totalConsidered: 3 });
+        expect(result).toEqual({
+            created: 2,
+            skipped: 1,
+            totalConsidered: 3,
+            tenantIds: ['tenant-1', 'tenant-3'], // only the newly-created
+        });
     });
 
     it('is a no-op when the org has zero tenants (no DB write)', async () => {
@@ -109,13 +125,39 @@ describe('provisionOrgAdminToTenants', () => {
 
         const result = await provisionOrgAdminToTenants('org-1', 'user-1');
 
-        expect(result).toEqual({ created: 0, skipped: 0, totalConsidered: 0 });
+        expect(result).toEqual({
+            created: 0,
+            skipped: 0,
+            totalConsidered: 0,
+            tenantIds: [],
+        });
         expect(tenantMembershipCreateManyMock).not.toHaveBeenCalled();
     });
 
-    it('uses createMany with skipDuplicates (preserves manual rows on conflict)', async () => {
+    it('uses createMany with skipDuplicates (race safety net) AND skips it entirely when nothing to create', async () => {
+        // Every tenant already has a membership — the function takes
+        // the no-write fast path: createMany is skipped, audit-relevant
+        // tenantIds list is empty.
         tenantFindManyMock.mockResolvedValue([{ id: 'tenant-1' }]);
-        tenantMembershipCreateManyMock.mockResolvedValue({ count: 0 });
+        tenantMembershipFindManyMock.mockResolvedValue([
+            { tenantId: 'tenant-1' },
+        ]);
+
+        const result = await provisionOrgAdminToTenants('org-1', 'user-1');
+
+        expect(result).toEqual({
+            created: 0,
+            skipped: 1,
+            totalConsidered: 1,
+            tenantIds: [],
+        });
+        expect(tenantMembershipCreateManyMock).not.toHaveBeenCalled();
+    });
+
+    it('createMany still uses skipDuplicates as a race safety net when there IS work to do', async () => {
+        tenantFindManyMock.mockResolvedValue([{ id: 'tenant-1' }]);
+        tenantMembershipFindManyMock.mockResolvedValue([]);
+        tenantMembershipCreateManyMock.mockResolvedValue({ count: 1 });
 
         await provisionOrgAdminToTenants('org-1', 'user-1');
 
@@ -146,7 +188,16 @@ describe('provisionAllOrgAdminsToTenant', () => {
 
         const result = await provisionAllOrgAdminsToTenant('org-1', 'tenant-new');
 
-        expect(result).toEqual({ created: 2, skipped: 0, totalConsidered: 2 });
+        // tenantIds intentionally empty — see the function's docstring:
+        // the per-tenant fan-out shape doesn't reuse the per-user
+        // `tenantIds` field. A future audit hook for tenant creation
+        // will introduce a per-(tenantId, userId) result shape.
+        expect(result).toEqual({
+            created: 2,
+            skipped: 0,
+            totalConsidered: 2,
+            tenantIds: [],
+        });
 
         const arg = tenantMembershipCreateManyMock.mock.calls[0][0];
         expect(arg.skipDuplicates).toBe(true);
@@ -175,7 +226,12 @@ describe('provisionAllOrgAdminsToTenant', () => {
 
         const result = await provisionAllOrgAdminsToTenant('org-1', 'tenant-new');
 
-        expect(result).toEqual({ created: 0, skipped: 0, totalConsidered: 0 });
+        expect(result).toEqual({
+            created: 0,
+            skipped: 0,
+            totalConsidered: 0,
+            tenantIds: [],
+        });
         expect(tenantMembershipCreateManyMock).not.toHaveBeenCalled();
     });
 
@@ -188,7 +244,12 @@ describe('provisionAllOrgAdminsToTenant', () => {
 
         const result = await provisionAllOrgAdminsToTenant('org-1', 'tenant-new');
 
-        expect(result).toEqual({ created: 1, skipped: 1, totalConsidered: 2 });
+        expect(result).toEqual({
+            created: 1,
+            skipped: 1,
+            totalConsidered: 2,
+            tenantIds: [],
+        });
     });
 });
 
@@ -280,18 +341,25 @@ describe('idempotency under retry', () => {
     it('repeated provisionOrgAdminToTenants converges to a stable state', async () => {
         tenantFindManyMock.mockResolvedValue([{ id: 'tenant-1' }, { id: 'tenant-2' }]);
 
-        // First run: 2 rows created
+        // First run: pre-query returns empty → both eligible → 2 created.
+        tenantMembershipFindManyMock.mockResolvedValueOnce([]);
         tenantMembershipCreateManyMock.mockResolvedValueOnce({ count: 2 });
         const a = await provisionOrgAdminToTenants('org-1', 'user-1');
         expect(a.created).toBe(2);
         expect(a.skipped).toBe(0);
+        expect(a.tenantIds).toEqual(['tenant-1', 'tenant-2']);
 
-        // Second run: 0 rows created, 2 skipped (rows already exist)
-        tenantMembershipCreateManyMock.mockResolvedValueOnce({ count: 0 });
+        // Second run: pre-query returns BOTH tenants → toCreate is empty
+        // → fast path skips createMany entirely → 0 created, 2 skipped.
+        tenantMembershipFindManyMock.mockResolvedValueOnce([
+            { tenantId: 'tenant-1' },
+            { tenantId: 'tenant-2' },
+        ]);
         const b = await provisionOrgAdminToTenants('org-1', 'user-1');
         expect(b.created).toBe(0);
         expect(b.skipped).toBe(2);
         expect(b.totalConsidered).toBe(2);
+        expect(b.tenantIds).toEqual([]);
     });
 
     it('repeated deprovisionOrgAdmin is a no-op after the first call', async () => {

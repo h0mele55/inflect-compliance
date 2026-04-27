@@ -16,6 +16,30 @@
  * service is). Callers must have passed `canManageMembers` at the
  * route layer; this usecase doesn't re-derive the permission.
  *
+ * ## Audit trail (durable, per-tenant)
+ *
+ * Org membership lifecycle changes that affect TenantMembership rows
+ * are persisted as `AuditLog` entries via `appendAuditEntry`. The
+ * AuditLog table is tenant-scoped (`tenantId` is required), so one
+ * audit row is written PER tenant whose access actually changed:
+ *
+ *   - `ORG_AUDITOR_PROVISIONED`   — written for each tenant where the
+ *                                   user gained AUDITOR access (admin
+ *                                   added; reader → admin promotion).
+ *   - `ORG_AUDITOR_DEPROVISIONED` — written for each tenant where an
+ *                                   auto-provisioned AUDITOR row was
+ *                                   deleted (admin removed; admin →
+ *                                   reader demotion). Manual rows are
+ *                                   excluded from the predicate so
+ *                                   they never trigger an audit row.
+ *
+ * Tenants with no access change (pre-existing manual membership;
+ * reader add/remove with no fan-out; same-role no-op) get NO audit
+ * row. The audit log records the actual access transition, not the
+ * org-level intent. Structured `logger.info` calls remain as
+ * supplementary observability but are no longer the load-bearing
+ * compliance evidence.
+ *
  * ## Last-ORG_ADMIN guard
  *
  * Removing — or demoting — the last ORG_ADMIN of an org would orphan
@@ -37,6 +61,79 @@ import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors/type
 import type { OrgContext } from '@/app-layer/types';
 import type { OrgRole } from '@prisma/client';
 import { logger } from '@/lib/observability/logger';
+import { appendAuditEntry } from '@/lib/audit';
+
+// ── Audit fan-out helper ──────────────────────────────────────────────
+
+type OrgAuditAction = 'ORG_AUDITOR_PROVISIONED' | 'ORG_AUDITOR_DEPROVISIONED';
+type OrgAuditSource =
+    | 'org_member_added'
+    | 'org_member_removed'
+    | 'org_member_promoted'
+    | 'org_member_demoted';
+
+/**
+ * Fan an `ORG_AUDITOR_*` audit event out to every tenant where the
+ * target user's access actually changed. Best-effort: a single
+ * tenant's audit failure does not poison the rest, and a missed row
+ * is recoverable via the chain-verification job. Each
+ * `appendAuditEntry` call is per-tenant serialised behind an
+ * advisory lock so the hash chain in each affected tenant stays
+ * intact.
+ *
+ * Called AFTER the membership operation (and any wrapping
+ * transaction) commits — same lifecycle as `events/audit.ts:logEvent`.
+ * If the caller's transaction rolls back, this helper isn't reached
+ * and no audit row is written.
+ */
+async function emitOrgMembershipAudit(
+    ctx: OrgContext,
+    args: {
+        action: OrgAuditAction;
+        sourceAction: OrgAuditSource;
+        targetUserId: string;
+        tenantIds: ReadonlyArray<string>;
+        previousOrgRole?: OrgRole;
+        newOrgRole?: OrgRole;
+    },
+): Promise<void> {
+    if (args.tenantIds.length === 0) return;
+
+    const detailsJson = {
+        category: 'access' as const,
+        event: args.action,
+        targetUserId: args.targetUserId,
+        operation: args.sourceAction,
+        sourceAction: args.sourceAction,
+        orgSlug: ctx.orgSlug,
+        organizationId: ctx.organizationId,
+        ...(args.previousOrgRole ? { previousOrgRole: args.previousOrgRole } : {}),
+        ...(args.newOrgRole ? { newOrgRole: args.newOrgRole } : {}),
+    };
+
+    await Promise.all(
+        args.tenantIds.map((tenantId) =>
+            appendAuditEntry({
+                tenantId,
+                userId: ctx.userId,
+                actorType: 'USER',
+                entity: 'TenantMembership',
+                entityId: args.targetUserId,
+                action: args.action,
+                detailsJson,
+                requestId: ctx.requestId,
+            }).catch((err: unknown) => {
+                logger.warn('org-members.audit_emit_failed', {
+                    component: 'org-members',
+                    tenantId,
+                    targetUserId: args.targetUserId,
+                    action: args.action,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }),
+        ),
+    );
+}
 
 // ── addOrgMember ──────────────────────────────────────────────────────
 
@@ -116,6 +213,15 @@ export async function addOrgMember(
             ctx.organizationId,
             user.id,
         );
+        if (provision.tenantIds.length > 0) {
+            await emitOrgMembershipAudit(ctx, {
+                action: 'ORG_AUDITOR_PROVISIONED',
+                sourceAction: 'org_member_added',
+                targetUserId: user.id,
+                tenantIds: provision.tenantIds,
+                newOrgRole: 'ORG_ADMIN',
+            });
+        }
     }
 
     logger.info('org-members.added', {
@@ -205,6 +311,16 @@ export async function removeOrgMember(
     await prisma.orgMembership.delete({
         where: { id: membership.id },
     });
+
+    if (deprovision && deprovision.tenantIds.length > 0) {
+        await emitOrgMembershipAudit(ctx, {
+            action: 'ORG_AUDITOR_DEPROVISIONED',
+            sourceAction: 'org_member_removed',
+            targetUserId: userId,
+            tenantIds: deprovision.tenantIds,
+            previousOrgRole: 'ORG_ADMIN',
+        });
+    }
 
     logger.info('org-members.removed', {
         component: 'org-members',
@@ -401,6 +517,33 @@ export async function changeOrgMemberRole(
 
         return { updated, provision, deprovision };
     });
+
+    // Audit fan-out — runs AFTER the transaction commits, mirroring
+    // the post-commit semantics of `events/audit.ts:logEvent`. If the
+    // transaction had rolled back we wouldn't reach this line.
+    if (transition === 'reader_to_admin' && result.provision && result.provision.tenantIds.length > 0) {
+        await emitOrgMembershipAudit(ctx, {
+            action: 'ORG_AUDITOR_PROVISIONED',
+            sourceAction: 'org_member_promoted',
+            targetUserId: userId,
+            tenantIds: result.provision.tenantIds,
+            previousOrgRole: 'ORG_READER',
+            newOrgRole: 'ORG_ADMIN',
+        });
+    } else if (
+        transition === 'admin_to_reader' &&
+        result.deprovision &&
+        result.deprovision.tenantIds.length > 0
+    ) {
+        await emitOrgMembershipAudit(ctx, {
+            action: 'ORG_AUDITOR_DEPROVISIONED',
+            sourceAction: 'org_member_demoted',
+            targetUserId: userId,
+            tenantIds: result.deprovision.tenantIds,
+            previousOrgRole: 'ORG_ADMIN',
+            newOrgRole: 'ORG_READER',
+        });
+    }
 
     logger.info('org-members.role_changed', {
         component: 'org-members',

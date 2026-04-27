@@ -15,6 +15,7 @@ const orgMembershipCountMock = jest.fn();
 const transactionMock = jest.fn();
 const provisionOrgAdminMock = jest.fn();
 const deprovisionOrgAdminMock = jest.fn();
+const appendAuditEntryMock = jest.fn();
 
 jest.mock('@/lib/prisma', () => {
     const client = {
@@ -35,6 +36,11 @@ jest.mock('@/app-layer/usecases/org-provisioning', () => ({
     __esModule: true,
     provisionOrgAdminToTenants: (...a: unknown[]) => provisionOrgAdminMock(...a),
     deprovisionOrgAdmin: (...a: unknown[]) => deprovisionOrgAdminMock(...a),
+}));
+
+jest.mock('@/lib/audit', () => ({
+    __esModule: true,
+    appendAuditEntry: (...a: unknown[]) => appendAuditEntryMock(...a),
 }));
 
 import {
@@ -72,6 +78,10 @@ beforeEach(() => {
     transactionMock.mockReset();
     provisionOrgAdminMock.mockReset();
     deprovisionOrgAdminMock.mockReset();
+    appendAuditEntryMock.mockReset();
+    // Default audit emission is a successful no-op so existing tests
+    // that don't specifically assert on audit behaviour stay green.
+    appendAuditEntryMock.mockResolvedValue(undefined);
 });
 
 // ── addOrgMember ───────────────────────────────────────────────────────
@@ -86,7 +96,12 @@ describe('addOrgMember', () => {
             userId: 'user-2',
             role: 'ORG_ADMIN',
         });
-        provisionOrgAdminMock.mockResolvedValue({ created: 3, skipped: 0, totalConsidered: 3 });
+        provisionOrgAdminMock.mockResolvedValue({
+            created: 3,
+            skipped: 0,
+            totalConsidered: 3,
+            tenantIds: ['t-1', 't-2', 't-3'],
+        });
 
         const result = await addOrgMember(ctxFor(), {
             userEmail: 'CISO@example.com',
@@ -103,10 +118,86 @@ describe('addOrgMember', () => {
         expect(provisionOrgAdminMock).toHaveBeenCalledWith('org-1', 'user-2');
 
         expect(result.membership.role).toBe('ORG_ADMIN');
-        expect(result.provision).toEqual({ created: 3, skipped: 0, totalConsidered: 3 });
+        expect(result.provision).toEqual({
+            created: 3,
+            skipped: 0,
+            totalConsidered: 3,
+            tenantIds: ['t-1', 't-2', 't-3'],
+        });
     });
 
-    it('does NOT fan out provisioning for ORG_READER', async () => {
+    it('writes one ORG_AUDITOR_PROVISIONED audit row per affected tenant on ORG_ADMIN add', async () => {
+        userUpsertMock.mockResolvedValue({ id: 'user-2', email: 'ciso@example.com' });
+        orgMembershipFindUniqueMock.mockResolvedValue(null);
+        orgMembershipCreateMock.mockResolvedValue({
+            id: 'mem-1',
+            organizationId: 'org-1',
+            userId: 'user-2',
+            role: 'ORG_ADMIN',
+        });
+        provisionOrgAdminMock.mockResolvedValue({
+            created: 2,
+            skipped: 1,
+            totalConsidered: 3,
+            tenantIds: ['t-1', 't-2'], // skipped tenant t-3 has no audit
+        });
+
+        await addOrgMember(ctxFor(), {
+            userEmail: 'ciso@example.com',
+            role: 'ORG_ADMIN',
+        });
+
+        // One AuditLog write per newly-created TenantMembership row.
+        expect(appendAuditEntryMock).toHaveBeenCalledTimes(2);
+
+        const tenantIdsAudited = appendAuditEntryMock.mock.calls
+            .map((c) => (c[0] as { tenantId: string }).tenantId)
+            .sort();
+        expect(tenantIdsAudited).toEqual(['t-1', 't-2']);
+
+        // Spot-check the payload shape for one of the calls.
+        const sample = appendAuditEntryMock.mock.calls[0][0] as Record<string, unknown>;
+        expect(sample.entity).toBe('TenantMembership');
+        expect(sample.entityId).toBe('user-2');
+        expect(sample.action).toBe('ORG_AUDITOR_PROVISIONED');
+        expect(sample.userId).toBe('caller-1'); // actor from ctx
+        expect(sample.actorType).toBe('USER');
+        expect(sample.requestId).toBe('req-test');
+        const details = sample.detailsJson as Record<string, unknown>;
+        expect(details.category).toBe('access');
+        expect(details.targetUserId).toBe('user-2');
+        expect(details.sourceAction).toBe('org_member_added');
+        expect(details.organizationId).toBe('org-1');
+        expect(details.orgSlug).toBe('acme-org');
+        expect(details.newOrgRole).toBe('ORG_ADMIN');
+    });
+
+    it('does NOT emit any audit row when ORG_ADMIN add has nothing to provision', async () => {
+        userUpsertMock.mockResolvedValue({ id: 'user-2', email: 'ciso@example.com' });
+        orgMembershipFindUniqueMock.mockResolvedValue(null);
+        orgMembershipCreateMock.mockResolvedValue({
+            id: 'mem-1',
+            organizationId: 'org-1',
+            userId: 'user-2',
+            role: 'ORG_ADMIN',
+        });
+        // Empty org — no tenants → no provisioning → no audit.
+        provisionOrgAdminMock.mockResolvedValue({
+            created: 0,
+            skipped: 0,
+            totalConsidered: 0,
+            tenantIds: [],
+        });
+
+        await addOrgMember(ctxFor(), {
+            userEmail: 'ciso@example.com',
+            role: 'ORG_ADMIN',
+        });
+
+        expect(appendAuditEntryMock).not.toHaveBeenCalled();
+    });
+
+    it('does NOT fan out provisioning OR emit audit rows for ORG_READER', async () => {
         userUpsertMock.mockResolvedValue({ id: 'user-3', email: 'reader@example.com' });
         orgMembershipFindUniqueMock.mockResolvedValue(null);
         orgMembershipCreateMock.mockResolvedValue({
@@ -122,6 +213,10 @@ describe('addOrgMember', () => {
         });
 
         expect(provisionOrgAdminMock).not.toHaveBeenCalled();
+        // ORG_READER add doesn't change tenant access — no audit
+        // evidence is written. Structured logger.info still records
+        // the org-level event for ops observability.
+        expect(appendAuditEntryMock).not.toHaveBeenCalled();
         expect(result.provision).toBeUndefined();
         expect(result.membership.role).toBe('ORG_READER');
     });
@@ -166,7 +261,7 @@ describe('removeOrgMember', () => {
         expect(result.deletedMembershipId).toBe('mem-1');
     });
 
-    it('does NOT deprovision when removing an ORG_READER', async () => {
+    it('does NOT deprovision OR emit audit rows when removing an ORG_READER', async () => {
         orgMembershipFindUniqueMock.mockResolvedValue({ id: 'mem-2', role: 'ORG_READER' });
         orgMembershipDeleteMock.mockResolvedValue({ id: 'mem-2' });
 
@@ -174,8 +269,56 @@ describe('removeOrgMember', () => {
 
         expect(orgMembershipCountMock).not.toHaveBeenCalled();
         expect(deprovisionOrgAdminMock).not.toHaveBeenCalled();
+        expect(appendAuditEntryMock).not.toHaveBeenCalled();
         expect(result.wasOrgAdmin).toBe(false);
         expect(result.deprovision).toBeUndefined();
+    });
+
+    it('writes one ORG_AUDITOR_DEPROVISIONED audit row per affected tenant on ORG_ADMIN remove', async () => {
+        orgMembershipFindUniqueMock.mockResolvedValue({ id: 'mem-1', role: 'ORG_ADMIN' });
+        orgMembershipCountMock.mockResolvedValue(2);
+        deprovisionOrgAdminMock.mockResolvedValue({
+            deleted: 3,
+            tenantIds: ['t-1', 't-2', 't-3'],
+        });
+        orgMembershipDeleteMock.mockResolvedValue({ id: 'mem-1' });
+
+        await removeOrgMember(ctxFor(), { userId: 'user-2' });
+
+        expect(appendAuditEntryMock).toHaveBeenCalledTimes(3);
+        const tenantIdsAudited = appendAuditEntryMock.mock.calls
+            .map((c) => (c[0] as { tenantId: string }).tenantId)
+            .sort();
+        expect(tenantIdsAudited).toEqual(['t-1', 't-2', 't-3']);
+
+        const sample = appendAuditEntryMock.mock.calls[0][0] as Record<string, unknown>;
+        expect(sample.action).toBe('ORG_AUDITOR_DEPROVISIONED');
+        expect(sample.entity).toBe('TenantMembership');
+        expect(sample.entityId).toBe('user-2');
+        const details = sample.detailsJson as Record<string, unknown>;
+        expect(details.sourceAction).toBe('org_member_removed');
+        expect(details.previousOrgRole).toBe('ORG_ADMIN');
+    });
+
+    it('audit emission runs AFTER the OrgMembership delete (not before)', async () => {
+        orgMembershipFindUniqueMock.mockResolvedValue({ id: 'mem-1', role: 'ORG_ADMIN' });
+        orgMembershipCountMock.mockResolvedValue(2);
+        deprovisionOrgAdminMock.mockResolvedValue({
+            deleted: 1,
+            tenantIds: ['t-1'],
+        });
+        orgMembershipDeleteMock.mockResolvedValue({ id: 'mem-1' });
+
+        await removeOrgMember(ctxFor(), { userId: 'user-2' });
+
+        // Order: deprovision → orgMembership.delete → audit emit. The
+        // tenant-side AUDITOR row is gone before the org-level row,
+        // and audit fires post-commit so a rollback (in a future
+        // refactor that wraps these in a tx) wouldn't leave a dangling
+        // audit entry.
+        const orgDelete = orgMembershipDeleteMock.mock.invocationCallOrder[0] ?? 0;
+        const audit = appendAuditEntryMock.mock.invocationCallOrder[0] ?? 0;
+        expect(audit).toBeGreaterThan(orgDelete);
     });
 
     it('refuses to remove the last ORG_ADMIN (last-admin guard)', async () => {
@@ -250,6 +393,7 @@ describe('changeOrgMemberRole', () => {
             created: 4,
             skipped: 0,
             totalConsidered: 4,
+            tenantIds: ['t-1', 't-2', 't-3', 't-4'],
         });
         wireTransactionPassthrough();
 
@@ -284,9 +428,25 @@ describe('changeOrgMemberRole', () => {
             created: 4,
             skipped: 0,
             totalConsidered: 4,
+            tenantIds: ['t-1', 't-2', 't-3', 't-4'],
         });
         expect(result.deprovision).toBeUndefined();
         expect(result.membership.role).toBe('ORG_ADMIN');
+
+        // Audit fan-out: one ORG_AUDITOR_PROVISIONED row per
+        // affected tenant, with previous/new role + promoted source
+        // attribution.
+        expect(appendAuditEntryMock).toHaveBeenCalledTimes(4);
+        const tenantIdsAudited = appendAuditEntryMock.mock.calls
+            .map((c) => (c[0] as { tenantId: string }).tenantId)
+            .sort();
+        expect(tenantIdsAudited).toEqual(['t-1', 't-2', 't-3', 't-4']);
+        const sample = appendAuditEntryMock.mock.calls[0][0] as Record<string, unknown>;
+        expect(sample.action).toBe('ORG_AUDITOR_PROVISIONED');
+        const details = sample.detailsJson as Record<string, unknown>;
+        expect(details.sourceAction).toBe('org_member_promoted');
+        expect(details.previousOrgRole).toBe('ORG_READER');
+        expect(details.newOrgRole).toBe('ORG_ADMIN');
     });
 
     it('ADMIN → READER: updates role inside tx and triggers deprovisioning (count > 1)', async () => {
@@ -332,6 +492,35 @@ describe('changeOrgMemberRole', () => {
         });
         expect(result.provision).toBeUndefined();
         expect(result.membership.role).toBe('ORG_READER');
+
+        // Audit fan-out: one ORG_AUDITOR_DEPROVISIONED row per
+        // affected tenant, with previous/new role + demoted source
+        // attribution.
+        expect(appendAuditEntryMock).toHaveBeenCalledTimes(4);
+        const tenantIdsAudited = appendAuditEntryMock.mock.calls
+            .map((c) => (c[0] as { tenantId: string }).tenantId)
+            .sort();
+        expect(tenantIdsAudited).toEqual(['t-1', 't-2', 't-3', 't-4']);
+        const sample = appendAuditEntryMock.mock.calls[0][0] as Record<string, unknown>;
+        expect(sample.action).toBe('ORG_AUDITOR_DEPROVISIONED');
+        const details = sample.detailsJson as Record<string, unknown>;
+        expect(details.sourceAction).toBe('org_member_demoted');
+        expect(details.previousOrgRole).toBe('ORG_ADMIN');
+        expect(details.newOrgRole).toBe('ORG_READER');
+    });
+
+    it('no-op transition emits zero audit rows (no access change to evidence)', async () => {
+        orgMembershipFindUniqueMock.mockResolvedValue({
+            id: 'mem-1',
+            role: 'ORG_READER',
+        });
+
+        await changeOrgMemberRole(ctxFor(), {
+            userId: 'user-2',
+            role: 'ORG_READER',
+        });
+
+        expect(appendAuditEntryMock).not.toHaveBeenCalled();
     });
 
     it('ADMIN → READER: refuses to demote the last ORG_ADMIN (outer guard)', async () => {
