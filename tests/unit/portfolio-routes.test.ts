@@ -19,6 +19,10 @@ const getPortfolioTrendsMock = jest.fn();
 const getNonPerformingControlsMock = jest.fn();
 const getCriticalRisksAcrossOrgMock = jest.fn();
 const getOverdueEvidenceAcrossOrgMock = jest.fn();
+// Paginated counterparts — the drill-down API now uses these.
+const listNonPerformingControlsMock = jest.fn();
+const listCriticalRisksAcrossOrgMock = jest.fn();
+const listOverdueEvidenceAcrossOrgMock = jest.fn();
 
 jest.mock('@/app-layer/context', () => ({
     __esModule: true,
@@ -33,6 +37,9 @@ jest.mock('@/app-layer/usecases/portfolio', () => ({
     getNonPerformingControls: (...a: unknown[]) => getNonPerformingControlsMock(...a),
     getCriticalRisksAcrossOrg: (...a: unknown[]) => getCriticalRisksAcrossOrgMock(...a),
     getOverdueEvidenceAcrossOrg: (...a: unknown[]) => getOverdueEvidenceAcrossOrgMock(...a),
+    listNonPerformingControls: (...a: unknown[]) => listNonPerformingControlsMock(...a),
+    listCriticalRisksAcrossOrg: (...a: unknown[]) => listCriticalRisksAcrossOrgMock(...a),
+    listOverdueEvidenceAcrossOrg: (...a: unknown[]) => listOverdueEvidenceAcrossOrgMock(...a),
 }));
 
 import { GET as viewGET } from '@/app/api/org/[orgSlug]/portfolio/route';
@@ -76,6 +83,9 @@ beforeEach(() => {
     getNonPerformingControlsMock.mockReset();
     getCriticalRisksAcrossOrgMock.mockReset();
     getOverdueEvidenceAcrossOrgMock.mockReset();
+    listNonPerformingControlsMock.mockReset();
+    listCriticalRisksAcrossOrgMock.mockReset();
+    listOverdueEvidenceAcrossOrgMock.mockReset();
 });
 
 // ── View dispatch ─────────────────────────────────────────────────────
@@ -161,7 +171,10 @@ describe('GET /api/org/[orgSlug]/portfolio', () => {
 
     it('drill-down view "controls" is allowed for ORG_ADMIN (canDrillDown=true)', async () => {
         getOrgCtxMock.mockResolvedValue(adminCtx);
-        getNonPerformingControlsMock.mockResolvedValue([{ controlId: 'c-1' }]);
+        listNonPerformingControlsMock.mockResolvedValue({
+            rows: [{ controlId: 'c-1' }],
+            nextCursor: null,
+        });
 
         const res = await viewGET(
             makeRequest('/api/org/acme-org/portfolio?view=controls'),
@@ -169,6 +182,29 @@ describe('GET /api/org/[orgSlug]/portfolio', () => {
         );
         const body = await res.json();
         expect(body.rows).toEqual([{ controlId: 'c-1' }]);
+        expect(body.nextCursor).toBeNull();
+    });
+
+    it('drill-down view "controls" forwards cursor + limit query params to the usecase', async () => {
+        getOrgCtxMock.mockResolvedValue(adminCtx);
+        listNonPerformingControlsMock.mockResolvedValue({
+            rows: [],
+            nextCursor: 'cursor-page-3',
+        });
+
+        const res = await viewGET(
+            makeRequest(
+                '/api/org/acme-org/portfolio?view=controls&cursor=opaque-cursor&limit=25',
+            ),
+            { params: { orgSlug: 'acme-org' } },
+        );
+        expect(res.status).toBe(200);
+        expect(listNonPerformingControlsMock).toHaveBeenCalledTimes(1);
+        const args = listNonPerformingControlsMock.mock.calls[0];
+        expect(args[1]).toEqual({ cursor: 'opaque-cursor', limit: 25 });
+
+        const body = await res.json();
+        expect(body.nextCursor).toBe('cursor-page-3');
     });
 
     it('drill-down views are blocked for ORG_READER with 403 — usecase NOT called', async () => {
@@ -181,9 +217,9 @@ describe('GET /api/org/[orgSlug]/portfolio', () => {
             );
             expect(res.status).toBe(403);
         }
-        expect(getNonPerformingControlsMock).not.toHaveBeenCalled();
-        expect(getCriticalRisksAcrossOrgMock).not.toHaveBeenCalled();
-        expect(getOverdueEvidenceAcrossOrgMock).not.toHaveBeenCalled();
+        expect(listNonPerformingControlsMock).not.toHaveBeenCalled();
+        expect(listCriticalRisksAcrossOrgMock).not.toHaveBeenCalled();
+        expect(listOverdueEvidenceAcrossOrgMock).not.toHaveBeenCalled();
     });
 
     it('non-drill-down views are allowed for ORG_READER', async () => {
@@ -201,9 +237,12 @@ describe('GET /api/org/[orgSlug]/portfolio', () => {
         }
     });
 
-    it('view=risks routes to getCriticalRisksAcrossOrg', async () => {
+    it('view=risks routes to listCriticalRisksAcrossOrg with cursor', async () => {
         getOrgCtxMock.mockResolvedValue(adminCtx);
-        getCriticalRisksAcrossOrgMock.mockResolvedValue([{ riskId: 'r-1' }]);
+        listCriticalRisksAcrossOrgMock.mockResolvedValue({
+            rows: [{ riskId: 'r-1' }],
+            nextCursor: 'risks-cursor',
+        });
 
         const res = await viewGET(
             makeRequest('/api/org/acme-org/portfolio?view=risks'),
@@ -211,11 +250,15 @@ describe('GET /api/org/[orgSlug]/portfolio', () => {
         );
         const body = await res.json();
         expect(body.rows).toEqual([{ riskId: 'r-1' }]);
+        expect(body.nextCursor).toBe('risks-cursor');
     });
 
-    it('view=evidence routes to getOverdueEvidenceAcrossOrg', async () => {
+    it('view=evidence routes to listOverdueEvidenceAcrossOrg with cursor', async () => {
         getOrgCtxMock.mockResolvedValue(adminCtx);
-        getOverdueEvidenceAcrossOrgMock.mockResolvedValue([{ evidenceId: 'e-1' }]);
+        listOverdueEvidenceAcrossOrgMock.mockResolvedValue({
+            rows: [{ evidenceId: 'e-1' }],
+            nextCursor: null,
+        });
 
         const res = await viewGET(
             makeRequest('/api/org/acme-org/portfolio?view=evidence'),
@@ -223,6 +266,21 @@ describe('GET /api/org/[orgSlug]/portfolio', () => {
         );
         const body = await res.json();
         expect(body.rows).toEqual([{ evidenceId: 'e-1' }]);
+        expect(body.nextCursor).toBeNull();
+    });
+
+    it('drill-down ignores invalid limit parameter (lenient on read)', async () => {
+        getOrgCtxMock.mockResolvedValue(adminCtx);
+        listCriticalRisksAcrossOrgMock.mockResolvedValue({ rows: [], nextCursor: null });
+
+        const res = await viewGET(
+            makeRequest('/api/org/acme-org/portfolio?view=risks&limit=not-a-number'),
+            { params: { orgSlug: 'acme-org' } },
+        );
+        expect(res.status).toBe(200);
+        // No `limit` key in the call args → usecase falls back to default.
+        const args = listCriticalRisksAcrossOrgMock.mock.calls[0];
+        expect(args[1].limit).toBeUndefined();
     });
 });
 

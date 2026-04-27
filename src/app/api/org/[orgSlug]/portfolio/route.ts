@@ -27,9 +27,9 @@ import {
     getPortfolioSummary,
     getPortfolioTenantHealth,
     getPortfolioTrends,
-    getNonPerformingControls,
-    getCriticalRisksAcrossOrg,
-    getOverdueEvidenceAcrossOrg,
+    listNonPerformingControls,
+    listCriticalRisksAcrossOrg,
+    listOverdueEvidenceAcrossOrg,
 } from '@/app-layer/usecases/portfolio';
 
 const SUPPORTED_VIEWS = [
@@ -93,20 +93,56 @@ export const GET = withApiErrorHandling(
                 return NextResponse.json(await getPortfolioTrends(ctx, days));
             }
 
-            case 'controls':
+            case 'controls': {
+                const page = parsePagination(req);
+                const result = await listNonPerformingControls(ctx, page);
                 return NextResponse.json({
-                    rows: await getNonPerformingControls(ctx),
+                    rows: result.rows,
+                    nextCursor: result.nextCursor,
                 });
+            }
 
-            case 'risks':
+            case 'risks': {
+                const page = parsePagination(req);
+                const result = await listCriticalRisksAcrossOrg(ctx, page);
                 return NextResponse.json({
-                    rows: await getCriticalRisksAcrossOrg(ctx),
+                    rows: result.rows,
+                    nextCursor: result.nextCursor,
                 });
+            }
 
-            case 'evidence':
+            case 'evidence': {
+                const page = parsePagination(req);
+                const result = await listOverdueEvidenceAcrossOrg(ctx, page);
                 return NextResponse.json({
-                    rows: await getOverdueEvidenceAcrossOrg(ctx),
+                    rows: result.rows,
+                    nextCursor: result.nextCursor,
                 });
+            }
         }
     },
 );
+
+/**
+ * Parse the cursor + limit query parameters used by the three
+ * paginated drill-down views. Both are optional — omitting them
+ * yields the first page at the default limit. Invalid values fall
+ * back to defaults rather than throwing, matching the existing
+ * "lenient on read" posture (the cursor is opaque from the client's
+ * perspective; an invalid one resets to page 1).
+ */
+function parsePagination(req: NextRequest): {
+    cursor?: string;
+    limit?: number;
+} {
+    const cursor = req.nextUrl.searchParams.get('cursor') ?? undefined;
+    const limitRaw = req.nextUrl.searchParams.get('limit');
+    let limit: number | undefined;
+    if (limitRaw !== null) {
+        const parsed = Number.parseInt(limitRaw, 10);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            limit = parsed;
+        }
+    }
+    return { ...(cursor ? { cursor } : {}), ...(limit !== undefined ? { limit } : {}) };
+}

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 
 import { getOrgCtx } from '@/app-layer/context';
-import { getNonPerformingControls } from '@/app-layer/usecases/portfolio';
+import { listNonPerformingControls } from '@/app-layer/usecases/portfolio';
 import { ControlsTable } from './ControlsTable';
 
 /**
@@ -17,10 +17,12 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
     params: Promise<{ orgSlug: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function OrgControlsPage({ params }: PageProps) {
+export default async function OrgControlsPage({ params, searchParams }: PageProps) {
     const { orgSlug } = await params;
+    const sp = await searchParams;
 
     let ctx;
     try {
@@ -29,7 +31,14 @@ export default async function OrgControlsPage({ params }: PageProps) {
         notFound();
     }
 
-    const rows = await getNonPerformingControls(ctx);
+    const cursor = typeof sp.cursor === 'string' ? sp.cursor : undefined;
+    const result = await listNonPerformingControls(ctx, { cursor });
 
-    return <ControlsTable rows={JSON.parse(JSON.stringify(rows))} />;
+    return (
+        <ControlsTable
+            rows={JSON.parse(JSON.stringify(result.rows))}
+            nextCursor={result.nextCursor}
+            orgSlug={orgSlug}
+        />
+    );
 }

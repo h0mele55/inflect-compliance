@@ -284,6 +284,57 @@ export const OverdueEvidenceRowSchema = z
 
 export type OverdueEvidenceRow = z.infer<typeof OverdueEvidenceRowSchema>;
 
+// ── Drill-down pagination (cursor-based) ─────────────────────────────
+//
+// The dashboard summary views still consume the top-50 functions
+// (`getNonPerformingControls`, `getCriticalRisksAcrossOrg`,
+// `getOverdueEvidenceAcrossOrg`) — fast, bounded, ideal for a card-
+// sized preview. The DEDICATED drill-down pages browse beyond that
+// cap via the `list*` usecase counterparts which accept a cursor
+// payload and return `nextCursor` alongside the rows.
+//
+// Cursor model: per-entity opaque base64-JSON. The shape is
+// intentionally NOT exposed to the client — `cursor` is "whatever
+// the previous response gave you in `nextCursor`". Encoded fields
+// are the entity's primary + secondary sort keys plus the row id
+// for tiebreaker stability across tenants.
+//
+// The sort order is identical to the dashboard preview's sort, so
+// page 1 of the paginated view matches the first 50 rows of the
+// preview byte-for-byte (modulo the optional `nextCursor`).
+//
+//   Controls  : (statusPriority DESC, updatedAt DESC, id ASC)
+//   Risks     : (inherentScore   DESC, updatedAt DESC, id ASC)
+//   Evidence  : (nextReviewDate  ASC,  id ASC)        ← daysOverdue DESC
+//
+// `id` ASC as the final tiebreaker is per-tenant unique by Prisma
+// cuid; cuid collisions across tenants are not a concern at the
+// scales the platform targets.
+
+export const PaginatedDrillDownInputSchema = z
+    .object({
+        /** Opaque cursor returned in the previous response's
+         *  `nextCursor`. Omit for the first page. */
+        cursor: z.string().min(1).optional(),
+        /** Max rows to return on this page. Defaults to 50; clamped
+         *  to [1, 200]. The dashboard summary keeps its hard 50;
+         *  this control is for the dedicated drill-down pages. */
+        limit: z.number().int().min(1).max(200).optional(),
+    })
+    .strict();
+
+export type PaginatedDrillDownInput = z.infer<typeof PaginatedDrillDownInputSchema>;
+
+export const DEFAULT_DRILLDOWN_PAGE_LIMIT = 50;
+export const MAX_DRILLDOWN_PAGE_LIMIT = 200;
+
+export interface PaginatedDrillDownResult<TRow> {
+    rows: TRow[];
+    /** Encoded cursor for the next page, or null when this is the
+     *  last page. Treat as opaque on the client. */
+    nextCursor: string | null;
+}
+
 // ── RAG threshold helper (shared) ────────────────────────────────────
 //
 // Single source of truth for the RAG mapping used by the per-tenant

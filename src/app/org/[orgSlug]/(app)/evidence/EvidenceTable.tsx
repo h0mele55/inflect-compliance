@@ -13,6 +13,8 @@ import type { OverdueEvidenceRow } from '@/app-layer/schemas/portfolio';
 
 interface Props {
     rows: OverdueEvidenceRow[];
+    nextCursor?: string | null;
+    orgSlug?: string;
 }
 
 const STATUS_VARIANTS: Record<OverdueEvidenceRow['status'], 'pending' | 'info' | 'error'> = {
@@ -31,7 +33,7 @@ function OverdueBadge({ days }: { days: number }) {
     );
 }
 
-export function EvidenceTable({ rows }: Props) {
+export function EvidenceTable({ rows, nextCursor, orgSlug }: Props) {
     const [sortBy, setSortBy] = useState<string>('daysOverdue');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
@@ -146,6 +148,18 @@ export function EvidenceTable({ rows }: Props) {
                     }
                     data-testid="org-evidence-table"
                 />
+                {nextCursor && orgSlug && (
+                    <div className="flex justify-center pt-3">
+                        <Link
+                            href={`/org/${orgSlug}/evidence?cursor=${encodeURIComponent(nextCursor)}`}
+                            className="btn btn-secondary btn-sm"
+                            data-testid="org-evidence-load-more"
+                            prefetch={false}
+                        >
+                            Load more evidence
+                        </Link>
+                    </div>
+                )}
             </ListPageShell.Body>
         </ListPageShell>
     );

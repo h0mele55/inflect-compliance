@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 
 import { getOrgCtx } from '@/app-layer/context';
-import { getOverdueEvidenceAcrossOrg } from '@/app-layer/usecases/portfolio';
+import { listOverdueEvidenceAcrossOrg } from '@/app-layer/usecases/portfolio';
 import { EvidenceTable } from './EvidenceTable';
 
 /**
@@ -16,10 +16,12 @@ export const dynamic = 'force-dynamic';
 
 interface PageProps {
     params: Promise<{ orgSlug: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function OrgEvidencePage({ params }: PageProps) {
+export default async function OrgEvidencePage({ params, searchParams }: PageProps) {
     const { orgSlug } = await params;
+    const sp = await searchParams;
 
     let ctx;
     try {
@@ -28,7 +30,14 @@ export default async function OrgEvidencePage({ params }: PageProps) {
         notFound();
     }
 
-    const rows = await getOverdueEvidenceAcrossOrg(ctx);
+    const cursor = typeof sp.cursor === 'string' ? sp.cursor : undefined;
+    const result = await listOverdueEvidenceAcrossOrg(ctx, { cursor });
 
-    return <EvidenceTable rows={JSON.parse(JSON.stringify(rows))} />;
+    return (
+        <EvidenceTable
+            rows={JSON.parse(JSON.stringify(result.rows))}
+            nextCursor={result.nextCursor}
+            orgSlug={orgSlug}
+        />
+    );
 }

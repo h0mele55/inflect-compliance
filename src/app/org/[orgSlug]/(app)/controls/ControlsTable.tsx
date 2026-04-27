@@ -13,6 +13,11 @@ import type { NonPerformingControlRow } from '@/app-layer/schemas/portfolio';
 
 interface Props {
     rows: NonPerformingControlRow[];
+    /** Encoded cursor for the next page, or null on the last page.
+     *  Threaded through the URL via `?cursor=`. */
+    nextCursor?: string | null;
+    /** Org slug used to construct the "Load more" link. */
+    orgSlug?: string;
 }
 
 const STATUS_VARIANTS: Record<NonPerformingControlRow['status'], 'warning' | 'pending' | 'info' | 'error'> = {
@@ -28,7 +33,7 @@ function StatusBadgeForControl({ status }: { status: NonPerformingControlRow['st
     return <StatusBadge variant={variant}>{status.replace(/_/g, ' ')}</StatusBadge>;
 }
 
-export function ControlsTable({ rows }: Props) {
+export function ControlsTable({ rows, nextCursor, orgSlug }: Props) {
     const [sortBy, setSortBy] = useState<string>('tenantName');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -143,6 +148,18 @@ export function ControlsTable({ rows }: Props) {
                     }
                     data-testid="org-controls-table"
                 />
+                {nextCursor && orgSlug && (
+                    <div className="flex justify-center pt-3">
+                        <Link
+                            href={`/org/${orgSlug}/controls?cursor=${encodeURIComponent(nextCursor)}`}
+                            className="btn btn-secondary btn-sm"
+                            data-testid="org-controls-load-more"
+                            prefetch={false}
+                        >
+                            Load more controls
+                        </Link>
+                    </div>
+                )}
             </ListPageShell.Body>
         </ListPageShell>
     );
