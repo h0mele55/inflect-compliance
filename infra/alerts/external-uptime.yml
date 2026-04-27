@@ -1,0 +1,109 @@
+# External uptime monitoring — provider-agnostic spec.
+#
+# OI-3 source-of-truth: external uptime monitoring against /api/livez.
+# This file documents the contract that the operator wires into their
+# uptime monitoring tool of choice.
+#
+# Why /api/livez (and NOT /api/readyz):
+#   - livez is dependency-free and ALWAYS returns 200 when the process
+#     is running. It proves the FULL service chain works:
+#     DNS → load balancer → ingress controller → pod → app process.
+#   - readyz returns 503 when ANY internal dependency is down. From an
+#     external monitor's perspective, that's noise — internal RDS
+#     blips mark the pod NotReady internally (k8s rotates traffic),
+#     but the user-perceived service is still up via other healthy
+#     pods. External uptime should fire only when the WHOLE service
+#     is unreachable.
+#   - Distinct from Kubernetes-internal probes (which DO use readyz
+#     and DO want dependency-awareness).
+#
+# Wiring this into your uptime tool of choice:
+#
+#   UptimeRobot:
+#     curl -X POST 'https://api.uptimerobot.com/v2/newMonitor' \
+#       -d "api_key=${UPTIMEROBOT_API_KEY}" \
+#       -d "type=2" \           # HTTP(S)
+#       -d "url=<from spec>" \
+#       -d "interval=60" \
+#       -d "friendly_name=<from spec>"
+#
+#   Pingdom: pingdomcli check create --url <from spec> --interval 1
+#
+#   Statuscake: equivalent via their API
+#
+#   AWS Route 53 Health Checks: aws route53 create-health-check ...
+#                                  with --health-check-config
+#                                  HTTPSPort=443,Type=HTTPS,
+#                                  ResourcePath=/api/livez,
+#                                  FullyQualifiedDomainName=<host>
+#
+# All four monitors below should route to the SAME PagerDuty service
+# as the in-cluster critical alerts (so on-call doesn't context-switch
+# between two tools to triage a service-down event).
+
+apiVersion: v1
+kind: ExternalUptimeContract
+metadata:
+  description: |
+    Inflect Compliance — external uptime monitor spec. Provider-agnostic;
+    operators implement these monitors in UptimeRobot / Pingdom /
+    Statuscake / Route 53 Health Checks and route alarms to PagerDuty.
+
+monitors:
+  # ─── Production ────────────────────────────────────────────────────
+  - name: inflect-livez-production
+    url: https://app.example.com/api/livez
+    method: GET
+    interval_seconds: 60                          # 1 minute
+    timeout_seconds: 10
+    expect:
+      status_code: 200
+      body_contains: '"status":"alive"'           # stable substring from livez response body
+      ssl_valid: true                             # also catches expired certs externally
+    locations:                                    # multi-region prevents single-pop false-positives
+      - us-east
+      - us-west
+      - eu-west
+      - ap-southeast
+    on_failure:
+      consecutive_failures_to_alarm: 2            # 2 minutes total before paging
+      severity: critical
+      route_to: pagerduty
+      pagerduty_dedup_key_template: "external-uptime:inflect-livez-production"
+      include_response_body_in_alarm: true        # so on-call sees the actual response
+
+  # ─── Staging ───────────────────────────────────────────────────────
+  - name: inflect-livez-staging
+    url: https://staging.example.com/api/livez
+    method: GET
+    interval_seconds: 300                         # 5 minutes — staging is lower priority
+    timeout_seconds: 10
+    expect:
+      status_code: 200
+      body_contains: '"status":"alive"'
+      ssl_valid: true
+    locations:
+      - us-east
+    on_failure:
+      consecutive_failures_to_alarm: 3            # 15 minutes — staging tolerance
+      severity: warning
+      route_to: slack                             # warnings only — no page
+      include_response_body_in_alarm: true
+
+# ─── Routing notes ──────────────────────────────────────────────────
+# Critical external-uptime alerts → PagerDuty.
+# This must be the SAME PagerDuty service as the in-cluster critical
+# alerts (`infra/alerts/receivers.yml::pagerduty-critical`). On-call
+# triages from one place.
+#
+# Warning external-uptime alerts → Slack #alerts-warnings.
+# Same channel as in-cluster warnings (`receivers.yml::slack-warnings`).
+#
+# When both an in-cluster critical AND the external monitor fire for
+# the same outage:
+#   - PagerDuty deduplicates by (incident.key + service). Use distinct
+#     dedup keys (`external-uptime:...` vs the in-cluster alert's
+#     default key) so both surfaces see the incident. Don't suppress
+#     one — they're independent failure-domain signals (in-cluster =
+#     "the cluster sees it broken"; external = "the user sees it
+#     broken"). Sometimes only one fires.

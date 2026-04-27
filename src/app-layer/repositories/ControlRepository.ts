@@ -3,6 +3,7 @@ import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
 import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
 import type { PaginatedResponse } from '@/lib/dto/pagination';
+import { traceRepository } from '@/lib/observability/repository-tracing';
 
 export interface ControlListFilters {
     status?: string;
@@ -20,40 +21,44 @@ export interface ControlListParams {
 
 export class ControlRepository {
     static async list(db: PrismaTx, ctx: RequestContext, filters?: ControlListFilters) {
-        const where = ControlRepository._buildWhere(ctx, filters);
+        return traceRepository('control.list', ctx, async () => {
+            const where = ControlRepository._buildWhere(ctx, filters);
 
-        return db.control.findMany({
-            where,
-            orderBy: [{ code: 'asc' }, { annexId: 'asc' }],
-            include: {
-                owner: { select: { id: true, name: true, email: true } },
-                _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
-            },
+            return db.control.findMany({
+                where,
+                orderBy: [{ code: 'asc' }, { annexId: 'asc' }],
+                include: {
+                    owner: { select: { id: true, name: true, email: true } },
+                    _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
+                },
+            });
         });
     }
 
     static async listPaginated(db: PrismaTx, ctx: RequestContext, params: ControlListParams): Promise<PaginatedResponse<unknown>> {
-        const limit = clampLimit(params.limit);
-        const where = ControlRepository._buildWhere(ctx, params.filters);
+        return traceRepository('control.listPaginated', ctx, async () => {
+            const limit = clampLimit(params.limit);
+            const where = ControlRepository._buildWhere(ctx, params.filters);
 
-        // Apply cursor
-        const cursorWhere = buildCursorWhere(params.cursor);
-        if (cursorWhere) {
-            where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), cursorWhere];
-        }
+            // Apply cursor
+            const cursorWhere = buildCursorWhere(params.cursor);
+            if (cursorWhere) {
+                where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), cursorWhere];
+            }
 
-        const items = await db.control.findMany({
-            where,
-            orderBy: CURSOR_ORDER_BY,
-            take: limit + 1,
-            include: {
-                owner: { select: { id: true, name: true, email: true } },
-                _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
-            },
+            const items = await db.control.findMany({
+                where,
+                orderBy: CURSOR_ORDER_BY,
+                take: limit + 1,
+                include: {
+                    owner: { select: { id: true, name: true, email: true } },
+                    _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
+                },
+            });
+
+            const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+            return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
         });
-
-        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
-        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
     }
 
     private static _buildWhere(ctx: RequestContext, filters?: ControlListFilters): Prisma.ControlWhereInput {
@@ -81,33 +86,37 @@ export class ControlRepository {
     }
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {
-        return db.control.findFirst({
-            where: {
-                id,
-                OR: [{ tenantId: ctx.tenantId }, { tenantId: null }],
-            },
-            include: {
-                owner: { select: { id: true, name: true, email: true } },
-                createdBy: { select: { id: true, name: true, email: true } },
-                applicabilityDecidedBy: { select: { id: true, name: true, email: true } },
-                contributors: { include: { user: { select: { id: true, name: true, email: true } } } },
-                controlTasks: { orderBy: { createdAt: 'desc' }, include: { assignee: { select: { id: true, name: true, email: true } } } },
-                evidenceLinks: { orderBy: { createdAt: 'desc' }, include: { createdBy: { select: { id: true, name: true } } } },
-                evidence: { where: { tenantId: ctx.tenantId }, orderBy: { createdAt: 'desc' } },
-                risks: { include: { risk: { select: { id: true, title: true, inherentScore: true } } } },
-                policyLinks: { include: { policy: { select: { id: true, title: true, status: true } } } },
-                frameworkMappings: { include: { fromRequirement: { include: { framework: { select: { name: true } } } } } },
-                _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
-            },
+        return traceRepository('control.getById', ctx, async () => {
+            return db.control.findFirst({
+                where: {
+                    id,
+                    OR: [{ tenantId: ctx.tenantId }, { tenantId: null }],
+                },
+                include: {
+                    owner: { select: { id: true, name: true, email: true } },
+                    createdBy: { select: { id: true, name: true, email: true } },
+                    applicabilityDecidedBy: { select: { id: true, name: true, email: true } },
+                    contributors: { include: { user: { select: { id: true, name: true, email: true } } } },
+                    controlTasks: { orderBy: { createdAt: 'desc' }, include: { assignee: { select: { id: true, name: true, email: true } } } },
+                    evidenceLinks: { orderBy: { createdAt: 'desc' }, include: { createdBy: { select: { id: true, name: true } } } },
+                    evidence: { where: { tenantId: ctx.tenantId }, orderBy: { createdAt: 'desc' } },
+                    risks: { include: { risk: { select: { id: true, title: true, inherentScore: true } } } },
+                    policyLinks: { include: { policy: { select: { id: true, title: true, status: true } } } },
+                    frameworkMappings: { include: { fromRequirement: { include: { framework: { select: { name: true } } } } } },
+                    _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
+                },
+            });
         });
     }
 
     static async create(db: PrismaTx, ctx: RequestContext, data: Omit<Prisma.ControlUncheckedCreateInput, 'tenantId'>) {
-        return db.control.create({
-            data: {
-                ...data,
-                tenantId: ctx.tenantId,
-            },
+        return traceRepository('control.create', ctx, async () => {
+            return db.control.create({
+                data: {
+                    ...data,
+                    tenantId: ctx.tenantId,
+                },
+            });
         });
     }
 
