@@ -149,9 +149,23 @@ describe('GAP-03 ratchet — env templates', () => {
         expect(src).toMatch(/^DATA_ENCRYPTION_KEY=/m);
     });
 
-    it('deploy/.env.prod.example sets DATA_ENCRYPTION_KEY (uncommented)', () => {
+    it('deploy/.env.prod.example signals DATA_ENCRYPTION_KEY lives in AWS Secrets Manager (post-OI-1 model)', () => {
         const src = readRepoFile('deploy/.env.prod.example');
-        expect(src).toMatch(/^DATA_ENCRYPTION_KEY=/m);
+        // Epic OI-1 migrated DATA_ENCRYPTION_KEY (and 4 other runtime
+        // secrets) out of plaintext deploy/.env.prod into AWS Secrets
+        // Manager. The pre-OI-1 contract was an uncommented
+        // `DATA_ENCRYPTION_KEY=` placeholder in this file; the new
+        // contract is a deprecation banner that tells operators where
+        // the value lives now and which tooling resolves it. Either
+        // shape gives the same operator-visible signal that the var
+        // is required, which is the original GAP-03 intent.
+        const hasUncommentedPlaceholder = /^DATA_ENCRYPTION_KEY=/m.test(src);
+        const hasSecretsManagerPointer =
+            /AWS Secrets Manager/i.test(src) &&
+            /bootstrap-env-from-secrets\.sh/.test(src) &&
+            /DEPRECATED/i.test(src);
+
+        expect(hasUncommentedPlaceholder || hasSecretsManagerPointer).toBe(true);
     });
 });
 
