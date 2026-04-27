@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 
 import { getOrgCtx } from '@/app-layer/context';
 import { listCriticalRisksAcrossOrg } from '@/app-layer/usecases/portfolio';
+import { toPlainJson } from '@/lib/server/to-plain-json';
 import { RisksTable } from './RisksTable';
 
 /**
@@ -31,9 +32,10 @@ export default async function OrgRisksPage({ params, searchParams }: PageProps) 
     const cursor = typeof sp.cursor === 'string' ? sp.cursor : undefined;
     const result = await listCriticalRisksAcrossOrg(ctx, { cursor });
 
+    // Server→client RSC boundary — see `toPlainJson` for rationale.
     return (
         <RisksTable
-            rows={JSON.parse(JSON.stringify(result.rows))}
+            rows={toPlainJson(result.rows)}
             nextCursor={result.nextCursor}
             orgSlug={orgSlug}
         />
