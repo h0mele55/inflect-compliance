@@ -34,6 +34,64 @@ import type { OrgContext } from '@/app-layer/types';
 import type { OrgRole } from '@prisma/client';
 import { logger } from '@/lib/observability/logger';
 
+// ── listOrgMembers ────────────────────────────────────────────────────
+
+export interface OrgMemberRow {
+    membershipId: string;
+    userId: string;
+    role: OrgRole;
+    /** ISO timestamp — when the OrgMembership row was created. */
+    joinedAt: string;
+    user: {
+        id: string;
+        email: string;
+        name: string | null;
+    };
+}
+
+/**
+ * Returns the org's full member list with user identity, role, and
+ * joined timestamp. Read-only — used by the org members management
+ * page. Caller must have passed `canManageMembers` at the route /
+ * page layer; this usecase does not re-derive permission since the
+ * member list is by-design visible to anyone managing the org.
+ *
+ * Sorted: ORG_ADMIN first (most-likely target of admin management
+ * decisions), then ORG_READER, alphabetical by email within each
+ * bucket. Stable across reloads.
+ */
+export async function listOrgMembers(
+    ctx: OrgContext,
+): Promise<OrgMemberRow[]> {
+    const memberships = await prisma.orgMembership.findMany({
+        where: { organizationId: ctx.organizationId },
+        select: {
+            id: true,
+            userId: true,
+            role: true,
+            createdAt: true,
+            user: { select: { id: true, email: true, name: true } },
+        },
+    });
+
+    return memberships
+        .map(
+            (m): OrgMemberRow => ({
+                membershipId: m.id,
+                userId: m.userId,
+                role: m.role,
+                joinedAt: m.createdAt.toISOString(),
+                user: m.user,
+            }),
+        )
+        .sort((a, b) => {
+            // ORG_ADMIN before ORG_READER so the most-actionable rows
+            // sit at the top of the table.
+            if (a.role !== b.role) return a.role === 'ORG_ADMIN' ? -1 : 1;
+            return a.user.email.localeCompare(b.user.email);
+        });
+}
+
 // ── addOrgMember ──────────────────────────────────────────────────────
 
 export interface AddOrgMemberInput {
