@@ -119,3 +119,17 @@ cred-list.txt
 
 # Claude Code runtime state
 .claude/
+
+# Terraform — runtime/state/plan artefacts must never land in git.
+# The full set lives in infra/terraform/.gitignore; these root-level
+# globs are a defence-in-depth against an operator running terraform
+# commands from outside infra/terraform/ by mistake.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+*.secret.tfvars
+*.secret.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
