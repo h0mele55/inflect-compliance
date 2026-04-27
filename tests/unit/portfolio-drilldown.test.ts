@@ -19,12 +19,20 @@ const tenantFindManyMock = jest.fn();
 const controlFindManyMock = jest.fn();
 const riskFindManyMock = jest.fn();
 const evidenceFindManyMock = jest.fn();
+const tenantMembershipFindManyMock = jest.fn();
 const withTenantDbCalls: string[] = [];
 
 jest.mock('@/lib/prisma', () => {
     const client = {
         tenant: { findMany: (...a: unknown[]) => tenantFindManyMock(...a) },
         complianceSnapshot: { findMany: jest.fn(), groupBy: jest.fn() },
+        // The drill-down auditor fan-out integrity check queries
+        // tenantMembership; default to "every tenant accessible" so
+        // existing tests (which assert on per-tenant iteration count)
+        // see the full org tenant set in the fan-out.
+        tenantMembership: {
+            findMany: (...a: unknown[]) => tenantMembershipFindManyMock(...a),
+        },
     };
     return { __esModule: true, default: client, prisma: client };
 });
@@ -80,7 +88,16 @@ beforeEach(() => {
     controlFindManyMock.mockReset();
     riskFindManyMock.mockReset();
     evidenceFindManyMock.mockReset();
+    tenantMembershipFindManyMock.mockReset();
     withTenantDbCalls.length = 0;
+    // Default to "every tenant accessible" so the existing
+    // iteration-count tests see the full org tenant set. The
+    // drift-detection behaviour has its own dedicated test file:
+    // tests/unit/portfolio-fanout-integrity.test.ts.
+    tenantMembershipFindManyMock.mockImplementation(async (args: { where?: { tenantId?: { in?: string[] } } }) => {
+        const ids = args?.where?.tenantId?.in ?? [];
+        return ids.map((tenantId: string) => ({ tenantId }));
+    });
 });
 
 // ── getNonPerformingControls ──────────────────────────────────────────
