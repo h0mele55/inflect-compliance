@@ -61,9 +61,22 @@
  * this file.
  */
 
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 
 import prisma from '@/lib/prisma';
+
+/**
+ * Helpers accept either the global Prisma client or an in-flight
+ * `$transaction` callback's tx client. This lets the role-change
+ * usecase wrap the OrgMembership update + the fan-out/fan-in in a
+ * single atomic transaction without duplicating the provisioning
+ * SQL inside the usecase.
+ *
+ * The default — the global client — preserves every existing call
+ * site (addOrgMember, removeOrgMember, createTenantUnderOrg) which
+ * is happy with helper-internal atomicity.
+ */
+type DbClient = Prisma.TransactionClient | typeof prisma;
 
 // ── Result types ──────────────────────────────────────────────────────
 
@@ -78,6 +91,14 @@ export interface ProvisionResult {
     skipped: number;
     /** Total number of (tenantId, userId) pairs the call considered. */
     totalConsidered: number;
+    /**
+     * Tenant ids where a new AUDITOR row was created. Caller fans an
+     * audit-event row out to each tenant in this list. A tenant whose
+     * membership pre-existed is intentionally omitted — its access
+     * did not change as a result of this call, and an audit row there
+     * would mislead a tenant auditor about when access was granted.
+     */
+    tenantIds: string[];
 }
 
 export interface DeprovisionResult {
@@ -109,17 +130,44 @@ export interface DeprovisionResult {
 export async function provisionOrgAdminToTenants(
     orgId: string,
     userId: string,
+    db: DbClient = prisma,
 ): Promise<ProvisionResult> {
-    const tenants = await prisma.tenant.findMany({
+    const tenants = await db.tenant.findMany({
         where: { organizationId: orgId },
         select: { id: true },
     });
     if (tenants.length === 0) {
-        return { created: 0, skipped: 0, totalConsidered: 0 };
+        return { created: 0, skipped: 0, totalConsidered: 0, tenantIds: [] };
     }
 
-    const result = await prisma.tenantMembership.createMany({
-        data: tenants.map((t) => ({
+    // Pre-query existing memberships so we can return the precise
+    // `tenantIds` set of newly-created rows. `createMany skipDuplicates`
+    // alone returns only a `count`, which is insufficient for the
+    // audit fan-out — the caller needs to know exactly which tenants
+    // gained access as a result of this call.
+    const existing = await db.tenantMembership.findMany({
+        where: { userId, tenantId: { in: tenants.map((t) => t.id) } },
+        select: { tenantId: true },
+    });
+    const existingSet = new Set(existing.map((e) => e.tenantId));
+    const toCreate = tenants.filter((t) => !existingSet.has(t.id));
+
+    if (toCreate.length === 0) {
+        return {
+            created: 0,
+            skipped: tenants.length,
+            totalConsidered: tenants.length,
+            tenantIds: [],
+        };
+    }
+
+    // skipDuplicates kept on as a race safety net — if a concurrent
+    // process inserted a row between our findMany and createMany, the
+    // unique constraint catches it without aborting the rest of the
+    // batch. The audit row in that race case still truthfully records
+    // the org-level intent at this timestamp.
+    await db.tenantMembership.createMany({
+        data: toCreate.map((t) => ({
             tenantId: t.id,
             userId,
             role: Role.AUDITOR,
@@ -129,9 +177,10 @@ export async function provisionOrgAdminToTenants(
     });
 
     return {
-        created: result.count,
-        skipped: tenants.length - result.count,
+        created: toCreate.length,
+        skipped: tenants.length - toCreate.length,
         totalConsidered: tenants.length,
+        tenantIds: toCreate.map((t) => t.id),
     };
 }
 
@@ -149,16 +198,17 @@ export async function provisionOrgAdminToTenants(
 export async function provisionAllOrgAdminsToTenant(
     orgId: string,
     tenantId: string,
+    db: DbClient = prisma,
 ): Promise<ProvisionResult> {
-    const admins = await prisma.orgMembership.findMany({
+    const admins = await db.orgMembership.findMany({
         where: { organizationId: orgId, role: 'ORG_ADMIN' },
         select: { userId: true },
     });
     if (admins.length === 0) {
-        return { created: 0, skipped: 0, totalConsidered: 0 };
+        return { created: 0, skipped: 0, totalConsidered: 0, tenantIds: [] };
     }
 
-    const result = await prisma.tenantMembership.createMany({
+    const result = await db.tenantMembership.createMany({
         data: admins.map((a) => ({
             tenantId,
             userId: a.userId,
@@ -168,10 +218,19 @@ export async function provisionAllOrgAdminsToTenant(
         skipDuplicates: true,
     });
 
+    // The tenant fan-out callsite (createTenantUnderOrg) is the only
+    // consumer today; it doesn't yet emit per-tenant audit rows for
+    // each admin promoted-by-virtue-of-new-tenant. When that audit
+    // fan-out is added, swap to the pre-query path used by
+    // provisionOrgAdminToTenants so `tenantIds` lists the actually-
+    // created (admin, tenantId) pairs. For now the array is left
+    // empty — over-reporting would attribute admin promotion to the
+    // wrong moment.
     return {
         created: result.count,
         skipped: admins.length - result.count,
         totalConsidered: admins.length,
+        tenantIds: [],
     };
 }
 
@@ -200,32 +259,48 @@ export async function provisionAllOrgAdminsToTenant(
 export async function deprovisionOrgAdmin(
     orgId: string,
     userId: string,
+    db?: Prisma.TransactionClient,
 ): Promise<DeprovisionResult> {
-    return prisma.$transaction(async (tx) => {
-        const targets = await tx.tenantMembership.findMany({
-            where: {
-                userId,
-                provisionedByOrgId: orgId,
-                role: Role.AUDITOR,
-            },
-            select: { tenantId: true },
-        });
+    // When the caller already owns a transaction (e.g. the role-change
+    // usecase), reuse it so the OrgMembership update + the AUDITOR
+    // delete commit together. Otherwise open our own — the explicit
+    // transaction is what guarantees the result's `tenantIds` reflects
+    // the rows we actually deleted, even if a concurrent provisioner
+    // races.
+    if (db) {
+        return doDeprovision(db, orgId, userId);
+    }
+    return prisma.$transaction((tx) => doDeprovision(tx, orgId, userId));
+}
 
-        if (targets.length === 0) {
-            return { deleted: 0, tenantIds: [] };
-        }
-
-        const result = await tx.tenantMembership.deleteMany({
-            where: {
-                userId,
-                provisionedByOrgId: orgId,
-                role: Role.AUDITOR,
-            },
-        });
-
-        return {
-            deleted: result.count,
-            tenantIds: targets.map((t) => t.tenantId),
-        };
+async function doDeprovision(
+    db: DbClient,
+    orgId: string,
+    userId: string,
+): Promise<DeprovisionResult> {
+    const targets = await db.tenantMembership.findMany({
+        where: {
+            userId,
+            provisionedByOrgId: orgId,
+            role: Role.AUDITOR,
+        },
+        select: { tenantId: true },
     });
+
+    if (targets.length === 0) {
+        return { deleted: 0, tenantIds: [] };
+    }
+
+    const result = await db.tenantMembership.deleteMany({
+        where: {
+            userId,
+            provisionedByOrgId: orgId,
+            role: Role.AUDITOR,
+        },
+    });
+
+    return {
+        deleted: result.count,
+        tenantIds: targets.map((t) => t.tenantId),
+    };
 }

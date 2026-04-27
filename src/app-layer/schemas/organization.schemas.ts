@@ -63,3 +63,19 @@ export const AddOrgMemberInput = z
     .strict();
 
 export type AddOrgMemberInputType = z.infer<typeof AddOrgMemberInput>;
+
+// ── PUT /api/org/[orgSlug]/members ────────────────────────────────────
+//
+// Atomic role change for an EXISTING org member. The legacy remove-
+// and-readd workaround (DELETE + POST) is no longer required; that
+// path created a brief deprovisioning window and a two-step admin
+// operation. See `changeOrgMemberRole` in `org-members.ts`.
+
+export const ChangeOrgMemberRoleInput = z
+    .object({
+        userId: z.string().min(1, 'userId is required'),
+        role: z.enum(['ORG_ADMIN', 'ORG_READER']),
+    })
+    .strict();
+
+export type ChangeOrgMemberRoleInputType = z.infer<typeof ChangeOrgMemberRoleInput>;
