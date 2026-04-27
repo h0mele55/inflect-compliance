@@ -130,6 +130,9 @@ describeFn('Epic O-2 — atomic org member role change (DB-backed)', () => {
     });
 
     afterAll(async () => {
+        await prisma.auditLog.deleteMany({
+            where: { tenantId: { in: tenantIds } },
+        }).catch(() => {});
         await prisma.tenantMembership.deleteMany({
             where: { tenantId: { in: tenantIds } },
         }).catch(() => {});
@@ -214,6 +217,41 @@ describeFn('Epic O-2 — atomic org member role change (DB-backed)', () => {
             });
             expect(owner?.role).toBe('OWNER');
         }
+
+        // Durable audit evidence: exactly one ORG_AUDITOR_PROVISIONED
+        // row in tenant-2's AuditLog (where the AUDITOR membership was
+        // newly created). Tenant-1's manual row pre-existed and is
+        // intentionally NOT audited — the access invariant for that
+        // tenant didn't change as a result of this op.
+        const t2Audits = await prisma.auditLog.findMany({
+            where: {
+                tenantId: tenantIds[1],
+                action: 'ORG_AUDITOR_PROVISIONED',
+                entity: 'TenantMembership',
+                entityId: targetUserId,
+            },
+        });
+        expect(t2Audits).toHaveLength(1);
+        const t2Audit = t2Audits[0];
+        expect(t2Audit.userId).toBe(creatorUserId); // actor
+        expect(t2Audit.actorType).toBe('USER');
+        const t2Details = t2Audit.detailsJson as Record<string, unknown>;
+        expect(t2Details.category).toBe('access');
+        expect(t2Details.sourceAction).toBe('org_member_promoted');
+        expect(t2Details.previousOrgRole).toBe('ORG_READER');
+        expect(t2Details.newOrgRole).toBe('ORG_ADMIN');
+        expect(t2Details.organizationId).toBe(orgId);
+        expect(t2Details.targetUserId).toBe(targetUserId);
+
+        const t1Audits = await prisma.auditLog.findMany({
+            where: {
+                tenantId: tenantIds[0],
+                action: 'ORG_AUDITOR_PROVISIONED',
+                entity: 'TenantMembership',
+                entityId: targetUserId,
+            },
+        });
+        expect(t1Audits).toHaveLength(0);
     });
 
     // ── 5. Demotion ──────────────────────────────────────────────────
@@ -280,6 +318,35 @@ describeFn('Epic O-2 — atomic org member role change (DB-backed)', () => {
             });
             expect(owner?.role).toBe('OWNER');
         }
+
+        // Durable audit evidence: exactly one
+        // ORG_AUDITOR_DEPROVISIONED row in tenant-2's AuditLog (where
+        // the AUDITOR row was actually deleted). Tenant-1 — manual
+        // grant — is intentionally NOT audited because the access
+        // invariant there didn't change.
+        const t2Audits = await prisma.auditLog.findMany({
+            where: {
+                tenantId: tenantIds[1],
+                action: 'ORG_AUDITOR_DEPROVISIONED',
+                entity: 'TenantMembership',
+                entityId: targetUserId,
+            },
+        });
+        expect(t2Audits).toHaveLength(1);
+        const t2Details = t2Audits[0].detailsJson as Record<string, unknown>;
+        expect(t2Details.sourceAction).toBe('org_member_demoted');
+        expect(t2Details.previousOrgRole).toBe('ORG_ADMIN');
+        expect(t2Details.newOrgRole).toBe('ORG_READER');
+
+        const t1Audits = await prisma.auditLog.findMany({
+            where: {
+                tenantId: tenantIds[0],
+                action: 'ORG_AUDITOR_DEPROVISIONED',
+                entity: 'TenantMembership',
+                entityId: targetUserId,
+            },
+        });
+        expect(t1Audits).toHaveLength(0);
     });
 
     // ── 6. No-op transition ─────────────────────────────────────────

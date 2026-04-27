@@ -91,6 +91,14 @@ export interface ProvisionResult {
     skipped: number;
     /** Total number of (tenantId, userId) pairs the call considered. */
     totalConsidered: number;
+    /**
+     * Tenant ids where a new AUDITOR row was created. Caller fans an
+     * audit-event row out to each tenant in this list. A tenant whose
+     * membership pre-existed is intentionally omitted — its access
+     * did not change as a result of this call, and an audit row there
+     * would mislead a tenant auditor about when access was granted.
+     */
+    tenantIds: string[];
 }
 
 export interface DeprovisionResult {
@@ -129,11 +137,37 @@ export async function provisionOrgAdminToTenants(
         select: { id: true },
     });
     if (tenants.length === 0) {
-        return { created: 0, skipped: 0, totalConsidered: 0 };
+        return { created: 0, skipped: 0, totalConsidered: 0, tenantIds: [] };
     }
 
-    const result = await db.tenantMembership.createMany({
-        data: tenants.map((t) => ({
+    // Pre-query existing memberships so we can return the precise
+    // `tenantIds` set of newly-created rows. `createMany skipDuplicates`
+    // alone returns only a `count`, which is insufficient for the
+    // audit fan-out — the caller needs to know exactly which tenants
+    // gained access as a result of this call.
+    const existing = await db.tenantMembership.findMany({
+        where: { userId, tenantId: { in: tenants.map((t) => t.id) } },
+        select: { tenantId: true },
+    });
+    const existingSet = new Set(existing.map((e) => e.tenantId));
+    const toCreate = tenants.filter((t) => !existingSet.has(t.id));
+
+    if (toCreate.length === 0) {
+        return {
+            created: 0,
+            skipped: tenants.length,
+            totalConsidered: tenants.length,
+            tenantIds: [],
+        };
+    }
+
+    // skipDuplicates kept on as a race safety net — if a concurrent
+    // process inserted a row between our findMany and createMany, the
+    // unique constraint catches it without aborting the rest of the
+    // batch. The audit row in that race case still truthfully records
+    // the org-level intent at this timestamp.
+    await db.tenantMembership.createMany({
+        data: toCreate.map((t) => ({
             tenantId: t.id,
             userId,
             role: Role.AUDITOR,
@@ -143,9 +177,10 @@ export async function provisionOrgAdminToTenants(
     });
 
     return {
-        created: result.count,
-        skipped: tenants.length - result.count,
+        created: toCreate.length,
+        skipped: tenants.length - toCreate.length,
         totalConsidered: tenants.length,
+        tenantIds: toCreate.map((t) => t.id),
     };
 }
 
@@ -170,7 +205,7 @@ export async function provisionAllOrgAdminsToTenant(
         select: { userId: true },
     });
     if (admins.length === 0) {
-        return { created: 0, skipped: 0, totalConsidered: 0 };
+        return { created: 0, skipped: 0, totalConsidered: 0, tenantIds: [] };
     }
 
     const result = await db.tenantMembership.createMany({
@@ -183,10 +218,19 @@ export async function provisionAllOrgAdminsToTenant(
         skipDuplicates: true,
     });
 
+    // The tenant fan-out callsite (createTenantUnderOrg) is the only
+    // consumer today; it doesn't yet emit per-tenant audit rows for
+    // each admin promoted-by-virtue-of-new-tenant. When that audit
+    // fan-out is added, swap to the pre-query path used by
+    // provisionOrgAdminToTenants so `tenantIds` lists the actually-
+    // created (admin, tenantId) pairs. For now the array is left
+    // empty — over-reporting would attribute admin promotion to the
+    // wrong moment.
     return {
         created: result.count,
         skipped: admins.length - result.count,
         totalConsidered: admins.length,
+        tenantIds: [],
     };
 }
 
