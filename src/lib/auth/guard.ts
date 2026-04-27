@@ -76,6 +76,18 @@ export function isTenantPath(pathname: string): boolean {
 }
 
 /**
+ * Check if a pathname is an org-scoped route.
+ *
+ * Mirror of `isTenantPath` for the hub-and-spoke organization layer.
+ * Used by the middleware-level org-access gate (GAP O4-1) to decide
+ * whether to apply the JWT-bound org membership check on top of the
+ * existing layout/page/API guards.
+ */
+export function isOrgPath(pathname: string): boolean {
+    return pathname.startsWith('/org/') || pathname.startsWith('/api/org/');
+}
+
+/**
  * Check if a path should remain accessible when MFA is pending.
  * These routes are allowed so users can complete MFA enrollment/challenge.
  */
@@ -211,5 +223,52 @@ export function checkTenantAccess(
 
     if (!memberships || memberships.length === 0) return 'no_tenant_access';
     if (!memberships.some((m) => m.slug === urlSlug)) return 'cross_tenant';
+    return 'allow';
+}
+
+// ── Org-route gate (mirror of the tenant gate) ───────────────────────
+
+/**
+ * Extract the org slug from `/org/:slug/...` or `/api/org/:slug/...`.
+ * Returns null for any path that is not org-scoped.
+ */
+export function extractOrgSlugFromPath(pathname: string): string | null {
+    const webMatch = pathname.match(/^\/org\/([^/]+)(?:\/|$)/);
+    if (webMatch) return webMatch[1];
+
+    const apiMatch = pathname.match(/^\/api\/org\/([^/]+)(?:\/|$)/);
+    if (apiMatch) return apiMatch[1];
+
+    return null;
+}
+
+/**
+ * Pure gate: check whether a user's `orgMemberships` allows access to
+ * an `/org/:slug/...` or `/api/org/:slug/...` path. Same shape as
+ * `checkTenantAccess` so the middleware can route both gates through
+ * a parallel branch.
+ *
+ * Returns:
+ *   'allow'           — pass through
+ *   'no_org_access'   — authed user has no org memberships at all
+ *   'cross_org'       — the URL slug is not in any of the user's org memberships
+ *
+ * Anti-enumeration: middleware MUST collapse both `no_org_access` and
+ * `cross_org` to the SAME external response (404 / no-tenant). The
+ * distinction exists for log/metric tagging, not for the user.
+ */
+export type OrgGateResult = 'allow' | 'no_org_access' | 'cross_org';
+
+export function checkOrgAccess(
+    pathname: string,
+    orgMemberships: ReadonlyArray<{ slug: string }> | null | undefined,
+): OrgGateResult {
+    const urlSlug = extractOrgSlugFromPath(pathname);
+    if (!urlSlug) return 'allow';
+
+    if (isPublicPath(pathname)) return 'allow';
+
+    if (!orgMemberships || orgMemberships.length === 0) return 'no_org_access';
+    if (!orgMemberships.some((m) => m.slug === urlSlug)) return 'cross_org';
     return 'allow';
 }
