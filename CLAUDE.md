@@ -172,10 +172,20 @@ rows under the old key, remove `DATA_ENCRYPTION_KEY_PREVIOUS` from
 env.
 
 Per-tenant DEK rotation (generating a fresh DEK for a single
-compromised tenant without touching the global KEK) is reserved at
-`rotateTenantDek` in `src/lib/security/tenant-key-manager.ts` —
-stubbed today. The `Tenant.previousEncryptedDek` column is in place
-so the real implementation can land without a schema change.
+compromised tenant without touching the global KEK) is implemented
+at `rotateTenantDek` in `src/lib/security/tenant-key-manager.ts`.
+The admin surface is `POST /api/t/:slug/admin/tenant-dek-rotation`,
+gated by `admin.tenant_lifecycle` (OWNER-only). The flow:
+atomic UPDATE moves the old wrapped DEK into
+`Tenant.previousEncryptedDek` and writes a fresh wrapped DEK to
+`Tenant.encryptedDek`; the response is 202 + a job id for the
+`tenant-dek-rotation` BullMQ sweep that re-encrypts every v2
+ciphertext under the new DEK and clears `previousEncryptedDek` on
+completion. Mid-flight reads remain correct via
+`decryptWithKeyOrPrevious` in the encryption layer — primary first,
+fall back to previous on AES-GCM auth failure. The per-tenant DEK
+fallback is locked in by
+`tests/guardrails/tenant-dek-rotation-fallback.test.ts`.
 
 **See `docs/epic-b-encryption.md`** for deployment order,
 rotation runbook, observability signals, rollback procedure, and
@@ -391,22 +401,26 @@ Small, independent remediations that close the long tail after
 Epic E. Each landed as a focused PR; treating them as one "epic"
 was purely a scheduling convenience.
 
-**F.2 — `rotateTenantDek` surface reserved.** A new stub at
+**F.2 — `rotateTenantDek` reserved (since superseded).** Originally
+landed as a stub at
 `src/lib/security/tenant-key-manager.ts::rotateTenantDek(tenantId)`
-throws with an inline three-step runbook (master-KEK rotation
-workaround: set `DATA_ENCRYPTION_KEY_PREVIOUS` and
-`DATA_ENCRYPTION_KEY`, redeploy, POST to the existing admin
-key-rotation endpoint). The stub is deliberately sibling-shaped —
-same signature as `createTenantWithDek` / `ensureTenantDek` — so
-the real implementation can land without a signature change.
-Paired with a new `Tenant.previousEncryptedDek String?` column
-reserved by migration `20260424010000_add_tenant_previous_encrypted_dek`,
-which also lands a CHECK constraint
-(`previousEncryptedDek IS NULL OR != encryptedDek` — silent key
-mixing guard) and a partial index for the future sweep-rotations
-query. Integration test at `tests/integration/tenant-dek-rotation-stub.test.ts`
-verifies all three artefacts (stub throws, column queryable, CHECK
-enforces).
+that threw a runbook-carrying error pointing at the master-KEK
+rotation workaround. The reservation included a new
+`Tenant.previousEncryptedDek String?` column from migration
+`20260424010000_add_tenant_previous_encrypted_dek`, paired with a
+CHECK constraint (`previousEncryptedDek IS NULL OR !=
+encryptedDek` — silent key-mixing guard) and a partial index for
+the eventual sweep-rotations query.
+
+The real implementation has since landed (see the "Field
+Encryption" section above). The reservation paid off: the
+implementation slotted in without a schema change and without any
+caller-signature break (the function now takes an options object
+instead of a single id; the only previous caller was the stub
+test itself). Integration test renamed to
+`tests/integration/tenant-dek-rotation.test.ts` — happy-path swap
++ double-rotation rejection + the original CHECK-constraint
+assertion preserved verbatim.
 
 **F.3 — `HttpMethod` union + sentinel comment.** The route
 permission matcher previously did

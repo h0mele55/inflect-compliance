@@ -214,6 +214,38 @@ export interface KeyRotationPayload {
 }
 
 /**
+ * Per-tenant DEK rotation re-encrypt sweep.
+ *
+ * Enqueued by `rotateTenantDek` after the atomic DEK swap. The job:
+ *   1. Walks every (model, field) in the encrypted-fields manifest
+ *      that has a `tenantId` column.
+ *   2. For each row carrying a v2 ciphertext, decrypts under the
+ *      previous DEK and re-encrypts under the new primary DEK.
+ *   3. On completion, clears `Tenant.previousEncryptedDek` to NULL
+ *      and invalidates the previous-DEK cache for that tenant.
+ *
+ * Idempotent — the dual-DEK fallback in the encryption middleware
+ * means rows already rewritten under the new primary stay readable
+ * if the job re-runs after a crash. The job's own decrypt path uses
+ * the previous DEK directly (not the fallback) because rows that
+ * primary-decrypt successfully are by definition NOT what we're
+ * sweeping for.
+ *
+ * Mid-flight reads remain correct via the middleware's
+ * `decryptWithKeyOrPrevious` fallback (the previous DEK stays
+ * resolvable until the final UPDATE clears `previousEncryptedDek`).
+ */
+export interface TenantDekRotationPayload {
+    tenantId: string;
+    /** User who initiated — attribution on audit-log entries. */
+    initiatedByUserId: string;
+    /** Upstream request id for log correlation. */
+    requestId?: string;
+    /** Override SELECT batch size per (model, field). Default 500. */
+    batchSize?: number;
+}
+
+/**
  * Automation event dispatch — one job per emitted domain event.
  *
  * The bus stamps `tenantId` and `emittedAt` on the event; the
@@ -302,6 +334,7 @@ export interface JobPayloadMap {
     'compliance-digest': ComplianceDigestPayload;
     'automation-event-dispatch': AutomationEventDispatchPayload;
     'key-rotation': KeyRotationPayload;
+    'tenant-dek-rotation': TenantDekRotationPayload;
 }
 
 /** Union of all valid job names */
@@ -413,6 +446,17 @@ export const JOB_DEFAULTS: Record<JobName, {
         // investigating; we'd rather they see "this one failed" in the
         // completed-with-errors state than have the queue silently
         // retry and potentially compound the problem.
+        attempts: 1,
+        backoff: { type: 'fixed', delay: 0 },
+        removeOnComplete: 100,
+        removeOnFail: 500,
+    },
+    'tenant-dek-rotation': {
+        // Same posture as key-rotation: a partial sweep means
+        // `Tenant.previousEncryptedDek` is still populated and reads
+        // continue working via the dual-DEK fallback. The operator
+        // re-enqueues manually after investigating any failure;
+        // silent auto-retry could compound a partial-progress bug.
         attempts: 1,
         backoff: { type: 'fixed', delay: 0 },
         removeOnComplete: 100,

@@ -467,6 +467,35 @@ executorRegistry.register('key-rotation', async (payload) => {
     );
 });
 
+// ── tenant-dek-rotation (Epic F.2 follow-up) ────────────────────────
+
+executorRegistry.register('tenant-dek-rotation', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runTenantDekRotation } = await import('./tenant-dek-rotation');
+    const r = await runTenantDekRotation({
+        tenantId: payload.tenantId,
+        initiatedByUserId: payload.initiatedByUserId,
+        requestId: payload.requestId,
+        batchSize: payload.batchSize,
+    });
+    return makeResult(
+        'tenant-dek-rotation',
+        startedAt,
+        startMs,
+        r.totalScanned,
+        r.totalRewritten,
+        r.totalSkipped,
+        {
+            tenantId: r.tenantId,
+            previousEncryptedDekCleared: r.previousEncryptedDekCleared,
+            perField: r.perField,
+            totalErrors: r.totalErrors,
+            jobRunId: r.jobRunId,
+        },
+    );
+});
+
 // ── automation-event-dispatch ────────────────────────────────────────
 //
 // One job invocation per domain event. Loads matching rules, evaluates

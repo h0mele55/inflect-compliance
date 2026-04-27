@@ -38,6 +38,7 @@ import {
 } from '@/lib/db/encryption-middleware';
 import { logger } from '@/lib/observability/logger';
 
+const NO_DEKS = { primary: null, previous: null } as const;
 const { walkWriteArgument, walkReadResult, encryptDataNode, decryptResultNode } =
     _internals;
 
@@ -135,7 +136,7 @@ describe('encryptDataNode', () => {
     });
 
     it('ignores models not in the manifest', () => {
-        const data = { secret: 'should-stay-plain' };
+        const data = { secret: 'should-stay-plain' }; // pragma: allowlist secret — test fixture, asserts non-manifest pass-through
         encryptDataNode(data, 'Framework', null);
         expect(data.secret).toBe('should-stay-plain');
     });
@@ -149,7 +150,7 @@ describe('decryptResultNode', () => {
             status: 'CLOSED',
             score: 1,
         };
-        decryptResultNode(node, 'Risk', null);
+        decryptResultNode(node, 'Risk', NO_DEKS);
         expect(node.treatmentNotes).toBe('nuclear launch codes');
         expect(node.status).toBe('CLOSED');
     });
@@ -158,7 +159,7 @@ describe('decryptResultNode', () => {
         const node: Record<string, unknown> = {
             treatmentNotes: 'legacy plaintext row',
         };
-        decryptResultNode(node, 'Risk', null);
+        decryptResultNode(node, 'Risk', NO_DEKS);
         expect(node.treatmentNotes).toBe('legacy plaintext row');
     });
 
@@ -168,7 +169,7 @@ describe('decryptResultNode', () => {
         const node: Record<string, unknown> = {
             treatmentNotes: 'v1:garbage-that-is-not-valid-base64-or-ciphertext',
         };
-        expect(() => decryptResultNode(node, 'Risk', null)).not.toThrow();
+        expect(() => decryptResultNode(node, 'Risk', NO_DEKS)).not.toThrow();
         expect(logger.warn).toHaveBeenCalledWith(
             'encryption-middleware.decrypt_failed',
             expect.objectContaining({ model: 'Risk', field: 'treatmentNotes' }),
@@ -184,7 +185,7 @@ describe('decryptResultNode', () => {
             treatmentNotes: null,
             threat: '',
         };
-        decryptResultNode(node, 'Risk', null);
+        decryptResultNode(node, 'Risk', NO_DEKS);
         expect(node.treatmentNotes).toBeNull();
         expect(node.threat).toBe('');
     });
@@ -310,7 +311,7 @@ describe('walkReadResult — end-to-end decrypt', () => {
             threat: encryptField('ransomware'),
             status: 'OPEN',
         };
-        walkReadResult(node, 'Risk', null);
+        walkReadResult(node, 'Risk', NO_DEKS);
         expect(node.treatmentNotes).toBe('plan');
         expect(node.threat).toBe('ransomware');
         expect(node.status).toBe('OPEN');
@@ -323,7 +324,7 @@ describe('walkReadResult — end-to-end decrypt', () => {
             { treatmentNotes: null },
             { treatmentNotes: 'legacy plaintext — passes through' },
         ];
-        walkReadResult(results, 'Risk', null);
+        walkReadResult(results, 'Risk', NO_DEKS);
         expect(results[0].treatmentNotes).toBe('A');
         expect(results[1].treatmentNotes).toBe('B');
         expect(results[2].treatmentNotes).toBeNull();
@@ -341,7 +342,7 @@ describe('walkReadResult — end-to-end decrypt', () => {
                 { body: encryptField('comment 2') },
             ],
         };
-        walkReadResult(node, 'Task', null);
+        walkReadResult(node, 'Task', NO_DEKS);
         expect(node.description).toBe('parent task description');
         expect(node.comments[0].body).toBe('comment 1');
         expect(node.comments[1].body).toBe('comment 2');
@@ -360,7 +361,7 @@ describe('walkReadResult — end-to-end decrypt', () => {
                 },
             ],
         };
-        walkReadResult(node, 'Task', null);
+        walkReadResult(node, 'Task', NO_DEKS);
         expect(node.description).toBe('top');
         expect(node.comments[0].body).toBe('mid');
         // The nestedExtra node is walked via the fan-out path.
@@ -372,15 +373,15 @@ describe('walkReadResult — end-to-end decrypt', () => {
     });
 
     it('handles null / undefined / empty result shapes', () => {
-        expect(() => walkReadResult(null, 'Risk', null)).not.toThrow();
-        expect(() => walkReadResult(undefined, 'Risk', null)).not.toThrow();
-        expect(() => walkReadResult([], 'Risk', null)).not.toThrow();
-        expect(() => walkReadResult({}, 'Risk', null)).not.toThrow();
+        expect(() => walkReadResult(null, 'Risk', NO_DEKS)).not.toThrow();
+        expect(() => walkReadResult(undefined, 'Risk', NO_DEKS)).not.toThrow();
+        expect(() => walkReadResult([], 'Risk', NO_DEKS)).not.toThrow();
+        expect(() => walkReadResult({}, 'Risk', NO_DEKS)).not.toThrow();
     });
 
     it('does NOT decrypt non-manifest model results', () => {
         const node = { description: 'stays plaintext forever' };
-        walkReadResult(node, 'Framework', null); // not in manifest
+        walkReadResult(node, 'Framework', NO_DEKS); // not in manifest
         expect(node.description).toBe('stays plaintext forever');
     });
 });

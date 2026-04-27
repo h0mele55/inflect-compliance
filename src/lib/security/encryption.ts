@@ -461,6 +461,46 @@ export function decryptWithKey(key: Buffer, ciphertext: string): string {
 }
 
 /**
+ * Decrypt a `v2:` envelope, falling back to a previous tenant DEK on
+ * AES-GCM auth failure. Mirrors the dual-KEK behaviour of
+ * `decryptField` (which falls back to `DATA_ENCRYPTION_KEY_PREVIOUS`
+ * for v1) — but at the per-tenant DEK granularity needed by
+ * `rotateTenantDek`.
+ *
+ * Behaviour:
+ *   - Try `primary` first. Auth-tag match → done.
+ *   - On any failure AND `previous` is non-null → retry with `previous`.
+ *   - If both keys reject (or `previous` is null) → re-throw the
+ *     PRIMARY error so the caller sees "current key doesn't fit", not
+ *     "previous key didn't either" (which would be misleading after
+ *     the rotation completes and the previous slot is cleared).
+ *
+ * The middleware uses this on every v2 read while
+ * `Tenant.previousEncryptedDek` is non-null. The re-encrypt job that
+ * walks v2 ciphertexts under the previous DEK and rewrites them under
+ * the new primary calls `decryptWithKey(previous, ...)` directly —
+ * deliberate, because if a row is supposed to be under the previous
+ * DEK and the primary somehow decrypts it, that's a state we want to
+ * surface as a hard error in the job, not silently accept.
+ */
+export function decryptWithKeyOrPrevious(
+    primary: Buffer,
+    previous: Buffer | null,
+    ciphertext: string,
+): string {
+    try {
+        return decryptWithKey(primary, ciphertext);
+    } catch (primaryErr) {
+        if (!previous) throw primaryErr;
+        try {
+            return decryptWithKey(previous, ciphertext);
+        } catch {
+            throw primaryErr;
+        }
+    }
+}
+
+/**
  * Clears the cached keys. Useful in tests to simulate key rotation.
  * @internal
  */

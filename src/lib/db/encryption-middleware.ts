@@ -63,6 +63,7 @@ import {
     decryptField,
     encryptWithKey,
     decryptWithKey,
+    decryptWithKeyOrPrevious,
     isEncryptedValue,
     getCiphertextVersion,
 } from '@/lib/security/encryption';
@@ -116,10 +117,27 @@ const BYPASS_SOURCES: ReadonlySet<string> = new Set([
 // ─── DEK resolution (Epic B.2) ────────────────────────────────────────
 
 /**
- * Resolve the per-tenant DEK for the current operation, or `null`
- * when the middleware should fall back to the global KEK.
+ * A resolved tenant-DEK pair. `primary` is the current encryption
+ * key (used for new writes and the first decrypt attempt on every
+ * v2 ciphertext). `previous` is non-null only while a per-tenant
+ * DEK rotation is mid-flight (`Tenant.previousEncryptedDek` is
+ * populated) — used as the fallback inside
+ * `decryptWithKeyOrPrevious` so reads of rows still under the old
+ * DEK keep working until the sweep rewrites them.
+ */
+interface TenantDekPair {
+    primary: Buffer | null;
+    previous: Buffer | null;
+}
+
+const NO_DEK_PAIR: TenantDekPair = { primary: null, previous: null };
+
+/**
+ * Resolve the per-tenant DEK pair for the current operation, or the
+ * `{ null, null }` sentinel when the middleware should fall back to
+ * the global KEK.
  *
- * Returns `null` when any of:
+ * Returns the empty pair when any of:
  *   - `model === 'Tenant'` — recursion guard. `getTenantDek` reads
  *     the `Tenant` row itself, which re-enters this hook; we must
  *     NOT try to resolve a DEK for a Tenant query.
@@ -127,35 +145,61 @@ const BYPASS_SOURCES: ReadonlySet<string> = new Set([
  *   - `source` is one of the known bypass markers
  *   - the manager throws (missing tenant / DB error)
  *
- * In every `null` case, the middleware uses `encryptField` /
+ * In every empty-pair case, the middleware uses `encryptField` /
  * `decryptField` under the global KEK — same behaviour as Epic B.1.
+ *
+ * The `previous` slot is independently optional. The primary may
+ * resolve while the previous is null (steady state, no rotation in
+ * flight). Both null is the global-KEK fallback. Primary null +
+ * previous non-null is impossible by construction.
  */
-async function resolveTenantDek(
+async function resolveTenantDekPair(
     model: string | undefined,
-): Promise<Buffer | null> {
-    if (model === 'Tenant') return null;
+): Promise<TenantDekPair> {
+    if (model === 'Tenant') return NO_DEK_PAIR;
 
     const ctx = getAuditContext();
     const tenantId = ctx?.tenantId;
-    if (!tenantId) return null;
-    if (ctx?.source && BYPASS_SOURCES.has(ctx.source)) return null;
+    if (!tenantId) return NO_DEK_PAIR;
+    if (ctx?.source && BYPASS_SOURCES.has(ctx.source)) return NO_DEK_PAIR;
 
     // Lazy-require the key manager to dodge the circular-import risk
     // pattern we use elsewhere (see `db/rls-middleware.ts`).
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getTenantDek } = require('@/lib/security/tenant-key-manager') as
-        typeof import('@/lib/security/tenant-key-manager');
+    const { getTenantDek, getTenantPreviousDek } = require(
+        '@/lib/security/tenant-key-manager',
+    ) as typeof import('@/lib/security/tenant-key-manager');
 
+    let primary: Buffer | null;
     try {
-        return await getTenantDek(tenantId);
+        primary = await getTenantDek(tenantId);
     } catch (err) {
         logger.warn('encryption-middleware.dek_resolve_failed', {
             component: 'encryption-middleware',
             tenantId,
             reason: err instanceof Error ? err.message : 'unknown',
         });
-        return null;
+        return NO_DEK_PAIR;
     }
+
+    // The previous-DEK lookup is cheap in steady state (negative TTL
+    // cache short-circuits the DB) and bounded during rotation
+    // (cache hit after the first call). A failure here is benign —
+    // we proceed with primary-only and accept that mid-rotation
+    // reads of stale rows fail in this process until the sweep
+    // catches up.
+    let previous: Buffer | null = null;
+    try {
+        previous = await getTenantPreviousDek(tenantId);
+    } catch (err) {
+        logger.warn('encryption-middleware.previous_dek_resolve_failed', {
+            component: 'encryption-middleware',
+            tenantId,
+            reason: err instanceof Error ? err.message : 'unknown',
+        });
+    }
+
+    return { primary, previous };
 }
 
 // ─── Encrypt traversal (write path) ──────────────────────────────────
@@ -268,25 +312,30 @@ function walkWriteArgument(
 
 /**
  * Decrypt a single value based on its envelope version. v1 → global
- * KEK via `decryptField`. v2 → tenant DEK via `decryptWithKey`. If
- * the ciphertext is v2 but no DEK is available (cross-tenant bypass
- * read), the caller is expected to leave the value untouched and
- * log a warning — this function throws in that case so the caller
- * can distinguish "expected pass-through" from "real decrypt
- * failure".
+ * KEK via `decryptField` (which has its own dual-KEK fallback for
+ * master-key rotation). v2 → primary tenant DEK first, falling back
+ * to the previous DEK on AES-GCM auth failure. If the ciphertext is
+ * v2 but no primary DEK is available (cross-tenant bypass read),
+ * the caller is expected to leave the value untouched and log a
+ * warning — this function throws in that case so the caller can
+ * distinguish "expected pass-through" from "real decrypt failure".
  */
-function decryptValue(ciphertext: string, dek: Buffer | null): string {
+function decryptValue(ciphertext: string, deks: TenantDekPair): string {
     const version = getCiphertextVersion(ciphertext);
     if (version === 'v1') {
         return decryptField(ciphertext);
     }
     if (version === 'v2') {
-        if (!dek) {
+        if (!deks.primary) {
             throw new Error(
                 'encryption-middleware: v2 ciphertext encountered but no tenant DEK is resolvable',
             );
         }
-        return decryptWithKey(dek, ciphertext);
+        // Steady state: deks.previous is null and this is a single
+        // primary decrypt attempt with the same shape as before.
+        // Mid-rotation: previous is non-null and the helper retries
+        // under it on AES-GCM auth failure.
+        return decryptWithKeyOrPrevious(deks.primary, deks.previous, ciphertext);
     }
     // Shouldn't happen — caller gates on isEncryptedValue.
     throw new Error('encryption-middleware: unknown ciphertext envelope');
@@ -295,7 +344,7 @@ function decryptValue(ciphertext: string, dek: Buffer | null): string {
 function decryptResultNode(
     node: Record<string, unknown>,
     modelName: string,
-    dek: Buffer | null,
+    deks: TenantDekPair,
 ): void {
     const fields = getEncryptedFields(modelName);
     if (!fields) return;
@@ -306,7 +355,7 @@ function decryptResultNode(
         if (value.length === 0) continue;
         if (!isEncryptedValue(value)) continue;
         try {
-            node[field] = decryptValue(value, dek);
+            node[field] = decryptValue(value, deks);
         } catch (err) {
             // Never throw on read. A malformed row or a cross-tenant
             // bypass read that can't resolve the right DEK surfaces
@@ -324,7 +373,7 @@ function decryptResultNode(
 
 function decryptResultNodeAllModels(
     node: Record<string, unknown>,
-    dek: Buffer | null,
+    deks: TenantDekPair,
 ): void {
     for (const key of Object.keys(node)) {
         if (!ALL_ENCRYPTED_FIELD_NAMES.has(key)) continue;
@@ -334,7 +383,7 @@ function decryptResultNodeAllModels(
         if (value.length === 0) continue;
         if (!isEncryptedValue(value)) continue;
         try {
-            node[key] = decryptValue(value, dek);
+            node[key] = decryptValue(value, deks);
         } catch (err) {
             logger.warn('encryption-middleware.decrypt_failed', {
                 component: 'encryption-middleware',
@@ -350,15 +399,20 @@ function decryptResultNodeAllModels(
 /**
  * Walk a Prisma result tree and decrypt every manifest field we
  * find. Handles single objects, arrays, and included relations.
+ *
+ * Accepts `null` as a shorthand for "no DEKs available" — same
+ * semantics as `{ primary: null, previous: null }` (callers that
+ * passed plain `null` before the dual-DEK refactor still work).
  */
 function walkReadResult(
     result: unknown,
     modelName: string,
-    dek: Buffer | null,
+    deks: TenantDekPair | null,
 ): void {
+    const pair = deks ?? NO_DEK_PAIR;
     if (result === null || result === undefined) return;
     if (Array.isArray(result)) {
-        for (const item of result) walkReadResult(item, modelName, dek);
+        for (const item of result) walkReadResult(item, modelName, pair);
         return;
     }
     if (typeof result !== 'object') return;
@@ -370,10 +424,10 @@ function walkReadResult(
         // field name, we can skip the per-key iteration AND the per-
         // field type/prefix checks.
         if (nodeHasAnyEncryptedFieldKey(node)) {
-            decryptResultNodeAllModels(node, dek);
+            decryptResultNodeAllModels(node, pair);
         }
     } else {
-        decryptResultNode(node, modelName, dek);
+        decryptResultNode(node, modelName, pair);
     }
 
     // Walk nested object / array values — might be included relations.
@@ -386,7 +440,7 @@ function walkReadResult(
         ) {
             continue;
         }
-        walkReadResult(value, '*', dek);
+        walkReadResult(value, '*', pair);
     }
 }
 
@@ -412,16 +466,13 @@ export function registerEncryptionMiddleware(client: PrismaClient): void {
         const isWrite = WRITE_ACTIONS.has(params.action);
         const isRead = RESULT_DECRYPT_ACTIONS.has(params.action);
 
-        // Pre-resolve the DEK once for the whole operation. Cache
-        // hit after the first lookup per tenant in this process.
-        // For models with no manifest involvement AND no nested
-        // encrypted relations, the traversal is a no-op anyway, so
-        // we could skip the lookup — but the cost is one `Map.get`
-        // on the hot path and the code is simpler when we always
-        // pre-resolve.
-        const dek: Buffer | null = (isWrite || isRead)
-            ? await resolveTenantDek(model)
-            : null;
+        // Pre-resolve the DEK pair once for the whole operation.
+        // Cache hit after the first lookup per tenant in this process
+        // for the primary; the previous slot is null in steady state
+        // and only populated during an in-flight rotation.
+        const deks: TenantDekPair = (isWrite || isRead)
+            ? await resolveTenantDekPair(model)
+            : NO_DEK_PAIR;
 
         // ── Write path ──
         if (isWrite) {
@@ -430,10 +481,14 @@ export function registerEncryptionMiddleware(client: PrismaClient): void {
             const targetModel =
                 model && isEncryptedModel(model) ? model : '*';
 
-            if (args?.data) walkWriteArgument(args.data, targetModel, dek);
+            // Writes always use the primary DEK (or fall back to
+            // global KEK when null). The previous slot is irrelevant
+            // for writes — it exists solely so reads of stale rows
+            // can find their key during a rotation.
+            if (args?.data) walkWriteArgument(args.data, targetModel, deks.primary);
             if (params.action === 'upsert') {
-                if (args?.create) walkWriteArgument(args.create, targetModel, dek);
-                if (args?.update) walkWriteArgument(args.update, targetModel, dek);
+                if (args?.create) walkWriteArgument(args.create, targetModel, deks.primary);
+                if (args?.update) walkWriteArgument(args.update, targetModel, deks.primary);
             }
         }
 
@@ -443,7 +498,7 @@ export function registerEncryptionMiddleware(client: PrismaClient): void {
         if (isRead) {
             const targetModel =
                 model && isEncryptedModel(model) ? model : '*';
-            walkReadResult(result, targetModel, dek);
+            walkReadResult(result, targetModel, deks);
         }
 
         return result;
@@ -463,5 +518,5 @@ export const _internals = {
     walkReadResult,
     encryptDataNode,
     decryptResultNode,
-    resolveTenantDek,
+    resolveTenantDekPair,
 };

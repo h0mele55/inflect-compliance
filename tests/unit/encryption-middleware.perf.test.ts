@@ -46,6 +46,7 @@ import {
 } from '@/lib/security/encryption';
 import { _internals } from '@/lib/db/encryption-middleware';
 
+const NO_DEKS = { primary: null, previous: null } as const;
 const { walkReadResult, walkWriteArgument } = _internals;
 
 // ─── Timing helpers ─────────────────────────────────────────────────
@@ -142,7 +143,7 @@ describe('Performance — Epic B.1 encryption middleware', () => {
                 vulnerability: CIPHER(2),
                 createdAt: '2026-04-22',
             };
-            walkReadResult(row, 'Risk', null);
+            walkReadResult(row, 'Risk', NO_DEKS);
         }, 200);
         console.log(
             `[perf] detail (3 fields × 200 runs): ${totalMs.toFixed(2)}ms total, ${(totalMs / 200).toFixed(3)}ms mean`,
@@ -167,7 +168,7 @@ describe('Performance — Epic B.1 encryption middleware', () => {
             // Re-clone each iteration so every run decrypts
             // ciphertext (not already-decrypted leftovers).
             const rows = JSON.parse(JSON.stringify(prebuilt));
-            walkReadResult(rows, 'Task', null);
+            walkReadResult(rows, 'Task', NO_DEKS);
         }, 20);
 
         console.log(
@@ -200,7 +201,7 @@ describe('Performance — Epic B.1 encryption middleware', () => {
 
         const { totalMs } = measure(() => {
             const rows = JSON.parse(JSON.stringify(prebuilt));
-            walkReadResult(rows, 'Task', null);
+            walkReadResult(rows, 'Task', NO_DEKS);
         }, 10);
 
         console.log(
@@ -227,7 +228,7 @@ describe('Performance — Epic B.1 encryption middleware', () => {
 
         const { totalMs } = measure(() => {
             const rows = JSON.parse(JSON.stringify(prebuilt));
-            walkReadResult(rows, 'Framework', null);
+            walkReadResult(rows, 'Framework', NO_DEKS);
         }, 50);
 
         console.log(
@@ -275,7 +276,7 @@ describe('Performance — Epic B.1 encryption middleware', () => {
         }));
         const viaMiddleware = measure(() => {
             const rows = JSON.parse(JSON.stringify(prebuilt));
-            walkReadResult(rows, 'Task', null);
+            walkReadResult(rows, 'Task', NO_DEKS);
         }, 20);
 
         const overhead = viaMiddleware.meanMs - raw.meanMs;
@@ -310,7 +311,7 @@ describe('Benchmark harness sanity', () => {
             description: CIPHER(0),
             resolution: CIPHER(1),
         };
-        walkReadResult(row, 'Task', null);
+        walkReadResult(row, 'Task', NO_DEKS);
         expect(isEncryptedValue(row.description)).toBe(false);
         expect(isEncryptedValue(row.resolution)).toBe(false);
     });
