@@ -61,9 +61,22 @@
  * this file.
  */
 
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 
 import prisma from '@/lib/prisma';
+
+/**
+ * Helpers accept either the global Prisma client or an in-flight
+ * `$transaction` callback's tx client. This lets the role-change
+ * usecase wrap the OrgMembership update + the fan-out/fan-in in a
+ * single atomic transaction without duplicating the provisioning
+ * SQL inside the usecase.
+ *
+ * The default — the global client — preserves every existing call
+ * site (addOrgMember, removeOrgMember, createTenantUnderOrg) which
+ * is happy with helper-internal atomicity.
+ */
+type DbClient = Prisma.TransactionClient | typeof prisma;
 
 // ── Result types ──────────────────────────────────────────────────────
 
@@ -109,8 +122,9 @@ export interface DeprovisionResult {
 export async function provisionOrgAdminToTenants(
     orgId: string,
     userId: string,
+    db: DbClient = prisma,
 ): Promise<ProvisionResult> {
-    const tenants = await prisma.tenant.findMany({
+    const tenants = await db.tenant.findMany({
         where: { organizationId: orgId },
         select: { id: true },
     });
@@ -118,7 +132,7 @@ export async function provisionOrgAdminToTenants(
         return { created: 0, skipped: 0, totalConsidered: 0 };
     }
 
-    const result = await prisma.tenantMembership.createMany({
+    const result = await db.tenantMembership.createMany({
         data: tenants.map((t) => ({
             tenantId: t.id,
             userId,
@@ -149,8 +163,9 @@ export async function provisionOrgAdminToTenants(
 export async function provisionAllOrgAdminsToTenant(
     orgId: string,
     tenantId: string,
+    db: DbClient = prisma,
 ): Promise<ProvisionResult> {
-    const admins = await prisma.orgMembership.findMany({
+    const admins = await db.orgMembership.findMany({
         where: { organizationId: orgId, role: 'ORG_ADMIN' },
         select: { userId: true },
     });
@@ -158,7 +173,7 @@ export async function provisionAllOrgAdminsToTenant(
         return { created: 0, skipped: 0, totalConsidered: 0 };
     }
 
-    const result = await prisma.tenantMembership.createMany({
+    const result = await db.tenantMembership.createMany({
         data: admins.map((a) => ({
             tenantId,
             userId: a.userId,
@@ -200,32 +215,48 @@ export async function provisionAllOrgAdminsToTenant(
 export async function deprovisionOrgAdmin(
     orgId: string,
     userId: string,
+    db?: Prisma.TransactionClient,
 ): Promise<DeprovisionResult> {
-    return prisma.$transaction(async (tx) => {
-        const targets = await tx.tenantMembership.findMany({
-            where: {
-                userId,
-                provisionedByOrgId: orgId,
-                role: Role.AUDITOR,
-            },
-            select: { tenantId: true },
-        });
+    // When the caller already owns a transaction (e.g. the role-change
+    // usecase), reuse it so the OrgMembership update + the AUDITOR
+    // delete commit together. Otherwise open our own — the explicit
+    // transaction is what guarantees the result's `tenantIds` reflects
+    // the rows we actually deleted, even if a concurrent provisioner
+    // races.
+    if (db) {
+        return doDeprovision(db, orgId, userId);
+    }
+    return prisma.$transaction((tx) => doDeprovision(tx, orgId, userId));
+}
 
-        if (targets.length === 0) {
-            return { deleted: 0, tenantIds: [] };
-        }
-
-        const result = await tx.tenantMembership.deleteMany({
-            where: {
-                userId,
-                provisionedByOrgId: orgId,
-                role: Role.AUDITOR,
-            },
-        });
-
-        return {
-            deleted: result.count,
-            tenantIds: targets.map((t) => t.tenantId),
-        };
+async function doDeprovision(
+    db: DbClient,
+    orgId: string,
+    userId: string,
+): Promise<DeprovisionResult> {
+    const targets = await db.tenantMembership.findMany({
+        where: {
+            userId,
+            provisionedByOrgId: orgId,
+            role: Role.AUDITOR,
+        },
+        select: { tenantId: true },
     });
+
+    if (targets.length === 0) {
+        return { deleted: 0, tenantIds: [] };
+    }
+
+    const result = await db.tenantMembership.deleteMany({
+        where: {
+            userId,
+            provisionedByOrgId: orgId,
+            role: Role.AUDITOR,
+        },
+    });
+
+    return {
+        deleted: result.count,
+        tenantIds: targets.map((t) => t.tenantId),
+    };
 }

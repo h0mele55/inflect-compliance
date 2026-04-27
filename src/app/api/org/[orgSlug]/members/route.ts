@@ -5,21 +5,35 @@
  *     add an ORG_ADMIN or ORG_READER. ORG_ADMIN add triggers fan-out
  *     of AUDITOR memberships into every existing org tenant.
  *
+ *   PUT /api/org/[orgSlug]/members
+ *     change an existing member's role atomically. READER→ADMIN
+ *     triggers tenant fan-out, ADMIN→READER triggers fan-in of only
+ *     the org-tagged auto-provisioned rows. Same-role transitions
+ *     are a no-op. Last-ORG_ADMIN guard refuses to demote the only
+ *     remaining admin.
+ *
  *   DELETE /api/org/[orgSlug]/members?userId=...
  *     remove a member. ORG_ADMIN remove triggers fan-in of the
  *     auto-provisioned AUDITOR memberships (only those tagged with
  *     this org's id; manual memberships are preserved). Last-
  *     ORG_ADMIN guard refuses to orphan the org.
  *
- * Both gated by `canManageMembers` (ORG_ADMIN only).
+ * All three gated by `canManageMembers` (ORG_ADMIN only).
  */
 import { NextRequest, NextResponse } from 'next/server';
 
 import { getOrgCtx } from '@/app-layer/context';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { withValidatedBody } from '@/lib/validation/route';
-import { AddOrgMemberInput } from '@/app-layer/schemas/organization.schemas';
-import { addOrgMember, removeOrgMember } from '@/app-layer/usecases/org-members';
+import {
+    AddOrgMemberInput,
+    ChangeOrgMemberRoleInput,
+} from '@/app-layer/schemas/organization.schemas';
+import {
+    addOrgMember,
+    changeOrgMemberRole,
+    removeOrgMember,
+} from '@/app-layer/usecases/org-members';
 import { badRequest, forbidden } from '@/lib/errors/types';
 
 interface RouteContext {
@@ -54,6 +68,41 @@ export const POST = withApiErrorHandling(
                 },
                 { status: 201 },
             );
+        },
+    ),
+);
+
+export const PUT = withApiErrorHandling(
+    withValidatedBody(
+        ChangeOrgMemberRoleInput,
+        async (req: NextRequest, routeCtx: RouteContext, body) => {
+            const ctx = await getOrgCtx(routeCtx.params, req);
+            if (!ctx.permissions.canManageMembers) {
+                throw forbidden('You do not have permission to manage members of this organization');
+            }
+
+            const result = await changeOrgMemberRole(ctx, {
+                userId: body.userId,
+                role: body.role,
+            });
+
+            return NextResponse.json({
+                membership: result.membership,
+                transition: result.transition,
+                provisioned: result.provision
+                    ? {
+                          created: result.provision.created,
+                          skipped: result.provision.skipped,
+                          totalConsidered: result.provision.totalConsidered,
+                      }
+                    : null,
+                deprovisioned: result.deprovision
+                    ? {
+                          deleted: result.deprovision.deleted,
+                          tenantIds: result.deprovision.tenantIds,
+                      }
+                    : null,
+            });
         },
     ),
 );
