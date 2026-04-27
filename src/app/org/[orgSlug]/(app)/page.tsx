@@ -12,11 +12,7 @@ import {
 } from 'lucide-react';
 
 import { getOrgCtx } from '@/app-layer/context';
-import {
-    getPortfolioSummary,
-    getPortfolioTenantHealth,
-    getPortfolioTrends,
-} from '@/app-layer/usecases/portfolio';
+import { getPortfolioOverview } from '@/app-layer/usecases/portfolio';
 import KpiCard from '@/components/ui/KpiCard';
 import DonutChart, { type DonutSegment } from '@/components/ui/DonutChart';
 import { TrendCard } from '@/components/ui/TrendCard';
@@ -67,12 +63,14 @@ export default async function PortfolioOverviewPage({ params }: PageProps) {
         notFound();
     }
 
-    // Parallel fetch — three independent reads, no inter-dependency.
-    const [summary, healthRows, trend] = await Promise.all([
-        getPortfolioSummary(ctx),
-        getPortfolioTenantHealth(ctx),
-        getPortfolioTrends(ctx, 90),
-    ]);
+    // Single-fetch orchestrator — loads tenant list once and projects
+    // summary, tenant-health, and trends from the shared base data.
+    // Replaces the previous 3-parallel-usecase pattern that fired
+    // identical `getOrgTenantIds` × 3 and `getLatestSnapshots` × 2.
+    const overview = await getPortfolioOverview(ctx, { trendDays: 90 });
+    const summary = overview.summary;
+    const healthRows = overview.tenantHealth;
+    const trend = overview.trends;
 
     return (
         <div className="space-y-8">
