@@ -10,7 +10,9 @@ const userUpsertMock = jest.fn();
 const orgMembershipFindUniqueMock = jest.fn();
 const orgMembershipCreateMock = jest.fn();
 const orgMembershipDeleteMock = jest.fn();
+const orgMembershipUpdateMock = jest.fn();
 const orgMembershipCountMock = jest.fn();
+const transactionMock = jest.fn();
 const provisionOrgAdminMock = jest.fn();
 const deprovisionOrgAdminMock = jest.fn();
 
@@ -21,8 +23,10 @@ jest.mock('@/lib/prisma', () => {
             findUnique: (...a: unknown[]) => orgMembershipFindUniqueMock(...a),
             create: (...a: unknown[]) => orgMembershipCreateMock(...a),
             delete: (...a: unknown[]) => orgMembershipDeleteMock(...a),
+            update: (...a: unknown[]) => orgMembershipUpdateMock(...a),
             count: (...a: unknown[]) => orgMembershipCountMock(...a),
         },
+        $transaction: (...a: unknown[]) => transactionMock(...a),
     };
     return { __esModule: true, default: client, prisma: client };
 });
@@ -33,7 +37,11 @@ jest.mock('@/app-layer/usecases/org-provisioning', () => ({
     deprovisionOrgAdmin: (...a: unknown[]) => deprovisionOrgAdminMock(...a),
 }));
 
-import { addOrgMember, removeOrgMember } from '@/app-layer/usecases/org-members';
+import {
+    addOrgMember,
+    changeOrgMemberRole,
+    removeOrgMember,
+} from '@/app-layer/usecases/org-members';
 import type { OrgContext } from '@/app-layer/types';
 
 function ctxFor(overrides: Partial<OrgContext> = {}): OrgContext {
@@ -59,7 +67,9 @@ beforeEach(() => {
     orgMembershipFindUniqueMock.mockReset();
     orgMembershipCreateMock.mockReset();
     orgMembershipDeleteMock.mockReset();
+    orgMembershipUpdateMock.mockReset();
     orgMembershipCountMock.mockReset();
+    transactionMock.mockReset();
     provisionOrgAdminMock.mockReset();
     deprovisionOrgAdminMock.mockReset();
 });
@@ -196,6 +206,219 @@ describe('removeOrgMember', () => {
             removeOrgMember(ctxFor(), { userId: '' }),
         ).rejects.toMatchObject({ status: 400 });
 
+        expect(orgMembershipFindUniqueMock).not.toHaveBeenCalled();
+    });
+});
+
+// ── changeOrgMemberRole ───────────────────────────────────────────────
+
+describe('changeOrgMemberRole', () => {
+    // Default $transaction mock — invokes the callback with the same
+    // prisma client, so methods called on `tx` resolve through the
+    // outer mocks. Each test that needs a different shape overrides
+    // this in its setup.
+    function wireTransactionPassthrough() {
+        transactionMock.mockImplementation(async (cb: unknown) => {
+            const fn = cb as (tx: unknown) => Promise<unknown>;
+            // The tx client is a structural subset of prisma — we
+            // pass the orgMembership + tenant + tenantMembership
+            // accessors the helpers might call. Provisioning helpers
+            // are mocked at module boundary so they don't reach the
+            // tx client; the role-change usecase only touches
+            // tx.orgMembership.update + tx.orgMembership.count here.
+            return fn({
+                orgMembership: {
+                    update: orgMembershipUpdateMock,
+                    count: orgMembershipCountMock,
+                },
+            });
+        });
+    }
+
+    it('READER → ADMIN: updates role inside tx and triggers provisioning fan-out', async () => {
+        orgMembershipFindUniqueMock.mockResolvedValue({
+            id: 'mem-1',
+            role: 'ORG_READER',
+        });
+        orgMembershipUpdateMock.mockResolvedValue({
+            id: 'mem-1',
+            organizationId: 'org-1',
+            userId: 'user-2',
+            role: 'ORG_ADMIN',
+        });
+        provisionOrgAdminMock.mockResolvedValue({
+            created: 4,
+            skipped: 0,
+            totalConsidered: 4,
+        });
+        wireTransactionPassthrough();
+
+        const result = await changeOrgMemberRole(ctxFor(), {
+            userId: 'user-2',
+            role: 'ORG_ADMIN',
+        });
+
+        // Single transaction wrapping both sides.
+        expect(transactionMock).toHaveBeenCalledTimes(1);
+
+        // Role updated.
+        expect(orgMembershipUpdateMock).toHaveBeenCalledWith({
+            where: { id: 'mem-1' },
+            data: { role: 'ORG_ADMIN' },
+            select: expect.any(Object),
+        });
+
+        // Provisioning called with the tx client (3rd arg, NOT the
+        // global prisma).
+        expect(provisionOrgAdminMock).toHaveBeenCalledTimes(1);
+        const provisionCall = provisionOrgAdminMock.mock.calls[0];
+        expect(provisionCall[0]).toBe('org-1');
+        expect(provisionCall[1]).toBe('user-2');
+        expect(provisionCall[2]).toBeDefined(); // tx client passed
+
+        // Demotion side effect MUST NOT fire.
+        expect(deprovisionOrgAdminMock).not.toHaveBeenCalled();
+
+        expect(result.transition).toBe('reader_to_admin');
+        expect(result.provision).toEqual({
+            created: 4,
+            skipped: 0,
+            totalConsidered: 4,
+        });
+        expect(result.deprovision).toBeUndefined();
+        expect(result.membership.role).toBe('ORG_ADMIN');
+    });
+
+    it('ADMIN → READER: updates role inside tx and triggers deprovisioning (count > 1)', async () => {
+        orgMembershipFindUniqueMock.mockResolvedValue({
+            id: 'mem-1',
+            role: 'ORG_ADMIN',
+        });
+        // Outer count check + inner re-check in tx — both > 1.
+        orgMembershipCountMock.mockResolvedValue(3);
+        orgMembershipUpdateMock.mockResolvedValue({
+            id: 'mem-1',
+            organizationId: 'org-1',
+            userId: 'user-2',
+            role: 'ORG_READER',
+        });
+        deprovisionOrgAdminMock.mockResolvedValue({
+            deleted: 4,
+            tenantIds: ['t-1', 't-2', 't-3', 't-4'],
+        });
+        wireTransactionPassthrough();
+
+        const result = await changeOrgMemberRole(ctxFor(), {
+            userId: 'user-2',
+            role: 'ORG_READER',
+        });
+
+        expect(transactionMock).toHaveBeenCalledTimes(1);
+
+        // Deprovision called with the tx client (3rd arg).
+        expect(deprovisionOrgAdminMock).toHaveBeenCalledTimes(1);
+        const deprovisionCall = deprovisionOrgAdminMock.mock.calls[0];
+        expect(deprovisionCall[0]).toBe('org-1');
+        expect(deprovisionCall[1]).toBe('user-2');
+        expect(deprovisionCall[2]).toBeDefined();
+
+        // Provision side effect MUST NOT fire.
+        expect(provisionOrgAdminMock).not.toHaveBeenCalled();
+
+        expect(result.transition).toBe('admin_to_reader');
+        expect(result.deprovision).toEqual({
+            deleted: 4,
+            tenantIds: ['t-1', 't-2', 't-3', 't-4'],
+        });
+        expect(result.provision).toBeUndefined();
+        expect(result.membership.role).toBe('ORG_READER');
+    });
+
+    it('ADMIN → READER: refuses to demote the last ORG_ADMIN (outer guard)', async () => {
+        orgMembershipFindUniqueMock.mockResolvedValue({
+            id: 'mem-1',
+            role: 'ORG_ADMIN',
+        });
+        // Last admin — guard refuses BEFORE opening the transaction.
+        orgMembershipCountMock.mockResolvedValue(1);
+
+        await expect(
+            changeOrgMemberRole(ctxFor(), {
+                userId: 'user-2',
+                role: 'ORG_READER',
+            }),
+        ).rejects.toMatchObject({ status: 409 });
+
+        // Transaction never opened, no role mutation, no
+        // deprovisioning fan-in.
+        expect(transactionMock).not.toHaveBeenCalled();
+        expect(orgMembershipUpdateMock).not.toHaveBeenCalled();
+        expect(deprovisionOrgAdminMock).not.toHaveBeenCalled();
+    });
+
+    it('ADMIN → READER: also catches the race inside the tx (inner re-check)', async () => {
+        orgMembershipFindUniqueMock.mockResolvedValue({
+            id: 'mem-1',
+            role: 'ORG_ADMIN',
+        });
+        // Outer count returns 2 (passes), inner returns 1 (race).
+        orgMembershipCountMock
+            .mockResolvedValueOnce(2)
+            .mockResolvedValueOnce(1);
+        wireTransactionPassthrough();
+
+        await expect(
+            changeOrgMemberRole(ctxFor(), {
+                userId: 'user-2',
+                role: 'ORG_READER',
+            }),
+        ).rejects.toMatchObject({ status: 409 });
+
+        // Transaction opened, but the tx body threw before the role
+        // update or the deprovision call.
+        expect(transactionMock).toHaveBeenCalledTimes(1);
+        expect(orgMembershipUpdateMock).not.toHaveBeenCalled();
+        expect(deprovisionOrgAdminMock).not.toHaveBeenCalled();
+    });
+
+    it('no-op transition: same role, no transaction, no provisioning', async () => {
+        orgMembershipFindUniqueMock.mockResolvedValue({
+            id: 'mem-1',
+            role: 'ORG_READER',
+        });
+
+        const result = await changeOrgMemberRole(ctxFor(), {
+            userId: 'user-2',
+            role: 'ORG_READER',
+        });
+
+        expect(result.transition).toBe('noop');
+        expect(transactionMock).not.toHaveBeenCalled();
+        expect(orgMembershipUpdateMock).not.toHaveBeenCalled();
+        expect(provisionOrgAdminMock).not.toHaveBeenCalled();
+        expect(deprovisionOrgAdminMock).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundError when the membership does not exist', async () => {
+        orgMembershipFindUniqueMock.mockResolvedValue(null);
+
+        await expect(
+            changeOrgMemberRole(ctxFor(), {
+                userId: 'user-99',
+                role: 'ORG_ADMIN',
+            }),
+        ).rejects.toMatchObject({ status: 404 });
+
+        expect(transactionMock).not.toHaveBeenCalled();
+    });
+
+    it('throws ValidationError when userId is empty', async () => {
+        await expect(
+            changeOrgMemberRole(ctxFor(), {
+                userId: '',
+                role: 'ORG_ADMIN',
+            }),
+        ).rejects.toMatchObject({ status: 400 });
         expect(orgMembershipFindUniqueMock).not.toHaveBeenCalled();
     });
 });
