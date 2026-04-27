@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 
 import { getOrgCtx } from '@/app-layer/context';
 import { listOverdueEvidenceAcrossOrg } from '@/app-layer/usecases/portfolio';
+import { toPlainJson } from '@/lib/server/to-plain-json';
 import { EvidenceTable } from './EvidenceTable';
 
 /**
@@ -33,9 +34,10 @@ export default async function OrgEvidencePage({ params, searchParams }: PageProp
     const cursor = typeof sp.cursor === 'string' ? sp.cursor : undefined;
     const result = await listOverdueEvidenceAcrossOrg(ctx, { cursor });
 
+    // Server→client RSC boundary — see `toPlainJson` for rationale.
     return (
         <EvidenceTable
-            rows={JSON.parse(JSON.stringify(result.rows))}
+            rows={toPlainJson(result.rows)}
             nextCursor={result.nextCursor}
             orgSlug={orgSlug}
         />

@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 
 import { getOrgCtx } from '@/app-layer/context';
 import { getPortfolioTenantHealth } from '@/app-layer/usecases/portfolio';
+import { toPlainJson } from '@/lib/server/to-plain-json';
 import { TenantsTable } from './TenantsTable';
 
 /**
@@ -32,10 +33,6 @@ export default async function OrgTenantsPage({ params }: PageProps) {
 
     const rows = await getPortfolioTenantHealth(ctx);
 
-    return (
-        <TenantsTable
-            rows={JSON.parse(JSON.stringify(rows))}
-            orgSlug={orgSlug}
-        />
-    );
+    // Server→client RSC boundary — see `toPlainJson` for rationale.
+    return <TenantsTable rows={toPlainJson(rows)} orgSlug={orgSlug} />;
 }
