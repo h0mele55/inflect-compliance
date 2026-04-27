@@ -252,3 +252,375 @@ docker compose -f docker-compose.prod.yml exec app \
 - [x] PII column-level encryption (AES-256-GCM) — see [encryption docs](encryption-data-protection.md)
 - [ ] Volume/disk encryption enabled (self-hosted) — see [encryption docs](encryption-data-protection.md)
 - [ ] Backup encryption (GPG) configured — see [encryption docs](encryption-data-protection.md)
+
+---
+
+## Kubernetes (Helm) — primary production path
+
+As of Epic OI-2 (2026-04-27), production deployments use the Helm
+chart at `infra/helm/inflect/` running on EKS. The earlier
+SSH/docker-compose path remains documented for self-hosted scenarios
+but is **deprecated as the primary production model**.
+
+> **Companion docs**
+> - `infra/helm/inflect/README.md` — chart-specific operator notes
+> - `docs/infrastructure.md` — Epic OI-1 (Terraform/AWS layer beneath the cluster)
+> - `docs/implementation-notes/2026-04-27-epic-oi-2-*.md` — design history
+
+### Architecture
+
+```
+┌─────────────────── EKS cluster ───────────────────────┐
+│                                                       │
+│  Namespace: inflect-{staging,production}              │
+│                                                       │
+│  ┌── Service ──────┐                                  │
+│  │ ClusterIP :80   │ ◄── Ingress (NGINX or ALB)       │
+│  └────────┬────────┘                                  │
+│           │ targetPort: http (3000)                   │
+│           ▼                                           │
+│  ┌──── App pod ──────────────────────────────┐        │
+│  │  ┌── inflect ─────────┐  ┌── pgbouncer ─┐ │        │
+│  │  │ Next.js :3000      │──│ :5432 (loop)  │ │        │
+│  │  └────────────────────┘  └──────┬────────┘ │        │
+│  └─────────┬─────────────────────────┼────────┘        │
+│            │                         │                 │
+│  ┌── Worker pod ──────┐               │                │
+│  │ node tsx worker.ts │               │                │
+│  └────────────────────┘               │                │
+│            │                          │                │
+│            └────── envFrom ──┬────────┘                │
+│                              │                         │
+│                       (egress via NetworkPolicy:       │
+│                        DNS, VPC:5432/6379, HTTPS)      │
+└──────────────────────────────┼─────────────────────────┘
+                               ▼
+                  RDS Postgres + ElastiCache Redis
+                  (Epic OI-1 — terraform-managed)
+```
+
+Per-release resources rendered by the chart:
+
+| Kind | Name | When |
+|---|---|---|
+| Service | `<release>` | always |
+| Deployment | `<release>` (component=app, with PgBouncer sidecar) | always |
+| Deployment | `<release>-worker` (component=worker) | `worker.enabled=true` |
+| Job | `<release>-migrate` | Helm pre-install/pre-upgrade hook |
+| HorizontalPodAutoscaler | `<release>` | `autoscaling.enabled=true` |
+| Ingress | `<release>` | `ingress.enabled=true` |
+| NetworkPolicy | `<release>-app` | `networkPolicy.enabled=true` |
+
+### Deploying
+
+The `Deploy` GitHub Actions workflow (`.github/workflows/deploy.yml`)
+is the canonical path. Manual trigger only:
+
+```
+GitHub → Actions → Deploy → Run workflow
+  environment: staging | production
+  ref: (blank for current main, or branch/tag/SHA)
+  image_tag: (blank for short-SHA-derived)
+```
+
+What happens:
+
+1. Build the app container image and push to GHCR
+2. OIDC into AWS, fetch kubeconfig for the target EKS cluster
+3. `helm lint` + `helm upgrade --install --dry-run` (validation)
+4. `helm upgrade --install ... --atomic --wait --timeout 10m`
+   - Pre-install/upgrade hook runs the Prisma migration Job; Helm
+     waits for the Job to succeed before rolling the Deployments
+   - `--atomic` rolls back automatically on any failure during
+     the upgrade window
+   - `--wait` blocks until all Deployments reach Ready and the
+     RolloutStatus reports complete (or `--timeout` expires)
+5. Smoke tests against `vars.SMOKE_URL` (per-env GitHub Environment variable)
+
+**Production is gated** by the `production` GitHub Environment's
+required-reviewers protection rule. The workflow pauses at the
+`deploy` job until a reviewer approves; this is the canonical
+manual-approval gate.
+
+### Local helm commands
+
+For ad-hoc operations (debugging, manual rollback, pod inspection)
+operators run helm locally with kubectl pointing at the cluster.
+
+**Setup once per workstation**:
+
+```bash
+# Authenticate to the AWS account
+aws sso login --profile inflect-prod   # or your auth method of choice
+
+# Update kubeconfig for the target cluster
+aws eks update-kubeconfig \
+  --region us-east-1 \
+  --name <eks-cluster-name>
+
+# Verify
+kubectl config current-context
+kubectl get nodes
+```
+
+**Inspect a release**:
+
+```bash
+helm list --namespace inflect-production
+helm history inflect-production --namespace inflect-production
+helm get values inflect-production --namespace inflect-production
+helm status inflect-production --namespace inflect-production
+```
+
+**Render the chart locally** (without applying):
+
+```bash
+helm template inflect-production infra/helm/inflect \
+  -f infra/helm/inflect/values-production.yaml \
+  --namespace inflect-production
+```
+
+**Manual install/upgrade** (rare — prefer the workflow so the
+approval audit trail is captured):
+
+```bash
+helm upgrade --install \
+  inflect-production \
+  infra/helm/inflect \
+  --namespace inflect-production \
+  --create-namespace \
+  --values infra/helm/inflect/values-production.yaml \
+  --set image.tag=<short-sha> \
+  --atomic \
+  --wait \
+  --timeout 10m
+```
+
+### Rollback via `helm rollback`
+
+Helm keeps the last 10 revisions per release (configurable via
+`HELM_HISTORY_MAX` in the workflow). Rollback restores the prior
+manifest set in a single atomic operation.
+
+**Find the target revision**:
+
+```bash
+helm history inflect-production --namespace inflect-production
+```
+
+Output (example):
+
+```
+REVISION  UPDATED                  STATUS      CHART          APP VERSION  DESCRIPTION
+1         2026-04-26 10:00:00 UTC  superseded  inflect-0.1.0  1.35.0       Install complete
+2         2026-04-27 09:15:00 UTC  superseded  inflect-0.1.0  1.35.1       Upgrade complete
+3         2026-04-27 14:00:00 UTC  deployed    inflect-0.1.0  1.36.0       Upgrade complete
+```
+
+**Roll back**:
+
+```bash
+# Roll back to the IMMEDIATELY PRIOR revision (most common)
+helm rollback inflect-production --namespace inflect-production
+
+# Roll back to a SPECIFIC revision
+helm rollback inflect-production 2 --namespace inflect-production
+
+# Roll back AND wait for resources to be ready
+helm rollback inflect-production 2 \
+  --namespace inflect-production \
+  --wait \
+  --timeout 5m
+
+# Roll back AND force-restart pods (sometimes needed when env hasn't actually changed)
+helm rollback inflect-production 2 \
+  --namespace inflect-production \
+  --recreate-pods   # deprecated but still useful in older Helm versions
+```
+
+**What rollback re-applies** (and what it doesn't):
+- ✅ Deployment image tags, replica counts, env, resources
+- ✅ ConfigMap / Secret content (chart-managed)
+- ✅ HPA bounds + metrics
+- ✅ Ingress + NetworkPolicy + Service spec
+- ⚠️  Pre-install/upgrade hook Jobs are **NOT re-run** on rollback —
+  Helm rollback does not invoke `helm.sh/hook: pre-install,pre-upgrade`
+  Jobs. The migration Job is one-way: rolling back the app image
+  to a revision that pre-dates a schema migration may break the
+  app on startup. See "Migration safety on rollback" below.
+- ❌ Externally-managed resources (RDS state, S3 bucket contents,
+  Secrets Manager entries) are NOT touched by rollback. Operator
+  handles those manually if a rollback also requires data revert.
+
+**Migration safety on rollback**:
+- Forward-incompatible schema changes (column drops, type changes,
+  constraint adds) make a rollback to a previous app image
+  dangerous — the old app code expects the old schema.
+- Mitigation: write **expand-and-contract** migrations.
+  - **Expand** PR adds the new column / table (compatible with
+    both app versions).
+  - **Migrate** PR ships the app code that uses the new shape.
+  - **Contract** PR drops the old shape AFTER the new code is
+    confirmed stable.
+  - Rollback after a Contract PR is a data-loss event — flag it
+    in PR descriptions so reviewers see the constraint explicitly.
+
+### Scaling
+
+**Horizontal — replicas**:
+
+The HPA owns the replica count when `autoscaling.enabled=true`
+(production default). Modify the bounds via values:
+
+```bash
+# Adjust bounds + reapply via helm upgrade
+helm upgrade --install \
+  inflect-production \
+  infra/helm/inflect \
+  --namespace inflect-production \
+  -f infra/helm/inflect/values-production.yaml \
+  --set autoscaling.minReplicas=4 \
+  --set autoscaling.maxReplicas=20 \
+  --reuse-values
+
+# OR: edit the per-env values file and commit + redeploy via the workflow
+```
+
+**Manual override** (when you need to pin replicas during an
+incident):
+
+```bash
+# Temporarily disable HPA + pin replica count
+kubectl --namespace inflect-production scale deployment inflect-production --replicas=8
+
+# WARNING: the next helm upgrade will reset this. Disable autoscaling
+# in values OR delete the HPA manually before the next deploy:
+kubectl --namespace inflect-production delete hpa inflect-production
+```
+
+**Vertical — resources**:
+
+```bash
+helm upgrade --install \
+  inflect-production \
+  infra/helm/inflect \
+  --namespace inflect-production \
+  -f infra/helm/inflect/values-production.yaml \
+  --set resources.requests.cpu=2 \
+  --set resources.requests.memory=1Gi \
+  --set resources.limits.cpu=4 \
+  --set resources.limits.memory=2Gi \
+  --reuse-values
+```
+
+For a permanent change, edit `values-production.yaml` and deploy
+through the workflow so the change is reviewable.
+
+**Worker scaling** is manual (no HPA per OI-2 spec):
+
+```bash
+helm upgrade --install \
+  inflect-production \
+  infra/helm/inflect \
+  --namespace inflect-production \
+  -f infra/helm/inflect/values-production.yaml \
+  --set worker.replicaCount=4 \
+  --reuse-values
+```
+
+### Secret rotation
+
+Production runtime secrets live in **AWS Secrets Manager** (per
+Epic OI-1). The K8s Secret in the namespace is populated by an
+External Secrets Operator (ESO) sync from Secrets Manager, OR
+manually via `kubectl create secret`. Both paths are supported.
+
+**Generated secrets — terraform-managed** (`AUTH_SECRET`,
+`JWT_SECRET`, `AV_WEBHOOK_SECRET`, `DATA_ENCRYPTION_KEY`,
+`POSTGRES_PASSWORD` (RDS-managed), Redis `AUTH_TOKEN`):
+
+See `docs/infrastructure.md` § "Day-2 ops → Rotating a generated
+secret" for the source-of-truth runbooks. Summary:
+
+| Secret | How to rotate |
+|---|---|
+| RDS master password | `aws secretsmanager rotate-secret --secret-id <rds-secret-id>` (RDS rotates without app downtime) |
+| Redis AUTH | `terraform apply` regenerates and rolls (auth_token_update_strategy = ROTATE keeps old token valid during transition) |
+| AUTH_SECRET / JWT_SECRET | Edit `modules/secrets/main.tf` to bump the random_id `keepers`, `terraform apply`, restart app pods (sessions invalidate — one mass logout) |
+| AV_WEBHOOK_SECRET | Same as AUTH_SECRET; ALSO update the AV scanner's HMAC config in lock-step |
+| DATA_ENCRYPTION_KEY | **NEVER regenerate without the v1→v2 sweep**. See `docs/epic-b-encryption.md` for the rotation runbook |
+
+**Operator-supplied secrets** (`GOOGLE_CLIENT_SECRET`,
+`MICROSOFT_CLIENT_SECRET`):
+
+```bash
+# 1. Rotate the secret in the cloud console (Google Cloud Console / Entra Portal)
+# 2. Update the value in AWS Secrets Manager
+aws secretsmanager put-secret-value \
+  --secret-id inflect-compliance-production-google-client-secret \
+  --secret-string '<new-value>'
+
+# 3. Force a sync if using External Secrets Operator
+kubectl --namespace inflect-production annotate \
+  externalsecret inflect-production-secrets \
+  force-sync=$(date +%s) \
+  --overwrite
+
+# 4. Restart pods to pick up the new value
+kubectl --namespace inflect-production rollout restart deployment inflect-production
+kubectl --namespace inflect-production rollout restart deployment inflect-production-worker
+```
+
+**Picking up a new K8s Secret value** (the chart's contract):
+- The Deployment uses `envFrom: [secretRef]`. K8s does NOT
+  hot-reload env vars when the Secret changes — pods read the
+  Secret's value at start time only.
+- Therefore: every secret rotation requires a `kubectl rollout
+  restart` (or a `helm upgrade` that triggers a pod recreation
+  via a non-trivial change like a templated annotation).
+
+**Triggering a no-op rollout** to pick up new Secret values
+without a values change:
+
+```bash
+# Bumps a pod template annotation, forcing K8s to recreate pods
+kubectl --namespace inflect-production rollout restart \
+  deployment/inflect-production
+```
+
+### Operational runbook quick reference
+
+```bash
+# Status
+helm list -n inflect-production
+helm status inflect-production -n inflect-production
+helm history inflect-production -n inflect-production --max 10
+kubectl -n inflect-production get pods -l "app.kubernetes.io/instance=inflect-production"
+
+# Logs
+kubectl -n inflect-production logs -f -l "app.kubernetes.io/component=app" --tail=100
+kubectl -n inflect-production logs -f -l "app.kubernetes.io/component=worker" --tail=100
+
+# Debug a single pod
+kubectl -n inflect-production describe pod <pod>
+kubectl -n inflect-production exec -it <pod> -c inflect -- /bin/sh
+
+# Migration Job logs (after a failed pre-install hook)
+kubectl -n inflect-production logs job/inflect-production-migrate
+
+# PgBouncer state
+kubectl -n inflect-production exec <app-pod> -c pgbouncer -- \
+  psql "host=127.0.0.1 port=5432 dbname=pgbouncer user=postgres" \
+  -c "SHOW POOLS;"
+
+# Rollback
+helm rollback inflect-production [revision] -n inflect-production --wait
+
+# Scale
+helm upgrade ... --set autoscaling.minReplicas=4 --reuse-values
+helm upgrade ... --set worker.replicaCount=4 --reuse-values
+
+# Force secret-pickup rollout
+kubectl -n inflect-production rollout restart \
+  deployment/inflect-production deployment/inflect-production-worker
+```

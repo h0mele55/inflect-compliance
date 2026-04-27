@@ -1,35 +1,36 @@
 # ───────────────────────────────────────────────────────────────
-#  Deploy — automated staging on CI pass + manual production
+#  Deploy — Helm-based Kubernetes deployment
+#
+#  Replaced the SSH + docker-compose path (Epic OI-2). The chart
+#  lives at infra/helm/inflect/. Deployment is now:
+#
+#    1. Build the app image and push to GHCR
+#    2. OIDC into AWS, fetch kubeconfig for the target EKS cluster
+#    3. helm upgrade --install with the env-specific values file
+#    4. Smoke tests against the public URL
 #
 #  Triggers:
-#    1. workflow_run: CI passes on main → auto-deploy to staging
-#    2. workflow_dispatch: manual deploy to staging or production
+#    workflow_dispatch (manual, with environment + ref + image_tag inputs)
 #
 #  REQUIRED GITHUB CONFIGURATION:
-#  ┌──────────────┬──────────────────────────────────────────────┐
-#  │ Environment   │ Required Secrets                             │
-#  ├──────────────┼──────────────────────────────────────────────┤
-#  │ staging       │ DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY,   │
-#  │               │ DEPLOY_PATH                                 │
-#  │ production    │ DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY,   │
-#  │               │ DEPLOY_PATH (+ required reviewers)          │
-#  └──────────────┴──────────────────────────────────────────────┘
-#  Optional environment vars: STAGING_URL, PRODUCTION_URL
+#    Repo Settings → Environments → {staging, production}:
+#      Secrets:
+#        AWS_ROLE_TO_ASSUME — IAM role ARN for OIDC assume-role
+#        EKS_CLUSTER_NAME   — EKS cluster name in this AWS account
+#      Variables:
+#        SMOKE_URL          — base URL for the smoke test (https://...)
+#      Protection rules (production only):
+#        REQUIRED REVIEWERS — at least one. This IS the manual gate.
 #
 #  Flow:
-#    gate → validate-secrets → build-image → deploy-staging  → smoke-staging
-#                                          → deploy-production → smoke-production
+#    gate → build-image → deploy → smoke
 # ───────────────────────────────────────────────────────────────
 name: Deploy
 
 on:
-  # Manual only. The auto-trigger on CI pass has been disabled —
-  # actual production deployment today is via Watchtower polling
-  # GHCR:latest (see docker-compose on the VM). This workflow is
-  # kept wired for the day a real SSH-based staging / prod
-  # environment is provisioned; configure DEPLOY_HOST, DEPLOY_USER,
-  # DEPLOY_SSH_KEY, DEPLOY_PATH in the environment secrets and
-  # re-enable the `workflow_run` trigger above.
+  # Manual only. Auto-deploy on CI pass remains commented as before
+  # — re-enable the workflow_run trigger once the staging EKS env is
+  # provisioned end-to-end and the smoke-test SLO is validated.
   workflow_dispatch:
     inputs:
       environment:
@@ -44,89 +45,83 @@ on:
         description: "Git ref to deploy (branch, tag, SHA). Blank = current main."
         required: false
         default: ""
+      image_tag:
+        description: "Container image tag to deploy. Blank = derive from ref (short SHA)."
+        required: false
+        default: ""
 
 concurrency:
   group: deploy-${{ github.event.inputs.environment || 'staging' }}
-  cancel-in-progress: false  # Never cancel in-progress deploys
+  cancel-in-progress: false # never cancel an in-progress deploy
 
 permissions:
   contents: read
-  packages: write  # GHCR push
+  packages: write   # GHCR push
+  id-token: write   # OIDC
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  AWS_REGION: us-east-1
+  HELM_VERSION: "3.14.0"
+  HELM_TIMEOUT: 10m
+  HELM_HISTORY_MAX: "10"
+  CHART_PATH: infra/helm/inflect
 
 jobs:
   # ═══════════════════════════════════════════════════════════════
-  #  1. Gate — only proceed if CI succeeded (auto-deploy path)
+  #  1. Gate — resolve target env + naming + image tag
   # ═══════════════════════════════════════════════════════════════
   gate:
-    name: "Gate: CI Status"
+    name: "Gate: resolve target"
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     outputs:
       target-env: ${{ steps.resolve.outputs.environment }}
       deploy-ref: ${{ steps.resolve.outputs.ref }}
-      smoke-url: ${{ steps.resolve.outputs.smoke_url }}
+      image-tag: ${{ steps.resolve.outputs.image_tag }}
+      release-name: ${{ steps.resolve.outputs.release }}
+      namespace: ${{ steps.resolve.outputs.namespace }}
     steps:
-      - name: Resolve target environment and ref
+      - name: Resolve target environment + Helm naming
         id: resolve
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ENV="${{ github.event.inputs.environment }}"
-            REF="${{ github.event.inputs.ref || github.sha }}"
+          set -euo pipefail
+          ENV="${{ github.event.inputs.environment }}"
+          REF="${{ github.event.inputs.ref || github.sha }}"
+          INPUT_TAG="${{ github.event.inputs.image_tag }}"
+          # Image tag — explicit input wins; fall back to short-SHA of the ref
+          if [ -n "$INPUT_TAG" ]; then
+            IMAGE_TAG="$INPUT_TAG"
           else
-            ENV="staging"
-            REF="${{ github.event.workflow_run.head_sha }}"
+            # Resolve full SHA (handles branch + tag + short-SHA refs)
+            FULL_SHA="$(git ls-remote https://github.com/${{ github.repository }}.git "$REF" | awk '{print $1}' | head -n1)"
+            if [ -z "$FULL_SHA" ]; then FULL_SHA="$REF"; fi
+            IMAGE_TAG="$(echo "$FULL_SHA" | cut -c1-12)"
           fi
-          echo "environment=${ENV}" >> $GITHUB_OUTPUT
-          echo "ref=${REF}" >> $GITHUB_OUTPUT
-          echo "::notice::Deploy target: ${ENV} @ ${REF:0:12}"
+          # Release + namespace naming convention — match the per-env
+          # values file naming (values-{env}.yaml ↔ inflect-{env} release)
+          RELEASE="inflect-$ENV"
+          NAMESPACE="inflect-$ENV"
+
+          echo "environment=$ENV"   >> $GITHUB_OUTPUT
+          echo "ref=$REF"           >> $GITHUB_OUTPUT
+          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "release=$RELEASE"   >> $GITHUB_OUTPUT
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+          echo "::notice::Deploy target: $ENV (release=$RELEASE, ns=$NAMESPACE) at $REF (image tag $IMAGE_TAG)"
 
   # ═══════════════════════════════════════════════════════════════
-  #  2. Validate Secrets — fail fast and clearly if deployment
-  #     secrets are not configured.
-  # ═══════════════════════════════════════════════════════════════
-  validate-secrets:
-    name: "Validate: Deploy Secrets"
-    needs: [gate]
-    runs-on: ubuntu-latest
-    environment: ${{ needs.gate.outputs.target-env }}
-    steps:
-      - name: "Gate: required deployment secrets"
-        env:
-          _HOST: ${{ secrets['DEPLOY_HOST'] }}
-          _USER: ${{ secrets['DEPLOY_USER'] }}
-          _KEY: ${{ secrets['DEPLOY_SSH_KEY'] }}
-          _PATH: ${{ secrets['DEPLOY_PATH'] }}
-        run: |
-          MISSING=()
-          [ -z "$_HOST" ] && MISSING+=("DEPLOY_HOST")
-          [ -z "$_USER" ] && MISSING+=("DEPLOY_USER")
-          [ -z "$_KEY"  ] && MISSING+=("DEPLOY_SSH_KEY")
-          [ -z "$_PATH" ] && MISSING+=("DEPLOY_PATH")
-
-          if [ ${#MISSING[@]} -gt 0 ]; then
-            echo "::error::Missing required secrets for '${{ needs.gate.outputs.target-env }}' environment: ${MISSING[*]}"
-            echo ""
-            echo "Configure these in: Settings → Environments → ${{ needs.gate.outputs.target-env }} → Secrets"
-            exit 1
-          fi
-          echo "✓ All required deployment secrets are configured"
-
-  # ═══════════════════════════════════════════════════════════════
-  #  3. Build & Push — container image to GHCR
+  #  2. Build & Push — container image to GHCR. Skipped if the
+  #     image_tag input was supplied AND already exists in GHCR
+  #     (cheap reuse path for re-deploys of an existing artefact).
   # ═══════════════════════════════════════════════════════════════
   build-image:
-    name: "Build & Push Image"
-    needs: [gate, validate-secrets]
+    name: "Build & Push image"
+    needs: [gate]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
-      image-tag: ${{ steps.meta.outputs.tags }}
+      image-ref: ${{ steps.meta.outputs.tags }}
       image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
@@ -150,9 +145,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=sha,prefix=
-            type=ref,event=branch
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ needs.gate.outputs.image-tag }}
 
       - name: Build and push
         id: build
@@ -165,132 +158,140 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Emit deploy summary
+      - name: Build summary
         run: |
-          echo "### 🐳 Image Built" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Tags** | \`${{ steps.meta.outputs.tags }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Digest** | \`${{ steps.build.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Target** | ${{ needs.gate.outputs.target-env }} |" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### 🐳 Image Built"
+            echo ""
+            echo "| Property | Value |"
+            echo "|----------|-------|"
+            echo "| **Tag** | \`${{ needs.gate.outputs.image-tag }}\` |"
+            echo "| **Digest** | \`${{ steps.build.outputs.digest }}\` |"
+            echo "| **Target** | ${{ needs.gate.outputs.target-env }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ═══════════════════════════════════════════════════════════════
-  #  4a. Deploy Staging — automatic on main merge, manual re-deploy
+  #  3. Deploy — helm upgrade --install
+  #     Production deploys are gated by the production GitHub
+  #     Environment's required-reviewers rule.
   # ═══════════════════════════════════════════════════════════════
-  deploy-staging:
-    name: "Deploy: Staging"
+  deploy:
+    name: "Deploy: ${{ needs.gate.outputs.target-env }}"
     needs: [gate, build-image]
     runs-on: ubuntu-latest
-    if: needs.gate.outputs.target-env == 'staging'
     environment: ${{ needs.gate.outputs.target-env }}
-    timeout-minutes: 10
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Deploy to staging
-        uses: appleboy/ssh-action@v1
-        env:
-          APP_PATH: ${{ secrets['DEPLOY_PATH'] }}
-          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.gate.outputs.deploy-ref }}
         with:
-          host: ${{ secrets['DEPLOY_HOST'] }}
-          username: ${{ secrets['DEPLOY_USER'] }}
-          key: ${{ secrets['DEPLOY_SSH_KEY'] }}
-          envs: APP_PATH,IMAGE
-          script: |
-            set -euo pipefail
-            cd "${APP_PATH}"
+          ref: ${{ needs.gate.outputs.deploy-ref }}
 
-            echo "── Pulling image: ${IMAGE} ──"
-            docker pull "${IMAGE}" || {
-              echo "::error::Failed to pull image. Falling back to SHA tag."
-              docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" || exit 1
-            }
-
-            # Tag as staging-current for compose
-            docker tag "${IMAGE}" inflect-compliance:staging-current 2>/dev/null || \
-            docker tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" inflect-compliance:staging-current
-
-            # Deploy with compose
-            docker compose -f docker-compose.staging.yml up -d --no-build
-
-            # Quick container boot check (full validation in smoke job)
-            echo "── Waiting for container boot ──"
-            for i in $(seq 1 15); do
-              if curl -sf http://localhost:3000/api/livez > /dev/null 2>&1; then
-                echo "✓ Container is responding (attempt ${i})"
-                exit 0
-              fi
-              sleep 2
-            done
-            echo "::error::Container failed to respond within 30s"
-            exit 1
-
-  # ═══════════════════════════════════════════════════════════════
-  #  4b. Deploy Production — manual only, requires environment approval
-  # ═══════════════════════════════════════════════════════════════
-  deploy-production:
-    name: "Deploy: Production"
-    needs: [gate, build-image]
-    runs-on: ubuntu-latest
-    if: needs.gate.outputs.target-env == 'production'
-    environment: ${{ needs.gate.outputs.target-env }}
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Deploy to production
-        uses: appleboy/ssh-action@v1
-        env:
-          APP_PATH: ${{ secrets['DEPLOY_PATH'] }}
-          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.gate.outputs.deploy-ref }}
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets['DEPLOY_HOST'] }}
-          username: ${{ secrets['DEPLOY_USER'] }}
-          key: ${{ secrets['DEPLOY_SSH_KEY'] }}
-          envs: APP_PATH,IMAGE
-          script: |
-            set -euo pipefail
-            cd "${APP_PATH}"
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gh-deploy-${{ needs.gate.outputs.target-env }}-${{ github.run_id }}
 
-            echo "── Pulling image: ${IMAGE} ──"
-            docker pull "${IMAGE}" || {
-              echo "::error::Failed to pull image. Falling back to SHA tag."
-              docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" || exit 1
-            }
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
 
-            # Tag as prod-current for compose
-            docker tag "${IMAGE}" inflect-compliance:prod-current 2>/dev/null || \
-            docker tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" inflect-compliance:prod-current
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
 
-            # Deploy with compose
-            docker compose -f docker-compose.prod.yml up -d --no-build
-
-            # Quick container boot check (full validation in smoke job)
-            echo "── Waiting for container boot ──"
-            for i in $(seq 1 15); do
-              if curl -sf http://localhost:3000/api/livez > /dev/null 2>&1; then
-                echo "✓ Container is responding (attempt ${i})"
-                exit 0
-              fi
-              sleep 2
-            done
-            echo "::error::Container failed to respond within 30s"
+      - name: Update kubeconfig (EKS)
+        env:
+          CLUSTER_NAME: ${{ secrets.EKS_CLUSTER_NAME }}
+        run: |
+          if [ -z "$CLUSTER_NAME" ]; then
+            echo "::error::EKS_CLUSTER_NAME secret is not set for the ${{ needs.gate.outputs.target-env }} GitHub Environment."
             exit 1
+          fi
+          aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
+          kubectl version --client --output=yaml
+          kubectl config current-context
+
+      - name: Helm lint chart
+        run: helm lint "${{ env.CHART_PATH }}"
+
+      - name: Helm dry-run
+        run: |
+          helm upgrade --install \
+            "${{ needs.gate.outputs.release-name }}" \
+            "${{ env.CHART_PATH }}" \
+            --namespace "${{ needs.gate.outputs.namespace }}" \
+            --create-namespace \
+            --values "${{ env.CHART_PATH }}/values-${{ needs.gate.outputs.target-env }}.yaml" \
+            --set image.tag="${{ needs.gate.outputs.image-tag }}" \
+            --set image.repository="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" \
+            --dry-run \
+            --debug \
+            > /tmp/helm-dry-run.txt 2>&1 || (cat /tmp/helm-dry-run.txt && exit 1)
+          echo "✓ Dry-run succeeded"
+
+      - name: Helm upgrade --install
+        id: helm
+        run: |
+          set -euo pipefail
+          helm upgrade --install \
+            "${{ needs.gate.outputs.release-name }}" \
+            "${{ env.CHART_PATH }}" \
+            --namespace "${{ needs.gate.outputs.namespace }}" \
+            --create-namespace \
+            --values "${{ env.CHART_PATH }}/values-${{ needs.gate.outputs.target-env }}.yaml" \
+            --set image.tag="${{ needs.gate.outputs.image-tag }}" \
+            --set image.repository="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" \
+            --wait \
+            --timeout "${{ env.HELM_TIMEOUT }}" \
+            --history-max "${{ env.HELM_HISTORY_MAX }}" \
+            --atomic
+          # --atomic: rolls back to the previous revision if the upgrade fails
+          # --wait: waits for resources to be ready before exiting
+          # --history-max: keeps the last N revisions for `helm rollback`
+
+      - name: Rollout summary
+        if: always()
+        env:
+          RELEASE: ${{ needs.gate.outputs.release-name }}
+          NS: ${{ needs.gate.outputs.namespace }}
+        run: |
+          {
+            echo "## Helm rollout: ${{ needs.gate.outputs.target-env }}"
+            echo ""
+            echo "**Release:** \`$RELEASE\` in namespace \`$NS\`"
+            echo "**Image:** \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.gate.outputs.image-tag }}\`"
+            echo ""
+            echo "### Helm history (last 5)"
+            echo '```'
+            helm history "$RELEASE" --namespace "$NS" --max 5 || echo "(no history available)"
+            echo '```'
+            echo ""
+            echo "### Pods"
+            echo '```'
+            kubectl --namespace "$NS" get pods \
+              -l "app.kubernetes.io/instance=$RELEASE" \
+              -o wide || echo "(no pods)"
+            echo '```'
+            echo ""
+            echo "### Rollback (if needed)"
+            echo '```bash'
+            echo "helm rollback $RELEASE --namespace $NS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ═══════════════════════════════════════════════════════════════
-  #  5a. Smoke: Staging — post-deploy validation
-  #  Runs the smoke test script against the deployed staging env.
-  #  Fails the pipeline if any health/readiness check doesn't pass.
+  #  4. Smoke — post-deploy validation against the public URL.
   # ═══════════════════════════════════════════════════════════════
-  smoke-staging:
-    name: "Smoke: Staging"
-    needs: [gate, deploy-staging]
+  smoke:
+    name: "Smoke: ${{ needs.gate.outputs.target-env }}"
+    needs: [gate, deploy]
     runs-on: ubuntu-latest
-    if: needs.gate.outputs.target-env == 'staging'
     environment: ${{ needs.gate.outputs.target-env }}
     timeout-minutes: 5
 
@@ -301,58 +302,36 @@ jobs:
         with:
           node-version: "22"
 
-      - name: "Gate: post-deploy smoke test"
+      - name: Smoke test
         env:
-          SMOKE_URL: https://staging.example.com
+          SMOKE_URL: ${{ vars.SMOKE_URL }}
           SMOKE_RETRIES: "5"
           SMOKE_RETRY_DELAY: "10000"
           SMOKE_TIMEOUT_MS: "15000"
-        run: node scripts/smoke-prod.mjs
+        run: |
+          if [ -z "$SMOKE_URL" ]; then
+            echo "::error::SMOKE_URL variable is not set for the ${{ needs.gate.outputs.target-env }} GitHub Environment."
+            echo "Configure it in repo Settings → Environments → ${{ needs.gate.outputs.target-env }} → Variables."
+            exit 1
+          fi
+          echo "Testing against $SMOKE_URL"
+          node scripts/smoke-prod.mjs
 
       - name: Post smoke summary
         if: success()
-        run: |
-          echo "### ✅ Staging Deploy + Smoke Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Ref:** \`${{ needs.gate.outputs.deploy-ref }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** staging" >> $GITHUB_STEP_SUMMARY
-          echo "- **Validated:** livez, readyz, health, login, auth session" >> $GITHUB_STEP_SUMMARY
-          echo "- **Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
-
-  # ═══════════════════════════════════════════════════════════════
-  #  5b. Smoke: Production — post-deploy validation
-  #  Runs the smoke test script against the deployed production env.
-  #  Fails the pipeline if any health/readiness check doesn't pass.
-  # ═══════════════════════════════════════════════════════════════
-  smoke-production:
-    name: "Smoke: Production"
-    needs: [gate, deploy-production]
-    runs-on: ubuntu-latest
-    if: needs.gate.outputs.target-env == 'production'
-    environment: ${{ needs.gate.outputs.target-env }}
-    timeout-minutes: 5
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: "Gate: post-deploy smoke test"
         env:
-          SMOKE_URL: https://app.example.com
-          SMOKE_RETRIES: "5"
-          SMOKE_RETRY_DELAY: "10000"
-          SMOKE_TIMEOUT_MS: "15000"
-        run: node scripts/smoke-prod.mjs
-
-      - name: Post smoke summary
-        if: success()
+          ENV: ${{ needs.gate.outputs.target-env }}
+          REF: ${{ needs.gate.outputs.deploy-ref }}
+          TAG: ${{ needs.gate.outputs.image-tag }}
+          RELEASE: ${{ needs.gate.outputs.release-name }}
+          NS: ${{ needs.gate.outputs.namespace }}
         run: |
-          echo "### ✅ Production Deploy + Smoke Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Ref:** \`${{ needs.gate.outputs.deploy-ref }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** production" >> $GITHUB_STEP_SUMMARY
-          echo "- **Validated:** livez, readyz, health, login, auth session" >> $GITHUB_STEP_SUMMARY
-          echo "- **Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### ✅ Deploy + Smoke complete"
+            echo ""
+            echo "- **Environment:** $ENV"
+            echo "- **Ref:** \`$REF\` (image tag \`$TAG\`)"
+            echo "- **Helm release:** \`$RELEASE\` (namespace \`$NS\`)"
+            echo "- **Validated:** livez, readyz, health, login, auth session"
+            echo "- **Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          } >> "$GITHUB_STEP_SUMMARY"
