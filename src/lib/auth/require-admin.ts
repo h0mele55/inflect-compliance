@@ -52,12 +52,14 @@ const ROLE_LEVEL: Record<Role, number> = {
  * Resolve tenant context and enforce ADMIN role.
  *
  * Drop-in replacement for `getTenantCtx(params, req)`.
- * Throws 403 Forbidden (AppError) if the authenticated user is not an ADMIN
- * on the resolved tenant. The error is caught by `withApiErrorHandling`.
+ * Throws 403 Forbidden (AppError) if the authenticated user is not an
+ * OWNER or ADMIN on the resolved tenant. OWNER is strictly superior to
+ * ADMIN per CLAUDE.md's RBAC section, so OWNER passes every ADMIN gate.
+ * The error is caught by `withApiErrorHandling`.
  *
  * @param params - Route params containing `tenantSlug`
  * @param req - The incoming NextRequest (for request ID extraction)
- * @returns RequestContext — guaranteed to have `role === 'ADMIN'`
+ * @returns RequestContext — guaranteed to have `role === 'OWNER' || 'ADMIN'`
  * @throws AppError(403) if non-admin
  * @throws AppError(401) if not authenticated
  * @throws AppError(404) if tenant not found
@@ -69,7 +71,7 @@ export async function requireAdminCtx(
 ): Promise<RequestContext> {
     const ctx = await getTenantCtx(params, req);
 
-    if (ctx.role !== 'ADMIN') {
+    if (ctx.role !== 'OWNER' && ctx.role !== 'ADMIN') {
         throw forbidden('Admin access required');
     }
 

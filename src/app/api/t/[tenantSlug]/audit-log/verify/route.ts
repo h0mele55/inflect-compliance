@@ -16,8 +16,8 @@ import { verifyTenantChain } from '@/lib/audit/verify';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
 
-    // ADMIN-only
-    if (ctx.role !== 'ADMIN') {
+    // OWNER + ADMIN. OWNER is a superset of ADMIN per CLAUDE.md RBAC.
+    if (ctx.role !== 'OWNER' && ctx.role !== 'ADMIN') {
         return NextResponse.json<any>({ error: 'Forbidden: ADMIN role required' }, { status: 403 });
     }
 

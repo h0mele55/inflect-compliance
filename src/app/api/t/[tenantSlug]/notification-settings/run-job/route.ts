@@ -6,7 +6,8 @@ import { runDailyEvidenceExpiryNotifications } from '@/app-layer/jobs/dailyEvide
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    if (ctx.role !== 'ADMIN') {
+    // Epic 1 — OWNER is a superset of ADMIN per CLAUDE.md RBAC.
+    if (ctx.role !== 'OWNER' && ctx.role !== 'ADMIN') {
         return NextResponse.json<any>({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
     }
 

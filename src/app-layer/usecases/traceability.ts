@@ -9,7 +9,10 @@ function assertCanRead(ctx: RequestContext) {
 }
 
 function assertCanManage(ctx: RequestContext) {
-    if (ctx.role !== 'ADMIN' && ctx.role !== 'EDITOR') throw forbidden('Only ADMIN or EDITOR can manage mappings');
+    // Epic 1 — OWNER is a superset of ADMIN per CLAUDE.md RBAC.
+    if (!['OWNER', 'ADMIN', 'EDITOR'].includes(ctx.role)) {
+        throw forbidden('Only OWNER, ADMIN, or EDITOR can manage mappings');
+    }
 }
 
 // ─── Control ↔ Risk ───

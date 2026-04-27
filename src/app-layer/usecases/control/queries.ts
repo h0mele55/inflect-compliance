@@ -131,7 +131,10 @@ export async function getControlDashboard(ctx: RequestContext) {
 // ─── Consistency Check (admin-only) ───
 
 export async function runConsistencyCheck(ctx: RequestContext) {
-    if (ctx.role !== 'ADMIN') throw (await import('@/lib/errors/types')).forbidden('Only admins can run consistency checks');
+    // Epic 1 — OWNER is a superset of ADMIN per CLAUDE.md RBAC.
+    if (ctx.role !== 'OWNER' && ctx.role !== 'ADMIN') {
+        throw (await import('@/lib/errors/types')).forbidden('Only admins can run consistency checks');
+    }
 
     return runInTenantContext(ctx, async (db) => {
         const controls = await db.control.findMany({
