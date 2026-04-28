@@ -152,38 +152,84 @@ export async function runConsistencyCheck(ctx: RequestContext) {
     }
 
     return runInTenantContext(ctx, async (db) => {
-        const controls = await db.control.findMany({
-            where: { tenantId: ctx.tenantId },
-            include: { controlTasks: { select: { id: true, title: true, status: true, dueAt: true } } },
-        });
-
+        // Three independent checks run in parallel — they don't share
+        // intermediate state. Pre-refactor (single `findMany` with
+        // full `controlTasks` include) loaded the entire task table
+        // for the tenant just to compute overdue counts; for tenants
+        // with hundreds of controls × dozens of tasks each this was
+        // a 5-50KB result set + an O(N×M) JS pass.
+        //
+        // The split lets each query use exactly the index it needs:
+        //   • controlsForCodeChecks — only `id, code, name` projected,
+        //     so the query never touches the wide row.
+        //   • overdueTasks — a direct `.findMany` with the GAP-perf
+        //     `(tenantId, status, dueAt)` composite index from the
+        //     companion migration. Returns ONLY overdue rows; no
+        //     in-memory filter needed.
         const now = new Date();
 
-        const missingCode = controls.filter(c => !c.code);
+        const [controlsForCodeChecks, totalControls, overdueTaskRows] = await Promise.all([
+            // Project the minimum needed for the missingCode +
+            // duplicateCodes checks. Skipping the relations and
+            // wide columns keeps this fast even on tenants with
+            // hundreds of controls.
+            db.control.findMany({
+                where: { tenantId: ctx.tenantId },
+                select: { id: true, code: true, name: true },
+            }),
+            db.control.count({ where: { tenantId: ctx.tenantId } }),
+            // Directly query the overdue tasks. With the
+            // GAP-perf [tenantId, status, dueAt] composite index
+            // this is an index range scan that returns only the
+            // matching rows — no scan-and-filter on the full task
+            // table.
+            db.controlTask.findMany({
+                where: {
+                    tenantId: ctx.tenantId,
+                    status: { in: ['OPEN', 'IN_PROGRESS'] },
+                    dueAt: { lt: now, not: null },
+                },
+                select: {
+                    id: true,
+                    title: true,
+                    status: true,
+                    dueAt: true,
+                    controlId: true,
+                    control: { select: { code: true } },
+                },
+                orderBy: { dueAt: 'asc' },
+            }),
+        ]);
 
-        // Check for duplicate codes
+        const missingCode = controlsForCodeChecks.filter((c) => !c.code);
+
+        // Duplicate-code detection — single pass over the
+        // narrow projection.
         const codeCounts: Record<string, string[]> = {};
-        for (const c of controls) {
+        for (const c of controlsForCodeChecks) {
             if (c.code) {
-                if (!codeCounts[c.code]) codeCounts[c.code] = [];
-                codeCounts[c.code].push(c.id);
+                (codeCounts[c.code] ||= []).push(c.id);
             }
         }
         const duplicateCodes = Object.entries(codeCounts)
             .filter(([, ids]) => ids.length > 1)
             .map(([code, ids]) => ({ code, controlIds: ids }));
 
-        // Tasks past due and still open
-        const overdueTasks = controls.flatMap(c =>
-            c.controlTasks
-                .filter(t => t.dueAt && new Date(t.dueAt) < now && (t.status === 'OPEN' || t.status === 'IN_PROGRESS'))
-                .map(t => ({ controlId: c.id, controlCode: c.code, taskId: t.id, taskTitle: t.title, dueAt: t.dueAt, status: t.status }))
-        );
+        // Shape the overdue rows to match the existing DTO contract
+        // — the response shape is unchanged.
+        const overdueTasks = overdueTaskRows.map((t) => ({
+            controlId: t.controlId,
+            controlCode: t.control?.code ?? null,
+            taskId: t.id,
+            taskTitle: t.title,
+            dueAt: t.dueAt,
+            status: t.status,
+        }));
 
         return {
-            totalControls: controls.length,
+            totalControls,
             issues: {
-                missingCode: missingCode.map(c => ({ id: c.id, name: c.name })),
+                missingCode: missingCode.map((c) => ({ id: c.id, name: c.name })),
                 duplicateCodes,
                 overdueTasks,
             },
