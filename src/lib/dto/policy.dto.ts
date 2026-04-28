@@ -1,7 +1,7 @@
 /**
  * Policy DTOs — mirrors shapes returned by PolicyRepository.list() and .getById()
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 import { UserRefSchema, UserRefShortSchema } from './common';
 
 // ─── Policy Version sub-shape ───
@@ -65,7 +65,9 @@ export const PolicyListItemDTOSchema = z.object({
         controlLinks: z.number().optional(),
         approvals: z.number().optional(),
     }).optional(),
-}).passthrough();
+}).passthrough().openapi('PolicyListItem', {
+    description: 'Policy as it appears in list views — includes the currently published version, owner, and aggregate counts. The detail endpoint adds full version history + control links.',
+});
 
 export type PolicyListItemDTO = z.infer<typeof PolicyListItemDTOSchema>;
 
@@ -84,6 +86,8 @@ export const PolicyDetailDTOSchema = PolicyListItemDTOSchema.extend({
         approvedBy: UserRefShortSchema.nullable().optional(),
         decidedAt: z.string().nullable().optional(),
     }).passthrough()).optional(),
+}).openapi('PolicyDetail', {
+    description: 'Policy with full version history, control links, and approval audit trail. Returned by GET /policies/{id}.',
 });
 
 export type PolicyDetailDTO = z.infer<typeof PolicyDetailDTOSchema>;

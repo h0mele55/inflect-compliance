@@ -1,7 +1,7 @@
 /**
  * Task (Work Item) DTOs
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 import { UserRefSchema } from './common';
 
 export const TaskDTOSchema = z.object({
@@ -27,6 +27,8 @@ export const TaskDTOSchema = z.object({
     assignee: UserRefSchema.nullable().optional(),
     reviewer: UserRefSchema.nullable().optional(),
     createdBy: UserRefSchema.nullable().optional(),
-}).passthrough();
+}).passthrough().openapi('Task', {
+    description: 'Unified work-item record covering audit findings, control gaps, incidents, improvements, and ad-hoc tasks. The type field discriminates which UI surfaces this row appears in.',
+});
 
 export type TaskDTO = z.infer<typeof TaskDTOSchema>;

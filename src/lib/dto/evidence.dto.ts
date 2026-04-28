@@ -1,7 +1,7 @@
 /**
  * Evidence DTOs — mirrors shapes returned by EvidenceRepository
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 import { UserRefShortSchema } from './common';
 
 // ─── Evidence Review sub-shape ───
@@ -14,7 +14,9 @@ export const EvidenceReviewDTOSchema = z.object({
     comment: z.string().nullable().optional(),
     createdAt: z.string(),
     reviewer: UserRefShortSchema.nullable().optional(),
-}).passthrough();
+}).passthrough().openapi('EvidenceReview', {
+    description: 'A single evidence-review event (submission/approval/rejection) — append-only audit row attached to the evidence record.',
+});
 
 export type EvidenceReviewDTO = z.infer<typeof EvidenceReviewDTOSchema>;
 
@@ -42,7 +44,9 @@ export const EvidenceListItemDTOSchema = z.object({
         name: z.string(),
         code: z.string().nullable().optional(),
     }).passthrough().nullable().optional(),
-}).passthrough();
+}).passthrough().openapi('EvidenceListItem', {
+    description: 'Evidence record as shown in list views. content is encrypted at rest for TEXT type and decrypted transparently on read by the field-encryption middleware.',
+});
 
 export type EvidenceListItemDTO = z.infer<typeof EvidenceListItemDTOSchema>;
 
@@ -50,6 +54,8 @@ export type EvidenceListItemDTO = z.infer<typeof EvidenceListItemDTOSchema>;
 
 export const EvidenceDetailDTOSchema = EvidenceListItemDTOSchema.extend({
     reviews: z.array(EvidenceReviewDTOSchema).optional(),
-}).passthrough();
+}).passthrough().openapi('EvidenceDetail', {
+    description: 'Evidence record with the full review history attached. Returned by GET /evidence/{id}.',
+});
 
 export type EvidenceDetailDTO = z.infer<typeof EvidenceDetailDTOSchema>;
