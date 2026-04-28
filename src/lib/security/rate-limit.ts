@@ -183,6 +183,38 @@ export const API_MUTATION_LIMIT: RateLimitConfig = {
 };
 
 /**
+ * General read API: 120 requests per minute per (IP, userId, tenantSlug).
+ *
+ * GAP-17. Applied at the Edge middleware to GET requests on
+ * `/api/t/<slug>/...`, excluding health probes (`/api/health`,
+ * `/api/livez`, `/api/readyz`) and `/api/docs`.
+ *
+ * Threat model: scraping / accidental overload — a runaway frontend
+ * that fans out many list calls per page load, an abusive script
+ * iterating filter combinations, or a compromised credential
+ * scraping data. The limit is roughly 2× the mutation budget because
+ * reads are cheaper, idempotent, and a normal page load can fan
+ * out to 5-10 list endpoints (controls + risks + evidence + counts
+ * + traceability + …); 120/min comfortably covers that for a single
+ * actor while still tripping a real scraper within seconds.
+ *
+ * Bucketing: per (IP, userId, tenantSlug) so a single user with a
+ * runaway tab in tenant A doesn't burn the budget for the same user
+ * in tenant B. The tenantSlug appears as a scope namespace in the
+ * key, not as part of the identifier — meaning N users in one
+ * tenant each get their own bucket, not a shared tenant pool.
+ *
+ * The actual enforcement lives in `src/lib/rate-limit/apiReadRateLimit.ts`
+ * (Upstash + memory-fallback, mirrors `authRateLimit.ts`). This
+ * preset is the single source of truth for the numbers; the
+ * enforcement module re-uses them.
+ */
+export const API_READ_LIMIT: RateLimitConfig = {
+    maxAttempts: 120,
+    windowMs: 60 * 1000,
+};
+
+/**
  * API key creation: 5 per hour per (tenant, creator user).
  *
  * Threat model: post-compromise lateral movement. A user with a

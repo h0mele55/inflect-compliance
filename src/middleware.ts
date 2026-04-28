@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { checkAuthRateLimit } from '@/lib/rate-limit/authRateLimit';
+import {
+    checkApiReadRateLimit,
+    extractTenantSlug,
+    isApiReadRateLimited,
+} from '@/lib/rate-limit/apiReadRateLimit';
 import { env } from '@/env';
 import {
     isPublicPath,
@@ -188,6 +193,24 @@ async function authMiddleware(req: NextRequest): Promise<NextResponse> {
             // see today via the layout's `notFound()` collapse, so a
             // probing user can't tell whether the slug exists.
             return NextResponse.redirect(new URL('/no-tenant', req.nextUrl.origin));
+        }
+    }
+
+    // ── 5c. API read rate limit (GAP-17) ──
+    // Tenant-scoped GETs go through a dedicated read-tier limiter
+    // before reaching the route handler. Sits AFTER the tenant-access
+    // gate so unauthorized cross-tenant reads still 403 (cheaper) and
+    // BEFORE the route runs (so we don't burn a DB query when the
+    // budget is exhausted). Health probes (`/api/health`, `/api/livez`,
+    // `/api/readyz`) and `/api/docs` are excluded by
+    // `isApiReadRateLimited`. Mutations + non-tenant routes are
+    // unaffected — they have their own tiers.
+    if (isApiReadRateLimited(req.method, pathname)) {
+        const tenantSlug = extractTenantSlug(pathname);
+        const userId = (token.sub as string | undefined) ?? null;
+        const rl = await checkApiReadRateLimit(req, userId, tenantSlug);
+        if (!rl.ok && rl.response) {
+            return rl.response;
         }
     }
 
