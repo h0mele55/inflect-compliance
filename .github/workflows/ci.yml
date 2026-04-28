@@ -584,10 +584,15 @@ jobs:
       - name: Seed test database
         run: npx tsx prisma/seed.ts
 
-      - name: Create upload directory
+      - name: Create upload + results directories
         # .env.e2e.example points UPLOAD_DIR / FILE_STORAGE_ROOT at
         # `./tmp/test-uploads` (matching the e2e job's convention).
-        run: mkdir -p tmp/test-uploads
+        # tests/load/results/ is where mutations.js writes its summary
+        # JSON in handleSummary(); without it k6 logs a "no such file"
+        # error and the artifact upload step has nothing to collect.
+        run: |
+          mkdir -p tmp/test-uploads
+          mkdir -p tests/load/results
 
       - name: Build Next.js app
         # Do NOT set NEXT_TEST_MODE=1 here. next.config.js routes the
