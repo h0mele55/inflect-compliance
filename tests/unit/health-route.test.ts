@@ -6,6 +6,7 @@
  * operator pointing legacy probes at /api/health doesn't get a
  * misleading "healthy" reading while Redis is broken.
  */
+export {};
 
 // ─── Mocks (declared before requires) ───────────────────────────────
 
@@ -101,7 +102,7 @@ describe('GET /api/health (GAP-13: Redis ping must affect status)', () => {
         // GAP-13 — env validation should already refuse to boot in
         // this state. The endpoint check is defense-in-depth for the
         // SKIP_ENV_VALIDATION=1 escape hatch.
-        process.env.NODE_ENV = 'production';
+        (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
         delete process.env.REDIS_URL;
         const { GET } = loadRouteFresh();
 
@@ -117,7 +118,7 @@ describe('GET /api/health (GAP-13: Redis ping must affect status)', () => {
     it('returns 200 + healthy under NODE_ENV=development when REDIS_URL is unset', async () => {
         // Dev/test ergonomics: a contributor running the app without
         // local Redis should not see a red probe.
-        process.env.NODE_ENV = 'development';
+        (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
         delete process.env.REDIS_URL;
         const { GET } = loadRouteFresh();
 

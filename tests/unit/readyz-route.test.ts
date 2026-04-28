@@ -7,6 +7,7 @@
  * balancers. Both must return 503 + structured error when Redis is
  * down, since Redis is a true production dependency post-GAP-13.
  */
+export {};
 
 // ─── Mocks (declared before requires) ───────────────────────────────
 
@@ -85,7 +86,7 @@ describe('GET /api/readyz (GAP-13: Redis is a production dependency)', () => {
         // SKIP_ENV_VALIDATION=1 escape hatch. Surfacing 'Not configured'
         // as a 503 prevents the orchestrator from routing traffic to
         // a misconfigured prod instance.
-        process.env.NODE_ENV = 'production';
+        (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
         delete process.env.REDIS_URL;
         const { GET } = loadRouteFresh();
 
@@ -103,7 +104,7 @@ describe('GET /api/readyz (GAP-13: Redis is a production dependency)', () => {
         // local Redis must not see a red probe. The redis check is
         // included in `checks` only when configured-or-prod; in dev
         // without REDIS_URL it's omitted entirely.
-        process.env.NODE_ENV = 'development';
+        (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
         delete process.env.REDIS_URL;
         const { GET } = loadRouteFresh();
 
