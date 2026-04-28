@@ -66,7 +66,7 @@ const VERSION_KEY_TTL_SECONDS = 60 * 60 * 24 * 30;
  * `bumpEntityCacheVersion` on every write) — adding a new entity
  * here without wiring the writes is a correctness bug.
  */
-export type CacheableEntity = 'control' | 'risk' | 'evidence';
+export type CacheableEntity = 'control' | 'risk' | 'evidence' | 'task';
 
 export interface CachedReadOptions<T> {
     ctx: RequestContext;
