@@ -1,7 +1,7 @@
 /**
  * Audit DTOs
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 
 export const AuditDTOSchema = z.object({
     id: z.string(),
@@ -16,6 +16,8 @@ export const AuditDTOSchema = z.object({
     departments: z.string().nullable().optional(),
     createdAt: z.string().optional(),
     updatedAt: z.string().optional(),
-}).passthrough();
+}).passthrough().openapi('Audit', {
+    description: 'Audit cycle record. Status flows PLANNED → IN_PROGRESS → COMPLETED (or CANCELLED).',
+});
 
 export type AuditDTO = z.infer<typeof AuditDTOSchema>;

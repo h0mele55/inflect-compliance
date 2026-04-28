@@ -37,10 +37,11 @@
     "prod:down": "docker compose -f docker-compose.prod.yml down"
   },
   "dependencies": {
-    "@next-auth/prisma-adapter": "1.0.7",
+    "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@aws-sdk/client-s3": "^3.1014.0",
     "@aws-sdk/s3-request-presigner": "^3.1014.0",
     "@internationalized/date": "^3.12.1",
+    "@next-auth/prisma-adapter": "1.0.7",
     "@node-saml/node-saml": "^5.1.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.213.0",

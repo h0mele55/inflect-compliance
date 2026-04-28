@@ -1,7 +1,7 @@
 /**
  * Vendor DTOs
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 
 export const VendorListItemDTOSchema = z.object({
     id: z.string(),
@@ -21,7 +21,9 @@ export const VendorListItemDTOSchema = z.object({
     contractRenewalAt: z.string().nullable().optional(),
     createdAt: z.string().optional(),
     updatedAt: z.string().optional(),
-}).passthrough();
+}).passthrough().openapi('VendorListItem', {
+    description: 'Vendor as shown in list views. residualRisk is the risk score after control coverage; null = not yet assessed.',
+});
 
 export type VendorListItemDTO = z.infer<typeof VendorListItemDTOSchema>;
 
@@ -45,6 +47,8 @@ export const VendorDetailDTOSchema = VendorListItemDTOSchema.extend({
     documents: z.array(VendorDocumentDTOSchema).optional(),
     assessments: z.array(z.object({ id: z.string() }).passthrough()).optional(),
     links: z.array(z.object({ id: z.string() }).passthrough()).optional(),
+}).openapi('VendorDetail', {
+    description: 'Vendor with full document set + assessment history + linked entities. Returned by GET /vendors/{id}.',
 });
 
 export type VendorDetailDTO = z.infer<typeof VendorDetailDTOSchema>;

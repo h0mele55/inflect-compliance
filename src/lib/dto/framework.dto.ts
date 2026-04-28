@@ -1,7 +1,7 @@
 /**
  * Framework & Requirement DTOs
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 
 export const FrameworkDTOSchema = z.object({
     id: z.string().optional(),
@@ -9,7 +9,9 @@ export const FrameworkDTOSchema = z.object({
     name: z.string(),
     version: z.string().nullable().optional(),
     description: z.string().nullable().optional(),
-}).passthrough();
+}).passthrough().openapi('Framework', {
+    description: 'Compliance framework record (e.g. ISO 27001:2022, SOC 2, NIS2). Key is the stable lookup identifier.',
+});
 
 export type FrameworkDTO = z.infer<typeof FrameworkDTOSchema>;
 
@@ -20,6 +22,8 @@ export const RequirementDTOSchema = z.object({
     description: z.string().nullable().optional(),
     section: z.string().nullable().optional(),
     category: z.string().nullable().optional(),
-}).passthrough();
+}).passthrough().openapi('Requirement', {
+    description: 'A single requirement within a framework (e.g. ISO 27001:2022 A.5.1). Mapped to controls via ControlRequirementMapRequest.',
+});
 
 export type RequirementDTO = z.infer<typeof RequirementDTOSchema>;
