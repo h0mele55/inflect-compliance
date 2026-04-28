@@ -1,7 +1,7 @@
 /**
  * Asset DTOs — mirrors shapes returned by AssetRepository.list() and .getById()
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 import { UserRefSchema } from './common';
 
 // ─── Asset List Item ───
@@ -33,7 +33,9 @@ export const AssetListItemDTOSchema = z.object({
         controls: z.number().optional(),
         risks: z.number().optional(),
     }).optional(),
-}).passthrough();
+}).passthrough().openapi('AssetListItem', {
+    description: 'Asset as it appears in list views. CIA scores are 1-5 ints; criticality is derived from the CIA tuple via the asset-tiering policy.',
+});
 
 export type AssetListItemDTO = z.infer<typeof AssetListItemDTOSchema>;
 
@@ -56,6 +58,8 @@ export const AssetDetailDTOSchema = AssetListItemDTOSchema.extend({
             status: z.string(),
         }).passthrough(),
     }).passthrough()).optional(),
+}).openapi('AssetDetail', {
+    description: 'Asset with linked controls and risks. Returned by GET /assets/{id}.',
 });
 
 export type AssetDetailDTO = z.infer<typeof AssetDetailDTOSchema>;

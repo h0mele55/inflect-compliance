@@ -1,14 +1,22 @@
 /**
  * Zod schemas for all API request bodies.
  * All schemas use .strip() to remove unknown fields.
- * 
+ *
  * Naming convention:
  *   Create<Entity>Schema — for POST (required fields)
  *   Update<Entity>Schema — for PUT (partial or full updates)
+ *
+ * GAP-10 — these schemas are also the single source of truth for the
+ * generated OpenAPI spec. The `.openapi('Name', { description })` calls
+ * below register each schema as a named component. Component naming
+ * convention is documented in `src/lib/openapi/registry.ts`. Add
+ * `.openapi(...)` to every NEW request schema when you add it.
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 
-export const EmptyBodySchema = z.object({}).strip();
+export const EmptyBodySchema = z.object({}).strip().openapi('EmptyBody', {
+    description: 'Empty request body. Used by mutation endpoints whose semantics live entirely in the URL (e.g. POST /restore on a soft-deleted resource).',
+});
 
 // ─── Assets ───
 
@@ -25,7 +33,9 @@ export const CreateAssetSchema = z.object({
     businessProcesses: z.string().optional().nullable(),
     dataResidency: z.string().optional().nullable(),
     retention: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('AssetCreateRequest', {
+    description: 'Payload for creating a tenant asset. CIA scores default to 3 when omitted; classification + owner + location are free-text.',
+});
 
 export const UpdateAssetSchema = z.object({
     name: z.string().min(1).optional(),
@@ -40,7 +50,9 @@ export const UpdateAssetSchema = z.object({
     businessProcesses: z.string().optional().nullable(),
     dataResidency: z.string().optional().nullable(),
     retention: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('AssetUpdateRequest', {
+    description: 'Partial update for an asset. Every field is optional; only provided fields are persisted.',
+});
 
 // ─── Risks ───
 
@@ -54,7 +66,9 @@ export const CreateRiskSchema = z.object({
     treatmentOwner: z.string().optional().nullable(),
     treatmentNotes: z.string().optional().nullable(),
     targetDate: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('RiskCreateRequest', {
+    description: 'Payload for creating a risk. Inherent score = impact × likelihood; the server computes residualScore separately when treatment data lands. treatmentNotes is encrypted at rest (Epic B field-encryption manifest).',
+});
 
 export const UpdateRiskSchema = z.object({
     title: z.string().min(1).optional(),
@@ -66,26 +80,36 @@ export const UpdateRiskSchema = z.object({
     treatmentOwner: z.string().optional().nullable(),
     treatmentNotes: z.string().optional().nullable(),
     targetDate: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('RiskUpdateRequest', {
+    description: 'Partial update for a risk. All fields optional.',
+});
 
 export const LinkRiskControlSchema = z.object({
     controlId: z.string().min(1, 'controlId is required'),
-}).strip();
+}).strip().openapi('RiskControlLinkRequest', {
+    description: 'Body for linking an existing control to this risk (mitigation mapping).',
+});
 
 // ─── Risk Status & Mapping ───
 
 
 export const SetRiskStatusSchema = z.object({
     status: z.enum(['OPEN', 'MITIGATING', 'ACCEPTED', 'CLOSED']),
-}).strip();
+}).strip().openapi('RiskSetStatusRequest', {
+    description: 'Lifecycle transition for a risk. The four states form an open lattice; closed risks remain queryable via includeDeleted=true.',
+});
 
 export const MapRiskControlSchema = z.object({
     controlId: z.string().min(1, 'controlId is required'),
-}).strip();
+}).strip().openapi('RiskControlMapRequest', {
+    description: 'Body for mapping a control to a risk (alternative endpoint to RiskControlLinkRequest; same shape, different surface).',
+});
 
 export const MapControlAssetSchema = z.object({
     assetId: z.string().min(1, 'assetId is required'),
-}).strip();
+}).strip().openapi('ControlAssetMapRequest', {
+    description: 'Body for mapping an asset to a control (declares the asset is in scope for this control).',
+});
 
 // ─── Controls ───
 
@@ -102,7 +126,9 @@ export const CreateControlSchema = z.object({
     evidenceSource: z.enum(['MANUAL', 'INTEGRATION']).optional().nullable(),
     automationKey: z.string().optional().nullable(),
     isCustom: z.boolean().optional().default(true),
-}).strip();
+}).strip().openapi('ControlCreateRequest', {
+    description: 'Payload for creating a control. Status defaults to NOT_STARTED. annexId references the framework annex catalogue (e.g. ISO 27001:2022 A.5.1). Custom controls (isCustom=true) are tenant-specific; framework-shipped controls install via the templates endpoint instead.',
+});
 
 export const UpdateControlSchema = z.object({
     name: z.string().min(1).optional(),
@@ -113,31 +139,43 @@ export const UpdateControlSchema = z.object({
     frequency: z.enum(['AD_HOC', 'DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'ANNUALLY']).optional().nullable(),
     evidenceSource: z.enum(['MANUAL', 'INTEGRATION']).optional().nullable(),
     automationKey: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('ControlUpdateRequest', {
+    description: 'Partial update for a control. Status, applicability, and owner have dedicated focused endpoints; this body covers descriptive metadata only.',
+});
 
 export const SetControlStatusSchema = z.object({
     status: z.enum(['NOT_STARTED', 'IN_PROGRESS', 'IMPLEMENTED', 'NEEDS_REVIEW']),
-}).strip();
+}).strip().openapi('ControlSetStatusRequest', {
+    description: 'Lifecycle transition for a control. NEEDS_REVIEW signals a control whose evidence has lapsed or whose owner was removed.',
+});
 
 export const SetControlApplicabilitySchema = z.object({
     applicability: z.enum(['APPLICABLE', 'NOT_APPLICABLE']),
     justification: z.string().optional().nullable().default(null),
-}).strip();
+}).strip().openapi('ControlSetApplicabilityRequest', {
+    description: 'Statement-of-applicability flag for a control. NOT_APPLICABLE controls are excluded from coverage metrics and audit packs but remain queryable.',
+});
 
 export const SetControlOwnerSchema = z.object({
     ownerUserId: z.string().nullable(),
-}).strip();
+}).strip().openapi('ControlSetOwnerRequest', {
+    description: 'Reassign or unassign a control owner. Pass null to clear the owner; pass a userId to assign.',
+});
 
 export const AddContributorSchema = z.object({
     userId: z.string().min(1, 'userId is required'),
-}).strip();
+}).strip().openapi('ContributorAddRequest', {
+    description: 'Add a user as a contributor to a control. Contributors get write access to the control without being the canonical owner.',
+});
 
 export const CreateControlTaskSchema = z.object({
     title: z.string().min(1, 'Title is required'),
     description: z.string().optional().nullable(),
     assigneeUserId: z.string().optional().nullable(),
     dueAt: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('ControlTaskCreateRequest', {
+    description: 'Create a task on a control. Tasks are the unit of operational work — implementation steps, evidence-gathering, review cycles.',
+});
 
 export const UpdateControlTaskSchema = z.object({
     title: z.string().min(1).optional(),
@@ -145,22 +183,30 @@ export const UpdateControlTaskSchema = z.object({
     status: z.enum(['OPEN', 'IN_PROGRESS', 'DONE', 'BLOCKED']).optional(),
     assigneeUserId: z.string().optional().nullable(),
     dueAt: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('ControlTaskUpdateRequest', {
+    description: 'Partial update for a control task — including status transitions and reassignment.',
+});
 
 export const LinkEvidenceSchema = z.object({
     kind: z.enum(['FILE', 'LINK', 'INTEGRATION_RESULT']),
     fileId: z.string().optional().nullable(),
     url: z.string().url().optional().nullable(),
     note: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('EvidenceLinkRequest', {
+    description: 'Attach evidence to a control. FILE kinds reference an uploaded FileRecord by id; LINK kinds carry a URL; INTEGRATION_RESULT kinds are emitted by automation runs.',
+});
 
 export const InstallTemplatesSchema = z.object({
     templateIds: z.array(z.string().min(1)).min(1, 'At least one template ID is required'),
-}).strip();
+}).strip().openapi('ControlTemplatesInstallRequest', {
+    description: 'Install one or more framework-shipped control templates into the tenant. Idempotent — re-installing an already-installed template is a no-op.',
+});
 
 export const MapRequirementSchema = z.object({
     requirementId: z.string().min(1, 'requirementId is required'),
-}).strip();
+}).strip().openapi('ControlRequirementMapRequest', {
+    description: 'Map a framework requirement to a control (e.g. asserting this control satisfies ISO 27001:2022 A.5.1).',
+});
 
 export const SetApplicabilitySchema = z.object({
     applicability: z.enum(['APPLICABLE', 'NOT_APPLICABLE']),
@@ -181,7 +227,9 @@ export const CreatePolicySchema = z.object({
     language: z.string().optional().nullable(),
     content: z.string().optional().nullable(), // initial markdown content
     templateId: z.string().optional().nullable(), // create from template
-}).strip();
+}).strip().openapi('PolicyCreateRequest', {
+    description: 'Create a policy. content (initial Markdown) AND templateId are optional but mutually exclusive — pass content for a from-scratch policy, templateId to spawn from a framework template. The first PolicyVersion is created server-side.',
+});
 
 export const UpdatePolicyMetadataSchema = z.object({
     title: z.string().min(1).optional(),
@@ -191,27 +239,37 @@ export const UpdatePolicyMetadataSchema = z.object({
     reviewFrequencyDays: z.coerce.number().int().min(1).optional().nullable(),
     nextReviewAt: z.string().optional().nullable(),
     language: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('PolicyMetadataUpdateRequest', {
+    description: 'Update policy metadata only — title, owner, review cadence. Content edits go through the policy-version endpoint.',
+});
 
 export const CreatePolicyVersionSchema = z.object({
     contentType: z.enum(['MARKDOWN', 'HTML', 'EXTERNAL_LINK']),
     contentText: z.string().optional().nullable(),
     externalUrl: z.string().url('Must be a valid URL').optional().nullable(),
     changeSummary: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('PolicyVersionCreateRequest', {
+    description: 'Create a new draft version of a policy. contentText is required for MARKDOWN/HTML; externalUrl is required for EXTERNAL_LINK. contentText is sanitized + encrypted at rest.',
+});
 
 export const RequestApprovalSchema = z.object({
     versionId: z.string().min(1, 'versionId is required'),
-}).strip();
+}).strip().openapi('PolicyApprovalRequestRequest', {
+    description: 'Request approval for a draft policy version. Routes through the configured approver chain.',
+});
 
 export const DecideApprovalSchema = z.object({
     decision: z.enum(['APPROVED', 'REJECTED']),
     comment: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('PolicyApprovalDecideRequest', {
+    description: 'Approver decision on a pending policy version. Rejection requires no comment per spec but operators are encouraged to provide one.',
+});
 
 export const PublishPolicySchema = z.object({
     versionId: z.string().min(1, 'versionId is required'),
-}).strip();
+}).strip().openapi('PolicyPublishRequest', {
+    description: 'Promote an approved policy version to PUBLISHED. Only one published version per policy at a time; the previous published version is archived.',
+});
 
 // ─── Evidence ───
 
@@ -227,7 +285,9 @@ export const CreateEvidenceSchema = z.object({
     ownerUserId: z.string().optional().nullable(),    // Real user reference (preferred)
     reviewCycle: z.string().optional().nullable(),
     nextReviewDate: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('EvidenceCreateRequest', {
+    description: 'Create an evidence record. type=FILE expects a paired multipart upload via /evidence/uploads; type=TEXT/LINK can use this JSON body directly. content is encrypted at rest for TEXT type.',
+});
 
 export const CreateEvidenceFormSchema = CreateEvidenceSchema.extend({
     file: z.any().optional(), // File object caught from FormData
@@ -241,12 +301,16 @@ export const UpdateEvidenceSchema = z.object({
     ownerUserId: z.string().optional().nullable(),    // Real user reference (preferred)
     reviewCycle: z.string().optional().nullable(),
     nextReviewDate: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('EvidenceUpdateRequest', {
+    description: 'Partial update for an evidence record (metadata only — file content is immutable post-upload).',
+});
 
 export const EvidenceReviewSchema = z.object({
     action: z.enum(['SUBMITTED', 'APPROVED', 'REJECTED']),
     comment: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('EvidenceReviewRequest', {
+    description: 'Lifecycle transition for an evidence record. SUBMITTED is the request-for-review state; APPROVED/REJECTED are reviewer decisions.',
+});
 
 // ─── Findings ───
 
@@ -260,7 +324,9 @@ export const CreateFindingSchema = z.object({
     correctiveAction: z.string().optional().nullable(),
     owner: z.string().optional().nullable(),
     dueDate: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('FindingCreateRequest', {
+    description: 'Create an audit finding. auditId is optional — findings can be raised independently of an audit cycle. description + rootCause are encrypted at rest.',
+});
 
 export const UpdateFindingSchema = z.object({
     severity: z.string().optional(),
@@ -273,7 +339,9 @@ export const UpdateFindingSchema = z.object({
     dueDate: z.string().optional().nullable(),
     status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional(),
     verificationNotes: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('FindingUpdateRequest', {
+    description: 'Partial update for a finding — including lifecycle transitions and verification notes.',
+});
 
 // ─── Audits ───
 
@@ -292,7 +360,9 @@ export const CreateAuditSchema = z.object({
     auditees: z.string().optional().nullable(),
     departments: z.string().optional().nullable(),
     generateChecklist: z.boolean().optional(),
-}).strip();
+}).strip().openapi('AuditCreateRequest', {
+    description: 'Create an audit cycle. generateChecklist=true seeds the audit with checklist items derived from the in-scope frameworks.',
+});
 
 export const UpdateAuditSchema = z.object({
     title: z.string().min(1).optional(),
@@ -302,7 +372,9 @@ export const UpdateAuditSchema = z.object({
     auditors: z.string().optional().nullable(),
     auditees: z.string().optional().nullable(),
     checklistUpdates: z.array(ChecklistUpdateSchema).optional(),
-}).strip();
+}).strip().openapi('AuditUpdateRequest', {
+    description: 'Update an audit cycle including status transitions and checklist-row updates (per-row result + notes via checklistUpdates).',
+});
 
 // ─── Tasks (Unified Work Items) ───
 
@@ -318,7 +390,9 @@ export const CreateTaskSchema = z.object({
     reviewerUserId: z.string().nullable().optional(),
     controlId: z.string().nullable().optional(),
     metadataJson: z.any().optional(),
-}).strip();
+}).strip().openapi('TaskCreateRequest', {
+    description: 'Create a task (unified work-item type covering audit findings, control gaps, incidents, improvements, and ad-hoc tasks). The type discriminator gates which UI surfaces this work item appears in.',
+});
 
 export const UpdateTaskSchema = z.object({
     title: z.string().min(1).max(500).optional(),
@@ -329,26 +403,36 @@ export const UpdateTaskSchema = z.object({
     controlId: z.string().nullable().optional(),
     reviewerUserId: z.string().nullable().optional(),
     metadataJson: z.any().optional(),
-}).strip();
+}).strip().openapi('TaskUpdateRequest', {
+    description: 'Partial update for a task. Status changes and assignment go through their own focused endpoints.',
+});
 
 export const SetTaskStatusSchema = z.object({
     status: z.enum(['OPEN', 'TRIAGED', 'IN_PROGRESS', 'BLOCKED', 'RESOLVED', 'CLOSED', 'CANCELED']),
     resolution: z.string().max(5000).nullable().optional(),
-}).strip();
+}).strip().openapi('TaskSetStatusRequest', {
+    description: 'Lifecycle transition for a task. resolution is required (by convention) when moving to RESOLVED/CLOSED to provide context for the audit trail.',
+});
 
 export const AssignTaskSchema = z.object({
     assigneeUserId: z.string().nullable(),
-}).strip();
+}).strip().openapi('TaskAssignRequest', {
+    description: 'Reassign or unassign a task. Pass null to clear the assignee.',
+});
 
 export const AddTaskLinkSchema = z.object({
     entityType: z.enum(['CONTROL', 'FRAMEWORK_REQUIREMENT', 'RISK', 'ASSET', 'POLICY', 'EVIDENCE', 'FILE', 'AUDIT_PACK', 'VENDOR']),
     entityId: z.string().min(1),
     relation: z.enum(['RELATES_TO', 'EVIDENCE_FOR', 'BLOCKED_BY', 'CAUSED_BY', 'MITIGATED_BY']).optional(),
-}).strip();
+}).strip().openapi('TaskLinkAddRequest', {
+    description: 'Link a task to another domain entity. The relation field captures semantic intent for downstream traceability views.',
+});
 
 export const AddTaskCommentSchema = z.object({
     body: z.string().min(1).max(10000),
-}).strip();
+}).strip().openapi('TaskCommentAddRequest', {
+    description: 'Append a comment to a task. body is sanitized server-side (rich-text allowlist) and encrypted at rest (Epic B field-encryption manifest).',
+});
 
 // ─── Task Bulk Actions ───
 
@@ -394,7 +478,9 @@ export const AuthRegisterSchema = z.object({
     password: z.string().min(8),
     name: z.string().min(1),
     orgName: z.string().min(1),
-}).strip();
+}).strip().openapi('AuthRegisterRequest', {
+    description: 'Self-service signup payload (gated by AUTH_TEST_MODE in non-prod). The password is checked against HIBP via k-anonymity before persistence; emailVerification is initiated server-side.',
+});
 
 // `action: 'login'` was removed 2026-04-22 — the old bespoke /api/auth/
 // register login endpoint was a parallel path to NextAuth's Credentials
@@ -435,7 +521,9 @@ export const CreateVendorSchema = z.object({
     tags: z.array(z.string().max(50)).max(20).optional().nullable(),
     nextReviewAt: z.string().optional().nullable(),
     contractRenewalAt: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('VendorCreateRequest', {
+    description: 'Create a vendor (third-party supplier) record. Risk + criticality fields drive vendor-tiering and audit-cycle scope. description is encrypted at rest.',
+});
 
 export const UpdateVendorSchema = z.object({
     name: z.string().min(1).max(200).optional(),
@@ -454,7 +542,9 @@ export const UpdateVendorSchema = z.object({
     tags: z.array(z.string().max(50)).max(20).optional().nullable(),
     nextReviewAt: z.string().optional().nullable(),
     contractRenewalAt: z.string().optional().nullable(),
-}).strip();
+}).strip().openapi('VendorUpdateRequest', {
+    description: 'Partial update for a vendor. residualRisk is computed from inherentRisk + control coverage; allow direct override here for SoC analyst workflow.',
+});
 
 export const CreateVendorDocumentSchema = z.object({
     type: z.enum(['CONTRACT', 'SOC2', 'ISO_CERT', 'DPA', 'SECURITY_POLICY', 'PEN_TEST', 'OTHER']),

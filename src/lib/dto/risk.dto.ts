@@ -1,7 +1,7 @@
 /**
  * Risk DTOs — mirrors shapes returned by RiskRepository.list() and .getById()
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 
 // ─── Linked control sub-shape ───
 
@@ -41,7 +41,9 @@ export const RiskListItemDTOSchema = z.object({
     createdAt: z.string().optional(),
     updatedAt: z.string().optional(),
     controls: z.array(RiskControlRefSchema).optional(),
-}).passthrough();
+}).passthrough().openapi('RiskListItem', {
+    description: 'Risk as it appears in list views. inherentScore = impact × likelihood; score is the residual after treatment. controls is a summary array of linked mitigating controls.',
+});
 
 export type RiskListItemDTO = z.infer<typeof RiskListItemDTOSchema>;
 
@@ -53,6 +55,8 @@ export const RiskDetailDTOSchema = RiskListItemDTOSchema.extend({
         id: z.string(),
         control: z.object({}).passthrough(),
     }).passthrough()).optional(),
+}).openapi('RiskDetail', {
+    description: 'Risk with full linked-control objects. Returned by GET /risks/{id}.',
 });
 
 export type RiskDetailDTO = z.infer<typeof RiskDetailDTOSchema>;

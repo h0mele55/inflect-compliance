@@ -1,7 +1,7 @@
 /**
  * Control DTOs — mirrors the shapes returned by ControlRepository.list() and .getById()
  */
-import { z } from 'zod';
+import { z } from '@/lib/openapi/zod';
 import { UserRefSchema, UserRefShortSchema } from './common';
 
 // ─── Control List Item ───
@@ -38,7 +38,9 @@ export const ControlListItemDTOSchema = z.object({
         evidenceLinks: z.number().optional(),
         contributors: z.number().optional(),
     }).optional(),
-}).passthrough();
+}).passthrough().openapi('ControlListItem', {
+    description: 'Control as it appears in list views — summary fields plus aggregate counts. The detail endpoint returns ControlDetail with the full include shape.',
+});
 
 export type ControlListItemDTO = z.infer<typeof ControlListItemDTOSchema>;
 
@@ -124,6 +126,8 @@ export const ControlDetailDTOSchema = ControlListItemDTOSchema.extend({
     risks: z.array(RiskLinkDTOSchema).optional(),
     policyLinks: z.array(PolicyLinkDTOSchema).optional(),
     frameworkMappings: z.array(FrameworkMappingDTOSchema).optional(),
+}).openapi('ControlDetail', {
+    description: 'Control with all relations included — contributors, tasks, evidence links, mapped risks/policies, and framework requirement mappings. Returned by GET /controls/{id}.',
 });
 export type ControlDetailDTO = z.infer<typeof ControlDetailDTOSchema>;
 
@@ -147,6 +151,8 @@ export const ControlDashboardDTOSchema = z.object({
     implementationProgress: z.number(),
     implementedCount: z.number(),
     applicableCount: z.number(),
+}).openapi('ControlDashboard', {
+    description: 'Aggregate metrics for the control dashboard view — counts, distributions, top-owner leaderboard, and implementation-progress percentage.',
 });
 export type ControlDashboardDTO = z.infer<typeof ControlDashboardDTOSchema>;
 
