@@ -24,114 +24,6 @@
   ],
   "components": {
     "schemas": {
-      "ContributorAddRequest": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "userId"
-        ],
-        "description": "Add a user as a contributor to a control. Contributors get write access to the control without being the canonical owner."
-      },
-      "TaskCommentAddRequest": {
-        "type": "object",
-        "properties": {
-          "body": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 10000
-          }
-        },
-        "required": [
-          "body"
-        ],
-        "description": "Append a comment to a task. body is sanitized server-side (rich-text allowlist) and encrypted at rest (Epic B field-encryption manifest)."
-      },
-      "TaskLinkAddRequest": {
-        "type": "object",
-        "properties": {
-          "entityType": {
-            "type": "string",
-            "enum": [
-              "CONTROL",
-              "FRAMEWORK_REQUIREMENT",
-              "RISK",
-              "ASSET",
-              "POLICY",
-              "EVIDENCE",
-              "FILE",
-              "AUDIT_PACK",
-              "VENDOR"
-            ]
-          },
-          "entityId": {
-            "type": "string",
-            "minLength": 1
-          },
-          "relation": {
-            "type": "string",
-            "enum": [
-              "RELATES_TO",
-              "EVIDENCE_FOR",
-              "BLOCKED_BY",
-              "CAUSED_BY",
-              "MITIGATED_BY"
-            ]
-          }
-        },
-        "required": [
-          "entityType",
-          "entityId"
-        ],
-        "description": "Link a task to another domain entity. The relation field captures semantic intent for downstream traceability views."
-      },
-      "TaskAssignRequest": {
-        "type": "object",
-        "properties": {
-          "assigneeUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "assigneeUserId"
-        ],
-        "description": "Reassign or unassign a task. Pass null to clear the assignee."
-      },
-      "AuthRegisterRequest": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "format": "email"
-          },
-          "password": {
-            "type": "string",
-            "minLength": 8
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1
-          },
-          "orgName": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "email",
-          "password",
-          "name",
-          "orgName"
-        ],
-        "description": "Self-service signup payload (gated by AUTH_TEST_MODE in non-prod). The password is checked against HIBP via k-anonymity before persistence; emailVerification is initiated server-side."
-      },
       "AssetCreateRequest": {
         "type": "object",
         "properties": {
@@ -201,6 +93,356 @@
         ],
         "description": "Payload for creating a tenant asset. CIA scores default to 3 when omitted; classification + owner + location are free-text."
       },
+      "AssetDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/AssetListItem"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "controls": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "control": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "status"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "control"
+                  ]
+                }
+              },
+              "risks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "risk": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title",
+                        "status"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "risk"
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "description": "Asset with linked controls and risks. Returned by GET /assets/{id}."
+      },
+      "AssetListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "classification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidentiality": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "integrity": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "availability": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "criticality": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "externalRef": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dependencies": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "businessProcesses": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dataResidency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retention": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "ownerUser": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "controls": {
+                "type": "number"
+              },
+              "risks": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "name",
+          "type"
+        ],
+        "description": "Asset as it appears in list views. CIA scores are 1-5 ints; criticality is derived from the CIA tuple via the asset-tiering policy."
+      },
+      "AssetUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "classification": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "confidentiality": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "integrity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "availability": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "dependencies": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "businessProcesses": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dataResidency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retention": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "description": "Partial update for an asset. Every field is optional; only provided fields are persisted."
+      },
+      "Audit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "scope": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "criteria": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "schedule": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auditors": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auditees": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "departments": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "title",
+          "status"
+        ],
+        "description": "Audit cycle record. Status flows PLANNED → IN_PROGRESS → COMPLETED (or CANCELLED)."
+      },
       "AuditCreateRequest": {
         "type": "object",
         "properties": {
@@ -249,6 +491,176 @@
           "title"
         ],
         "description": "Create an audit cycle. generateChecklist=true seeds the audit with checklist items derived from the in-scope frameworks."
+      },
+      "AuditLogEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "example": "CONTROL_CREATED"
+          },
+          "entity": {
+            "type": "string",
+            "example": "Control"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "details": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-04-28T07:42:11.000Z"
+          },
+          "user": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRefShort"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "details",
+          "createdAt"
+        ],
+        "description": "A single audit-log row. Hash-chained at the DB layer; this DTO is the read view exposed via the audit/activity endpoints."
+      },
+      "AuditUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope": {
+            "type": "string"
+          },
+          "criteria": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PLANNED",
+              "IN_PROGRESS",
+              "COMPLETED",
+              "CANCELLED"
+            ]
+          },
+          "auditors": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "auditees": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "checklistUpdates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "result": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "notes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id"
+              ]
+            }
+          }
+        },
+        "description": "Update an audit cycle including status transitions and checklist-row updates (per-row result + notes via checklistUpdates)."
+      },
+      "AuthRegisterRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "orgName": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "name",
+          "orgName"
+        ],
+        "description": "Self-service signup payload (gated by AUTH_TEST_MODE in non-prod). The password is checked against HIBP via k-anonymity before persistence; emailVerification is initiated server-side."
+      },
+      "ContributorAddRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "userId"
+        ],
+        "description": "Add a user as a contributor to a control. Contributors get write access to the control without being the canonical owner."
+      },
+      "ControlAssetMapRequest": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "assetId"
+        ],
+        "description": "Body for mapping an asset to a control (declares the asset is in scope for this control)."
       },
       "ControlCreateRequest": {
         "type": "object",
@@ -343,1561 +755,6 @@
         ],
         "description": "Payload for creating a control. Status defaults to NOT_STARTED. annexId references the framework annex catalogue (e.g. ISO 27001:2022 A.5.1). Custom controls (isCustom=true) are tenant-specific; framework-shipped controls install via the templates endpoint instead."
       },
-      "ControlTaskCreateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "assigneeUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "dueAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "title"
-        ],
-        "description": "Create a task on a control. Tasks are the unit of operational work — implementation steps, evidence-gathering, review cycles."
-      },
-      "EvidenceCreateRequest": {
-        "type": "object",
-        "properties": {
-          "controlId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "TEXT",
-              "FILE",
-              "LINK",
-              "SCREENSHOT"
-            ],
-            "default": "TEXT"
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "content": {
-            "type": "string"
-          },
-          "fileName": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "fileSize": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "category": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "owner": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "ownerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "reviewCycle": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "nextReviewDate": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "title"
-        ],
-        "description": "Create an evidence record. type=FILE expects a paired multipart upload via /evidence/uploads; type=TEXT/LINK can use this JSON body directly. content is encrypted at rest for TEXT type."
-      },
-      "FindingCreateRequest": {
-        "type": "object",
-        "properties": {
-          "auditId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "severity": {
-            "type": "string",
-            "minLength": 1
-          },
-          "type": {
-            "type": "string",
-            "minLength": 1
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": {
-            "type": "string"
-          },
-          "rootCause": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "correctiveAction": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "owner": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "dueDate": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "severity",
-          "type",
-          "title"
-        ],
-        "description": "Create an audit finding. auditId is optional — findings can be raised independently of an audit cycle. description + rootCause are encrypted at rest."
-      },
-      "TaskCreateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "AUDIT_FINDING",
-              "CONTROL_GAP",
-              "INCIDENT",
-              "IMPROVEMENT",
-              "TASK"
-            ],
-            "default": "TASK"
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 10000
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "INFO",
-              "LOW",
-              "MEDIUM",
-              "HIGH",
-              "CRITICAL"
-            ]
-          },
-          "priority": {
-            "type": "string",
-            "enum": [
-              "P0",
-              "P1",
-              "P2",
-              "P3"
-            ]
-          },
-          "source": {
-            "type": "string",
-            "enum": [
-              "MANUAL",
-              "TEMPLATE",
-              "POLICY_REVIEW",
-              "AUDIT",
-              "INTEGRATION"
-            ]
-          },
-          "dueAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "assigneeUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "reviewerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "controlId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "metadataJson": {}
-        },
-        "required": [
-          "title"
-        ],
-        "description": "Create a task (unified work-item type covering audit findings, control gaps, incidents, improvements, and ad-hoc tasks). The type discriminator gates which UI surfaces this work item appears in."
-      },
-      "PolicyCreateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "category": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "ownerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "reviewFrequencyDays": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1
-          },
-          "language": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "content": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "templateId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "title"
-        ],
-        "description": "Create a policy. content (initial Markdown) AND templateId are optional but mutually exclusive — pass content for a from-scratch policy, templateId to spawn from a framework template. The first PolicyVersion is created server-side."
-      },
-      "PolicyVersionCreateRequest": {
-        "type": "object",
-        "properties": {
-          "contentType": {
-            "type": "string",
-            "enum": [
-              "MARKDOWN",
-              "HTML",
-              "EXTERNAL_LINK"
-            ]
-          },
-          "contentText": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "externalUrl": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uri"
-          },
-          "changeSummary": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "contentType"
-        ],
-        "description": "Create a new draft version of a policy. contentText is required for MARKDOWN/HTML; externalUrl is required for EXTERNAL_LINK. contentText is sanitized + encrypted at rest."
-      },
-      "RiskCreateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "threat": {
-            "type": "string"
-          },
-          "vulnerability": {
-            "type": "string"
-          },
-          "impact": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10,
-            "default": 3
-          },
-          "likelihood": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10,
-            "default": 3
-          },
-          "treatment": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "treatmentOwner": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "treatmentNotes": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "targetDate": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "title"
-        ],
-        "description": "Payload for creating a risk. Inherent score = impact × likelihood; the server computes residualScore separately when treatment data lands. treatmentNotes is encrypted at rest (Epic B field-encryption manifest)."
-      },
-      "VendorCreateRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "legalName": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 300
-          },
-          "websiteUrl": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 500,
-            "format": "uri"
-          },
-          "domain": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 200
-          },
-          "country": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 100
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 5000
-          },
-          "ownerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "ONBOARDING",
-              "OFFBOARDING",
-              "OFFBOARDED"
-            ]
-          },
-          "criticality": {
-            "type": "string",
-            "enum": [
-              "LOW",
-              "MEDIUM",
-              "HIGH",
-              "CRITICAL"
-            ]
-          },
-          "inherentRisk": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "LOW",
-              "MEDIUM",
-              "HIGH",
-              "CRITICAL"
-            ]
-          },
-          "dataAccess": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "NONE",
-              "LOW",
-              "MEDIUM",
-              "HIGH"
-            ]
-          },
-          "isSubprocessor": {
-            "type": "boolean"
-          },
-          "tags": {
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "type": "string",
-              "maxLength": 50
-            },
-            "maxItems": 20
-          },
-          "nextReviewAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "contractRenewalAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "description": "Create a vendor (third-party supplier) record. Risk + criticality fields drive vendor-tiering and audit-cycle scope. description is encrypted at rest."
-      },
-      "PolicyApprovalDecideRequest": {
-        "type": "object",
-        "properties": {
-          "decision": {
-            "type": "string",
-            "enum": [
-              "APPROVED",
-              "REJECTED"
-            ]
-          },
-          "comment": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "decision"
-        ],
-        "description": "Approver decision on a pending policy version. Rejection requires no comment per spec but operators are encouraged to provide one."
-      },
-      "EmptyBody": {
-        "type": "object",
-        "properties": {},
-        "description": "Empty request body. Used by mutation endpoints whose semantics live entirely in the URL (e.g. POST /restore on a soft-deleted resource)."
-      },
-      "EvidenceReviewRequest": {
-        "type": "object",
-        "properties": {
-          "action": {
-            "type": "string",
-            "enum": [
-              "SUBMITTED",
-              "APPROVED",
-              "REJECTED"
-            ]
-          },
-          "comment": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "action"
-        ],
-        "description": "Lifecycle transition for an evidence record. SUBMITTED is the request-for-review state; APPROVED/REJECTED are reviewer decisions."
-      },
-      "ControlTemplatesInstallRequest": {
-        "type": "object",
-        "properties": {
-          "templateIds": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            },
-            "minItems": 1
-          }
-        },
-        "required": [
-          "templateIds"
-        ],
-        "description": "Install one or more framework-shipped control templates into the tenant. Idempotent — re-installing an already-installed template is a no-op."
-      },
-      "EvidenceLinkRequest": {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "FILE",
-              "LINK",
-              "INTEGRATION_RESULT"
-            ]
-          },
-          "fileId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "url": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "uri"
-          },
-          "note": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "kind"
-        ],
-        "description": "Attach evidence to a control. FILE kinds reference an uploaded FileRecord by id; LINK kinds carry a URL; INTEGRATION_RESULT kinds are emitted by automation runs."
-      },
-      "RiskControlLinkRequest": {
-        "type": "object",
-        "properties": {
-          "controlId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "controlId"
-        ],
-        "description": "Body for linking an existing control to this risk (mitigation mapping)."
-      },
-      "ControlAssetMapRequest": {
-        "type": "object",
-        "properties": {
-          "assetId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "assetId"
-        ],
-        "description": "Body for mapping an asset to a control (declares the asset is in scope for this control)."
-      },
-      "ControlRequirementMapRequest": {
-        "type": "object",
-        "properties": {
-          "requirementId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "requirementId"
-        ],
-        "description": "Map a framework requirement to a control (e.g. asserting this control satisfies ISO 27001:2022 A.5.1)."
-      },
-      "RiskControlMapRequest": {
-        "type": "object",
-        "properties": {
-          "controlId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "controlId"
-        ],
-        "description": "Body for mapping a control to a risk (alternative endpoint to RiskControlLinkRequest; same shape, different surface)."
-      },
-      "PolicyPublishRequest": {
-        "type": "object",
-        "properties": {
-          "versionId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "versionId"
-        ],
-        "description": "Promote an approved policy version to PUBLISHED. Only one published version per policy at a time; the previous published version is archived."
-      },
-      "PolicyApprovalRequestRequest": {
-        "type": "object",
-        "properties": {
-          "versionId": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "versionId"
-        ],
-        "description": "Request approval for a draft policy version. Routes through the configured approver chain."
-      },
-      "ControlSetApplicabilityRequest": {
-        "type": "object",
-        "properties": {
-          "applicability": {
-            "type": "string",
-            "enum": [
-              "APPLICABLE",
-              "NOT_APPLICABLE"
-            ]
-          },
-          "justification": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "default": null
-          }
-        },
-        "required": [
-          "applicability"
-        ],
-        "description": "Statement-of-applicability flag for a control. NOT_APPLICABLE controls are excluded from coverage metrics and audit packs but remain queryable."
-      },
-      "ControlSetOwnerRequest": {
-        "type": "object",
-        "properties": {
-          "ownerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "ownerUserId"
-        ],
-        "description": "Reassign or unassign a control owner. Pass null to clear the owner; pass a userId to assign."
-      },
-      "ControlSetStatusRequest": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "NOT_STARTED",
-              "IN_PROGRESS",
-              "IMPLEMENTED",
-              "NEEDS_REVIEW"
-            ]
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "description": "Lifecycle transition for a control. NEEDS_REVIEW signals a control whose evidence has lapsed or whose owner was removed."
-      },
-      "TaskSetStatusRequest": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "OPEN",
-              "TRIAGED",
-              "IN_PROGRESS",
-              "BLOCKED",
-              "RESOLVED",
-              "CLOSED",
-              "CANCELED"
-            ]
-          },
-          "resolution": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 5000
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "description": "Lifecycle transition for a task. resolution is required (by convention) when moving to RESOLVED/CLOSED to provide context for the audit trail."
-      },
-      "RiskSetStatusRequest": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "OPEN",
-              "MITIGATING",
-              "ACCEPTED",
-              "CLOSED"
-            ]
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "description": "Lifecycle transition for a risk. The four states form an open lattice; closed risks remain queryable via includeDeleted=true."
-      },
-      "AssetUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1
-          },
-          "type": {
-            "type": "string",
-            "minLength": 1
-          },
-          "classification": {
-            "type": "string"
-          },
-          "owner": {
-            "type": "string"
-          },
-          "location": {
-            "type": "string"
-          },
-          "confidentiality": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 5
-          },
-          "integrity": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 5
-          },
-          "availability": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 5
-          },
-          "dependencies": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "businessProcesses": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "dataResidency": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "retention": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "description": "Partial update for an asset. Every field is optional; only provided fields are persisted."
-      },
-      "AuditUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "scope": {
-            "type": "string"
-          },
-          "criteria": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "PLANNED",
-              "IN_PROGRESS",
-              "COMPLETED",
-              "CANCELLED"
-            ]
-          },
-          "auditors": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "auditees": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "checklistUpdates": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "result": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "notes": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
-              },
-              "required": [
-                "id"
-              ]
-            }
-          }
-        },
-        "description": "Update an audit cycle including status transitions and checklist-row updates (per-row result + notes via checklistUpdates)."
-      },
-      "ControlUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "code": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "intent": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "category": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "frequency": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "AD_HOC",
-              "DAILY",
-              "WEEKLY",
-              "MONTHLY",
-              "QUARTERLY",
-              "ANNUALLY"
-            ]
-          },
-          "evidenceSource": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "MANUAL",
-              "INTEGRATION"
-            ]
-          },
-          "automationKey": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "description": "Partial update for a control. Status, applicability, and owner have dedicated focused endpoints; this body covers descriptive metadata only."
-      },
-      "ControlTaskUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "OPEN",
-              "IN_PROGRESS",
-              "DONE",
-              "BLOCKED"
-            ]
-          },
-          "assigneeUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "dueAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "description": "Partial update for a control task — including status transitions and reassignment."
-      },
-      "EvidenceUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "content": {
-            "type": "string"
-          },
-          "category": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "owner": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "ownerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "reviewCycle": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "nextReviewDate": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "description": "Partial update for an evidence record (metadata only — file content is immutable post-upload)."
-      },
-      "FindingUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "severity": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": {
-            "type": "string"
-          },
-          "rootCause": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "correctiveAction": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "owner": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "dueDate": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "OPEN",
-              "IN_PROGRESS",
-              "RESOLVED",
-              "CLOSED"
-            ]
-          },
-          "verificationNotes": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "description": "Partial update for a finding — including lifecycle transitions and verification notes."
-      },
-      "TaskUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 10000
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "INFO",
-              "LOW",
-              "MEDIUM",
-              "HIGH",
-              "CRITICAL"
-            ]
-          },
-          "priority": {
-            "type": "string",
-            "enum": [
-              "P0",
-              "P1",
-              "P2",
-              "P3"
-            ]
-          },
-          "dueAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "controlId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "reviewerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "metadataJson": {}
-        },
-        "description": "Partial update for a task. Status changes and assignment go through their own focused endpoints."
-      },
-      "PolicyMetadataUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "category": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "ownerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "reviewFrequencyDays": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "minimum": 1
-          },
-          "nextReviewAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "language": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "description": "Update policy metadata only — title, owner, review cadence. Content edits go through the policy-version endpoint."
-      },
-      "RiskUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "threat": {
-            "type": "string"
-          },
-          "vulnerability": {
-            "type": "string"
-          },
-          "impact": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10
-          },
-          "likelihood": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10
-          },
-          "treatment": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "treatmentOwner": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "treatmentNotes": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "targetDate": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "description": "Partial update for a risk. All fields optional."
-      },
-      "VendorUpdateRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "legalName": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 300
-          },
-          "websiteUrl": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 500,
-            "format": "uri"
-          },
-          "domain": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 200
-          },
-          "country": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 100
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 5000
-          },
-          "ownerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "ACTIVE",
-              "ONBOARDING",
-              "OFFBOARDING",
-              "OFFBOARDED"
-            ]
-          },
-          "criticality": {
-            "type": "string",
-            "enum": [
-              "LOW",
-              "MEDIUM",
-              "HIGH",
-              "CRITICAL"
-            ]
-          },
-          "inherentRisk": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "LOW",
-              "MEDIUM",
-              "HIGH",
-              "CRITICAL"
-            ]
-          },
-          "residualRisk": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "LOW",
-              "MEDIUM",
-              "HIGH",
-              "CRITICAL"
-            ]
-          },
-          "dataAccess": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "NONE",
-              "LOW",
-              "MEDIUM",
-              "HIGH"
-            ]
-          },
-          "isSubprocessor": {
-            "type": "boolean"
-          },
-          "tags": {
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "type": "string",
-              "maxLength": 50
-            },
-            "maxItems": 20
-          },
-          "nextReviewAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "contractRenewalAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "description": "Partial update for a vendor. residualRisk is computed from inherentRisk + control coverage; allow direct override here for SoC analyst workflow."
-      },
-      "ErrorResponse": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "example": "NOT_FOUND"
-              },
-              "message": {
-                "type": "string",
-                "example": "Control not found"
-              },
-              "requestId": {
-                "type": "string",
-                "example": "req_01HG7…"
-              },
-              "details": {}
-            },
-            "required": [
-              "code",
-              "message"
-            ]
-          }
-        },
-        "required": [
-          "error"
-        ],
-        "description": "Canonical error envelope returned by every error path. `code` is a stable string clients can branch on; `message` is human-readable; `requestId` correlates with server logs; `details` is optional structured context (validation issues, rate-limit info, etc.)."
-      },
-      "UserRefShort": {
-        "type": [
-          "object",
-          "null"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "usr_01HG7…"
-          },
-          "name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "example": "Alice Admin"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ],
-        "description": "User identity reference without email — used in audit-log entries and other places where leaking the email would be inappropriate."
-      },
-      "AuditLogEntry": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "action": {
-            "type": "string",
-            "example": "CONTROL_CREATED"
-          },
-          "entity": {
-            "type": "string",
-            "example": "Control"
-          },
-          "entityId": {
-            "type": "string"
-          },
-          "details": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdAt": {
-            "type": "string",
-            "example": "2026-04-28T07:42:11.000Z"
-          },
-          "user": {
-            "$ref": "#/components/schemas/UserRefShort"
-          }
-        },
-        "required": [
-          "id",
-          "action",
-          "details",
-          "createdAt"
-        ],
-        "description": "A single audit-log row. Hash-chained at the DB layer; this DTO is the read view exposed via the audit/activity endpoints."
-      },
-      "SuccessResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "enum": [
-              true
-            ]
-          }
-        },
-        "required": [
-          "success"
-        ],
-        "description": "Empty success envelope. Returned by mutation endpoints that have no resource to echo back (e.g. status changes, links, deletes)."
-      },
-      "UserRef": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "usr_01HG7…"
-          },
-          "name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "example": "Alice Admin"
-          },
-          "email": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "example": "admin@acme.com"
-          }
-        },
-        "required": [
-          "id",
-          "name"
-        ],
-        "description": "User identity reference embedded inside other resources (id + display name + optional email)."
-      },
       "ControlDashboard": {
         "type": "object",
         "properties": {
@@ -1975,166 +832,6 @@
           "applicableCount"
         ],
         "description": "Aggregate metrics for the control dashboard view — counts, distributions, top-owner leaderboard, and implementation-progress percentage."
-      },
-      "ControlListItem": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "tenantId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "code": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "annexId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "intent": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "category": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "type": "string"
-          },
-          "applicability": {
-            "type": "string"
-          },
-          "frequency": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "ownerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdByUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "evidenceSource": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "automationKey": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "isCustom": {
-            "type": "boolean"
-          },
-          "lastTested": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "nextDueAt": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "applicabilityJustification": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "owner": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/UserRef"
-              },
-              {
-                "type": [
-                  "object",
-                  "null"
-                ]
-              }
-            ]
-          },
-          "_count": {
-            "type": "object",
-            "properties": {
-              "evidence": {
-                "type": "number"
-              },
-              "risks": {
-                "type": "number"
-              },
-              "assets": {
-                "type": "number"
-              },
-              "controlTasks": {
-                "type": "number"
-              },
-              "evidenceLinks": {
-                "type": "number"
-              },
-              "contributors": {
-                "type": "number"
-              }
-            }
-          }
-        },
-        "required": [
-          "id",
-          "tenantId",
-          "code",
-          "annexId",
-          "name",
-          "description",
-          "category",
-          "status",
-          "applicability",
-          "frequency",
-          "ownerUserId"
-        ],
-        "description": "Control as it appears in list views — summary fields plus aggregate counts. The detail endpoint returns ControlDetail with the full include shape."
       },
       "ControlDetail": {
         "allOf": [
@@ -2283,7 +980,17 @@
                       "type": "string"
                     },
                     "createdBy": {
-                      "$ref": "#/components/schemas/UserRefShort"
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/UserRefShort"
+                        },
+                        {
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -2453,6 +1160,1706 @@
         ],
         "description": "Control with all relations included — contributors, tasks, evidence links, mapped risks/policies, and framework requirement mappings. Returned by GET /controls/{id}."
       },
+      "ControlListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "annexId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "intent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "applicability": {
+            "type": "string"
+          },
+          "frequency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdByUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidenceSource": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "automationKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isCustom": {
+            "type": "boolean"
+          },
+          "lastTested": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nextDueAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "applicabilityJustification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "owner": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "evidence": {
+                "type": "number"
+              },
+              "risks": {
+                "type": "number"
+              },
+              "assets": {
+                "type": "number"
+              },
+              "controlTasks": {
+                "type": "number"
+              },
+              "evidenceLinks": {
+                "type": "number"
+              },
+              "contributors": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "code",
+          "annexId",
+          "name",
+          "description",
+          "category",
+          "status",
+          "applicability",
+          "frequency",
+          "ownerUserId"
+        ],
+        "description": "Control as it appears in list views — summary fields plus aggregate counts. The detail endpoint returns ControlDetail with the full include shape."
+      },
+      "ControlRequirementMapRequest": {
+        "type": "object",
+        "properties": {
+          "requirementId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "requirementId"
+        ],
+        "description": "Map a framework requirement to a control (e.g. asserting this control satisfies ISO 27001:2022 A.5.1)."
+      },
+      "ControlSetApplicabilityRequest": {
+        "type": "object",
+        "properties": {
+          "applicability": {
+            "type": "string",
+            "enum": [
+              "APPLICABLE",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "justification": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "applicability"
+        ],
+        "description": "Statement-of-applicability flag for a control. NOT_APPLICABLE controls are excluded from coverage metrics and audit packs but remain queryable."
+      },
+      "ControlSetOwnerRequest": {
+        "type": "object",
+        "properties": {
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ownerUserId"
+        ],
+        "description": "Reassign or unassign a control owner. Pass null to clear the owner; pass a userId to assign."
+      },
+      "ControlSetStatusRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_STARTED",
+              "IN_PROGRESS",
+              "IMPLEMENTED",
+              "NEEDS_REVIEW"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "description": "Lifecycle transition for a control. NEEDS_REVIEW signals a control whose evidence has lapsed or whose owner was removed."
+      },
+      "ControlTaskCreateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dueAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "description": "Create a task on a control. Tasks are the unit of operational work — implementation steps, evidence-gathering, review cycles."
+      },
+      "ControlTaskUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "DONE",
+              "BLOCKED"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dueAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "description": "Partial update for a control task — including status transitions and reassignment."
+      },
+      "ControlTemplatesInstallRequest": {
+        "type": "object",
+        "properties": {
+          "templateIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "templateIds"
+        ],
+        "description": "Install one or more framework-shipped control templates into the tenant. Idempotent — re-installing an already-installed template is a no-op."
+      },
+      "ControlUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "intent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "frequency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "AD_HOC",
+              "DAILY",
+              "WEEKLY",
+              "MONTHLY",
+              "QUARTERLY",
+              "ANNUALLY"
+            ]
+          },
+          "evidenceSource": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "MANUAL",
+              "INTEGRATION"
+            ]
+          },
+          "automationKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "description": "Partial update for a control. Status, applicability, and owner have dedicated focused endpoints; this body covers descriptive metadata only."
+      },
+      "EmptyBody": {
+        "type": "object",
+        "properties": {},
+        "description": "Empty request body. Used by mutation endpoints whose semantics live entirely in the URL (e.g. POST /restore on a soft-deleted resource)."
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "example": "NOT_FOUND"
+              },
+              "message": {
+                "type": "string",
+                "example": "Control not found"
+              },
+              "requestId": {
+                "type": "string",
+                "example": "req_01HG7…"
+              },
+              "details": {}
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "description": "Canonical error envelope returned by every error path. `code` is a stable string clients can branch on; `message` is human-readable; `requestId` correlates with server logs; `details` is optional structured context (validation issues, rate-limit info, etc.)."
+      },
+      "EvidenceCreateRequest": {
+        "type": "object",
+        "properties": {
+          "controlId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "FILE",
+              "LINK",
+              "SCREENSHOT"
+            ],
+            "default": "TEXT"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fileSize": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewCycle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nextReviewDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "description": "Create an evidence record. type=FILE expects a paired multipart upload via /evidence/uploads; type=TEXT/LINK can use this JSON body directly. content is encrypted at rest for TEXT type."
+      },
+      "EvidenceDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/EvidenceListItem"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "reviews": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EvidenceReview"
+                }
+              }
+            }
+          }
+        ],
+        "description": "Evidence record with the full review history attached. Returned by GET /evidence/{id}."
+      },
+      "EvidenceLinkRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "FILE",
+              "LINK",
+              "INTEGRATION_RESULT"
+            ]
+          },
+          "fileId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "description": "Attach evidence to a control. FILE kinds reference an uploaded FileRecord by id; LINK kinds carry a URL; INTEGRATION_RESULT kinds are emitted by automation runs."
+      },
+      "EvidenceListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "controlId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fileName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fileSize": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dateCollected": {
+            "type": "string"
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewCycle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nextReviewDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "control": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "type",
+          "title",
+          "status"
+        ],
+        "description": "Evidence record as shown in list views. content is encrypted at rest for TEXT type and decrypted transparently on read by the field-encryption middleware."
+      },
+      "EvidenceReview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "evidenceId": {
+            "type": "string"
+          },
+          "reviewerId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "reviewer": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRefShort"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "evidenceId",
+          "reviewerId",
+          "action",
+          "createdAt"
+        ],
+        "description": "A single evidence-review event (submission/approval/rejection) — append-only audit row attached to the evidence record."
+      },
+      "EvidenceReviewRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "SUBMITTED",
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "description": "Lifecycle transition for an evidence record. SUBMITTED is the request-for-review state; APPROVED/REJECTED are reviewer decisions."
+      },
+      "EvidenceUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "content": {
+            "type": "string"
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewCycle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nextReviewDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "description": "Partial update for an evidence record (metadata only — file content is immutable post-upload)."
+      },
+      "FindingCreateRequest": {
+        "type": "object",
+        "properties": {
+          "auditId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "rootCause": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correctiveAction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dueDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "severity",
+          "type",
+          "title"
+        ],
+        "description": "Create an audit finding. auditId is optional — findings can be raised independently of an audit cycle. description + rootCause are encrypted at rest."
+      },
+      "FindingUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "rootCause": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "correctiveAction": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dueDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "IN_PROGRESS",
+              "RESOLVED",
+              "CLOSED"
+            ]
+          },
+          "verificationNotes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "description": "Partial update for a finding — including lifecycle transitions and verification notes."
+      },
+      "Framework": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ],
+        "description": "Compliance framework record (e.g. ISO 27001:2022, SOC 2, NIS2). Key is the stable lookup identifier."
+      },
+      "PolicyApprovalDecideRequest": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVED",
+              "REJECTED"
+            ]
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "decision"
+        ],
+        "description": "Approver decision on a pending policy version. Rejection requires no comment per spec but operators are encouraged to provide one."
+      },
+      "PolicyApprovalRequestRequest": {
+        "type": "object",
+        "properties": {
+          "versionId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "versionId"
+        ],
+        "description": "Request approval for a draft policy version. Routes through the configured approver chain."
+      },
+      "PolicyCreateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewFrequencyDays": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "templateId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "description": "Create a policy. content (initial Markdown) AND templateId are optional but mutually exclusive — pass content for a from-scratch policy, templateId to spawn from a framework template. The first PolicyVersion is created server-side."
+      },
+      "PolicyDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PolicyListItem"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "versions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "policyId": {
+                      "type": "string"
+                    },
+                    "versionNumber": {
+                      "type": "number"
+                    },
+                    "contentType": {
+                      "type": "string"
+                    },
+                    "contentText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "externalUrl": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "changeSummary": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "createdBy": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/UserRefShort"
+                        },
+                        {
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "approvals": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "policyVersionId": {
+                            "type": "string"
+                          },
+                          "requestedBy": {
+                            "allOf": [
+                              {
+                                "$ref": "#/components/schemas/UserRefShort"
+                              },
+                              {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ]
+                              }
+                            ]
+                          },
+                          "approvedBy": {
+                            "allOf": [
+                              {
+                                "$ref": "#/components/schemas/UserRefShort"
+                              },
+                              {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ]
+                              }
+                            ]
+                          },
+                          "decidedAt": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "comment": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "policyId",
+                    "versionNumber",
+                    "contentType",
+                    "createdAt"
+                  ]
+                }
+              },
+              "controlLinks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "control": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "annexId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "control"
+                  ]
+                }
+              },
+              "approvals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "policyVersionId": {
+                      "type": "string"
+                    },
+                    "policyId": {
+                      "type": "string"
+                    },
+                    "requestedBy": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/UserRefShort"
+                        },
+                        {
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "approvedBy": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/UserRefShort"
+                        },
+                        {
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "decidedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status"
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "description": "Policy with full version history, control links, and approval audit trail. Returned by GET /policies/{id}."
+      },
+      "PolicyListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewFrequencyDays": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "nextReviewAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentVersionId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "currentVersion": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "policyId": {
+                "type": "string"
+              },
+              "versionNumber": {
+                "type": "number"
+              },
+              "contentType": {
+                "type": "string"
+              },
+              "contentText": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "externalUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "changeSummary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "createdBy": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/UserRefShort"
+                  },
+                  {
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  }
+                ]
+              },
+              "approvals": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "policyVersionId": {
+                      "type": "string"
+                    },
+                    "requestedBy": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/UserRefShort"
+                        },
+                        {
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "approvedBy": {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/UserRefShort"
+                        },
+                        {
+                          "type": [
+                            "object",
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "decidedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "comment": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "policyId",
+              "versionNumber",
+              "contentType",
+              "createdAt"
+            ]
+          },
+          "owner": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRef"
+              },
+              {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            ]
+          },
+          "_count": {
+            "type": "object",
+            "properties": {
+              "versions": {
+                "type": "number"
+              },
+              "controlLinks": {
+                "type": "number"
+              },
+              "approvals": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "slug",
+          "title",
+          "status"
+        ],
+        "description": "Policy as it appears in list views — includes the currently published version, owner, and aggregate counts. The detail endpoint adds full version history + control links."
+      },
+      "PolicyMetadataUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewFrequencyDays": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "nextReviewAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "description": "Update policy metadata only — title, owner, review cadence. Content edits go through the policy-version endpoint."
+      },
+      "PolicyPublishRequest": {
+        "type": "object",
+        "properties": {
+          "versionId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "versionId"
+        ],
+        "description": "Promote an approved policy version to PUBLISHED. Only one published version per policy at a time; the previous published version is archived."
+      },
+      "PolicyVersionCreateRequest": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "enum": [
+              "MARKDOWN",
+              "HTML",
+              "EXTERNAL_LINK"
+            ]
+          },
+          "contentText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "externalUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "changeSummary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "contentType"
+        ],
+        "description": "Create a new draft version of a policy. contentText is required for MARKDOWN/HTML; externalUrl is required for EXTERNAL_LINK. contentText is sanitized + encrypted at rest."
+      },
+      "Requirement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "section": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "description": "A single requirement within a framework (e.g. ISO 27001:2022 A.5.1). Mapped to controls via ControlRequirementMapRequest."
+      },
+      "RiskControlLinkRequest": {
+        "type": "object",
+        "properties": {
+          "controlId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "controlId"
+        ],
+        "description": "Body for linking an existing control to this risk (mitigation mapping)."
+      },
+      "RiskControlMapRequest": {
+        "type": "object",
+        "properties": {
+          "controlId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "controlId"
+        ],
+        "description": "Body for mapping a control to a risk (alternative endpoint to RiskControlLinkRequest; same shape, different surface)."
+      },
+      "RiskCreateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "threat": {
+            "type": "string"
+          },
+          "vulnerability": {
+            "type": "string"
+          },
+          "impact": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 3
+          },
+          "likelihood": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 3
+          },
+          "treatment": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "treatmentOwner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "treatmentNotes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "targetDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "description": "Payload for creating a risk. Inherent score = impact × likelihood; the server computes residualScore separately when treatment data lands. treatmentNotes is encrypted at rest (Epic B field-encryption manifest)."
+      },
+      "RiskDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RiskListItem"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "controls": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "control": {
+                      "type": "object",
+                      "properties": {}
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "control"
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        "description": "Risk with full linked-control objects. Returned by GET /risks/{id}."
+      },
       "RiskListItem": {
         "type": "object",
         "properties": {
@@ -2611,858 +3018,88 @@
         ],
         "description": "Risk as it appears in list views. inherentScore = impact × likelihood; score is the residual after treatment. controls is a summary array of linked mitigating controls."
       },
-      "RiskDetail": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/RiskListItem"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "controls": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "control": {
-                      "type": "object",
-                      "properties": {}
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "control"
-                  ]
-                }
-              }
-            }
-          }
-        ],
-        "description": "Risk with full linked-control objects. Returned by GET /risks/{id}."
-      },
-      "EvidenceReview": {
+      "RiskSetStatusRequest": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "evidenceId": {
-            "type": "string"
-          },
-          "reviewerId": {
-            "type": "string"
-          },
-          "action": {
-            "type": "string"
-          },
-          "comment": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "reviewer": {
-            "$ref": "#/components/schemas/UserRefShort"
-          }
-        },
-        "required": [
-          "id",
-          "evidenceId",
-          "reviewerId",
-          "action",
-          "createdAt"
-        ],
-        "description": "A single evidence-review event (submission/approval/rejection) — append-only audit row attached to the evidence record."
-      },
-      "EvidenceListItem": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "tenantId": {
-            "type": "string"
-          },
-          "controlId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "type": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "content": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "fileName": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "fileSize": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "category": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "dateCollected": {
-            "type": "string"
-          },
-          "owner": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "reviewCycle": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "nextReviewDate": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "status": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "control": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "code": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            },
-            "required": [
-              "id",
-              "name"
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "MITIGATING",
+              "ACCEPTED",
+              "CLOSED"
             ]
           }
         },
         "required": [
-          "id",
-          "tenantId",
-          "type",
-          "title",
           "status"
         ],
-        "description": "Evidence record as shown in list views. content is encrypted at rest for TEXT type and decrypted transparently on read by the field-encryption middleware."
+        "description": "Lifecycle transition for a risk. The four states form an open lattice; closed risks remain queryable via includeDeleted=true."
       },
-      "EvidenceDetail": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/EvidenceListItem"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "reviews": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/EvidenceReview"
-                }
-              }
-            }
-          }
-        ],
-        "description": "Evidence record with the full review history attached. Returned by GET /evidence/{id}."
-      },
-      "PolicyListItem": {
+      "RiskUpdateRequest": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "tenantId": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
           "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "threat": {
             "type": "string"
           },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "category": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
+          "vulnerability": {
             "type": "string"
           },
-          "ownerUserId": {
+          "impact": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "likelihood": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "treatment": {
             "type": [
               "string",
               "null"
             ]
           },
-          "language": {
+          "treatmentOwner": {
             "type": [
               "string",
               "null"
             ]
           },
-          "reviewFrequencyDays": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "nextReviewAt": {
+          "treatmentNotes": {
             "type": [
               "string",
               "null"
             ]
           },
-          "currentVersionId": {
+          "targetDate": {
             "type": [
               "string",
               "null"
             ]
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "currentVersion": {
-            "type": [
-              "object",
-              "null"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "policyId": {
-                "type": "string"
-              },
-              "versionNumber": {
-                "type": "number"
-              },
-              "contentType": {
-                "type": "string"
-              },
-              "contentText": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "externalUrl": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "changeSummary": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "createdAt": {
-                "type": "string"
-              },
-              "createdBy": {
-                "$ref": "#/components/schemas/UserRefShort"
-              },
-              "approvals": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    },
-                    "policyVersionId": {
-                      "type": "string"
-                    },
-                    "requestedBy": {
-                      "$ref": "#/components/schemas/UserRefShort"
-                    },
-                    "approvedBy": {
-                      "$ref": "#/components/schemas/UserRefShort"
-                    },
-                    "decidedAt": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "comment": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "status"
-                  ]
-                }
-              }
-            },
-            "required": [
-              "id",
-              "policyId",
-              "versionNumber",
-              "contentType",
-              "createdAt"
-            ]
-          },
-          "owner": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/UserRef"
-              },
-              {
-                "type": [
-                  "object",
-                  "null"
-                ]
-              }
-            ]
-          },
-          "_count": {
-            "type": "object",
-            "properties": {
-              "versions": {
-                "type": "number"
-              },
-              "controlLinks": {
-                "type": "number"
-              },
-              "approvals": {
-                "type": "number"
-              }
-            }
           }
         },
-        "required": [
-          "id",
-          "tenantId",
-          "slug",
-          "title",
-          "status"
-        ],
-        "description": "Policy as it appears in list views — includes the currently published version, owner, and aggregate counts. The detail endpoint adds full version history + control links."
+        "description": "Partial update for a risk. All fields optional."
       },
-      "PolicyDetail": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/PolicyListItem"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "versions": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "policyId": {
-                      "type": "string"
-                    },
-                    "versionNumber": {
-                      "type": "number"
-                    },
-                    "contentType": {
-                      "type": "string"
-                    },
-                    "contentText": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "externalUrl": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "changeSummary": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "createdAt": {
-                      "type": "string"
-                    },
-                    "createdBy": {
-                      "$ref": "#/components/schemas/UserRefShort"
-                    },
-                    "approvals": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "status": {
-                            "type": "string"
-                          },
-                          "policyVersionId": {
-                            "type": "string"
-                          },
-                          "requestedBy": {
-                            "$ref": "#/components/schemas/UserRefShort"
-                          },
-                          "approvedBy": {
-                            "$ref": "#/components/schemas/UserRefShort"
-                          },
-                          "decidedAt": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          },
-                          "comment": {
-                            "type": [
-                              "string",
-                              "null"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "status"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "policyId",
-                    "versionNumber",
-                    "contentType",
-                    "createdAt"
-                  ]
-                }
-              },
-              "controlLinks": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "control": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "annexId": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "name"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "control"
-                  ]
-                }
-              },
-              "approvals": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    },
-                    "policyVersionId": {
-                      "type": "string"
-                    },
-                    "policyId": {
-                      "type": "string"
-                    },
-                    "requestedBy": {
-                      "$ref": "#/components/schemas/UserRefShort"
-                    },
-                    "approvedBy": {
-                      "$ref": "#/components/schemas/UserRefShort"
-                    },
-                    "decidedAt": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "status"
-                  ]
-                }
-              }
-            }
-          }
-        ],
-        "description": "Policy with full version history, control links, and approval audit trail. Returned by GET /policies/{id}."
-      },
-      "Audit": {
+      "SuccessResponse": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "tenantId": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "scope": {
-            "type": [
-              "string",
-              "null"
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
             ]
-          },
-          "criteria": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "type": "string"
-          },
-          "schedule": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "auditors": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "auditees": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "departments": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
           }
         },
         "required": [
-          "id",
-          "tenantId",
-          "title",
-          "status"
+          "success"
         ],
-        "description": "Audit cycle record. Status flows PLANNED → IN_PROGRESS → COMPLETED (or CANCELLED)."
-      },
-      "AssetListItem": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "tenantId": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          },
-          "classification": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "owner": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "ownerUserId": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "location": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "confidentiality": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "integrity": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "availability": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "criticality": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "status": {
-            "type": "string"
-          },
-          "externalRef": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "tags": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "dependencies": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "businessProcesses": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "dataResidency": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "retention": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
-          },
-          "ownerUser": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/UserRef"
-              },
-              {
-                "type": [
-                  "object",
-                  "null"
-                ]
-              }
-            ]
-          },
-          "_count": {
-            "type": "object",
-            "properties": {
-              "controls": {
-                "type": "number"
-              },
-              "risks": {
-                "type": "number"
-              }
-            }
-          }
-        },
-        "required": [
-          "id",
-          "tenantId",
-          "name",
-          "type"
-        ],
-        "description": "Asset as it appears in list views. CIA scores are 1-5 ints; criticality is derived from the CIA tuple via the asset-tiering policy."
-      },
-      "AssetDetail": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/AssetListItem"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "controls": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "control": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "status": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "name",
-                        "status"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "control"
-                  ]
-                }
-              },
-              "risks": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "risk": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "title": {
-                          "type": "string"
-                        },
-                        "status": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "title",
-                        "status"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "risk"
-                  ]
-                }
-              }
-            }
-          }
-        ],
-        "description": "Asset with linked controls and risks. Returned by GET /assets/{id}."
+        "description": "Empty success envelope. Returned by mutation endpoints that have no resource to echo back (e.g. status changes, links, deletes)."
       },
       "Task": {
         "type": "object",
@@ -3604,65 +3241,335 @@
         ],
         "description": "Unified work-item record covering audit findings, control gaps, incidents, improvements, and ad-hoc tasks. The type field discriminates which UI surfaces this row appears in."
       },
-      "VendorListItem": {
+      "TaskAssignRequest": {
+        "type": "object",
+        "properties": {
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "assigneeUserId"
+        ],
+        "description": "Reassign or unassign a task. Pass null to clear the assignee."
+      },
+      "TaskCommentAddRequest": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "description": "Append a comment to a task. body is sanitized server-side (rich-text allowlist) and encrypted at rest (Epic B field-encryption manifest)."
+      },
+      "TaskCreateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "AUDIT_FINDING",
+              "CONTROL_GAP",
+              "INCIDENT",
+              "IMPROVEMENT",
+              "TASK"
+            ],
+            "default": "TASK"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 10000
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "INFO",
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "TEMPLATE",
+              "POLICY_REVIEW",
+              "AUDIT",
+              "INTEGRATION"
+            ]
+          },
+          "dueAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assigneeUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "controlId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadataJson": {}
+        },
+        "required": [
+          "title"
+        ],
+        "description": "Create a task (unified work-item type covering audit findings, control gaps, incidents, improvements, and ad-hoc tasks). The type discriminator gates which UI surfaces this work item appears in."
+      },
+      "TaskLinkAddRequest": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "CONTROL",
+              "FRAMEWORK_REQUIREMENT",
+              "RISK",
+              "ASSET",
+              "POLICY",
+              "EVIDENCE",
+              "FILE",
+              "AUDIT_PACK",
+              "VENDOR"
+            ]
+          },
+          "entityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "relation": {
+            "type": "string",
+            "enum": [
+              "RELATES_TO",
+              "EVIDENCE_FOR",
+              "BLOCKED_BY",
+              "CAUSED_BY",
+              "MITIGATED_BY"
+            ]
+          }
+        },
+        "required": [
+          "entityType",
+          "entityId"
+        ],
+        "description": "Link a task to another domain entity. The relation field captures semantic intent for downstream traceability views."
+      },
+      "TaskSetStatusRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "TRIAGED",
+              "IN_PROGRESS",
+              "BLOCKED",
+              "RESOLVED",
+              "CLOSED",
+              "CANCELED"
+            ]
+          },
+          "resolution": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 5000
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "description": "Lifecycle transition for a task. resolution is required (by convention) when moving to RESOLVED/CLOSED to provide context for the audit trail."
+      },
+      "TaskUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 10000
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "INFO",
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "P0",
+              "P1",
+              "P2",
+              "P3"
+            ]
+          },
+          "dueAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "controlId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadataJson": {}
+        },
+        "description": "Partial update for a task. Status changes and assignment go through their own focused endpoints."
+      },
+      "UserRef": {
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
-          },
-          "tenantId": {
-            "type": "string"
+            "type": "string",
+            "example": "usr_01HG7…"
           },
           "name": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Alice Admin"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "admin@acme.com"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "description": "User identity reference embedded inside other resources (id + display name + optional email)."
+      },
+      "UserRefShort": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "usr_01HG7…"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "example": "Alice Admin"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "description": "User identity reference without email — used in audit-log entries and other places where leaking the email would be inappropriate."
+      },
+      "VendorCreateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           },
           "legalName": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "maxLength": 300
           },
-          "status": {
-            "type": "string"
-          },
-          "criticality": {
+          "websiteUrl": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "maxLength": 500,
+            "format": "uri"
           },
-          "inherentRisk": {
+          "domain": {
             "type": [
               "string",
               "null"
-            ]
-          },
-          "residualRisk": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "dataAccess": {
-            "type": [
-              "string",
-              "null"
-            ]
+            ],
+            "maxLength": 200
           },
           "country": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "maxLength": 100
           },
-          "tags": {
+          "description": {
             "type": [
-              "array",
+              "string",
               "null"
             ],
-            "items": {
-              "type": "string"
-            }
+            "maxLength": 5000
           },
           "ownerUserId": {
             "type": [
@@ -3670,8 +3577,61 @@
               "null"
             ]
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ONBOARDING",
+              "OFFBOARDING",
+              "OFFBOARDED"
+            ]
+          },
+          "criticality": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "inherentRisk": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "dataAccess": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NONE",
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ]
+          },
           "isSubprocessor": {
             "type": "boolean"
+          },
+          "tags": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "maxLength": 50
+            },
+            "maxItems": 20
           },
           "nextReviewAt": {
             "type": [
@@ -3684,21 +3644,12 @@
               "string",
               "null"
             ]
-          },
-          "createdAt": {
-            "type": "string"
-          },
-          "updatedAt": {
-            "type": "string"
           }
         },
         "required": [
-          "id",
-          "tenantId",
-          "name",
-          "status"
+          "name"
         ],
-        "description": "Vendor as shown in list views. residualRisk is the risk score after control coverage; null = not yet assessed."
+        "description": "Create a vendor (third-party supplier) record. Risk + criticality fields drive vendor-tiering and audit-cycle scope. description is encrypted at rest."
       },
       "VendorDetail": {
         "allOf": [
@@ -3816,78 +3767,234 @@
         ],
         "description": "Vendor with full document set + assessment history + linked entities. Returned by GET /vendors/{id}."
       },
-      "Framework": {
+      "VendorListItem": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string"
           },
-          "key": {
+          "tenantId": {
             "type": "string"
           },
           "name": {
             "type": "string"
           },
-          "version": {
+          "legalName": {
             "type": [
               "string",
               "null"
             ]
           },
-          "description": {
-            "type": [
-              "string",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "key",
-          "name"
-        ],
-        "description": "Compliance framework record (e.g. ISO 27001:2022, SOC 2, NIS2). Key is the stable lookup identifier."
-      },
-      "Requirement": {
-        "type": "object",
-        "properties": {
-          "id": {
+          "status": {
             "type": "string"
           },
-          "code": {
+          "criticality": {
             "type": [
               "string",
               "null"
             ]
           },
-          "title": {
+          "inherentRisk": {
             "type": [
               "string",
               "null"
             ]
+          },
+          "residualRisk": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dataAccess": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "ownerUserId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "isSubprocessor": {
+            "type": "boolean"
+          },
+          "nextReviewAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contractRenewalAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "name",
+          "status"
+        ],
+        "description": "Vendor as shown in list views. residualRisk is the risk score after control coverage; null = not yet assessed."
+      },
+      "VendorUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "legalName": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 300
+          },
+          "websiteUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "domain": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
           },
           "description": {
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "maxLength": 5000
           },
-          "section": {
+          "ownerUserId": {
             "type": [
               "string",
               "null"
             ]
           },
-          "category": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ONBOARDING",
+              "OFFBOARDING",
+              "OFFBOARDED"
+            ]
+          },
+          "criticality": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "inherentRisk": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "residualRisk": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "dataAccess": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NONE",
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ]
+          },
+          "isSubprocessor": {
+            "type": "boolean"
+          },
+          "tags": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "maxLength": 50
+            },
+            "maxItems": 20
+          },
+          "nextReviewAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contractRenewalAt": {
             "type": [
               "string",
               "null"
             ]
           }
         },
-        "required": [
-          "id"
-        ],
-        "description": "A single requirement within a framework (e.g. ISO 27001:2022 A.5.1). Mapped to controls via ControlRequirementMapRequest."
+        "description": "Partial update for a vendor. residualRisk is computed from inherentRisk + control coverage; allow direct override here for SoC analyst workflow."
       }
     },
     "parameters": {}

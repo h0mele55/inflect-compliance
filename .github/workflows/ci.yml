@@ -190,6 +190,23 @@ jobs:
       - name: "Run tests: architectural guards"
         run: npx jest tests/guards/ --runInBand --forceExit --no-coverage
 
+      # ── API contract regression gate (GAP-10 step 6) ──
+      # Runs the per-schema snapshot suite + the full-spec drift
+      # check from `tests/contracts/api-schemas.test.ts`. The
+      # explicit step (rather than relying on default Jest discovery
+      # in `test:ci` above) gives reviewers a clean PASS/FAIL signal
+      # in the CI log: a failure here is ALWAYS an unintentional
+      # API-shape change and the failure message includes the
+      # remediation commands.
+      #
+      # On legitimate contract changes:
+      #   1. `npm run openapi:generate`         (rewrites public/openapi.json)
+      #   2. `npx jest tests/contracts/ -u`     (updates per-schema snapshots)
+      #   3. Commit both files together. Reviewer sees the diff
+      #      against the previous contract and approves explicitly.
+      - name: "Gate: API contract tests"
+        run: npx jest tests/contracts/ --runInBand --forceExit --no-coverage --ci
+
   # ═══════════════════════════════════════════════════════════════
   #  Job 4: Coverage — enforce minimum test coverage threshold
   #  Blocking gate: fails if coverage drops below 60%.
