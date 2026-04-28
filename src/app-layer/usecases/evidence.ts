@@ -5,13 +5,21 @@ import { logEvent } from '../events/audit';
 import { validateFile, uploadFile } from '@/lib/storage';
 import { notFound, badRequest, forbidden } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
+import { cachedListRead, bumpEntityCacheVersion } from '@/lib/cache/list-cache';
 import type { EvidenceType, ReviewCadence } from '@prisma/client';
 
 export async function listEvidence(ctx: RequestContext, filters?: EvidenceListFilters) {
     assertCanRead(ctx);
-    return runInTenantContext(ctx, (db) =>
-        EvidenceRepository.list(db, ctx, filters)
-    );
+    return cachedListRead({
+        ctx,
+        entity: 'evidence',
+        operation: 'list',
+        params: filters ?? {},
+        loader: () =>
+            runInTenantContext(ctx, (db) =>
+                EvidenceRepository.list(db, ctx, filters),
+            ),
+    });
 }
 
 export async function listEvidencePaginated(ctx: RequestContext, params: {
@@ -19,9 +27,16 @@ export async function listEvidencePaginated(ctx: RequestContext, params: {
     filters?: { type?: string; controlId?: string; q?: string; archived?: boolean; expiring?: boolean };
 }) {
     assertCanRead(ctx);
-    return runInTenantContext(ctx, (db) =>
-        EvidenceRepository.listPaginated(db, ctx, params)
-    );
+    return cachedListRead({
+        ctx,
+        entity: 'evidence',
+        operation: 'listPaginated',
+        params,
+        loader: () =>
+            runInTenantContext(ctx, (db) =>
+                EvidenceRepository.listPaginated(db, ctx, params),
+            ),
+    });
 }
 
 export async function getEvidence(ctx: RequestContext, id: string) {
@@ -66,7 +81,7 @@ export async function createEvidence(ctx: RequestContext, data: {
         }
     }
 
-    return runInTenantContext(ctx, async (db) => {
+    const created = await runInTenantContext(ctx, async (db) => {
         const controlId = data.controlId || null;
 
         // Validate control belongs to the same tenant
@@ -131,6 +146,11 @@ export async function createEvidence(ctx: RequestContext, data: {
 
         return evidence;
     });
+    // Linking back to a control also affects the control list view
+    // (`_count.evidence`); bump both entities.
+    await bumpEntityCacheVersion(ctx, 'evidence');
+    if (data.controlId) await bumpEntityCacheVersion(ctx, 'control');
+    return created;
 }
 
 export async function updateEvidence(ctx: RequestContext, id: string, data: {
@@ -144,7 +164,7 @@ export async function updateEvidence(ctx: RequestContext, id: string, data: {
 }) {
     assertCanWrite(ctx);
 
-    return runInTenantContext(ctx, async (db) => {
+    const updated = await runInTenantContext(ctx, async (db) => {
         const evidence = await EvidenceRepository.update(db, ctx, id, {
             title: data.title,
             content: data.content,
@@ -175,6 +195,8 @@ export async function updateEvidence(ctx: RequestContext, id: string, data: {
 
         return evidence;
     });
+    await bumpEntityCacheVersion(ctx, 'evidence');
+    return updated;
 }
 
 export async function reviewEvidence(ctx: RequestContext, id: string, data: { action: string; comment?: string | null }) {
@@ -188,7 +210,7 @@ export async function reviewEvidence(ctx: RequestContext, id: string, data: { ac
         throw badRequest('Invalid review action');
     }
 
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const evidence = await EvidenceRepository.getById(db, ctx, id);
         if (!evidence) throw notFound('Evidence not found');
 
@@ -241,6 +263,8 @@ export async function reviewEvidence(ctx: RequestContext, id: string, data: { ac
 
         return { success: true, status: newStatus };
     });
+    await bumpEntityCacheVersion(ctx, 'evidence');
+    return result;
 }
 
 // ─── Soft Delete / Restore / Purge ───
@@ -250,7 +274,7 @@ import { withDeleted } from '@/lib/soft-delete';
 
 export async function deleteEvidence(ctx: RequestContext, id: string) {
     assertCanAdmin(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const evidence = await EvidenceRepository.getById(db, ctx, id);
         if (!evidence) throw notFound('Evidence not found');
 
@@ -271,14 +295,20 @@ export async function deleteEvidence(ctx: RequestContext, id: string) {
         });
         return { success: true };
     });
+    await bumpEntityCacheVersion(ctx, 'evidence');
+    return result;
 }
 
 export async function restoreEvidence(ctx: RequestContext, id: string) {
-    return restoreEntity(ctx, 'Evidence', id);
+    const result = await restoreEntity(ctx, 'Evidence', id);
+    await bumpEntityCacheVersion(ctx, 'evidence');
+    return result;
 }
 
 export async function purgeEvidence(ctx: RequestContext, id: string) {
-    return purgeEntity(ctx, 'Evidence', id);
+    const result = await purgeEntity(ctx, 'Evidence', id);
+    await bumpEntityCacheVersion(ctx, 'evidence');
+    return result;
 }
 
 export async function listEvidenceWithDeleted(ctx: RequestContext) {

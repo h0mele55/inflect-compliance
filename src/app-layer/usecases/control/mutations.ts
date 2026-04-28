@@ -10,6 +10,7 @@ import { runInTenantContext } from '@/lib/db-context';
 import { computeNextDueAt } from '../../utils/cadence';
 import { restoreEntity, purgeEntity } from '../soft-delete-operations';
 import { assertCanAdmin } from '../../policies/common';
+import { bumpEntityCacheVersion } from '@/lib/cache/list-cache';
 
 // ─── Create / Update ───
 
@@ -29,7 +30,7 @@ export async function createControl(ctx: RequestContext, data: {
 }) {
     assertCanCreateControl(ctx);
 
-    return runInTenantContext(ctx, async (db) => {
+    const created = await runInTenantContext(ctx, async (db) => {
         const control = await ControlRepository.create(db, ctx, {
             code: data.code || null,
             annexId: data.annexId || null,
@@ -56,6 +57,8 @@ export async function createControl(ctx: RequestContext, data: {
 
         return control;
     });
+    await bumpEntityCacheVersion(ctx, 'control');
+    return created;
 }
 
 export async function updateControl(ctx: RequestContext, id: string, data: {
@@ -70,7 +73,7 @@ export async function updateControl(ctx: RequestContext, id: string, data: {
 }) {
     assertCanUpdateControl(ctx);
 
-    return runInTenantContext(ctx, async (db) => {
+    const updated = await runInTenantContext(ctx, async (db) => {
         const control = await ControlRepository.update(db, ctx, id, {
             ...(data.name !== undefined && { name: data.name }),
             ...(data.description !== undefined && { description: data.description }),
@@ -98,13 +101,15 @@ export async function updateControl(ctx: RequestContext, id: string, data: {
 
         return control;
     });
+    await bumpEntityCacheVersion(ctx, 'control');
+    return updated;
 }
 
 // ─── Status ───
 
 export async function setControlStatus(ctx: RequestContext, id: string, status: string) {
     assertCanUpdateControl(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const existing = await ControlRepository.getById(db, ctx, id);
         if (!existing) throw notFound('Control not found');
         if (!existing.tenantId) throw forbidden('Cannot change status of global library controls');
@@ -122,6 +127,8 @@ export async function setControlStatus(ctx: RequestContext, id: string, status: 
         });
         return control;
     });
+    await bumpEntityCacheVersion(ctx, 'control');
+    return result;
 }
 
 // ─── Applicability ───
@@ -138,7 +145,7 @@ export async function setControlApplicability(
         throw badRequest('Justification is required when marking a control as NOT_APPLICABLE');
     }
 
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const existing = await ControlRepository.getById(db, ctx, controlId);
         if (!existing) throw notFound('Control not found');
         if (!existing.tenantId) throw forbidden('Cannot change applicability of global library controls');
@@ -158,13 +165,15 @@ export async function setControlApplicability(
 
         return updated;
     });
+    await bumpEntityCacheVersion(ctx, 'control');
+    return result;
 }
 
 // ─── Owner ───
 
 export async function setControlOwner(ctx: RequestContext, id: string, ownerUserId: string | null) {
     assertCanUpdateControl(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         // Validate the user exists before updating
         if (ownerUserId) {
             const userExists = await db.$queryRawUnsafe<Array<{ id: string }>>(
@@ -186,6 +195,8 @@ export async function setControlOwner(ctx: RequestContext, id: string, ownerUser
         });
         return control;
     });
+    await bumpEntityCacheVersion(ctx, 'control');
+    return result;
 }
 
 // ─── Cadence: Mark Test Completed ───
@@ -193,7 +204,7 @@ export async function setControlOwner(ctx: RequestContext, id: string, ownerUser
 export async function markControlTestCompleted(ctx: RequestContext, controlId: string) {
     assertCanUpdateControl(ctx);
 
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const existing = await ControlRepository.getById(db, ctx, controlId);
         if (!existing) throw notFound('Control not found');
         if (!existing.tenantId) throw forbidden('Cannot modify global library controls');
@@ -221,13 +232,15 @@ export async function markControlTestCompleted(ctx: RequestContext, controlId: s
 
         return updated;
     });
+    await bumpEntityCacheVersion(ctx, 'control');
+    return result;
 }
 
 // ─── Soft Delete / Restore / Purge ───
 
 export async function deleteControl(ctx: RequestContext, id: string) {
     assertCanAdmin(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const control = await ControlRepository.getById(db, ctx, id);
         if (!control) throw notFound('Control not found');
         if (!control.tenantId) throw forbidden('Cannot delete global library controls');
@@ -243,12 +256,18 @@ export async function deleteControl(ctx: RequestContext, id: string) {
         });
         return { success: true };
     });
+    await bumpEntityCacheVersion(ctx, 'control');
+    return result;
 }
 
 export async function restoreControl(ctx: RequestContext, id: string) {
-    return restoreEntity(ctx, 'Control', id);
+    const result = await restoreEntity(ctx, 'Control', id);
+    await bumpEntityCacheVersion(ctx, 'control');
+    return result;
 }
 
 export async function purgeControl(ctx: RequestContext, id: string) {
-    return purgeEntity(ctx, 'Control', id);
+    const result = await purgeEntity(ctx, 'Control', id);
+    await bumpEntityCacheVersion(ctx, 'control');
+    return result;
 }
