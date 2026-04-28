@@ -43,10 +43,25 @@ describe('CSP Style Guardrails', () => {
     const tsxFiles = collectFiles(SRC_DIR, ['.ts', '.tsx', '.js', '.jsx']);
 
     describe('<style> tags', () => {
+        // Files that legitimately emit a <style> tag inside a server-side
+        // string template (NOT JSX), where the CSP-style-src argument
+        // doesn't apply. Each entry must be a server-only route, not a
+        // React component.
+        const STYLE_TAG_EXEMPTIONS = new Set([
+            // GAP-10 — Swagger UI route returns a fully self-contained
+            // HTML document (loads the Swagger UI CDN bundle). The page
+            // is HARD 404'd in production by isDocsEnabled(), so the
+            // <style> never reaches a prod browser; a CSP exemption for
+            // dev/staging is acceptable.
+            'app/api/docs/route.ts',
+        ]);
+
         it('should not contain any <style> tags in JSX (use CSS files instead)', () => {
             const violations: { file: string; line: number; content: string }[] = [];
 
             for (const file of tsxFiles) {
+                const rel = path.relative(SRC_DIR, file);
+                if (STYLE_TAG_EXEMPTIONS.has(rel)) continue;
                 const content = fs.readFileSync(file, 'utf-8');
                 const lines = content.split('\n');
                 for (let i = 0; i < lines.length; i++) {
@@ -56,7 +71,7 @@ describe('CSP Style Guardrails', () => {
                     // Match <style> or <style>{
                     if (/<style[\s>]/.test(lines[i]) && !lines[i].includes('</style>')) {
                         violations.push({
-                            file: path.relative(SRC_DIR, file),
+                            file: rel,
                             line: i + 1,
                             content: line.substring(0, 120),
                         });

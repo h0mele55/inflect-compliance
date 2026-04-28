@@ -55,12 +55,15 @@ describe('R-3: signIn rejects email_verified=false', () => {
 describe('R-6: production startup requires REDIS_URL', () => {
     const instrumentation = read('src/instrumentation.ts');
 
-    it('aborts in production when REDIS_URL is unset and rate limiting is on', () => {
-        // The check must guard on NODE_ENV=production, REDIS_URL absence,
-        // and RATE_LIMIT_ENABLED !== '0' (escape hatch).
+    it('aborts in production when REDIS_URL is unset', () => {
+        // The check guards on NODE_ENV=production AND REDIS_URL absence.
+        // The previous RATE_LIMIT_ENABLED=0 escape hatch was removed
+        // (see src/instrumentation.ts docblock) because Redis underpins
+        // more than the rate limiter — login throttle, invite redemption,
+        // email dispatch, and BullMQ all break silently when Redis is
+        // absent. Toggling rate limits off doesn't make Redis optional.
         expect(instrumentation).toMatch(/NODE_ENV === 'production'/);
         expect(instrumentation).toMatch(/!process\.env\.REDIS_URL/);
-        expect(instrumentation).toMatch(/RATE_LIMIT_ENABLED !== '0'/);
     });
 
     it('exits the process (no silent degrade)', () => {

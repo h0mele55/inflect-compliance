@@ -354,10 +354,14 @@ jobs:
       DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DIRECT_DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
-      # `next start` startup gate refuses to boot in prod mode without REDIS_URL.
-      # CI does not run a Redis service; rate limits are not exercised by the
-      # e2e suite (auth + UI flow, not 429 backpressure), so the documented
-      # escape hatch is correct here.
+      # GAP-13: `next start` refuses to boot in prod without REDIS_URL.
+      # The previous `RATE_LIMIT_ENABLED=0` escape hatch was removed
+      # (Redis underpins login throttle, invite redemption, BullMQ jobs,
+      # session coordination — not just rate limits) — see the docblock
+      # in src/instrumentation.ts. The redis service below satisfies
+      # the boot check; RATE_LIMIT_ENABLED stays "0" so 429s don't
+      # interfere with the auth + UI flow under test.
+      REDIS_URL: redis://localhost:6379
       RATE_LIMIT_ENABLED: "0"
       # GAP-03 startup sentinel — the encryption-key check refuses to boot
       # in prod mode without a >=32-char DATA_ENCRYPTION_KEY. Same synthetic
@@ -376,6 +380,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd="pg_isready -U ci -d ci_testdb"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10

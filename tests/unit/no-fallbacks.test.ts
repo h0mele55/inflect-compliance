@@ -62,6 +62,16 @@ describe('Static Analysis: No process.env fallbacks', () => {
             // cached env.ts snapshot would freeze the value at import
             // time and break those flows.
             if (file.endsWith('rate-limit-middleware.ts')) continue;
+            // GAP-17 read-tier rate limiter follows the same convention
+            // as rate-limit-middleware.ts above — NEXT_TEST_MODE must be
+            // read at request time so the Playwright suite can flip the
+            // bypass per-test without re-importing the module.
+            if (file.endsWith('apiReadRateLimit.ts')) continue;
+            // GAP-10 Swagger-UI route gates prod via process.env.NODE_ENV
+            // (HARD 404 in production). Same rationale as health/readyz
+            // routes above — env.ts snapshot freezes at import time and
+            // the route MUST refuse to render under prod.
+            if (file.endsWith('docs/route.ts')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 
