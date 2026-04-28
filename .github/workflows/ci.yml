@@ -590,10 +590,15 @@ jobs:
         run: mkdir -p tmp/test-uploads
 
       - name: Build Next.js app
+        # Do NOT set NEXT_TEST_MODE=1 here. next.config.js routes the
+        # build to `.next-test/` when that env is set; this job runs
+        # `next start` directly (no Playwright shim), so the build
+        # must land in the default `.next/` directory the start
+        # command reads from. The e2e job uses NEXT_TEST_MODE because
+        # Playwright's runner expects the test-mode artifact path.
         run: npx next build
         env:
           NODE_ENV: production
-          NEXT_TEST_MODE: "1"
 
       - name: Start app (background)
         run: |
