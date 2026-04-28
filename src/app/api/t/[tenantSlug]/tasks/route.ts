@@ -6,6 +6,7 @@ import { CreateTaskSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
+import { jsonResponse } from '@/lib/api-response';
 
 const TaskQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -45,7 +46,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
                 linkedEntityId: query.linkedEntityId,
             },
         });
-        return NextResponse.json<any>(result);
+        return jsonResponse(result);
     }
 
     // Backward compat: return flat array
@@ -61,11 +62,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         linkedEntityType: query.linkedEntityType,
         linkedEntityId: query.linkedEntityId,
     });
-    return NextResponse.json<any>(tasks);
+    return jsonResponse(tasks);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateTaskSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const task = await createTask(ctx, body);
-    return NextResponse.json<any>(task, { status: 201 });
+    return jsonResponse(task, { status: 201 });
 }));

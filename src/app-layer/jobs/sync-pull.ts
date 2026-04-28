@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Client component receiving server-rendered domain data; tanstack column callbacks; or library-boundary callbacks. Per-site narrowing requires generated DTOs / per-cell CellContext imports — out of scope for the lint cleanup PR. */
 import { prisma } from '@/lib/prisma';
 import { integrationRegistry } from '../integrations/registry';
 import { PrismaSyncMappingStore } from '../integrations/prisma-sync-store';

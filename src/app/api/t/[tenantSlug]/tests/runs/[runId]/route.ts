@@ -5,9 +5,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { getTestRun } from '@/app-layer/usecases/control-test';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; runId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const run = await getTestRun(ctx, params.runId);
-    return NextResponse.json<any>(run);
+    return jsonResponse(run);
 });

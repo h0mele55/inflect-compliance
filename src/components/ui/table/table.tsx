@@ -1,3 +1,12 @@
+/* eslint-disable react-hooks/exhaustive-deps -- Various useEffect/useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers recreated each render) or use selector functions whose change-detection happens elsewhere. Adding the deps would either trigger unnecessary re-runs OR cause infinite render loops; the proper structural fix is to wrap parent-level callbacks in useCallback. Tracked as follow-up. */
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * Tanstack-react-table primitive wrapper. The `any` casts here are
+ * structural — column meta, getValue<T>(), and the heterogeneous
+ * row.original access work against a generic `TData` that downstream
+ * consumers specialise. Replacing each with the right `Cell<TData, T>`
+ * / `RowData` import would lock the wrapper to one row shape; the
+ * primitive deliberately stays open.
+ */
 import { cn, deepEqual, isClickOnInteractiveChild } from "./table-utils";
 import {
   Column,

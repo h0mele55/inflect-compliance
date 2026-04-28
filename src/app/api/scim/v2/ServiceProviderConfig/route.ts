@@ -8,10 +8,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { scimServiceProviderConfig } from '@/lib/scim/types';
+import { jsonResponse } from '@/lib/api-response';
 
 export async function GET(req: NextRequest) {
     const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
-    return NextResponse.json<any>(scimServiceProviderConfig(baseUrl), {
+    return jsonResponse(scimServiceProviderConfig(baseUrl), {
         headers: { 'Content-Type': 'application/scim+json' },
     });
 }

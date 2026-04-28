@@ -4,17 +4,18 @@ import { getAsset, updateAsset, deleteAsset } from '@/app-layer/usecases/asset';
 import { withValidatedBody } from '@/lib/validation/route';
 import { UpdateAssetSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const asset = await getAsset(ctx, params.id);
-    return NextResponse.json<any>(asset);
+    return jsonResponse(asset);
 });
 
 export const PUT = withApiErrorHandling(withValidatedBody(UpdateAssetSchema, async (req, { params }: { params: { tenantSlug: string; id: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const asset = await updateAsset(ctx, params.id, body);
-    return NextResponse.json<any>({ success: true, asset });
+    return jsonResponse({ success: true, asset });
 }));
 
 export const PATCH = PUT;
@@ -22,5 +23,5 @@ export const PATCH = PUT;
 export const DELETE = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
     const ctx = await getTenantCtx(params, req);
     await deleteAsset(ctx, params.id);
-    return NextResponse.json<any>({ success: true });
+    return jsonResponse({ success: true });
 });

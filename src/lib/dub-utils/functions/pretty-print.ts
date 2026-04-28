@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Dub-ported utility code; preserves upstream shape. */
 export function prettyPrint(value: any, indent = 2) {
   return JSON.stringify(
     value,

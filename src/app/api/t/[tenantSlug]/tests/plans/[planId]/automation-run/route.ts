@@ -7,13 +7,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { createAutomatedTestRun } from '@/app-layer/usecases/control-test';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; planId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const body = await req.json();
     if (!body.result || !['PASS', 'FAIL', 'INCONCLUSIVE'].includes(body.result)) {
-        return NextResponse.json<any>({ error: 'result is required: PASS | FAIL | INCONCLUSIVE' }, { status: 400 });
+        return jsonResponse({ error: 'result is required: PASS | FAIL | INCONCLUSIVE' }, { status: 400 });
     }
     const run = await createAutomatedTestRun(ctx, params.planId, body);
-    return NextResponse.json<any>(run, { status: 201 });
+    return jsonResponse(run, { status: 201 });
 });

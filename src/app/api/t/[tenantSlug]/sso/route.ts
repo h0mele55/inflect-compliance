@@ -9,6 +9,7 @@ import {
 } from '@/app-layer/usecases/sso';
 import { UpsertSsoConfigInput } from '@/app-layer/schemas/sso-config.schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * Tenant-scoped SSO configuration routes.
@@ -29,7 +30,7 @@ export const GET = withApiErrorHandling(
             ...p,
             configJson: maskSecrets(p.configJson as Record<string, unknown>),
         }));
-        return NextResponse.json<any>(safe);
+        return jsonResponse(safe);
     }),
 );
 
@@ -41,7 +42,7 @@ export const POST = withApiErrorHandling(
         const body = await req.json();
         const parsed = UpsertSsoConfigInput.parse(body);
         const provider = await upsertTenantSsoConfig(ctx, parsed);
-        return NextResponse.json<any>(provider, { status: body.id ? 200 : 201 });
+        return jsonResponse(provider, { status: body.id ? 200 : 201 });
     }),
 );
 
@@ -68,9 +69,9 @@ export const PATCH = withApiErrorHandling(
                 result = await setTenantSsoEnforced(ctx, id, false);
                 break;
             default:
-                return NextResponse.json<any>({ error: 'Invalid action' }, { status: 400 });
+                return jsonResponse({ error: 'Invalid action' }, { status: 400 });
         }
-        return NextResponse.json<any>(result);
+        return jsonResponse(result);
     }),
 );
 
@@ -82,7 +83,7 @@ export const DELETE = withApiErrorHandling(
     requirePermission('admin.manage', async (req: NextRequest, _routeArgs, ctx) => {
         const { id } = (await req.json()) as { id: string };
         await deleteTenantSsoConfig(ctx, id);
-        return NextResponse.json<any>({ ok: true });
+        return jsonResponse({ ok: true });
     }),
 );
 

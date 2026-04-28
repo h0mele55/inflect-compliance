@@ -6,6 +6,7 @@ import { CreateControlSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
+import { jsonResponse } from '@/lib/api-response';
 
 const ControlsQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -25,7 +26,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (query.includeDeleted === 'true') {
         const controls = await listControlsWithDeleted(ctx);
-        return NextResponse.json<any>(controls);
+        return jsonResponse(controls);
     }
 
     const filters = {
@@ -43,16 +44,16 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
             cursor: query.cursor,
             filters,
         });
-        return NextResponse.json<any>(result);
+        return jsonResponse(result);
     }
 
     // Backward compatibility: flat array
     const controls = await listControls(ctx, filters);
-    return NextResponse.json<any>(controls);
+    return jsonResponse(controls);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateControlSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const control = await createControl(ctx, body);
-    return NextResponse.json<any>(control, { status: 201 });
+    return jsonResponse(control, { status: 201 });
 }));

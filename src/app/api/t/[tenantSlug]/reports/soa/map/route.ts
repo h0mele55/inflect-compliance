@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { runInTenantContext } from '@/lib/db-context';
 import { assertCanWrite } from '@/app-layer/policies/common';
 import { logEvent } from '@/app-layer/events/audit';
+import { jsonResponse } from '@/lib/api-response';
 
 // ─── Map a control to a requirement ───
 
@@ -53,5 +54,5 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
         return link;
     });
 
-    return NextResponse.json<any>(result, { status: 201 });
+    return jsonResponse(result, { status: 201 });
 });

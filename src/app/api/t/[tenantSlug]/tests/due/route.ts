@@ -6,15 +6,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { getDueQueue, runDuePlanning } from '@/app-layer/usecases/due-planning';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const queue = await getDueQueue(ctx);
-    return NextResponse.json<any>(queue);
+    return jsonResponse(queue);
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const result = await runDuePlanning(ctx);
-    return NextResponse.json<any>(result);
+    return jsonResponse(result);
 });

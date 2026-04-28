@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * Filter primitive types. The `any` defaults on the value-shape
+ * generics let consumers specialise without forcing an unbound
+ * generic on the primitive's public API.
+ */
 import { type FilterOperator } from "@dub/utils";
 import { LucideIcon } from "lucide-react";
 import { ComponentType, ReactNode, SVGProps } from "react";

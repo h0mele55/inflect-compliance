@@ -3,6 +3,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { startMfaEnrollment } from '@/app-layer/usecases/mfa-enrollment';
 import { getUserMfaStatus } from '@/app-layer/usecases/mfa';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * POST /api/t/[tenantSlug]/security/mfa/enroll/start
@@ -23,7 +24,7 @@ export const POST = withApiErrorHandling(async (
     // Check if user already has verified MFA — prevent re-enrollment without explicit removal
     const status = await getUserMfaStatus(ctx);
     if (status.isVerified) {
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'MFA is already enrolled and verified. Remove existing enrollment first.' },
             { status: 409 },
         );
@@ -31,7 +32,7 @@ export const POST = withApiErrorHandling(async (
 
     const result = await startMfaEnrollment(ctx);
 
-    return NextResponse.json<any>({
+    return jsonResponse({
         otpauthUrl: result.uri,
         secret: result.secret,
         enrollmentId: result.enrollmentId,

@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/security/permission-middleware';
 import { updateCustomRole, deleteCustomRole } from '@/app-layer/usecases/custom-roles';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const UpdateRoleSchema = z.object({
     name: z.string().min(1).max(100).optional(),
@@ -18,7 +19,7 @@ export const PATCH = withApiErrorHandling(
             const body = await req.json();
             const input = UpdateRoleSchema.parse(body);
             const role = await updateCustomRole(ctx, params.roleId, input);
-            return NextResponse.json<any>(role);
+            return jsonResponse(role);
         },
     ),
 );
@@ -28,7 +29,7 @@ export const DELETE = withApiErrorHandling(
         'admin.manage',
         async (_req: NextRequest, { params }, ctx) => {
             const result = await deleteCustomRole(ctx, params.roleId);
-            return NextResponse.json<any>(result);
+            return jsonResponse(result);
         },
     ),
 );

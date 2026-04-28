@@ -4,15 +4,16 @@ import { mapRequirementToControl, unmapRequirementFromControl } from '@/app-laye
 import { withValidatedBody } from '@/lib/validation/route';
 import { MapRequirementSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const POST = withApiErrorHandling(withValidatedBody(MapRequirementSchema, async (req, { params }: { params: { tenantSlug: string; controlId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const mapping = await mapRequirementToControl(ctx, params.controlId, body.requirementId);
-    return NextResponse.json<any>(mapping, { status: 201 });
+    return jsonResponse(mapping, { status: 201 });
 }));
 
 export const DELETE = withApiErrorHandling(withValidatedBody(MapRequirementSchema, async (req, { params }: { params: { tenantSlug: string; controlId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     await unmapRequirementFromControl(ctx, params.controlId, body.requirementId);
-    return NextResponse.json<any>({ success: true });
+    return jsonResponse({ success: true });
 }));

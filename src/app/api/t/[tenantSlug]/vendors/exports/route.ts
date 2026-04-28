@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { exportVendorsRegister, exportAssessments, exportDocumentExpiry } from '@/app-layer/usecases/vendor-audit';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toCsv(rows: Record<string, any>[]): string {
@@ -72,5 +73,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         });
     }
 
-    return NextResponse.json<any>(data);
+    return jsonResponse(data);
 });

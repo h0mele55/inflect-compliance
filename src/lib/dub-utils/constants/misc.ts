@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Dub-ported utility code; preserves upstream shape. */
 export const DEFAULT_LINK_PROPS: any = {
   key: "",
   url: "",

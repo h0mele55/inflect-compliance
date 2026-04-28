@@ -3,6 +3,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { getAuditCycle, updateAuditCycle, previewDefaultPack } from '@/app-layer/usecases/audit-readiness';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const UpdateCycleSchema = z.object({
     name: z.string().min(1).max(200).optional(),
@@ -17,14 +18,14 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     const action = url.searchParams.get('action');
 
     if (action === 'default-pack-preview') {
-        return NextResponse.json<any>(await previewDefaultPack(ctx, params.cycleId));
+        return jsonResponse(await previewDefaultPack(ctx, params.cycleId));
     }
 
-    return NextResponse.json<any>(await getAuditCycle(ctx, params.cycleId));
+    return jsonResponse(await getAuditCycle(ctx, params.cycleId));
 });
 
 export const PATCH = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; cycleId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const body = UpdateCycleSchema.parse(await req.json());
-    return NextResponse.json<any>(await updateAuditCycle(ctx, params.cycleId, body));
+    return jsonResponse(await updateAuditCycle(ctx, params.cycleId, body));
 });

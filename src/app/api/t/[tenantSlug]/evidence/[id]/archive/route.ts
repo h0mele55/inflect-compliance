@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { archiveEvidence } from '@/app-layer/usecases/evidence-retention';
+import { jsonResponse } from '@/lib/api-response';
 
 export const POST = withApiErrorHandling(async (
     req: NextRequest,
@@ -13,5 +14,5 @@ export const POST = withApiErrorHandling(async (
 ) => {
     const ctx = await getTenantCtx(params, req);
     const result = await archiveEvidence(ctx, params.id);
-    return NextResponse.json<any>(result);
+    return jsonResponse(result);
 });

@@ -1,3 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * The adapter writes JSON-typed columns (lifecycleHistoryJson,
+ * answerJson) and runtime-validated enum strings (status, riskRating)
+ * that Prisma's generated types treat as their narrower compile-time
+ * shapes. The `as any` casts here are deliberate at the persistence
+ * boundary — runtime values are validated upstream by
+ * EditableLifecycle and the per-column zod schemas. Re-typing through
+ * Prisma.JsonValue + per-column union types is a structural refactor
+ * of the adapter pattern, not a one-liner.
+ */
 /**
  * Vendor Assessment Lifecycle Adapter — Bridges the VendorAssessment domain
  * to the generic EditableLifecycle.

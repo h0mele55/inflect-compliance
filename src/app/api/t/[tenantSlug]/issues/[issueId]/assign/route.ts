@@ -5,9 +5,10 @@ import { assignTask } from '@/app-layer/usecases/task';
 import { withValidatedBody } from '@/lib/validation/route';
 import { AssignTaskSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const POST = withApiErrorHandling(withValidatedBody(AssignTaskSchema, async (req, { params }: { params: { tenantSlug: string; issueId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const task = await assignTask(ctx, params.issueId, body.assigneeUserId);
-    return NextResponse.json<any>(task);
+    return jsonResponse(task);
 }));

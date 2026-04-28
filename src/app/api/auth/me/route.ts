@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import prisma from '@/lib/prisma';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async () => {
     const session = await auth();
     if (!session?.user) {
-        return NextResponse.json<any>({ error: 'Unauthorized' }, { status: 401 });
+        return jsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
@@ -29,7 +30,7 @@ export const GET = withApiErrorHandling(async () => {
 
     const membership = user?.tenantMemberships[0];
 
-    return NextResponse.json<any>({
+    return jsonResponse({
         user: {
             id: user?.id,
             email: user?.email,

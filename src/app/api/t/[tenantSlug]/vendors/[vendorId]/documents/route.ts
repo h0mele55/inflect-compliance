@@ -4,15 +4,16 @@ import { listVendorDocuments, addVendorDocument } from '@/app-layer/usecases/ven
 import { withValidatedBody } from '@/lib/validation/route';
 import { CreateVendorDocumentSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const docs = await listVendorDocuments(ctx, params.vendorId);
-    return NextResponse.json<any>(docs);
+    return jsonResponse(docs);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateVendorDocumentSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const doc = await addVendorDocument(ctx, params.vendorId, body);
-    return NextResponse.json<any>(doc, { status: 201 });
+    return jsonResponse(doc, { status: 201 });
 }));

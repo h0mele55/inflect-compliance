@@ -6,7 +6,7 @@ import { Plus, UserMinus, Shield, AlertTriangle } from 'lucide-react';
 
 import { ListPageShell } from '@/components/layout/ListPageShell';
 import { DataTable, createColumns } from '@/components/ui/table';
-import { TableEmptyState } from '@/components/ui/table/table-empty-state';
+import { TableEmptyState } from '@/components/ui/table';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';

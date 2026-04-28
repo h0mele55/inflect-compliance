@@ -45,6 +45,7 @@ import {
 import { logEvent } from '@/app-layer/events/audit';
 import { prisma } from '@/lib/prisma';
 import { badRequest, notFound } from '@/lib/errors/types';
+import { jsonResponse } from '@/lib/api-response';
 
 // ─── GET ────────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ export const GET = withApiErrorHandling(
                   userId,
               })
             : await listActiveSessionsForTenant(ctx.tenantId);
-        return NextResponse.json<any>({
+        return jsonResponse({
             sessions,
             count: sessions.length,
         });
@@ -133,7 +134,7 @@ export const DELETE = withApiErrorHandling(
             // Audit infrastructure failure — ignored intentionally.
         }
 
-        return NextResponse.json<any>({
+        return jsonResponse({
             ok: true,
             sessionId: result.sessionId,
             userId: result.userId,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { getSession } from '@/app-layer/usecases/risk-suggestions';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (
     req: NextRequest,
@@ -9,5 +10,5 @@ export const GET = withApiErrorHandling(async (
 ) => {
     const ctx = await getTenantCtx(params, req);
     const session = await getSession(ctx, params.sessionId);
-    return NextResponse.json<any>(session);
+    return jsonResponse(session);
 });

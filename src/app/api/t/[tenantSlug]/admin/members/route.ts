@@ -4,6 +4,7 @@ import { listTenantMembers } from '@/app-layer/usecases/tenant-admin';
 import { createInviteToken, listPendingInvites } from '@/app-layer/usecases/tenant-invites';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const InviteMemberSchema = z.object({
     email: z.string().email('Valid email required'),
@@ -17,11 +18,11 @@ export const GET = withApiErrorHandling(
 
         if (view === 'invites') {
             const invites = await listPendingInvites(ctx);
-            return NextResponse.json<any>(invites);
+            return jsonResponse(invites);
         }
 
         const members = await listTenantMembers(ctx);
-        return NextResponse.json<any>(members);
+        return jsonResponse(members);
     }),
 );
 
@@ -31,6 +32,6 @@ export const POST = withApiErrorHandling(
         const input = InviteMemberSchema.parse(body);
         const result = await createInviteToken(ctx, input);
         // Response always returns the invite (no more 'added'/'reactivated' branch).
-        return NextResponse.json<any>({ invite: result.invite, url: result.url }, { status: 201 });
+        return jsonResponse({ invite: result.invite, url: result.url }, { status: 201 });
     }),
 );

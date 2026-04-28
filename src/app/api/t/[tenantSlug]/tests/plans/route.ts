@@ -8,6 +8,7 @@ import { listAllTestPlans } from '@/app-layer/usecases/due-planning';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
+import { jsonResponse } from '@/lib/api-response';
 
 const TestPlanQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -29,5 +30,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         due: query.due,
         q: query.q,
     });
-    return NextResponse.json<any>(plans);
+    return jsonResponse(plans);
 });

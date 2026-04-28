@@ -14,6 +14,7 @@ import { getLegacyCtx } from '@/app-layer/context';
 import { forbidden } from '@/lib/errors/types';
 import { isTelemetryInitialized } from '@/lib/observability/instrumentation';
 import { isSentryInitialized } from '@/lib/observability/sentry';
+import { jsonResponse } from '@/lib/api-response';
 
 const startedAt = new Date();
 
@@ -25,7 +26,7 @@ export const GET = withApiErrorHandling(async (req) => {
 
     const uptimeSeconds = Math.round((Date.now() - startedAt.getTime()) / 1000);
 
-    return NextResponse.json<any>({
+    return jsonResponse({
         service: {
             name: process.env.OTEL_SERVICE_NAME || 'inflect-compliance',
             version: process.env.npm_package_version || '0.0.0',

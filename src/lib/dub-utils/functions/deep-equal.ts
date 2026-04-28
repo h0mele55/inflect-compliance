@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Dub-ported utility code; preserves upstream shape. See CLAUDE.md "dub-ported modules" allowlist (also covers console.* in this directory tree). */
 type DeepEqual = (
   obj1: Record<string, any>,
   obj2: Record<string, any>,

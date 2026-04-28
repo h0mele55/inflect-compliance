@@ -20,6 +20,7 @@
  */
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { jsonResponse } from '@/lib/api-response';
 
 // Reuse a module-level client to avoid connection pool churn on every probe.
 const prisma = new PrismaClient();
@@ -86,7 +87,7 @@ export async function GET() {
 
     const allOk = Object.values(checks).every(c => c.status === 'ok');
 
-    return NextResponse.json<any>(
+    return jsonResponse(
         {
             status: allOk ? 'ready' : 'not_ready',
             timestamp: new Date().toISOString(),

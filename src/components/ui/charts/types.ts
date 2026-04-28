@@ -1,3 +1,17 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * The `any` defaults on the chart generics (`T extends Datum = any`,
+ * `Record<string, any>`, `ReactElement<any>`) are load-bearing for
+ * downstream specialization. Replacing them with `Datum` or `unknown`
+ * defaults breaks 9 consumer files (chart-context, time-series-chart,
+ * use-tooltip, examples) because the chart system's generic
+ * relationships rely on `any`'s "accept-anything" semantics in unbound
+ * defaults — `Datum` self-reference creates an over-narrowed default
+ * that doesn't unify with concrete consumer types.
+ *
+ * The proper structural fix is a chart-system generics redesign — out
+ * of scope for the lint-cleanup PR. Re-evaluate when the chart
+ * primitive next gets a substantive update.
+ */
 import { ScaleTypeToD3Scale } from "@visx/scale";
 import { TooltipWithBounds } from "@visx/tooltip";
 import { UseTooltipParams } from "@visx/tooltip/lib/hooks/useTooltip";

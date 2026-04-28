@@ -4,12 +4,13 @@ import { withValidatedBody } from '@/lib/validation/route';
 import { getTenantCtx } from '@/app-layer/context';
 import { RequestApprovalSchema } from '@/lib/schemas';
 import * as policyUsecases from '@/app-layer/usecases/policy';
+import { jsonResponse } from '@/lib/api-response';
 
 // POST /api/t/[tenantSlug]/policies/[id]/approval — request approval
 export const POST = withApiErrorHandling(
     withValidatedBody(RequestApprovalSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }, body) => {
         const ctx = await getTenantCtx(params, req);
         const approval = await policyUsecases.requestPolicyApproval(ctx, params.id, body.versionId);
-        return NextResponse.json<any>(approval, { status: 201 });
+        return jsonResponse(approval, { status: 201 });
     })
 );

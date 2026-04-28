@@ -8,6 +8,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { updateEvidenceRetention } from '@/app-layer/usecases/evidence-retention';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const RetentionSchema = z.object({
     retentionUntil: z.string().datetime().nullable().optional(),
@@ -22,5 +23,5 @@ export const POST = withApiErrorHandling(async (
     const ctx = await getTenantCtx(params, req);
     const body = RetentionSchema.parse(await req.json());
     const result = await updateEvidenceRetention(ctx, params.id, body);
-    return NextResponse.json<any>(result);
+    return jsonResponse(result);
 });

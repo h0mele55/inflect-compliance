@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * Form primitive — generic over arbitrary input value shapes. The
+ * 2 `any` sites here are in onSubmit/onChange handlers that pass
+ * through whatever shape the caller's <input> element produces.
+ */
 import { cn } from "@dub/utils";
 import { InputHTMLAttributes, ReactNode, useMemo, useState } from "react";
 import { Button } from "./button";

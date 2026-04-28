@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processIncomingWebhook } from '@/app-layer/usecases/webhook-processor';
 import { logger } from '@/lib/observability/logger';
+import { jsonResponse } from '@/lib/api-response';
 
 interface RouteParams {
     params: Promise<{ provider: string }>;
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest, props: RouteParams): Promise<NextRe
     const { provider } = params;
 
     if (!provider || typeof provider !== 'string') {
-        return NextResponse.json<any>({ error: 'Missing provider' }, { status: 400 });
+        return jsonResponse({ error: 'Missing provider' }, { status: 400 });
     }
 
     try {
@@ -56,20 +57,20 @@ export async function POST(req: NextRequest, props: RouteParams): Promise<NextRe
         // Always return 200 for valid requests (prevent webhook retries on processing errors)
         // Only return 4xx for auth/validation failures
         if (result.status === 'auth_failed') {
-            return NextResponse.json<any>(
+            return jsonResponse(
                 { error: 'Webhook authentication failed' },
                 { status: 401 }
             );
         }
 
         if (result.status === 'invalid_provider') {
-            return NextResponse.json<any>(
+            return jsonResponse(
                 { error: 'Unknown integration provider' },
                 { status: 404 }
             );
         }
 
-        return NextResponse.json<any>({
+        return jsonResponse({
             received: true,
             eventId: result.eventId,
             status: result.status,
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest, props: RouteParams): Promise<NextRe
             provider,
             err: err instanceof Error ? err : new Error(String(err)),
         });
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'Internal server error' },
             { status: 500 }
         );

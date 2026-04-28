@@ -4,15 +4,16 @@ import { listVendorLinks, addVendorLink } from '@/app-layer/usecases/vendor';
 import { withValidatedBody } from '@/lib/validation/route';
 import { AddVendorLinkSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const links = await listVendorLinks(ctx, params.vendorId);
-    return NextResponse.json<any>(links);
+    return jsonResponse(links);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(AddVendorLinkSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string; vendorId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const link = await addVendorLink(ctx, params.vendorId, body);
-    return NextResponse.json<any>(link, { status: 201 });
+    return jsonResponse(link, { status: 201 });
 }));

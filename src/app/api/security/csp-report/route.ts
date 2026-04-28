@@ -8,6 +8,7 @@ import {
     getViolationSummary,
     MAX_REPORT_PAYLOAD_BYTES,
 } from '@/lib/security/csp-violations';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * CSP Violation Report Endpoint
@@ -108,7 +109,7 @@ export async function GET(): Promise<NextResponse> {
     // NOTE: This route is protected by the middleware auth guard.
     // Only authenticated users can access /api/* routes.
     const summary = getViolationSummary(50);
-    return NextResponse.json<any>(summary);
+    return jsonResponse(summary);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────

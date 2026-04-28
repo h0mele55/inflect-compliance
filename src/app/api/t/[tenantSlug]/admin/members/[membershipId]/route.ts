@@ -4,6 +4,7 @@ import { updateTenantMemberRole } from '@/app-layer/usecases/tenant-admin';
 import { assignCustomRole } from '@/app-layer/usecases/custom-roles';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const UpdateMemberSchema = z.object({
     role: z.enum(['OWNER', 'ADMIN', 'EDITOR', 'AUDITOR', 'READER']).optional(),
@@ -37,13 +38,13 @@ export const PATCH = withApiErrorHandling(
             }
 
             if (!result) {
-                return NextResponse.json<any>(
+                return jsonResponse(
                     { error: 'No changes specified' },
                     { status: 400 },
                 );
             }
 
-            return NextResponse.json<any>(result);
+            return jsonResponse(result);
         },
     ),
 );

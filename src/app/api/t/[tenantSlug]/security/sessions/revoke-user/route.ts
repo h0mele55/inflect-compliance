@@ -4,6 +4,7 @@ import { revokeUserSessions } from '@/app-layer/usecases/session-security';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { RevokeSessionsInput } from '@/app-layer/schemas/mfa.schemas';
 import { badRequest } from '@/lib/errors/types';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * POST /api/t/[tenantSlug]/security/sessions/revoke-user
@@ -33,7 +34,7 @@ export const POST = withApiErrorHandling(
 
         const result = await revokeUserSessions(ctx, body.targetUserId);
 
-        return NextResponse.json<any>({
+        return jsonResponse({
             success: true,
             message: 'User sessions revoked.',
             userId: result.userId,

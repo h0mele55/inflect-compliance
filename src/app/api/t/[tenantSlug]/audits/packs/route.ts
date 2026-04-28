@@ -3,6 +3,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { createAuditPack, listAuditPacks } from '@/app-layer/usecases/audit-readiness';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const CreatePackSchema = z.object({
     auditCycleId: z.string().min(1),
@@ -13,11 +14,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     const ctx = await getTenantCtx(params, req);
     const url = new URL(req.url);
     const cycleId = url.searchParams.get('cycleId') || undefined;
-    return NextResponse.json<any>(await listAuditPacks(ctx, cycleId));
+    return jsonResponse(await listAuditPacks(ctx, cycleId));
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const body = CreatePackSchema.parse(await req.json());
-    return NextResponse.json<any>(await createAuditPack(ctx, body.auditCycleId, body.name), { status: 201 });
+    return jsonResponse(await createAuditPack(ctx, body.auditCycleId, body.name), { status: 201 });
 });

@@ -3,6 +3,7 @@ import { requirePermission } from '@/lib/security/permission-middleware';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { findOrCreateCustomer, createPortalSession } from '@/lib/stripe';
 import { env } from '@/env';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * POST /api/t/[tenantSlug]/billing/portal
@@ -24,6 +25,6 @@ export const POST = withApiErrorHandling(
             `${appUrl}/t/${ctx.tenantSlug}/admin`,
         );
 
-        return NextResponse.json<any>({ url });
+        return jsonResponse({ url });
     }),
 );

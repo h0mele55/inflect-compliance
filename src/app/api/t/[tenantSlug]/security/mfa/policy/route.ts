@@ -5,6 +5,7 @@ import { getTenantSecuritySettings, updateTenantMfaPolicy } from '@/app-layer/us
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { UpdateMfaPolicyInput } from '@/app-layer/schemas/mfa.schemas';
 import { badRequest } from '@/lib/errors/types';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * GET /api/t/[tenantSlug]/security/mfa/policy
@@ -20,7 +21,7 @@ export const GET = withApiErrorHandling(async (
 ) => {
     const ctx = await getTenantCtx(params, req);
     const settings = await getTenantSecuritySettings(ctx);
-    return NextResponse.json<any>(settings);
+    return jsonResponse(settings);
 });
 
 /**
@@ -37,6 +38,6 @@ export const PUT = withApiErrorHandling(
             throw badRequest(parsed.error.issues[0]?.message ?? 'Invalid body');
         }
         const result = await updateTenantMfaPolicy(ctx, parsed.data);
-        return NextResponse.json<any>(result);
+        return jsonResponse(result);
     }),
 );

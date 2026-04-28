@@ -6,6 +6,7 @@ import { CreatePolicySchema } from '@/lib/schemas';
 import * as policyUsecases from '@/app-layer/usecases/policy';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
+import { jsonResponse } from '@/lib/api-response';
 
 const PolicyQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -25,7 +26,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
   if (query.includeDeleted === 'true') {
     const policies = await policyUsecases.listPoliciesWithDeleted(ctx);
-    return NextResponse.json<any>(policies);
+    return jsonResponse(policies);
   }
 
   const hasPagination = query.limit || query.cursor;
@@ -40,7 +41,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         q: query.q,
       },
     });
-    return NextResponse.json<any>(result);
+    return jsonResponse(result);
   }
 
   // Backward compat: return flat array
@@ -50,7 +51,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     language: query.language,
     q: query.q,
   });
-  return NextResponse.json<any>(policies);
+  return jsonResponse(policies);
 });
 
 // POST /api/t/[tenantSlug]/policies — create (blank or from template)
@@ -79,6 +80,6 @@ export const POST = withApiErrorHandling(
       });
     }
 
-    return NextResponse.json<any>(policy, { status: 201 });
+    return jsonResponse(policy, { status: 201 });
   })
 );

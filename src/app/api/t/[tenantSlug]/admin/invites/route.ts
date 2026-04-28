@@ -14,6 +14,7 @@ import { TENANT_INVITE_CREATE_LIMIT } from '@/lib/security/rate-limit';
 import { enforceRateLimit, getClientIp } from '@/lib/security/rate-limit-middleware';
 import { isRateLimitBypassed } from '@/lib/security/rate-limit-middleware';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const CreateInviteSchema = z.object({
     email: z.string().email('Valid email required'),
@@ -23,7 +24,7 @@ const CreateInviteSchema = z.object({
 export const GET = withApiErrorHandling(
     requirePermission('admin.members', async (_req: NextRequest, _routeArgs, ctx) => {
         const invites = await listPendingInvites(ctx);
-        return NextResponse.json<any>(invites);
+        return jsonResponse(invites);
     }),
 );
 
@@ -45,6 +46,6 @@ export const POST = withApiErrorHandling(
         const body = await req.json();
         const input = CreateInviteSchema.parse(body);
         const result = await createInviteToken(ctx, input);
-        return NextResponse.json<any>({ invite: result.invite, url: result.url }, { status: 201 });
+        return jsonResponse({ invite: result.invite, url: result.url }, { status: 201 });
     }),
 );

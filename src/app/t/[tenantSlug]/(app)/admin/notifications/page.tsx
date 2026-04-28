@@ -1,4 +1,5 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any -- Tanstack-react-table cell callbacks (tanstack cell callbacks where row/getValue carry the implicit-any annotation) — typing each callback with `CellContext<TData, TValue>` requires importing the right generic per column and adds significant ceremony. The implicit any here is at the render-time boundary; row.original is type-narrowed by the column's accessorKey at runtime. */
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
