@@ -1,7 +1,7 @@
 # ───────────────────────────────────────────────────────────────
 #  CI — Enterprise-grade pipeline
 #  Jobs: lint · typecheck · test · coverage · build · e2e
-#        security · codeql · docker · trivy
+#        load-smoke · security · codeql · docker · trivy
 #
 #  Job graph:
 #    lint ─────────────┐
@@ -10,6 +10,7 @@
 #    coverage ─────────┼──→ (PR merge gate)
 #    build ────────────┤
 #      ├──→ e2e ───────┤
+#      ├──→ load-smoke ┤
 #      └──→ docker ────┤
 #           └──→ trivy ┤
 #    security ─────────┤
@@ -494,6 +495,152 @@ jobs:
         with:
           name: playwright-test-results
           path: test-results/
+          retention-days: 14
+        continue-on-error: true
+
+  # ═══════════════════════════════════════════════════════════════
+  #  Job 6.5: Load Smoke — k6 mutation smoke (10 VUs × 30s)
+  #
+  #  Runs on every PR + push to main. Catches obvious latency / error
+  #  regressions in the highest-traffic mutation paths (control create,
+  #  evidence upload) before merge. Full-scale baselines stay in the
+  #  on-demand load-test.yml workflow (50 / 100 / 200 VU).
+  #
+  #  Thresholds (from tests/load/mutations.js, must stay in sync):
+  #    p95 < 1500ms (create_control), 2000ms (upload_evidence)
+  #    p99 < 3000ms / 4000ms
+  #    error-rate < 2% per op, check-rate > 98%
+  #
+  #  Needs: build (no point smoking the app if it doesn't compile).
+  # ═══════════════════════════════════════════════════════════════
+  load-smoke:
+    name: "Load Smoke (k6)"
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    env:
+      AUTH_TEST_MODE: "1"
+      AUTH_TRUST_HOST: "1"
+      AUTH_SECRET: "test-auth-secret-that-is-long-enough-32chars" # pragma: allowlist secret — test-only stub for the load-smoke CI job
+      JWT_SECRET: "test-auth-secret-that-is-long-enough-32chars" # pragma: allowlist secret — test-only stub for the load-smoke CI job
+      AUTH_URL: "http://localhost:3006"
+      DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      DIRECT_DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      RATE_LIMIT_ENABLED: "0"
+      DATA_ENCRYPTION_KEY: ci-test-data-encryption-key-32-chars-or-more-deterministic-x
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci -d ci_testdb"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Setup environment
+        run: cp .env.e2e.example .env
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Prisma client
+        run: ./node_modules/.bin/prisma generate
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      # ── Create roles required by RLS migrations ──
+      - name: Create PostgreSQL roles for RLS
+        run: |
+          PGPASSWORD=ci_password psql -h localhost -U ci -d ci_testdb <<'SQL'
+          DO $$ BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_user') THEN CREATE ROLE app_user NOLOGIN; END IF;
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'postgres') THEN CREATE ROLE postgres NOLOGIN; END IF;
+          END $$;
+          GRANT app_user TO ci;
+          GRANT app_user TO postgres;
+          SQL
+
+      - name: Apply Prisma migrations
+        run: ./node_modules/.bin/prisma migrate deploy
+
+      - name: Seed test database
+        run: npx tsx prisma/seed.ts
+
+      - name: Create upload directory
+        # .env.e2e.example points UPLOAD_DIR / FILE_STORAGE_ROOT at
+        # `./tmp/test-uploads` (matching the e2e job's convention).
+        run: mkdir -p tmp/test-uploads
+
+      - name: Build Next.js app
+        run: npx next build
+        env:
+          NODE_ENV: production
+          NEXT_TEST_MODE: "1"
+
+      - name: Start app (background)
+        run: |
+          nohup npx next start -p 3006 > /tmp/app.log 2>&1 &
+          echo $! > /tmp/app.pid
+
+      - name: Wait for /api/health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3006/api/health > /dev/null 2>&1; then
+              echo "App is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::App failed to start within 60s. Last 100 lines of log:"
+          tail -n 100 /tmp/app.log || true
+          exit 1
+
+      # ── k6 smoke: 10 VUs × 30s mutation scenario ──
+      # The script's own thresholds gate the run (p95/p99 latency,
+      # error rate, check rate). A breach exits non-zero → CI fails.
+      - name: "Gate: k6 mutation smoke"
+        run: |
+          k6 run \
+            -e VUS=10 \
+            -e DURATION=30s \
+            -e RAMP_UP=5s \
+            -e RAMP_DOWN=5s \
+            -e RUN_ID=ci-${{ github.run_id }}-${{ github.run_attempt }} \
+            tests/load/mutations.js
+
+      - name: Stop app
+        if: always()
+        run: |
+          if [ -f /tmp/app.pid ]; then
+            kill "$(cat /tmp/app.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload k6 + app logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-smoke-results-${{ github.run_id }}
+          path: |
+            tests/load/results/*.json
+            /tmp/app.log
           retention-days: 14
         continue-on-error: true
 
