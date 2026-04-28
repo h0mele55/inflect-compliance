@@ -218,15 +218,13 @@ export async function GET() {
         checkStorage(),
     ]);
 
-    // Always include the redis check in production so a missing
-    // REDIS_URL surfaces as not_ready (GAP-13). In dev/test, omit
-    // the redis entry when unconfigured to keep "ready" green when
-    // a contributor runs the app without local Redis.
-    const checks: Record<string, CheckResult> = { database };
-    if (isRedisConfigured || process.env.NODE_ENV === 'production') {
-        checks.redis = redis;
-    }
-    checks.storage = storage;
+    // Stable response shape — checks.redis and checks.storage are
+    // always present so probe consumers don't need to check for key
+    // existence. Under dev/test without REDIS_URL the redis entry
+    // reports `status: 'skipped'` (counts as ready). Under prod a
+    // missing REDIS_URL still surfaces as `status: 'error'` per
+    // GAP-13 (defense-in-depth past SKIP_ENV_VALIDATION).
+    const checks: Record<string, CheckResult> = { database, redis, storage };
 
     // 'skipped' counts as ready — those services aren't configured
     // for this deployment (local dev). Only 'error' fails the probe.

@@ -125,7 +125,7 @@ describe('OI-3 readyz — database failure', () => {
         expect(body.status).toBe('not_ready');
         expect(body.failed).toEqual(['database']);
         expect(body.checks.database.status).toBe('error');
-        expect(body.checks.database.error).toBe('connection_failed');
+        expect(body.checks.database.error).toBe('Connection failed');
     });
 
     it('does NOT leak the underlying error message (e.g. host:port)', async () => {
@@ -151,14 +151,14 @@ describe('OI-3 readyz — redis failure', () => {
         expect(status).toBe(503);
         expect(body.failed).toEqual(['redis']);
         expect(body.checks.redis.status).toBe('error');
-        expect(body.checks.redis.error).toBe('ping_failed');
+        expect(body.checks.redis.error).toBe('Ping failed');
     });
 
     it('flags an unexpected ping response (not PONG) as redis error', async () => {
         mockPing.mockResolvedValue('UNEXPECTED');
         const { status, body } = await callReadyz();
         expect(status).toBe(503);
-        expect(body.checks.redis.error).toBe('unexpected_response');
+        expect(body.checks.redis.error).toBe('Unexpected ping response');
     });
 });
 

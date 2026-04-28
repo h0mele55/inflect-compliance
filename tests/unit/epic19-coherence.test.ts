@@ -60,9 +60,15 @@ describe('Epic 19 Coherence: metric names', () => {
 
     it('should reference every SLO-relevant metric in the dashboard or alerts (Prometheus convention)', () => {
         // Metrics that are intentionally diagnostic-only and not required in dashboards/alerts.
-        // api.request.errors provides per-error-code breakdown; SLO alerts use
-        // api.request.count{status=5xx} instead, which is the business-relevant signal.
-        const diagnosticOnly = new Set(['api.request.errors']);
+        // - api.request.errors provides per-error-code breakdown; SLO alerts use
+        //   api.request.count{status=5xx} instead, which is the business-relevant signal.
+        // - repo.method.duration is per-repository-method timing emitted by the
+        //   tracing layer; it shows up as span attributes in OTel traces and is
+        //   used ad-hoc when chasing slow queries, not on the SLO board.
+        const diagnosticOnly = new Set([
+            'api.request.errors',
+            'repo.method.duration',
+        ]);
 
         // Dot → underscore: api.request.count → api_request_count
         for (const otelName of otelNames) {
@@ -144,7 +150,10 @@ describe('Epic 19 Coherence: alert rules', () => {
         path.join(ROOT, 'infra/alerts/rules.yml'), 'utf-8'
     );
 
-    const ALL_ALERT_NAMES = [
+    // The original SLO-tracking alerts (Epic OI-3 step 1). Every one
+    // of these MUST link to the SLO dashboard — the dashboard is the
+    // operator's first stop when one fires.
+    const SLO_ALERT_NAMES = [
         'ApiErrorRateWarning',
         'ApiErrorRateCritical',
         'ApiP95LatencyWarning',
@@ -154,12 +163,27 @@ describe('Epic 19 Coherence: alert rules', () => {
         'LivezProbeFailure',
         'ApiAvailabilityBurnRateHigh',
         'JobFailureRateWarning',
-        'QueueDepthBacklogWarning',
     ];
 
-    it('should define exactly 10 alert rules', () => {
+    // Infrastructure alerts added later. These belong on dedicated
+    // dashboards (queue-depth, DB-pool, Redis-memory, cert-expiry)
+    // and intentionally don't link to the SLO board, so they are
+    // exempt from the SLO-dashboard invariant below.
+    const INFRA_ALERT_NAMES = [
+        'QueueDepthBacklogWarning',
+        'QueueDepthBacklogCritical',
+        'DatabaseConnectionPoolExhausted',
+        'RedisMemoryHighWarning',
+        'RedisMemoryHighCritical',
+        'CertificateExpiryWarning',
+        'CertificateExpiryCritical',
+    ];
+
+    const ALL_ALERT_NAMES = [...SLO_ALERT_NAMES, ...INFRA_ALERT_NAMES];
+
+    it('should define exactly 16 alert rules (9 SLO + 7 infra)', () => {
         const alertCount = (alertContent.match(/- alert:/g) || []).length;
-        expect(alertCount).toBe(10);
+        expect(alertCount).toBe(ALL_ALERT_NAMES.length);
     });
 
     it('should have all known alert names', () => {
@@ -168,9 +192,9 @@ describe('Epic 19 Coherence: alert rules', () => {
         }
     });
 
-    it('should have 5 alert groups', () => {
+    it('should have 8 alert groups', () => {
         const groupCount = (alertContent.match(/- name: inflect\./g) || []).length;
-        expect(groupCount).toBe(5);
+        expect(groupCount).toBe(8);
     });
 
     it('every alert should have service: inflect-compliance label', () => {
@@ -179,10 +203,12 @@ describe('Epic 19 Coherence: alert rules', () => {
         expect(serviceCount).toBe(alertCount);
     });
 
-    it('every alert should reference the SLO dashboard', () => {
-        const alertCount = (alertContent.match(/- alert:/g) || []).length;
+    it('every SLO-tracking alert references the SLO dashboard', () => {
+        // Only the SLO-tier alerts must link to the SLO dashboard;
+        // infra alerts have their own dashboards and would clutter
+        // the SLO board if they all linked back to it.
         const dashboardRefCount = (alertContent.match(/inflect-compliance-slos/g) || []).length;
-        expect(dashboardRefCount).toBe(alertCount);
+        expect(dashboardRefCount).toBe(SLO_ALERT_NAMES.length);
     });
 });
 
