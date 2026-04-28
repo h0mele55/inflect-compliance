@@ -254,7 +254,7 @@ docker compose -f docker-compose.prod.yml exec app \
 - [x] Non-root container user (`nextjs:nodejs`)
 - [x] Auth cookies: `httpOnly`, `secure`, `sameSite: lax`
 - [x] HSTS + CSP + X-Frame-Options headers
-- [x] Rate limiting on auth endpoints
+- [x] Rate limiting on auth endpoints, mutations, and tenant-scoped reads — see [rate-limiting docs](rate-limiting.md) for the three-tier design + exclusions
 - [x] Test credentials disabled in production
 - [x] File upload: mime/size validation + path traversal protection
 - [x] PII column-level encryption (AES-256-GCM) — see [encryption docs](encryption-data-protection.md)
