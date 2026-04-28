@@ -28,6 +28,7 @@
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -371,6 +372,96 @@ describe('Epic C.2 — sanity: scanner catches planted secrets', () => {
             );
             expect(result.status).toBe(1);
             expect(result.stdout).toMatch(/AWS Access Key ID/);
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+});
+
+// ─── GAP-16 — env-file filename guard ─────────────────────────────────
+//
+// Pre-commit hook (scripts/detect-secrets.sh) refuses staged `.env` /
+// `.env.<name>` files by name. The CI side mirrors that as a tracked-
+// files invariant: no `.env` or `.env.<name>` should EVER exist in
+// `git ls-files`. Templates (.env.<name>.example) are explicitly
+// allowed.
+//
+// This complements the content-pattern scan above. Together they cover:
+//   - accidental commits of secret-bearing .env files (content scan)
+//   - deliberate -f overrides committing placeholder-only .env files
+//     that don't trip any secret pattern (this filename guard)
+
+describe('GAP-16 — no tracked .env files (filename guard)', () => {
+    it('no `.env` or `.env.<name>` is in the git index (only .env.<>.example templates allowed)', () => {
+        // Use git ls-files to enumerate tracked files. Cheaper than
+        // walking the tree, and matches what reviewers see on the PR.
+        const tracked = execFileSync('git', ['ls-files', '-z'], {
+            encoding: 'utf8',
+            cwd: REPO_ROOT,
+        })
+            .split('\0')
+            .filter(Boolean);
+
+        const violations: string[] = [];
+        for (const file of tracked) {
+            // basename() of the path
+            const base = file.split('/').pop() ?? file;
+            // Allow templates first.
+            if (base.endsWith('.example')) continue;
+            // Match `.env` or `.env.<anything>`.
+            if (base === '.env' || base.startsWith('.env.')) {
+                violations.push(file);
+            }
+        }
+
+        if (violations.length > 0) {
+            throw new Error(
+                'Tracked .env files detected (forbidden by GAP-16):\n' +
+                    violations.map((v) => `  ${v}`).join('\n') +
+                    '\n\n' +
+                    'Templates must be named .env.<name>.example. Real env files ' +
+                    'must never be committed. See scripts/detect-secrets.sh ' +
+                    'env_reject_findings for the pre-commit equivalent.',
+            );
+        }
+    });
+
+    it('the pre-commit env-file guard refuses a planted .env file', () => {
+        // Plant a `.env` file containing PLACEHOLDER content that does
+        // NOT match any secret pattern. The filename guard MUST still
+        // refuse it — that's the whole point of having a separate
+        // filename check on top of content scanning.
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'env-guard-'));
+        const planted = path.join(tmp, '.env');
+        fs.writeFileSync(planted, 'FOO=bar\nBAZ=qux\n');
+        try {
+            const result = spawnSync(
+                'bash',
+                [path.join(REPO_ROOT, 'scripts/detect-secrets.sh'), planted],
+                { encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } },
+            );
+            expect(result.status).toBe(1);
+            expect(result.stdout).toMatch(/Refusing to commit env file/);
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+
+    it('the pre-commit env-file guard ALLOWS a .env.example template', () => {
+        // Templates with the `.example` suffix are the canonical
+        // committed-template shape. The filename guard must let them
+        // through (the content scan still applies separately, but
+        // a placeholder-only template should pass that too).
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'env-guard-'));
+        const planted = path.join(tmp, '.env.example');
+        fs.writeFileSync(planted, 'FOO=replace-me\n');
+        try {
+            const result = spawnSync(
+                'bash',
+                [path.join(REPO_ROOT, 'scripts/detect-secrets.sh'), planted],
+                { encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } },
+            );
+            expect(result.status).toBe(0);
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });
         }

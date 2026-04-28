@@ -188,6 +188,44 @@ scan_file() {
     done
 }
 
+## ─── Env-file filename guard (GAP-16) ───────────────────────────────
+#
+# Refuses to commit a `.env` file (or any `.env.<name>` variant) by
+# filename, REGARDLESS of content. Defense-in-depth on top of three
+# existing layers:
+#
+#   1. .gitignore lines 13-19 cover the common .env variants — primary
+#      gate against accidental `git add`.
+#   2. The pattern-based content scan below catches real secret
+#      payloads inside a force-staged file.
+#   3. The CI guardrail at tests/guardrails/no-secrets.test.ts re-runs
+#      the same content scan repository-wide.
+#
+# This filename guard catches the remaining hole: someone deliberately
+# `git add -f .env` with placeholder-only content that doesn't trip
+# any secret pattern. Such a file should never be committed regardless
+# of what's inside.
+#
+# Allowed filenames (for templates committed for developer onboarding):
+#   .env.example, .env.local.example, .env.<env>.example, etc.
+#
+# Detection: basename matches `.env` or `.env.<name>` AND does NOT end
+# in `.example`.
+
+env_reject_findings=()
+
+is_forbidden_env_file() {
+    local file="$1"
+    local base="${file##*/}"
+    case "$base" in
+        # Allow templates first.
+        *.example) return 1;;
+        # Reject .env and .env.<name>.
+        .env|.env.*) return 0;;
+        *) return 1;;
+    esac
+}
+
 main() {
     local files
     files=$(resolve_files "$@")
@@ -195,6 +233,40 @@ main() {
         # No staged files; nothing to do. Don't fail — that would block
         # commits that only touch e.g. submodule pointers.
         exit 0
+    fi
+
+    # Filename guard runs BEFORE content scanning. A forbidden .env
+    # file is a structural mistake; we want to surface it cleanly with
+    # an actionable message rather than potentially mask it under a
+    # secret-pattern hit (or worse, miss it entirely if the placeholders
+    # don't match any pattern).
+    while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        if is_forbidden_env_file "$f"; then
+            env_reject_findings+=("$f")
+        fi
+    done <<<"$files"
+
+    if [[ ${#env_reject_findings[@]} -gt 0 ]]; then
+        echo
+        echo "${BOLD}${RED}✖ Refusing to commit env file(s)${RESET}"
+        echo "${DIM}  scanned by scripts/detect-secrets.sh (GAP-16 filename guard)${RESET}"
+        echo
+        for f in "${env_reject_findings[@]}"; do
+            echo "  ${BOLD}${f}${RESET}"
+        done
+        cat <<-EOF
+
+${BOLD}How to proceed:${RESET}
+  1. ${BOLD}If this is a real env file${RESET} — remove it from the
+     working tree (and rotate any credentials it carried at the
+     issuer). Add the path to .gitignore if it isn't already.
+  2. ${BOLD}If this is a template${RESET} — rename to ${YELLOW}.env.<name>.example${RESET}.
+     The .example suffix is the convention for committed templates.
+  3. As a last resort (review first!) bypass the hook:
+       ${DIM}git commit --no-verify${RESET}
+EOF
+        exit 1
     fi
 
     while IFS= read -r f; do
