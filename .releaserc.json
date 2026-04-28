@@ -51,9 +51,21 @@
       }
     ],
     [
+      "@semantic-release/exec",
+      {
+        "_comment": "Sync infra/helm/inflect/Chart.yaml::appVersion to ${nextRelease.version} during the prepare phase so the Helm chart and package.json release in lock-step. Without this, every PR opened after a release fails the structural guard at tests/guards/helm-chart-foundation.test.ts:69 until someone manually bumps the chart (recurring root cause of PR #53). The script fails LOUDLY (non-zero exit) if the regex misses — silent no-op would re-introduce the same drift.",
+        "prepareCmd": "node scripts/sync-chart-version.mjs ${nextRelease.version}"
+      }
+    ],
+    [
       "@semantic-release/git",
       {
-        "assets": ["CHANGELOG.md", "package.json", "package-lock.json"],
+        "assets": [
+          "CHANGELOG.md",
+          "package.json",
+          "package-lock.json",
+          "infra/helm/inflect/Chart.yaml"
+        ],
         "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
       }
     ],
