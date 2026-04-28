@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps -- Various useEffect/useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers recreated each render) or use selector functions whose change-detection happens elsewhere. Adding the deps would either trigger unnecessary re-runs OR cause infinite render loops; the proper structural fix is to wrap parent-level callbacks in useCallback. Tracked as follow-up. */
 import { cn, currencyFormatter, nFormatter } from "@dub/utils";
 import { curveBasis } from "@visx/curve";
 import { ParentSize } from "@visx/responsive";

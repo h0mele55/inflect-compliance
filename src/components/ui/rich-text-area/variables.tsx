@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * TipTap mention/variable suggestion popover. The `any` casts mirror
+ * TipTap's mention-suggestion API, which uses dynamic command names.
+ */
 import { cn } from "@dub/utils";
 import { computePosition, flip, shift } from "@floating-ui/dom";
 import { Editor, posToDOMRect, ReactRenderer } from "@tiptap/react";

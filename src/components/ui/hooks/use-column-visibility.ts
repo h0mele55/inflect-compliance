@@ -11,12 +11,12 @@ type SingleTableConfig = {
 type MultiTableConfig<T extends string> = Record<T, SingleTableConfig>;
 
 // Type guard for SingleTableConfig
-function isSingleTableConfig(config: any): config is SingleTableConfig {
+function isSingleTableConfig(config: unknown): config is SingleTableConfig {
   return (
-    config &&
+    !!config &&
     typeof config === "object" &&
-    Array.isArray(config.all) &&
-    Array.isArray(config.defaultVisible)
+    Array.isArray((config as { all?: unknown }).all) &&
+    Array.isArray((config as { defaultVisible?: unknown }).defaultVisible)
   );
 }
 

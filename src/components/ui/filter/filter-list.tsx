@@ -718,5 +718,5 @@ function OperatorFilterPill({
   );
 }
 
-const isReactNode = (element: any): element is ReactNode =>
+const isReactNode = (element: unknown): element is ReactNode =>
   isValidElement(element);

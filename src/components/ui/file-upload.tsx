@@ -341,6 +341,7 @@ export function FileUpload({
       </div>
       {imageSrc &&
         (customPreview ?? (
+          // eslint-disable-next-line @next/next/no-img-element -- imageSrc is a runtime-generated blob URL or upstream-hosted preview; next/image needs known dimensions + remote-pattern allowlisting that this generic upload primitive can't pre-declare. Plain <img> is the right primitive here.
           <img
             src={imageSrc}
             alt="Preview"

@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * Generic type aliases over `TData`. The `any` defaults exist so
+ * unspecialised consumers don't explode at type-check time; they
+ * mirror tanstack-react-table's own default-generic strategy.
+ */
 import {
   Cell,
   ColumnDef,

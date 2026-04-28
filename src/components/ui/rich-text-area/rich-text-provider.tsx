@@ -1,3 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * TipTap extension wiring. The `any` casts here are at the boundary
+ * with TipTap's HookEditor type, which exposes `editor.commands.<name>(args: any)`
+ * dynamically. Re-typing each command would shadow TipTap's own runtime
+ * dispatch table — out of scope for a lint cleanup.
+ */
 import { cn } from "@dub/utils";
 import FileHandler from "@tiptap/extension-file-handler";
 import Image from "@tiptap/extension-image";

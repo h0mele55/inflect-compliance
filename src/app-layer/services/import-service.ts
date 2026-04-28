@@ -1,3 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * Tenant import works on free-form JSON envelope payloads where each
+ * entity's row shape is validated at parse time (zod) but typed as
+ * `unknown` flowing through the FK-resolution graph. The `any` casts
+ * here are at the resolver-output boundary — narrowing to a specific
+ * Prisma model type would re-do the validation unnecessarily.
+ */
 /**
  * Import Service — Topological, FK-Aware Tenant Data Import
  *

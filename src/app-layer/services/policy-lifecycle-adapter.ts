@@ -1,3 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any --
+ * Same Prisma-vs-runtime gap as the vendor adapter: lifecycleHistoryJson
+ * and contentType are stored as JSON / enum strings narrower than
+ * Prisma's generated types. Casts at the persistence boundary; runtime
+ * validation upstream.
+ */
 /**
  * Policy Lifecycle Adapter — Bridges Policy domain to the generic EditableLifecycle.
  *

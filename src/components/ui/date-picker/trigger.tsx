@@ -78,6 +78,7 @@ const Trigger = forwardRef<HTMLButtonElement, TriggerProps>(
         forwardedRef,
     ) => {
         return (
+            // eslint-disable-next-line jsx-a11y/role-supports-aria-props -- aria-invalid IS valid on <button> per WAI-ARIA 1.1 (global state); the lint rule's role-spec table is overly strict here. The form-trigger UX requires the invalid state to be announced.
             <button
                 ref={forwardedRef}
                 // Default to `type="button"` so the trigger never

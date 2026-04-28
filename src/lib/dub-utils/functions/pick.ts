@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Dub-ported utility code; preserves upstream shape. */
 // Picks a subset of properties from an object and returns a new object
 // containing only the specified keys.
 export const pick = <T extends Record<string, any>, K extends keyof T>(
