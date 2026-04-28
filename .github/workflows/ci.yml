@@ -577,7 +577,7 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Build Docker image (no push)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
@@ -607,7 +607,7 @@ jobs:
 
       # Rebuild image locally — docker job uses GHA cache so this is fast
       - name: Build Docker image for scanning
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: false
