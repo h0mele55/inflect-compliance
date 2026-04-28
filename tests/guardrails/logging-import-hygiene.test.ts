@@ -131,6 +131,8 @@ describe('Dynamic require() usage is minimized', () => {
         'app-layer/libraries/framework-provider.ts': ['@/data/frameworks', '@/data/clauses'],
         'app-layer/usecases/evidence-maintenance.ts': ['@/lib/audit/audit-writer'],
         'app/api/readyz/route.ts': ['@/lib/redis'],
+        // GAP-13 — same conditional Redis check pattern as readyz.
+        'app/api/health/route.ts': ['@/lib/redis'],
         // Epic A.1 — `rls-middleware` is imported by `lib/prisma.ts` to
         // install the tripwire at startup; the prisma reference must be
         // lazy to avoid a TDZ cycle.
