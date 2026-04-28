@@ -3,6 +3,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { runAutomationForControl } from '@/app-layer/usecases/integrations';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { forbidden } from '@/lib/errors/types';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * POST /api/t/[tenantSlug]/controls/[controlId]/sync
@@ -22,7 +23,7 @@ export const POST = withApiErrorHandling(async (
         triggeredBy: 'manual',
     });
 
-    return NextResponse.json<any>(result);
+    return jsonResponse(result);
 });
 
 /**
@@ -50,7 +51,7 @@ export const GET = withApiErrorHandling(async (
     });
 
     if (!control?.automationKey) {
-        return NextResponse.json<any>({ syncStatus: null, provider: null });
+        return jsonResponse({ syncStatus: null, provider: null });
     }
 
     const [provider] = control.automationKey.split('.');
@@ -63,7 +64,7 @@ export const GET = withApiErrorHandling(async (
         params.controlId,
     );
 
-    return NextResponse.json<any>({
+    return jsonResponse({
         syncStatus: mapping?.syncStatus ?? null,
         lastSyncedAt: mapping?.lastSyncedAt ?? null,
         lastSyncDirection: mapping?.lastSyncDirection ?? null,

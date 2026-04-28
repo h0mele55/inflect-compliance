@@ -6,6 +6,7 @@ import { CreateAssetSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
+import { jsonResponse } from '@/lib/api-response';
 
 const AssetQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -24,7 +25,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (query.includeDeleted === 'true') {
         const assets = await listAssetsWithDeleted(ctx);
-        return NextResponse.json<any>(assets);
+        return jsonResponse(assets);
     }
 
     const hasPagination = query.limit || query.cursor;
@@ -39,7 +40,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
                 q: query.q,
             },
         });
-        return NextResponse.json<any>(result);
+        return jsonResponse(result);
     }
 
     // Backward compat: return flat array
@@ -49,11 +50,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         criticality: query.criticality,
         q: query.q,
     });
-    return NextResponse.json<any>(assets);
+    return jsonResponse(assets);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateAssetSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const asset = await createAsset(ctx, body);
-    return NextResponse.json<any>(asset, { status: 201 });
+    return jsonResponse(asset, { status: 201 });
 }));

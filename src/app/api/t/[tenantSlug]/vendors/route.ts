@@ -6,6 +6,7 @@ import { CreateVendorSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
+import { jsonResponse } from '@/lib/api-response';
 
 const VendorQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -35,7 +36,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
                 q: query.q,
             },
         });
-        return NextResponse.json<any>(result);
+        return jsonResponse(result);
     }
 
     // Backward compat: return flat array
@@ -46,12 +47,12 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         reviewDue: query.reviewDue,
         q: query.q,
     });
-    return NextResponse.json<any>(vendors);
+    return jsonResponse(vendors);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateVendorSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const vendor = await createVendor(ctx, body as any);
-    return NextResponse.json<any>(vendor, { status: 201 });
+    return jsonResponse(vendor, { status: 201 });
 }));

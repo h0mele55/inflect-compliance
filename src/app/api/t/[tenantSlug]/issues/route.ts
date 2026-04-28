@@ -8,6 +8,7 @@ import { listTasks, createTask } from '@/app-layer/usecases/task';
 import { withValidatedBody } from '@/lib/validation/route';
 import { CreateTaskSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
@@ -21,11 +22,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         due: (sp.get('due') as 'overdue' | 'next7d') ?? undefined,
         q: sp.get('q') ?? undefined,
     });
-    return NextResponse.json<any>(tasks);
+    return jsonResponse(tasks);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateTaskSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const task = await createTask(ctx, body);
-    return NextResponse.json<any>(task, { status: 201 });
+    return jsonResponse(task, { status: 201 });
 }));

@@ -13,9 +13,10 @@
  *   (never returns anything else while the process is running)
  */
 import { NextResponse } from 'next/server';
+import { jsonResponse } from '@/lib/api-response';
 
 export async function GET() {
-    return NextResponse.json<any>(
+    return jsonResponse(
         {
             status: 'alive',
             timestamp: new Date().toISOString(),

@@ -4,6 +4,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { findOrCreateCustomer, createCheckoutSession } from '@/lib/stripe';
 import { env } from '@/env';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const CheckoutBody = z.object({
     plan: z.enum(['PRO', 'ENTERPRISE']),
@@ -33,6 +34,6 @@ export const POST = withApiErrorHandling(
             `${appUrl}/t/${ctx.tenantSlug}/admin?billing=canceled`,
         );
 
-        return NextResponse.json<any>({ url });
+        return jsonResponse({ url });
     }),
 );

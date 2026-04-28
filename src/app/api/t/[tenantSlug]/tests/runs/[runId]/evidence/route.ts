@@ -8,15 +8,16 @@ import { listRunEvidence, linkEvidenceToRun } from '@/app-layer/usecases/control
 import { withValidatedBody } from '@/lib/validation/route';
 import { LinkTestEvidenceSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; runId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const evidence = await listRunEvidence(ctx, params.runId);
-    return NextResponse.json<any>(evidence);
+    return jsonResponse(evidence);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(LinkTestEvidenceSchema, async (req, { params }: { params: { tenantSlug: string; runId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const link = await linkEvidenceToRun(ctx, params.runId, body);
-    return NextResponse.json<any>(link, { status: 201 });
+    return jsonResponse(link, { status: 201 });
 }));

@@ -3,6 +3,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { createAuditCycle, listAuditCycles } from '@/app-layer/usecases/audit-readiness';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const CreateCycleSchema = z.object({
     frameworkKey: z.enum(['ISO27001', 'NIS2']),
@@ -14,11 +15,11 @@ const CreateCycleSchema = z.object({
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    return NextResponse.json<any>(await listAuditCycles(ctx));
+    return jsonResponse(await listAuditCycles(ctx));
 });
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const body = CreateCycleSchema.parse(await req.json());
-    return NextResponse.json<any>(await createAuditCycle(ctx, body), { status: 201 });
+    return jsonResponse(await createAuditCycle(ctx, body), { status: 201 });
 });

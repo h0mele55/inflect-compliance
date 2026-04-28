@@ -3,6 +3,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { getSoA } from '@/app-layer/usecases/soa';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const SoAQuerySchema = z.object({
     framework: z.string().default('ISO27001'),
@@ -23,5 +24,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         includeTests: query.includeTests === 'true',
     });
 
-    return NextResponse.json<any>(report);
+    return jsonResponse(report);
 });

@@ -4,6 +4,7 @@ import {
     computeReadiness, exportReadinessJson, exportUnmappedCsv, exportControlGapsCsv,
 } from '@/app-layer/usecases/audit-readiness-scoring';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; cycleId: string } }) => {
     const ctx = await getTenantCtx(params, req);
@@ -12,7 +13,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (action === 'export-json') {
         const data = await exportReadinessJson(ctx, params.cycleId);
-        return NextResponse.json<any>(data);
+        return jsonResponse(data);
     }
 
     if (action === 'export-unmapped-csv') {
@@ -31,5 +32,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     // Default: compute readiness
     const result = await computeReadiness(ctx, params.cycleId);
-    return NextResponse.json<any>(result);
+    return jsonResponse(result);
 });

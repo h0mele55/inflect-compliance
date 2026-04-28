@@ -6,6 +6,7 @@ import { CreateEvidenceSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
+import { jsonResponse } from '@/lib/api-response';
 
 const EvidenceQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -26,7 +27,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (query.includeDeleted === 'true') {
         const evidence = await listEvidenceWithDeleted(ctx);
-        return NextResponse.json<any>(evidence);
+        return jsonResponse(evidence);
     }
 
     const filters = {
@@ -45,17 +46,17 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
             cursor: query.cursor,
             filters,
         });
-        return NextResponse.json<any>(result);
+        return jsonResponse(result);
     }
 
     // Backward compatibility: flat array
     const evidence = await listEvidence(ctx, filters);
-    return NextResponse.json<any>(evidence);
+    return jsonResponse(evidence);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateEvidenceSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const evidence = await createEvidence(ctx, body as any);
-    return NextResponse.json<any>(evidence, { status: 201 });
+    return jsonResponse(evidence, { status: 201 });
 }));

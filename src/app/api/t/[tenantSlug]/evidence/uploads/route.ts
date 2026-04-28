@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { uploadEvidenceFile } from '@/app-layer/usecases/evidence';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
@@ -15,7 +16,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     const file = formData.get('file');
 
     if (!file || !(file instanceof File)) {
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'Missing or invalid file in form data' },
             { status: 400 },
         );
@@ -31,5 +32,5 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     };
 
     const evidence = await uploadEvidenceFile(ctx, file, metadata);
-    return NextResponse.json<any>(evidence, { status: 201 });
+    return jsonResponse(evidence, { status: 201 });
 });

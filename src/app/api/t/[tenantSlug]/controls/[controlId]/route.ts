@@ -4,15 +4,16 @@ import { getControl, updateControl } from '@/app-layer/usecases/control';
 import { withValidatedBody } from '@/lib/validation/route';
 import { UpdateControlSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; controlId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const control = await getControl(ctx, params.controlId);
-    return NextResponse.json<any>(control);
+    return jsonResponse(control);
 });
 
 export const PATCH = withApiErrorHandling(withValidatedBody(UpdateControlSchema, async (req, { params }: { params: { tenantSlug: string; controlId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const control = await updateControl(ctx, params.controlId, body);
-    return NextResponse.json<any>(control);
+    return jsonResponse(control);
 }));

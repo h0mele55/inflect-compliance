@@ -8,6 +8,7 @@ import {
     updateTenantNotificationSettings,
     getOutboxStats,
 } from '@/app-layer/notifications/settings';
+import { jsonResponse } from '@/lib/api-response';
 
 /** GET — returns tenant notification settings + outbox stats */
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
@@ -21,7 +22,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         ]);
     });
 
-    return NextResponse.json<any>({ settings, stats });
+    return jsonResponse({ settings, stats });
 });
 
 /** PUT — update tenant notification settings (admin-only) */
@@ -39,5 +40,5 @@ export const PUT = withApiErrorHandling(async (req: NextRequest, { params }: { p
         }),
     );
 
-    return NextResponse.json<any>(updated);
+    return jsonResponse(updated);
 });

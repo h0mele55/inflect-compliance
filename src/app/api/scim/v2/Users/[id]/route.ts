@@ -18,6 +18,7 @@ import {
     scimDeleteUser,
     type ScimCreateUserInput,
 } from '@/app-layer/usecases/scim-users';
+import { jsonResponse } from '@/lib/api-response';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -29,20 +30,20 @@ export async function GET(req: NextRequest, props: RouteContext) {
 
         const user = await scimGetUser(ctx, params.id, baseUrl);
         if (!user) {
-            return NextResponse.json<any>(
+            return jsonResponse(
                 scimError(404, `User ${params.id} not found`),
                 { status: 404 }
             );
         }
 
-        return NextResponse.json<any>(user, {
+        return jsonResponse(user, {
             headers: { 'Content-Type': 'application/scim+json' },
         });
     } catch (e) {
         if (e instanceof ScimAuthError) {
-            return NextResponse.json<any>(scimError(e.status, e.message, e.scimType), { status: e.status });
+            return jsonResponse(scimError(e.status, e.message, e.scimType), { status: e.status });
         }
-        return NextResponse.json<any>(scimError(500, 'Internal server error'), { status: 500 });
+        return jsonResponse(scimError(500, 'Internal server error'), { status: 500 });
     }
 }
 
@@ -55,7 +56,7 @@ export async function PATCH(req: NextRequest, props: RouteContext) {
         const body = await req.json() as ScimPatchOp;
 
         if (!body.Operations || !Array.isArray(body.Operations)) {
-            return NextResponse.json<any>(
+            return jsonResponse(
                 scimError(400, 'Operations array is required', 'invalidValue'),
                 { status: 400 }
             );
@@ -63,20 +64,20 @@ export async function PATCH(req: NextRequest, props: RouteContext) {
 
         const user = await scimPatchUser(ctx, params.id, body.Operations, baseUrl);
         if (!user) {
-            return NextResponse.json<any>(
+            return jsonResponse(
                 scimError(404, `User ${params.id} not found`),
                 { status: 404 }
             );
         }
 
-        return NextResponse.json<any>(user, {
+        return jsonResponse(user, {
             headers: { 'Content-Type': 'application/scim+json' },
         });
     } catch (e) {
         if (e instanceof ScimAuthError) {
-            return NextResponse.json<any>(scimError(e.status, e.message, e.scimType), { status: e.status });
+            return jsonResponse(scimError(e.status, e.message, e.scimType), { status: e.status });
         }
-        return NextResponse.json<any>(scimError(500, 'Internal server error'), { status: 500 });
+        return jsonResponse(scimError(500, 'Internal server error'), { status: 500 });
     }
 }
 
@@ -89,7 +90,7 @@ export async function PUT(req: NextRequest, props: RouteContext) {
         const body = await req.json() as ScimCreateUserInput;
 
         if (!body.userName) {
-            return NextResponse.json<any>(
+            return jsonResponse(
                 scimError(400, 'userName is required', 'invalidValue'),
                 { status: 400 }
             );
@@ -97,20 +98,20 @@ export async function PUT(req: NextRequest, props: RouteContext) {
 
         const user = await scimPutUser(ctx, params.id, body, baseUrl);
         if (!user) {
-            return NextResponse.json<any>(
+            return jsonResponse(
                 scimError(404, `User ${params.id} not found`),
                 { status: 404 }
             );
         }
 
-        return NextResponse.json<any>(user, {
+        return jsonResponse(user, {
             headers: { 'Content-Type': 'application/scim+json' },
         });
     } catch (e) {
         if (e instanceof ScimAuthError) {
-            return NextResponse.json<any>(scimError(e.status, e.message, e.scimType), { status: e.status });
+            return jsonResponse(scimError(e.status, e.message, e.scimType), { status: e.status });
         }
-        return NextResponse.json<any>(scimError(500, 'Internal server error'), { status: 500 });
+        return jsonResponse(scimError(500, 'Internal server error'), { status: 500 });
     }
 }
 
@@ -121,7 +122,7 @@ export async function DELETE(req: NextRequest, props: RouteContext) {
 
         const deleted = await scimDeleteUser(ctx, params.id);
         if (!deleted) {
-            return NextResponse.json<any>(
+            return jsonResponse(
                 scimError(404, `User ${params.id} not found`),
                 { status: 404 }
             );
@@ -130,8 +131,8 @@ export async function DELETE(req: NextRequest, props: RouteContext) {
         return new NextResponse(null, { status: 204 });
     } catch (e) {
         if (e instanceof ScimAuthError) {
-            return NextResponse.json<any>(scimError(e.status, e.message, e.scimType), { status: e.status });
+            return jsonResponse(scimError(e.status, e.message, e.scimType), { status: e.status });
         }
-        return NextResponse.json<any>(scimError(500, 'Internal server error'), { status: 500 });
+        return jsonResponse(scimError(500, 'Internal server error'), { status: 500 });
     }
 }

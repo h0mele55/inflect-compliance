@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/security/permission-middleware';
 import { deactivateTenantMember } from '@/app-layer/usecases/tenant-admin';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const POST = withApiErrorHandling(
     requirePermission<{ tenantSlug: string; membershipId: string }>(
@@ -10,7 +11,7 @@ export const POST = withApiErrorHandling(
             const result = await deactivateTenantMember(ctx, {
                 membershipId: params.membershipId,
             });
-            return NextResponse.json<any>(result);
+            return jsonResponse(result);
         },
     ),
 );

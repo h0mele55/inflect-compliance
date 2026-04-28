@@ -4,6 +4,7 @@ import { listApiKeys, createApiKey } from '@/app-layer/usecases/api-keys';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { API_KEY_CREATE_LIMIT } from '@/lib/security/rate-limit-middleware';
 import { z } from 'zod';
+import { jsonResponse } from '@/lib/api-response';
 
 const CreateApiKeySchema = z.object({
     name: z.string().min(1).max(100),
@@ -14,7 +15,7 @@ const CreateApiKeySchema = z.object({
 export const GET = withApiErrorHandling(
     requirePermission('admin.manage', async (_req: NextRequest, _routeArgs, ctx) => {
         const keys = await listApiKeys(ctx);
-        return NextResponse.json<any>(keys);
+        return jsonResponse(keys);
     }),
 );
 
@@ -28,7 +29,7 @@ export const POST = withApiErrorHandling(
         const body = await req.json();
         const input = CreateApiKeySchema.parse(body);
         const result = await createApiKey(ctx, input);
-        return NextResponse.json<any>(result, { status: 201 });
+        return jsonResponse(result, { status: 201 });
     }),
     {
         rateLimit: { config: API_KEY_CREATE_LIMIT, scope: 'api-key-create' },

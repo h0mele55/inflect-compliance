@@ -8,15 +8,16 @@ import { listControlTestPlans, createTestPlan } from '@/app-layer/usecases/contr
 import { withValidatedBody } from '@/lib/validation/route';
 import { CreateTestPlanSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; controlId: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const plans = await listControlTestPlans(ctx, params.controlId);
-    return NextResponse.json<any>(plans);
+    return jsonResponse(plans);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateTestPlanSchema, async (req, { params }: { params: { tenantSlug: string; controlId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const plan = await createTestPlan(ctx, params.controlId, body);
-    return NextResponse.json<any>(plan, { status: 201 });
+    return jsonResponse(plan, { status: 201 });
 }));

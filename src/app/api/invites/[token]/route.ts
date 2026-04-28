@@ -18,6 +18,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { INVITE_REDEEM_LIMIT } from '@/lib/security/rate-limit';
 import { enforceRateLimit, getClientIp, isRateLimitBypassed } from '@/lib/security/rate-limit-middleware';
 import { unauthorized } from '@/lib/errors/types';
+import { jsonResponse } from '@/lib/api-response';
 
 function applyRedeemRateLimit(req: NextRequest): NextResponse | null {
     if (isRateLimitBypassed()) return null;
@@ -48,7 +49,7 @@ export const GET = withApiErrorHandling(
             );
         }
 
-        return NextResponse.json<any>({
+        return jsonResponse({
             tenantName: preview.tenantName,
             tenantSlug: preview.tenantSlug,
             role: preview.role,
@@ -75,7 +76,7 @@ export const POST = withApiErrorHandling(
             userEmail: session.user.email,
         });
 
-        return NextResponse.json<any>({
+        return jsonResponse({
             tenantId: result.tenantId,
             slug: result.slug,
             role: result.role,

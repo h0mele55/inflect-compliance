@@ -3,6 +3,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { getUserMfaStatus } from '@/app-layer/usecases/mfa';
 import { removeMfaEnrollment } from '@/app-layer/usecases/mfa-enrollment';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * GET /api/t/[tenantSlug]/security/mfa/enroll
@@ -16,7 +17,7 @@ export const GET = withApiErrorHandling(async (
     const ctx = await getTenantCtx(params, req);
     const status = await getUserMfaStatus(ctx);
 
-    return NextResponse.json<any>(status);
+    return jsonResponse(status);
 });
 
 /**
@@ -42,11 +43,11 @@ export const DELETE = withApiErrorHandling(async (
     const result = await removeMfaEnrollment(ctx, targetUserId);
 
     if (!result.removed) {
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'No MFA enrollment found to remove.' },
             { status: 404 },
         );
     }
 
-    return NextResponse.json<any>({ success: true, message: 'MFA enrollment removed.' });
+    return jsonResponse({ success: true, message: 'MFA enrollment removed.' });
 });

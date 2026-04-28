@@ -4,10 +4,11 @@ import { listControlTemplates, installControlsFromTemplate } from '@/app-layer/u
 import { withValidatedBody } from '@/lib/validation/route';
 import { InstallTemplatesSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 // GET /controls/templates — list available templates
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const templates = await listControlTemplates(ctx);
-    return NextResponse.json<any>(templates);
+    return jsonResponse(templates);
 });

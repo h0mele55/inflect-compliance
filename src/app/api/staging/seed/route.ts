@@ -11,11 +11,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '@/lib/observability/logger';
+import { jsonResponse } from '@/lib/api-response';
 
 export async function POST(req: NextRequest) {
     // ── Gate 1: Environment check ──
     if (process.env.NODE_ENV === 'production') {
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'Seed endpoint is disabled in production' },
             { status: 403 }
         );
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
     // ── Gate 2: Token check ──
     const seedToken = process.env.STAGING_SEED_TOKEN;
     if (!seedToken) {
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'STAGING_SEED_TOKEN env var not set' },
             { status: 503 }
         );
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
     const providedToken = req.headers.get('x-seed-token');
     if (providedToken !== seedToken) {
         logger.warn('Unauthorized staging seed attempt', { component: 'staging-seed' });
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'Invalid seed token' },
             { status: 401 }
         );
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
 
         logger.info('Staging seed completed', { component: 'staging-seed', ...counts });
 
-        return NextResponse.json<any>({
+        return jsonResponse({
             success: true,
             message: 'Staging seed completed',
             counts,
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
         });
     } catch (err) {
         logger.error('Staging seed failed', { component: 'staging-seed', error: err instanceof Error ? err.message : String(err) });
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'Seed failed', details: String(err) },
             { status: 500 }
         );

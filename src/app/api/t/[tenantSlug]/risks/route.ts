@@ -6,6 +6,7 @@ import { CreateRiskSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
+import { jsonResponse } from '@/lib/api-response';
 
 const RiskQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -26,7 +27,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     if (query.includeDeleted === 'true') {
         const risks = await listRisksWithDeleted(ctx);
-        return NextResponse.json<any>(risks);
+        return jsonResponse(risks);
     }
 
     const hasPagination = query.limit || query.cursor;
@@ -43,7 +44,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
                 q: query.q,
             },
         });
-        return NextResponse.json<any>(result);
+        return jsonResponse(result);
     }
 
     // Backward compat: return flat array
@@ -55,12 +56,12 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         ownerUserId: query.ownerUserId,
         q: query.q,
     });
-    return NextResponse.json<any>(risks);
+    return jsonResponse(risks);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateRiskSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const risk = await createRisk(ctx, body as any);
-    return NextResponse.json<any>(risk, { status: 201 });
+    return jsonResponse(risk, { status: 201 });
 }));

@@ -198,7 +198,10 @@ describe('Vendor Audit Enhancements', () => {
 
         it('supports csv and json formats', () => {
             expect(content).toContain("format === 'csv'");
-            expect(content).toContain('NextResponse.json');
+            // Accepts either NextResponse.json (legacy) or jsonResponse
+            // (the typed wrapper from src/lib/api-response.ts that
+            // replaced ~450 NextResponse.json<any>(...) call sites).
+            expect(content).toMatch(/NextResponse\.json|jsonResponse\(/);
         });
 
         it('sets Content-Disposition for CSV downloads', () => {

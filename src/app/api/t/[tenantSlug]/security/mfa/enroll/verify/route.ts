@@ -5,6 +5,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { withValidatedBody } from '@/lib/validation/route';
 import { VerifyMfaInput } from '@/app-layer/schemas/mfa.schemas';
 import { checkRateLimit, resetRateLimit, MFA_ENROLL_VERIFY_LIMIT } from '@/lib/security/rate-limit';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * POST /api/t/[tenantSlug]/security/mfa/enroll/verify
@@ -27,7 +28,7 @@ export const POST = withApiErrorHandling(withValidatedBody(
 
         if (!rateCheck.allowed) {
             const retrySeconds = Math.ceil(rateCheck.retryAfterMs / 1000);
-            return NextResponse.json<any>(
+            return jsonResponse(
                 {
                     success: false,
                     error: `Too many attempts. Please try again in ${retrySeconds} seconds.`,
@@ -39,7 +40,7 @@ export const POST = withApiErrorHandling(withValidatedBody(
         const result = await verifyMfaEnrollment(ctx, body);
 
         if (!result.success) {
-            return NextResponse.json<any>({
+            return jsonResponse({
                 success: false,
                 error: 'Invalid TOTP code. Please try again.',
                 enrollmentId: result.enrollmentId,
@@ -49,7 +50,7 @@ export const POST = withApiErrorHandling(withValidatedBody(
         // Success — reset rate limit
         resetRateLimit(rateLimitKey);
 
-        return NextResponse.json<any>({
+        return jsonResponse({
             success: true,
             enrollmentId: result.enrollmentId,
             message: 'MFA enrollment verified successfully.',

@@ -22,6 +22,7 @@ import { getStorageProvider, buildTenantObjectKey } from '@/lib/storage';
 import { FEATURES } from '@/lib/entitlements';
 import { requireFeature } from '@/lib/entitlements-server';
 import { logger } from '@/lib/observability/logger';
+import { jsonResponse } from '@/lib/api-response';
 
 const GenerateSchema = z.object({
     type: z.nativeEnum(ReportType),
@@ -79,7 +80,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
                 pdfDoc = await generateGapAnalysisPdf(ctx, { watermark });
                 break;
             default:
-                return NextResponse.json<any>({ error: 'Unknown report type' }, { status: 400 });
+                return jsonResponse({ error: 'Unknown report type' }, { status: 400 });
         }
     } catch (genErr) {
         logger.error('PDF generation failed', { component: 'report', reportType: body.type });
@@ -132,7 +133,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
             })
         ) as { id: string };
 
-        return NextResponse.json<any>({
+        return jsonResponse({
             fileId: fileRecord.id,
             fileName,
             sizeBytes: writeResult.sizeBytes,

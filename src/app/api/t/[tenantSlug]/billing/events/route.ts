@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/security/permission-middleware';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { listBillingEvents } from '@/lib/entitlements-server';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * GET /api/t/[tenantSlug]/billing/events
@@ -16,6 +17,6 @@ export const GET = withApiErrorHandling(
 
         const events = await listBillingEvents(ctx.tenantId, limit);
 
-        return NextResponse.json<any>({ events });
+        return jsonResponse({ events });
     }),
 );

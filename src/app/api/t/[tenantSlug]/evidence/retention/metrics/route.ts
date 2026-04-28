@@ -6,9 +6,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { getRetentionMetrics } from '@/app-layer/usecases/evidence-retention';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const metrics = await getRetentionMetrics(ctx);
-    return NextResponse.json<any>(metrics);
+    return jsonResponse(metrics);
 });

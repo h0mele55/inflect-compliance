@@ -7,9 +7,10 @@ import { completeTestRun } from '@/app-layer/usecases/control-test';
 import { withValidatedBody } from '@/lib/validation/route';
 import { CompleteTestRunSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const POST = withApiErrorHandling(withValidatedBody(CompleteTestRunSchema, async (req, { params }: { params: { tenantSlug: string; runId: string } }, body) => {
     const ctx = await getTenantCtx(params, req);
     const run = await completeTestRun(ctx, params.runId, body);
-    return NextResponse.json<any>(run);
+    return jsonResponse(run);
 }));

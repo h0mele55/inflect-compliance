@@ -8,6 +8,7 @@ import {
 } from '@/lib/security/saml-client';
 import { ssoLog, generateSsoRequestId } from '@/lib/security/sso-logging';
 import { env } from '@/env';
+import { jsonResponse } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     // ── Validate params ──
     if (!tenantSlug || !providerId) {
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'Missing required parameters: tenant and provider' },
             { status: 400 }
         );
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!tenant) {
-        return NextResponse.json<any>({ error: 'Tenant not found' }, { status: 404 });
+        return jsonResponse({ error: 'Tenant not found' }, { status: 404 });
     }
 
     // ── Load provider config ──
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!provider) {
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'SAML provider not found or not enabled' },
             { status: 404 }
         );
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
             requestId, tenantSlug: tenantSlug || '', providerType: 'SAML',
             providerId: provider.id, stage: 'config_load',
         });
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'SSO configuration error' },
             { status: 500 }
         );
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
         ssoLog('error', 'SAML config missing ssoUrl or entityId', {
             tenantSlug: tenantSlug || '', providerType: 'SAML', providerId: provider.id, stage: 'config_load',
         });
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'SAML configuration incomplete — ssoUrl and entityId required' },
             { status: 500 }
         );
@@ -118,7 +119,7 @@ export async function GET(req: NextRequest) {
             meta: { error: (err as Error).message },
         });
 
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'Failed to initiate SAML authentication' },
             { status: 500 }
         );

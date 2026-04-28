@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { exportTestEvidenceBundle } from '@/app-layer/usecases/test-hardening';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
@@ -26,5 +27,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         });
     }
 
-    return NextResponse.json<any>(result);
+    return jsonResponse(result);
 });

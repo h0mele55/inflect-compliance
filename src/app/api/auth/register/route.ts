@@ -21,6 +21,7 @@ import { AuthActionSchema } from '@/lib/schemas';
 import { env } from '@/env';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { logger } from '@/lib/observability/logger';
+import { jsonResponse } from '@/lib/api-response';
 
 export const POST = withApiErrorHandling(withValidatedBody(AuthActionSchema, async (_req, _ctx, body) => {
     try {
@@ -32,7 +33,7 @@ export const POST = withApiErrorHandling(withValidatedBody(AuthActionSchema, asy
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         logger.error('Auth error', { component: 'auth', error: error instanceof Error ? error.message : String(error) });
-        return NextResponse.json<any>({ error: error.message || 'Auth failed' }, { status: 500 });
+        return jsonResponse({ error: error.message || 'Auth failed' }, { status: 500 });
     }
 }));
 
@@ -40,7 +41,7 @@ export const POST = withApiErrorHandling(withValidatedBody(AuthActionSchema, asy
 async function handleRegister(body: any) {
     const { email: rawEmail, password, name, orgName } = body;
     if (!rawEmail || !password || !name || !orgName) {
-        return NextResponse.json<any>({ error: 'Missing required fields' }, { status: 400 });
+        return jsonResponse({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Enforce password policy at the set-password boundary. Login
@@ -48,7 +49,7 @@ async function handleRegister(body: any) {
     // users aren't locked out by a later rule bump.
     const policy = validatePasswordPolicy(password);
     if (!policy.ok) {
-        return NextResponse.json<any>(
+        return jsonResponse(
             {
                 error:
                     policy.reason === 'too_short'
@@ -66,7 +67,7 @@ async function handleRegister(body: any) {
     // logs the password or its hash.
     const hibp = await checkPasswordAgainstHIBP(password);
     if (hibp.breached) {
-        return NextResponse.json<any>(
+        return jsonResponse(
             {
                 error:
                     'This password appears in known data breaches. Please choose a different password.',
@@ -80,7 +81,7 @@ async function handleRegister(body: any) {
     // Check if email already used
     const existing = await prisma.user.findFirst({ where: { email } });
     if (existing) {
-        return NextResponse.json<any>({ error: 'Email already registered' }, { status: 409 });
+        return jsonResponse({ error: 'Email already registered' }, { status: 409 });
     }
 
     // Create tenant (Epic B.2: with a wrapped per-tenant DEK primed
@@ -124,7 +125,7 @@ async function handleRegister(body: any) {
         role: membership.role,
     });
 
-    const response = NextResponse.json<any>({
+    const response = jsonResponse({
         user: { id: user.id, email: user.email, name: user.name, role: membership.role },
         tenant: { id: tenant.id, name: tenant.name },
         emailVerificationRequired: env.AUTH_REQUIRE_EMAIL_VERIFICATION === '1',

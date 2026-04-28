@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { getExecutiveDashboard } from '@/app-layer/usecases/dashboard';
 import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * GET /api/t/:tenantSlug/dashboard/executive
@@ -12,5 +13,5 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     const payload = await getExecutiveDashboard(ctx);
-    return NextResponse.json<any>(payload);
+    return jsonResponse(payload);
 });

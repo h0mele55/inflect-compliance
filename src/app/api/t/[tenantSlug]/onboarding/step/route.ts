@@ -6,6 +6,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { withValidatedBody } from '@/lib/validation/route';
 import { z } from 'zod';
 import { OnboardingStepEnum } from '@/lib/schemas/onboarding';
+import { jsonResponse } from '@/lib/api-response';
 
 const StepBodySchema = z.object({
     step: OnboardingStepEnum,
@@ -18,16 +19,16 @@ export const POST = withApiErrorHandling(withValidatedBody(StepBodySchema, async
 
     if (body.action === 'save') {
         const state = await saveOnboardingStep(ctx, body.step as any, body.data ?? {});
-        return NextResponse.json<any>(state);
+        return jsonResponse(state);
     }
 
     if (body.action === 'skip') {
         const state = await skipOnboardingStep(ctx, body.step as any);
-        return NextResponse.json<any>(state);
+        return jsonResponse(state);
     }
 
     // action === 'complete'
     const state = await completeOnboardingStep(ctx, body.step as any);
-    return NextResponse.json<any>(state);
+    return jsonResponse(state);
 }));
 

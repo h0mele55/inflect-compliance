@@ -5,6 +5,7 @@ import { parseBody } from '@/lib/validation';
 import { LinkRiskControlSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { badRequest } from '@/lib/errors/types';
+import { jsonResponse } from '@/lib/api-response';
 
 // Map a control to a risk
 export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string; id: string } }) => {
@@ -13,5 +14,5 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
     if (error) throw badRequest('Invalid Request Body', error);
 
     const rc = await linkControlToRisk(ctx, params.id, body.controlId);
-    return NextResponse.json<any>(rc, { status: 201 });
+    return jsonResponse(rc, { status: 201 });
 });

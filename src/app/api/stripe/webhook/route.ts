@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { constructWebhookEvent, handleWebhookEvent } from '@/lib/stripe';
 import { logger } from '@/lib/observability/logger';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * POST /api/stripe/webhook
@@ -12,7 +13,7 @@ import { logger } from '@/lib/observability/logger';
 export async function POST(req: NextRequest): Promise<NextResponse> {
     const signature = req.headers.get('stripe-signature');
     if (!signature) {
-        return NextResponse.json<any>({ error: 'Missing stripe-signature header' }, { status: 400 });
+        return jsonResponse({ error: 'Missing stripe-signature header' }, { status: 400 });
     }
 
     let event;
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Invalid signature';
         logger.error('Stripe webhook signature verification failed', { component: 'stripe', error: message });
-        return NextResponse.json<any>({ error: `Webhook signature verification failed: ${message}` }, { status: 400 });
+        return jsonResponse({ error: `Webhook signature verification failed: ${message}` }, { status: 400 });
     }
 
     try {
@@ -34,5 +35,5 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         // In production, this should alert to an error tracking service
     }
 
-    return NextResponse.json<any>({ received: true });
+    return jsonResponse({ received: true });
 }

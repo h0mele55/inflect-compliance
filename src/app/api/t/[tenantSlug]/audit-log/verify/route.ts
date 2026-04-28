@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { verifyTenantChain } from '@/lib/audit/verify';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * GET /api/t/[tenantSlug]/audit-log/verify
@@ -18,7 +19,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     // OWNER + ADMIN. OWNER is a superset of ADMIN per CLAUDE.md RBAC.
     if (ctx.role !== 'OWNER' && ctx.role !== 'ADMIN') {
-        return NextResponse.json<any>({ error: 'Forbidden: ADMIN role required' }, { status: 403 });
+        return jsonResponse({ error: 'Forbidden: ADMIN role required' }, { status: 403 });
     }
 
     // Parse optional query params
@@ -32,5 +33,5 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         maxBreaks: 20,
     });
 
-    return NextResponse.json<any>(result);
+    return jsonResponse(result);
 });

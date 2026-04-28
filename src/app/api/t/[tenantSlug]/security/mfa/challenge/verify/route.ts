@@ -5,6 +5,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { checkRateLimit, resetRateLimit, MFA_VERIFY_LIMIT } from '@/lib/security/rate-limit';
 import { verifyMfaChallenge } from '@/app-layer/usecases/mfa-challenge';
 import { env } from '@/env';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * POST /api/t/[tenantSlug]/security/mfa/challenge/verify
@@ -22,14 +23,14 @@ export const POST = withApiErrorHandling(async (
     // Get current session
     const session = await auth();
     if (!session?.user?.id) {
-        return NextResponse.json<any>({ error: 'Not authenticated' }, { status: 401 });
+        return jsonResponse({ error: 'Not authenticated' }, { status: 401 });
     }
 
     const userId = session.user.id;
     const tenantId = session.user.tenantId;
 
     if (!tenantId) {
-        return NextResponse.json<any>({ error: 'No tenant context' }, { status: 400 });
+        return jsonResponse({ error: 'No tenant context' }, { status: 400 });
     }
 
     // ── Rate Limit Check ────────────────────────────────────────────
@@ -38,7 +39,7 @@ export const POST = withApiErrorHandling(async (
 
     if (!rateCheck.allowed) {
         const retrySeconds = Math.ceil(rateCheck.retryAfterMs / 1000);
-        return NextResponse.json<any>(
+        return jsonResponse(
             {
                 success: false,
                 error: `Too many verification attempts. Please try again in ${retrySeconds} seconds.`,
@@ -53,12 +54,12 @@ export const POST = withApiErrorHandling(async (
     try {
         body = await req.json();
     } catch {
-        return NextResponse.json<any>({ error: 'Invalid request' }, { status: 400 });
+        return jsonResponse({ error: 'Invalid request' }, { status: 400 });
     }
 
     const parsed = VerifyMfaInput.safeParse(body);
     if (!parsed.success) {
-        return NextResponse.json<any>(
+        return jsonResponse(
             { error: 'Invalid code format' },
             { status: 400 },
         );
@@ -68,7 +69,7 @@ export const POST = withApiErrorHandling(async (
     const result = await verifyMfaChallenge(userId, tenantId, parsed.data.code, rateCheck.remaining);
 
     if (!result.success) {
-        return NextResponse.json<any>({
+        return jsonResponse({
             success: false,
             error: result.message,
             remaining: result.remaining,
@@ -78,7 +79,7 @@ export const POST = withApiErrorHandling(async (
     // Reset rate limit on success
     resetRateLimit(rateLimitKey);
 
-    const response = NextResponse.json<any>({
+    const response = jsonResponse({
         success: true,
         message: result.message,
     });

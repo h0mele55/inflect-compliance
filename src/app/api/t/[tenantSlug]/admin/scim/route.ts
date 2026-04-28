@@ -13,6 +13,7 @@ import { randomBytes, createHash } from 'crypto';
 import { requirePermission } from '@/lib/security/permission-middleware';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import prisma from '@/lib/prisma';
+import { jsonResponse } from '@/lib/api-response';
 
 /**
  * GET — list SCIM tokens for tenant (admin.scim only).
@@ -35,7 +36,7 @@ export const GET = withApiErrorHandling(
         // Also return the SCIM endpoint base URL for admin visibility
         const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`;
 
-        return NextResponse.json<any>({
+        return jsonResponse({
             tokens,
             scimEndpoint: `${baseUrl}/api/scim/v2`,
             isEnabled: tokens.some((t) => !t.revokedAt),
@@ -66,7 +67,7 @@ export const POST = withApiErrorHandling(
         });
 
         // Return the plaintext token ONCE — it cannot be retrieved again
-        return NextResponse.json<any>(
+        return jsonResponse(
             {
                 ...token,
                 plaintext,
@@ -84,7 +85,7 @@ export const DELETE = withApiErrorHandling(
     requirePermission('admin.scim', async (req: NextRequest, _routeArgs, ctx) => {
         const { tokenId } = (await req.json()) as { tokenId: string };
         if (!tokenId) {
-            return NextResponse.json<any>({ error: 'tokenId required' }, { status: 400 });
+            return jsonResponse({ error: 'tokenId required' }, { status: 400 });
         }
 
         // Verify token belongs to this tenant
@@ -93,7 +94,7 @@ export const DELETE = withApiErrorHandling(
         });
 
         if (!existing) {
-            return NextResponse.json<any>({ error: 'Token not found' }, { status: 404 });
+            return jsonResponse({ error: 'Token not found' }, { status: 404 });
         }
 
         await prisma.tenantScimToken.update({
@@ -101,6 +102,6 @@ export const DELETE = withApiErrorHandling(
             data: { revokedAt: new Date() },
         });
 
-        return NextResponse.json<any>({ ok: true, revokedAt: new Date().toISOString() });
+        return jsonResponse({ ok: true, revokedAt: new Date().toISOString() });
     }),
 );
