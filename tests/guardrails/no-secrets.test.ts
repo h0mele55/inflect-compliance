@@ -105,7 +105,6 @@ const REPO_BASELINE: readonly KnownHit[] = [
     { file: 'tests/unit/av-webhook.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'AV webhook test fixtures.' },
     { file: 'tests/unit/backfill-token-encryption.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Token encryption backfill test fixtures.' },
     { file: 'tests/unit/credentials-auth.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Credentials auth test fixtures.' },
-    { file: 'tests/unit/env.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Env validation test fixtures.' },
     { file: 'tests/unit/oauth-token-encryption.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'OAuth token encryption test fixtures.' },
     { file: 'tests/unit/oauth-token-encryption.test.ts', pattern: 'GitHub Token', reason: 'Synthetic GitHub-shaped token used to verify provider-specific encryption envelopes.' },
     { file: 'tests/unit/password-check.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Password-check test fixtures.' },

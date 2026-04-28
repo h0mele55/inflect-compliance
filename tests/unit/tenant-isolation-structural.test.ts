@@ -150,6 +150,11 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
             // See `src/app-layer/usecases/portfolio.ts` security
             // invariant comment for the full argument.
             'org',
+            // GAP-10 — Swagger UI route. HARD 404 in production
+            // (`isDocsEnabled()` in src/app/api/docs/route.ts), so it
+            // never serves a request in a tenant-data context. The
+            // tenant-scoping invariant doesn't apply to dev-only docs.
+            'docs',
         ]);
 
         // Legacy routes are allowed as documented thin wrappers
