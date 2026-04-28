@@ -33,6 +33,7 @@
     "staging:down": "docker compose -f docker-compose.staging.yml down",
     "smoke:staging": "node scripts/smoke-staging.mjs",
     "smoke:prod": "node scripts/smoke-prod.mjs",
+    "openapi:generate": "tsx scripts/generate-openapi.ts",
     "prod:up": "docker compose -f docker-compose.prod.yml up -d --build",
     "prod:down": "docker compose -f docker-compose.prod.yml down"
   },
