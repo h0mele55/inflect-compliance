@@ -5,6 +5,7 @@ import { notFound } from '@/lib/errors/types';
 import { runInTenantContext } from '@/lib/db-context';
 import { assertCanAdmin } from '../../policies/common';
 import { withDeleted } from '@/lib/soft-delete';
+import { cachedListRead } from '@/lib/cache/list-cache';
 
 // ─── Queries ───
 
@@ -12,9 +13,16 @@ export async function listControls(ctx: RequestContext, filters?: {
     status?: string; applicability?: string; ownerUserId?: string; q?: string; category?: string;
 }) {
     assertCanReadControls(ctx);
-    return runInTenantContext(ctx, (db) =>
-        ControlRepository.list(db, ctx, filters)
-    );
+    return cachedListRead({
+        ctx,
+        entity: 'control',
+        operation: 'list',
+        params: filters ?? {},
+        loader: () =>
+            runInTenantContext(ctx, (db) =>
+                ControlRepository.list(db, ctx, filters),
+            ),
+    });
 }
 
 export async function listControlsPaginated(ctx: RequestContext, params: {
@@ -22,9 +30,16 @@ export async function listControlsPaginated(ctx: RequestContext, params: {
     filters?: { status?: string; applicability?: string; ownerUserId?: string; q?: string; category?: string };
 }) {
     assertCanReadControls(ctx);
-    return runInTenantContext(ctx, (db) =>
-        ControlRepository.listPaginated(db, ctx, params)
-    );
+    return cachedListRead({
+        ctx,
+        entity: 'control',
+        operation: 'listPaginated',
+        params,
+        loader: () =>
+            runInTenantContext(ctx, (db) =>
+                ControlRepository.listPaginated(db, ctx, params),
+            ),
+    });
 }
 
 export async function getControl(ctx: RequestContext, id: string) {

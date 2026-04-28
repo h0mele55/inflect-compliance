@@ -7,6 +7,7 @@ import { notFound, badRequest } from '@/lib/errors/types';
 import { calculateRiskScore } from '@/lib/risk-scoring';
 import { runInTenantContext } from '@/lib/db-context';
 import { sanitizePlainText } from '@/lib/security/sanitize';
+import { cachedListRead, bumpEntityCacheVersion } from '@/lib/cache/list-cache';
 import type { TreatmentDecision, RiskStatus } from '@prisma/client';
 
 // Epic D.2 — sanitise optional free-text on UPDATE without disturbing
@@ -24,16 +25,30 @@ function sanitizeOptional(v: string | null | undefined): string | null | undefin
 
 export async function listRisks(ctx: RequestContext, filters: RiskFilters = {}) {
     assertCanRead(ctx);
-    return runInTenantContext(ctx, (db) =>
-        RiskRepository.list(db, ctx, filters)
-    );
+    return cachedListRead({
+        ctx,
+        entity: 'risk',
+        operation: 'list',
+        params: filters,
+        loader: () =>
+            runInTenantContext(ctx, (db) =>
+                RiskRepository.list(db, ctx, filters),
+            ),
+    });
 }
 
 export async function listRisksPaginated(ctx: RequestContext, params: RiskListParams) {
     assertCanRead(ctx);
-    return runInTenantContext(ctx, (db) =>
-        RiskRepository.listPaginated(db, ctx, params)
-    );
+    return cachedListRead({
+        ctx,
+        entity: 'risk',
+        operation: 'listPaginated',
+        params,
+        loader: () =>
+            runInTenantContext(ctx, (db) =>
+                RiskRepository.listPaginated(db, ctx, params),
+            ),
+    });
 }
 
 export async function getRisk(ctx: RequestContext, id: string) {
@@ -62,7 +77,7 @@ export async function createRisk(ctx: RequestContext, data: {
 }) {
     assertCanWrite(ctx);
 
-    return runInTenantContext(ctx, async (db) => {
+    const created = await runInTenantContext(ctx, async (db) => {
         // Tenant lookup is global (Tenant table has no RLS)
         const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId } });
         const maxScale = tenant?.maxRiskScale || 5;
@@ -99,6 +114,8 @@ export async function createRisk(ctx: RequestContext, data: {
 
         return risk;
     });
+    await bumpEntityCacheVersion(ctx, 'risk');
+    return created;
 }
 
 interface RiskCreateInput {
@@ -124,7 +141,7 @@ export async function createRiskFromTemplate(ctx: RequestContext, templateId: st
     const template = await RiskTemplateRepository.getById(templateId);
     if (!template) throw notFound('Risk template not found');
 
-    return runInTenantContext(ctx, async (db) => {
+    const created = await runInTenantContext(ctx, async (db) => {
         const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId } });
         const maxScale = tenant?.maxRiskScale || 5;
         const likelihood = overrides.likelihood ?? template.defaultLikelihood;
@@ -165,6 +182,8 @@ export async function createRiskFromTemplate(ctx: RequestContext, templateId: st
 
         return risk;
     });
+    await bumpEntityCacheVersion(ctx, 'risk');
+    return created;
 }
 
 export async function updateRisk(ctx: RequestContext, id: string, data: {
@@ -185,7 +204,7 @@ export async function updateRisk(ctx: RequestContext, id: string, data: {
 }) {
     assertCanWrite(ctx);
 
-    return runInTenantContext(ctx, async (db) => {
+    const updated = await runInTenantContext(ctx, async (db) => {
         // Tenant lookup is global (Tenant table has no RLS)
         const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId } });
         const maxScale = tenant?.maxRiskScale || 5;
@@ -228,12 +247,14 @@ export async function updateRisk(ctx: RequestContext, id: string, data: {
 
         return risk;
     });
+    await bumpEntityCacheVersion(ctx, 'risk');
+    return updated;
 }
 
 export async function deleteRisk(ctx: RequestContext, id: string) {
     assertCanAdmin(ctx);
 
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const deleted = await RiskRepository.delete(db, ctx, id);
         if (!deleted) throw notFound('Risk not found');
 
@@ -247,6 +268,8 @@ export async function deleteRisk(ctx: RequestContext, id: string) {
 
         return { success: true };
     });
+    await bumpEntityCacheVersion(ctx, 'risk');
+    return result;
 }
 
 // ─── Restore / Purge / Include Deleted ───
@@ -255,11 +278,15 @@ import { restoreEntity, purgeEntity } from './soft-delete-operations';
 import { withDeleted } from '@/lib/soft-delete';
 
 export async function restoreRisk(ctx: RequestContext, id: string) {
-    return restoreEntity(ctx, 'Risk', id);
+    const result = await restoreEntity(ctx, 'Risk', id);
+    await bumpEntityCacheVersion(ctx, 'risk');
+    return result;
 }
 
 export async function purgeRisk(ctx: RequestContext, id: string) {
-    return purgeEntity(ctx, 'Risk', id);
+    const result = await purgeEntity(ctx, 'Risk', id);
+    await bumpEntityCacheVersion(ctx, 'risk');
+    return result;
 }
 
 export async function listRisksWithDeleted(ctx: RequestContext) {
@@ -272,7 +299,7 @@ export async function listRisksWithDeleted(ctx: RequestContext) {
 export async function linkControlToRisk(ctx: RequestContext, riskId: string, controlId: string) {
     assertCanWrite(ctx);
 
-    return runInTenantContext(ctx, async (db) => {
+    const linked = await runInTenantContext(ctx, async (db) => {
         const rc = await RiskRepository.linkControl(db, ctx, riskId, controlId);
         if (!rc) throw notFound('Risk not found');
 
@@ -286,5 +313,10 @@ export async function linkControlToRisk(ctx: RequestContext, riskId: string, con
 
         return rc;
     });
+    // Linking affects both risk list (controls[] count) and control list
+    // (risks[] count). Bump both.
+    await bumpEntityCacheVersion(ctx, 'risk');
+    await bumpEntityCacheVersion(ctx, 'control');
+    return linked;
 }
 
