@@ -628,6 +628,14 @@ model Risk {
   @@index([tenantId, status])
   @@index([tenantId, category])
   @@index([tenantId, deletedAt])
+  // GAP-perf — supports `ownerUserId` filter in RiskFilters
+  @@index([tenantId, ownerUserId])
+  // GAP-perf — supports `scoreMin`/`scoreMax` range filter
+  @@index([tenantId, score])
+  // GAP-perf — backs the default unpaginated `list()` orderBy:
+  // `inherentScore desc`. Without this Postgres sorts the full
+  // tenant result set per call.
+  @@index([tenantId, inherentScore])
 }
 
 model RiskTemplate {
@@ -745,6 +753,13 @@ model Control {
   @@index([ownerUserId])
   @@index([nextDueAt])
   @@index([tenantId, deletedAt])
+  // GAP-perf — supports `ownerUserId` filter in tenant scope.
+  // `[ownerUserId]` alone exists but isn't tenant-prefixed, so
+  // Postgres can't selectively scan one tenant's slice for a
+  // specific owner without an additional filter pass.
+  @@index([tenantId, ownerUserId])
+  // GAP-perf — supports `category` filter (free-text exact match).
+  @@index([tenantId, category])
 }
 
 model RiskControl {
@@ -833,6 +848,12 @@ model ControlTask {
   @@index([controlId])
   @@index([status])
   @@index([dueAt])
+  // GAP-perf — backs the dashboard "overdue tasks" query
+  // (status IN ('OPEN','IN_PROGRESS') AND dueAt < now()) and the
+  // refactored `runConsistencyCheck` overdue lookup. The
+  // single-column `[status]` and `[dueAt]` indexes can't satisfy
+  // the combined predicate efficiently.
+  @@index([tenantId, status, dueAt])
 }
 
 model ControlEvidenceLink {
@@ -932,6 +953,14 @@ model Evidence {
   @@index([tenantId, retentionUntil])
   @@index([tenantId, isArchived])
   @@index([tenantId, ownerUserId])
+  // GAP-perf — supports `status` filter (DRAFT|SUBMITTED|APPROVED|REJECTED).
+  @@index([tenantId, status])
+  // GAP-perf — supports `controlId` filter ("evidence for control X").
+  // Already a heavily-used UI surface — every control detail page
+  // pulls evidence by controlId.
+  @@index([tenantId, controlId])
+  // GAP-perf — supports `type` filter (FILE|LINK|TEXT|SCREENSHOT).
+  @@index([tenantId, type])
 }
 
 model FileRecord {
