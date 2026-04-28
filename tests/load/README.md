@@ -1,8 +1,17 @@
 # Load tests (k6)
 
-Closes the auth + read-path half of GAP-11 (no meaningful load testing).
-The two scenarios in this directory establish baselines for our most
-common authenticated request paths under 50 / 100 / 200 virtual users.
+Closes GAP-11. The three scenarios in this directory exercise our
+highest-traffic authenticated paths against documented SLOs.
+
+> **Read [`docs/slos.md`](../../docs/slos.md) first** — that doc owns
+> the performance targets. Each k6 metric here maps to one of the four
+> SLOs defined there; the threshold tables below are the *load-test
+> regression gates* (looser than the production SLOs by a calibrated
+> margin) not the SLOs themselves. The "Load-Test Validation of SLOs"
+> section in `docs/slos.md` is the canonical reference for: the
+> scenario→SLO mapping, why the k6 thresholds are looser than
+> production, and the operating procedure when a smoke or baseline
+> fails.
 
 ## Scenarios
 
@@ -266,3 +275,9 @@ pull request** via the `Load Smoke (k6)` job in
 budget (~5 min job total) while still producing ~200 samples per op —
 enough for p95 to be meaningful and catch obvious regressions before
 merge without being flaky.
+
+For the full SLO framing — which production SLO each k6 metric
+validates, why the k6 budgets are deliberately looser than the
+production p95 < 500ms target, what to do when a CI smoke or full
+baseline breaches a threshold — see the **Load-Test Validation of
+SLOs** section in [`docs/slos.md`](../../docs/slos.md).
