@@ -9,7 +9,7 @@
  *
  * Checked dependencies:
  *   - PostgreSQL (via Prisma $queryRaw)
- *   - Redis (optional — only checked when REDIS_URL is configured)
+ *   - Redis (REQUIRED in production — see GAP-13. Optional in dev/test.)
  *
  * Contract:
  *   200 — ready to serve traffic
@@ -56,7 +56,14 @@ async function checkDatabase(): Promise<CheckResult> {
 
 async function checkRedis(): Promise<CheckResult> {
     if (!isRedisConfigured || !getRedis) {
-        return { status: 'ok', latencyMs: 0 }; // Not configured = not required
+        // GAP-13 — In production REDIS_URL is required by the env
+        // schema (`src/env.ts`). Reaching this branch under prod
+        // means validation was bypassed (SKIP_ENV_VALIDATION) or
+        // the module failed to load — either way, surface the
+        // misconfiguration rather than report a false "ready".
+        return process.env.NODE_ENV === 'production'
+            ? { status: 'error', latencyMs: 0, error: 'Not configured' }
+            : { status: 'ok', latencyMs: 0 };
     }
     const start = Date.now();
     try {
@@ -80,8 +87,12 @@ export async function GET() {
         checkRedis(),
     ]);
 
+    // Always include the redis check in production so a missing
+    // REDIS_URL surfaces as not_ready (GAP-13). In dev/test,
+    // include it only when configured to keep "ready" green when
+    // a contributor runs the app without local Redis.
     const checks: Record<string, CheckResult> = { database };
-    if (isRedisConfigured) {
+    if (isRedisConfigured || process.env.NODE_ENV === 'production') {
         checks.redis = redis;
     }
 

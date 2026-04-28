@@ -52,6 +52,7 @@ curl http://localhost:3000/api/health | jq .
 | `MICROSOFT_CLIENT_SECRET` | ✅ | OAuth provider |
 | `UPLOAD_DIR` | ✅ | Set to `/data/uploads` (Docker) |
 | `DATA_ENCRYPTION_KEY` | ✅ **REQUIRED** in production | ≥32 chars, `openssl rand -base64 48`. **Production startup exits 1 if missing, too short, or equal to the documented dev fallback.** Both the Next.js app server and the BullMQ worker enforce this. See [encryption docs](encryption-data-protection.md). |
+| `REDIS_URL` | ✅ **REQUIRED** in production (GAP-13) | Connection string (e.g. `redis://USER:PASS@HOST:6379` or `rediss://…` for TLS). **Production startup exits 1 if unset under `NODE_ENV=production`** (`src/env.ts` schema check + `src/instrumentation.ts` defense-in-depth). The `/api/readyz` and legacy `/api/health` probes also PING Redis on every check; a missing or broken Redis returns 503 → orchestrator stops routing traffic. Hosts: rate limits (login brute-force, invite redemption, email dispatch), BullMQ job queue, session/cache coordination. |
 | `CORS_ALLOWED_ORIGINS` | Optional | Comma-separated origins |
 
 ## Docker Compose (Self-hosted / VPS)

@@ -15,9 +15,36 @@ export const env = createEnv({
         // Falls back to DATABASE_URL if not set (non-pooled environments).
         DIRECT_DATABASE_URL: z.string().url().optional(),
 
-        // Redis (caching, jobs, async coordination)
-        // Optional — app degrades gracefully when Redis is not available.
-        REDIS_URL: z.string().optional(),
+        // Redis (rate limits, BullMQ jobs, session/cache coordination)
+        //
+        // Schema layer carries the optional() shape so dev/test boots
+        // without Redis (rate-limit middleware + audit-stream buffer
+        // both fall back to in-memory). The production-required
+        // contract is enforced by the per-field superRefine() below
+        // (mirrors the GAP-03 DATA_ENCRYPTION_KEY pattern).
+        //
+        // GAP-13 — Redis is REQUIRED in production. Without it three
+        // production-load-bearing controls collapse into no-ops:
+        //   - login brute-force throttle (Epic A.3)
+        //   - invite-redemption rate limit
+        //   - email-dispatch rate limit
+        // Refuse to boot rather than ship with the limits stripped.
+        REDIS_URL: z
+            .string()
+            .optional()
+            .superRefine((val, ctx) => {
+                if (process.env.NODE_ENV !== 'production') return;
+                if (!val) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message:
+                            'REDIS_URL is REQUIRED in production. ' +
+                            'Rate limits, queues, and session coordination depend on it. ' +
+                            'Set REDIS_URL to your Redis / ElastiCache connection string ' +
+                            '(e.g. redis://USER:PASS@HOST:6379) before deploying.',
+                    });
+                }
+            }),
 
         // NextAuth
         NEXTAUTH_URL: z.preprocess(

@@ -6,24 +6,24 @@
 export async function register() {
     // Only initialize on the server (Node.js runtime), not Edge.
     if (process.env.NEXT_RUNTIME === 'nodejs' || !process.env.NEXT_RUNTIME) {
-        // ── R-6: Redis is required in production ──
-        // Rate limits, BullMQ jobs, and caching all degrade silently
-        // when REDIS_URL is unset. In dev/test that's intentional
-        // (graceful fallback). In production it's a security control
-        // failure: the rate-limit middleware that gates login + invite
-        // redemption + email dispatch becomes a no-op.
-        // Fail loudly at startup rather than silently in the audit log.
-        if (
-            process.env.NODE_ENV === 'production' &&
-            !process.env.REDIS_URL &&
-            process.env.RATE_LIMIT_ENABLED !== '0'
-        ) {
+        // ── GAP-13: Redis is required in production ──
+        // Defense-in-depth alongside the env-schema check (`src/env.ts`):
+        // schema validation catches missing REDIS_URL at module load,
+        // this hook catches the case where SKIP_ENV_VALIDATION=1 leaks
+        // into the runtime container.
+        //
+        // The previous incarnation of this check had a `RATE_LIMIT_ENABLED=0`
+        // escape hatch — that's been removed because Redis underpins more
+        // than the rate limiter. Login brute-force throttle (Epic A.3),
+        // invite-redemption limit, email-dispatch limit, and BullMQ jobs
+        // all break silently when Redis is absent. Toggling rate limits
+        // off doesn't make Redis optional in production.
+        if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL) {
             // eslint-disable-next-line no-console
             console.error(
-                '[startup] FATAL: REDIS_URL is required in production ' +
-                '(rate limits, jobs, and caching depend on it). ' +
-                'Set REDIS_URL or explicitly disable rate limits with ' +
-                'RATE_LIMIT_ENABLED=0 (NOT recommended in prod).',
+                '[startup] FATAL: REDIS_URL is required in production. ' +
+                'Rate limits, queues, and session coordination depend on it. ' +
+                'Set REDIS_URL to your Redis / ElastiCache connection string.',
             );
             process.exit(1);
         }

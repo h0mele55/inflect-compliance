@@ -9,8 +9,8 @@ describe('Environment Variable Validation', () => {
         DATABASE_URL: 'postgres://user:password@localhost:5432/db',
         NEXTAUTH_URL: 'http://localhost:3000',
         AUTH_URL: 'http://localhost:3000',
-        AUTH_SECRET: 'supersecretstringthatis16charplus',
-        JWT_SECRET: 'supersecretstringthatis16charplus',
+        AUTH_SECRET: 'supersecretstringthatis16charplus', // pragma: allowlist secret — test fixture (mirrors REPO_BASELINE in tests/guardrails/no-secrets.test.ts)
+        JWT_SECRET: 'supersecretstringthatis16charplus', // pragma: allowlist secret — test fixture (mirrors REPO_BASELINE)
         GOOGLE_CLIENT_ID: 'google-client-id',
         GOOGLE_CLIENT_SECRET: 'google-secret',
         MICROSOFT_CLIENT_ID: 'ms-client-id',
@@ -90,6 +90,9 @@ describe('Environment Variable Validation', () => {
         const result = runEnvScript({
             NODE_ENV: 'production',
             DATA_ENCRYPTION_KEY: undefined,
+            // Provide REDIS_URL so we isolate the encryption-key path
+            // (GAP-13 makes REDIS_URL prod-required too).
+            REDIS_URL: 'redis://localhost:6379',
             // Provide everything else so we isolate the encryption-key path.
             STORAGE_PROVIDER: 'local',
         });
@@ -109,6 +112,7 @@ describe('Environment Variable Validation', () => {
             // spawns a child process — the constant isn't available in
             // shell env at that point.
             DATA_ENCRYPTION_KEY: 'inflect-dev-encryption-key-not-for-production-use!!',
+            REDIS_URL: 'redis://localhost:6379',
             STORAGE_PROVIDER: 'local',
         });
         expect(result.success).toBe(false);
@@ -125,6 +129,7 @@ describe('Environment Variable Validation', () => {
         const result = runEnvScript({
             NODE_ENV: 'production',
             DATA_ENCRYPTION_KEY: 'too-short',
+            REDIS_URL: 'redis://localhost:6379',
             STORAGE_PROVIDER: 'local',
         });
         expect(result.success).toBe(false);
@@ -156,6 +161,63 @@ describe('Environment Variable Validation', () => {
         const result = runEnvScript({
             NODE_ENV: 'production',
             DATA_ENCRYPTION_KEY: 'a-real-production-key-at-least-32-chars-long-deterministic',
+            REDIS_URL: 'redis://localhost:6379',
+            STORAGE_PROVIDER: 'local',
+        });
+        if (!result.success) {
+            console.error(result.error);
+        }
+        expect(result.success).toBe(true);
+    });
+
+    // ─── GAP-13: REDIS_URL production enforcement ──────────────────
+    //
+    // The schema-level superRefine on REDIS_URL enforces the
+    // production-required contract. These tests run the env loader
+    // in a child process under NODE_ENV=production and assert the
+    // failure modes that GAP-13 closed.
+
+    it('rejects NODE_ENV=production when REDIS_URL is unset', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'production',
+            // Isolate the REDIS_URL path — supply everything else.
+            DATA_ENCRYPTION_KEY: 'a-real-production-key-at-least-32-chars-long-deterministic',
+            STORAGE_PROVIDER: 'local',
+            REDIS_URL: undefined,
+        });
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('REDIS_URL');
+        expect(result.error).toContain('REQUIRED in production');
+        // Regression: a refactor that drops the superRefine and makes
+        // the field optional in production again would silently strip
+        // rate-limit + queue + session-coordination guarantees.
+    });
+
+    it('passes when REDIS_URL is unset under NODE_ENV=test (dev/test ergonomics preserved)', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'test',
+            REDIS_URL: undefined,
+        });
+        // Without this, every contributor and every test runner would
+        // need a local Redis to validate env. The graceful fallback
+        // (in-memory rate-limit, no BullMQ jobs) is intentional in
+        // dev/test only.
+        expect(result.success).toBe(true);
+    });
+
+    it('passes when REDIS_URL is unset under NODE_ENV=development', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'development',
+            REDIS_URL: undefined,
+        });
+        expect(result.success).toBe(true);
+    });
+
+    it('passes when production has a real REDIS_URL (happy path)', () => {
+        const result = runEnvScript({
+            NODE_ENV: 'production',
+            DATA_ENCRYPTION_KEY: 'a-real-production-key-at-least-32-chars-long-deterministic',
+            REDIS_URL: 'redis://user:pass@redis.example.internal:6379',
             STORAGE_PROVIDER: 'local',
         });
         if (!result.success) {
