@@ -9,6 +9,7 @@ import { notFound, badRequest } from '@/lib/errors/types';
 import { sanitizePlainText } from '@/lib/security/sanitize';
 import { validateTaskMetadata } from '../schemas/json-columns.schemas';
 import { logger } from '@/lib/observability/logger';
+import { cachedListRead, bumpEntityCacheVersion } from '@/lib/cache/list-cache';
 import type { PrismaTx } from '@/lib/db-context';
 
 // ─── Type-Specific Validation ───
@@ -57,12 +58,30 @@ async function validateTypeRelevance(
 
 export async function listTasks(ctx: RequestContext, filters: TaskFilters = {}) {
     assertCanReadTasks(ctx);
-    return runInTenantContext(ctx, (db) => WorkItemRepository.list(db, ctx, filters));
+    return cachedListRead({
+        ctx,
+        entity: 'task',
+        operation: 'list',
+        params: filters,
+        loader: () =>
+            runInTenantContext(ctx, (db) =>
+                WorkItemRepository.list(db, ctx, filters),
+            ),
+    });
 }
 
 export async function listTasksPaginated(ctx: RequestContext, params: TaskListParams) {
     assertCanReadTasks(ctx);
-    return runInTenantContext(ctx, (db) => WorkItemRepository.listPaginated(db, ctx, params));
+    return cachedListRead({
+        ctx,
+        entity: 'task',
+        operation: 'listPaginated',
+        params,
+        loader: () =>
+            runInTenantContext(ctx, (db) =>
+                WorkItemRepository.listPaginated(db, ctx, params),
+            ),
+    });
 }
 
 export async function getTask(ctx: RequestContext, taskId: string) {
@@ -90,7 +109,7 @@ export async function createTask(ctx: RequestContext, input: {
     metadataJson?: unknown;
 }) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         // Validate metadataJson on write
         if (input.metadataJson !== undefined) {
             input.metadataJson = validateTaskMetadata(input.metadataJson);
@@ -142,6 +161,8 @@ export async function createTask(ctx: RequestContext, input: {
 
         return task;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return result;
 }
 
 // ─── Update ───
@@ -157,7 +178,7 @@ export async function updateTask(ctx: RequestContext, taskId: string, patch: {
     metadataJson?: unknown;
 }) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         // Validate metadataJson on write
         if (patch.metadataJson !== undefined) {
             patch.metadataJson = validateTaskMetadata(patch.metadataJson);
@@ -174,13 +195,15 @@ export async function updateTask(ctx: RequestContext, taskId: string, patch: {
         });
         return task;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return result;
 }
 
 // ─── Status ───
 
 export async function setTaskStatus(ctx: RequestContext, taskId: string, status: string, resolution?: string | null) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         // Pre-fetch once so we can both validate + capture fromStatus
         // for the automation event.
         const existing = await WorkItemRepository.getById(db, ctx, taskId);
@@ -215,13 +238,15 @@ export async function setTaskStatus(ctx: RequestContext, taskId: string, status:
         });
         return task;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return result;
 }
 
 // ─── Assign ───
 
 export async function assignTask(ctx: RequestContext, taskId: string, assigneeUserId: string | null) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const task = await WorkItemRepository.assign(db, ctx, taskId, assigneeUserId);
         if (!task) throw notFound('Task not found');
         await logEvent(db, ctx, {
@@ -240,6 +265,8 @@ export async function assignTask(ctx: RequestContext, taskId: string, assigneeUs
 
         return task;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return result;
 }
 
 /** Look up assignee email and enqueue TASK_ASSIGNED notification */
@@ -294,7 +321,7 @@ export async function listTaskLinks(ctx: RequestContext, taskId: string) {
 
 export async function addTaskLink(ctx: RequestContext, taskId: string, entityType: string, entityId: string, relation?: string) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const link = await TaskLinkRepository.link(db, ctx, taskId, entityType, entityId, relation);
         await logEvent(db, ctx, {
             action: 'TASK_LINKED',
@@ -306,11 +333,13 @@ export async function addTaskLink(ctx: RequestContext, taskId: string, entityTyp
         });
         return link;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return result;
 }
 
 export async function removeTaskLink(ctx: RequestContext, linkId: string) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const outcome = await runInTenantContext(ctx, async (db) => {
         const result = await TaskLinkRepository.unlink(db, ctx, linkId);
         if (!result) throw notFound('Task link not found');
         await logEvent(db, ctx, {
@@ -322,6 +351,8 @@ export async function removeTaskLink(ctx: RequestContext, linkId: string) {
         });
         return result;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return outcome;
 }
 
 // ─── Comments ───
@@ -338,7 +369,7 @@ export async function addTaskComment(ctx: RequestContext, taskId: string, body: 
     // change (Markdown, HTML preview) can never accidentally re-enable
     // a stored XSS vector.
     const safeBody = sanitizePlainText(body);
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const comment = await TaskCommentRepository.add(db, ctx, taskId, safeBody);
         await logEvent(db, ctx, {
             action: 'TASK_COMMENT_ADDED',
@@ -350,6 +381,8 @@ export async function addTaskComment(ctx: RequestContext, taskId: string, body: 
         });
         return comment;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return result;
 }
 
 // ─── Watchers ───
@@ -361,16 +394,20 @@ export async function listTaskWatchers(ctx: RequestContext, taskId: string) {
 
 export async function addTaskWatcher(ctx: RequestContext, taskId: string, userId: string) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, (db) => TaskWatcherRepository.add(db, ctx, taskId, userId));
+    const result = await runInTenantContext(ctx, (db) => TaskWatcherRepository.add(db, ctx, taskId, userId));
+    await bumpEntityCacheVersion(ctx, 'task');
+    return result;
 }
 
 export async function removeTaskWatcher(ctx: RequestContext, taskId: string, userId: string) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const outcome = await runInTenantContext(ctx, async (db) => {
         const result = await TaskWatcherRepository.remove(db, ctx, taskId, userId);
         if (!result) throw notFound('Watcher not found');
         return result;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return outcome;
 }
 
 // ─── Metrics ───
@@ -398,7 +435,7 @@ export async function getTaskActivity(ctx: RequestContext, taskId: string) {
 
 export async function bulkAssignTasks(ctx: RequestContext, taskIds: string[], assigneeUserId: string | null) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const outcome = await runInTenantContext(ctx, async (db) => {
         const result = await WorkItemRepository.bulkAssign(db, ctx, taskIds, assigneeUserId);
         for (const id of taskIds) {
             await logEvent(db, ctx, {
@@ -412,11 +449,13 @@ export async function bulkAssignTasks(ctx: RequestContext, taskIds: string[], as
         }
         return result;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return outcome;
 }
 
 export async function bulkSetTaskStatus(ctx: RequestContext, taskIds: string[], status: string, resolution?: string) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const outcome = await runInTenantContext(ctx, async (db) => {
         const result = await WorkItemRepository.bulkSetStatus(db, ctx, taskIds, status, resolution);
         for (const id of taskIds) {
             await logEvent(db, ctx, {
@@ -430,11 +469,13 @@ export async function bulkSetTaskStatus(ctx: RequestContext, taskIds: string[], 
         }
         return result;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return outcome;
 }
 
 export async function bulkSetTaskDueDate(ctx: RequestContext, taskIds: string[], dueAt: string | null) {
     assertCanWriteTasks(ctx);
-    return runInTenantContext(ctx, async (db) => {
+    const outcome = await runInTenantContext(ctx, async (db) => {
         const result = await WorkItemRepository.bulkSetDueDate(db, ctx, taskIds, dueAt);
         for (const id of taskIds) {
             await logEvent(db, ctx, {
@@ -448,11 +489,22 @@ export async function bulkSetTaskDueDate(ctx: RequestContext, taskIds: string[],
         }
         return result;
     });
+    await bumpEntityCacheVersion(ctx, 'task');
+    return outcome;
 }
 
 // ─── By Control ───
 
 export async function listTasksByControl(ctx: RequestContext, controlId: string) {
     assertCanReadTasks(ctx);
-    return runInTenantContext(ctx, (db) => WorkItemRepository.list(db, ctx, { controlId }));
+    return cachedListRead({
+        ctx,
+        entity: 'task',
+        operation: 'listByControl',
+        params: { controlId },
+        loader: () =>
+            runInTenantContext(ctx, (db) =>
+                WorkItemRepository.list(db, ctx, { controlId }),
+            ),
+    });
 }

@@ -156,14 +156,14 @@ model Tenant {
 // URL paths are `/org/{slug}` and `/t/{slug}` — the namespaces don't
 // collide because the prefixes differ.
 model Organization {
-  id          String           @id @default(cuid())
-  name        String
-  slug        String           @unique
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenants     Tenant[]
-  memberships OrgMembership[]
+  tenants                      Tenant[]
+  memberships                  OrgMembership[]
   provisionedTenantMemberships TenantMembership[] @relation("OrgProvisionedTenantMemberships")
 }
 
@@ -179,14 +179,14 @@ model Organization {
 // `provisionedByOrgId` matching this org); manually-granted
 // memberships are preserved.
 model OrgMembership {
-  id             String       @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
   userId         String
-  role           OrgRole      @default(ORG_READER)
-  createdAt      DateTime     @default(now())
+  role           OrgRole  @default(ORG_READER)
+  createdAt      DateTime @default(now())
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -509,6 +509,8 @@ model Task {
   @@index([tenantId, dueAt])
   @@index([tenantId, controlId])
   @@index([tenantId, deletedAt])
+  @@index([tenantId, priority, createdAt])
+  @@index([tenantId, dueAt, status])
 }
 
 model TaskLink {
@@ -524,6 +526,7 @@ model TaskLink {
 
   @@unique([tenantId, taskId, entityType, entityId])
   @@index([tenantId, taskId])
+  @@index([tenantId, entityType, entityId])
 }
 
 model TaskComment {
@@ -1995,29 +1998,29 @@ model UserIdentityLink {
 }
 
 model TenantSecuritySettings {
-  id                          String    @id @default(cuid())
-  tenantId                    String    @unique
-  mfaPolicy                   MfaPolicy @default(DISABLED)
+  id                         String    @id @default(cuid())
+  tenantId                   String    @unique
+  mfaPolicy                  MfaPolicy @default(DISABLED)
   /// Hard cap on JWT lifetime in minutes. When set, every newly minted
   /// session row's `expiresAt` is min(NextAuth max-age, now + this).
-  sessionMaxAgeMinutes        Int?
+  sessionMaxAgeMinutes       Int?
   /// Maximum number of concurrent active sessions allowed per user
   /// in this tenant. When reached, the oldest session (by
   /// `lastActiveAt` ASC) is revoked to make room for the new sign-in.
   /// Null = unlimited (legacy behaviour).
-  maxConcurrentSessions       Int?
+  maxConcurrentSessions      Int?
   /// Epic C.4 — outbound audit-event streaming.
   /// `auditStreamUrl`: HTTPS endpoint the audit streamer POSTs batched
   /// audit events to. Null disables streaming.
   /// `auditStreamSecretEncrypted`: HMAC-SHA256 secret used to sign
   /// each batch. Stored encrypted via the field-encryption manifest
   /// (added to `ENCRYPTED_FIELDS.TenantSecuritySettings`).
-  auditStreamUrl              String?
-  auditStreamSecretEncrypted  String?
-  createdAt                   DateTime  @default(now())
-  updatedAt                   DateTime  @updatedAt
-  mfaFailClosed               Boolean   @default(false)
-  tenant                      Tenant    @relation(fields: [tenantId], references: [id])
+  auditStreamUrl             String?
+  auditStreamSecretEncrypted String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  mfaFailClosed              Boolean   @default(false)
+  tenant                     Tenant    @relation(fields: [tenantId], references: [id])
 }
 
 model UserMfaEnrollment {
