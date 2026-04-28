@@ -211,7 +211,14 @@ This app uses **local file storage** for evidence uploads. Platforms without per
 - **Manual**: `npm run migrate:deploy`
 - **Never** use `db push` in production
 
-## Backup & Restore
+## Backup & Restore (Docker Compose — legacy path only)
+
+> **K8s/EKS users see [Backup & Restore (RDS + S3)](#backup--restore-rds--s3)
+> in the Kubernetes section below.** The commands here apply only to
+> the deprecated docker-compose deploy model (self-hosted single VPS
+> running Postgres in a container with a mounted volume). They do
+> NOT apply to the EKS production path, which uses RDS automated
+> backups + S3 versioning instead of host-level pg_dump and tar.
 
 ### Database
 
@@ -587,6 +594,165 @@ without a values change:
 kubectl --namespace inflect-production rollout restart \
   deployment/inflect-production
 ```
+
+### Backup & Restore (RDS + S3)
+
+In the EKS path the stateful stores are AWS-managed; backup is
+automated by AWS, not by the operator. Operators DO drive the
+restore — the runbook below is what to run when something needs
+recovery.
+
+#### Database (RDS Postgres)
+
+**What's automatic** (no operator action required):
+
+- **Automated backups** — RDS takes a daily snapshot during the
+  configured `backup_window`, retained for `db_backup_retention_days`
+  (staging: 7d, production: 14d — see
+  `infra/terraform/environments/*/terraform.tfvars`).
+- **Point-in-time recovery (PITR)** — implicit while
+  `backup_retention_period > 0`. The recovery window equals the
+  retention period.
+- **Multi-AZ failover** (production only) — RDS handles automatic
+  failover to the standby on AZ outage. No restore needed; the
+  standby promotes within ~60 seconds.
+
+**Manual snapshot** (one-off — typically before a risky migration):
+
+```bash
+# Identifier embeds a date so listing snapshots later is grep-friendly
+aws rds create-db-snapshot \
+  --db-instance-identifier inflect-production-db \
+  --db-snapshot-identifier inflect-production-pre-migration-$(date +%Y%m%d-%H%M%S) \
+  --region us-east-1
+
+# Verify
+aws rds describe-db-snapshots \
+  --db-instance-identifier inflect-production-db \
+  --snapshot-type manual \
+  --region us-east-1 \
+  --query 'DBSnapshots[*].[DBSnapshotIdentifier,Status,SnapshotCreateTime]' \
+  --output table
+```
+
+**Restore from snapshot** (creates a NEW DB instance — never
+overwrites the running one):
+
+```bash
+# 1. List available snapshots
+aws rds describe-db-snapshots \
+  --db-instance-identifier inflect-production-db \
+  --region us-east-1 \
+  --query 'DBSnapshots[*].[DBSnapshotIdentifier,SnapshotCreateTime]' \
+  --output table
+
+# 2. Restore to a new instance (cannot reuse the original identifier)
+aws rds restore-db-instance-from-db-snapshot \
+  --db-instance-identifier inflect-production-db-restored \
+  --db-snapshot-identifier <snapshot-id> \
+  --db-subnet-group-name inflect-production-db-subnet-group \
+  --vpc-security-group-ids <db-sg-id> \
+  --no-publicly-accessible \
+  --multi-az \
+  --region us-east-1
+
+# 3. Once the restored instance is "available", point app at it via
+#    the runtime ConfigMap (DATABASE_URL host) — atomic cutover via
+#    `kubectl rollout restart`. Old instance kept until the cutover
+#    is verified, then deleted with a final snapshot.
+```
+
+**Restore to a point in time** (PITR — surgical recovery from a
+specific minute, e.g. just before a destructive query):
+
+```bash
+# Restore to 2 hours ago (or any timestamp within the retention window)
+aws rds restore-db-instance-to-point-in-time \
+  --source-db-instance-identifier inflect-production-db \
+  --target-db-instance-identifier inflect-production-db-pitr \
+  --restore-time "$(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%SZ)" \
+  --db-subnet-group-name inflect-production-db-subnet-group \
+  --vpc-security-group-ids <db-sg-id> \
+  --no-publicly-accessible \
+  --region us-east-1
+```
+
+The new instance comes up with the same parameter group, security
+group, and subnet group — only the data differs. Cutover via the
+same ConfigMap-edit + `rollout restart` pattern as the snapshot
+restore.
+
+#### Files (S3 storage bucket)
+
+**What's automatic**:
+
+- **Versioning** is enabled on the bucket
+  (`infra/terraform/modules/storage/main.tf::aws_s3_bucket_versioning`).
+  Every PUT creates a new version; deletes are tombstones, not
+  data loss.
+- **Lifecycle** transitions current objects to `STANDARD_IA` after
+  90d (configurable via `storage_ia_transition_days`); noncurrent
+  versions expire after `noncurrent_version_expiration_days`
+  (default 90d). **Tune the noncurrent retention up if you need a
+  longer file-restore window.**
+
+**Find a deleted or overwritten file**:
+
+```bash
+# List ALL versions of a key (including delete markers)
+aws s3api list-object-versions \
+  --bucket inflect-production-storage \
+  --prefix path/to/file \
+  --output table
+```
+
+The output shows `IsLatest`, `VersionId`, `LastModified`, and
+whether a row is a `DeleteMarker`. The version you want to restore
+is the `LastModified`-most-recent non-delete-marker entry from
+before the unwanted change.
+
+**Restore a single file**:
+
+```bash
+# Copy an old version back to the canonical key — creates a new
+# "latest" version that matches the old content.
+aws s3api copy-object \
+  --bucket inflect-production-storage \
+  --copy-source 'inflect-production-storage/path/to/file?versionId=<VERSION_ID>' \
+  --key path/to/file
+```
+
+**Restore from a delete marker** (file was deleted, want it back):
+
+```bash
+# Removing the delete marker re-exposes the version underneath.
+aws s3api delete-object \
+  --bucket inflect-production-storage \
+  --key path/to/file \
+  --version-id <DELETE_MARKER_VERSION_ID>
+```
+
+**Bulk-restore a deleted prefix** (e.g. accidental `aws s3 rm
+--recursive`): script the above two calls over the output of
+`list-object-versions --prefix <prefix>`. There's no single AWS
+command for this — list, then iterate. Test against a small
+prefix first.
+
+#### What this section deliberately does NOT cover
+
+- **Off-region disaster recovery** (cross-region snapshot copy,
+  Aurora Global, S3 Cross-Region Replication) — out of scope for
+  the current single-region production posture. When a DR objective
+  forces a cross-region requirement, that's its own runbook.
+- **Audit-log database** — we use the same RDS instance; if an
+  immutable separate-store audit DB ships, it gets its own backup
+  policy here.
+- **Redis** — BullMQ job state is intentionally ephemeral; on-disk
+  Redis snapshots exist (`redis_snapshot_retention_days`) but there
+  is no operator restore flow because losing in-flight jobs is
+  acceptable. Document a Redis restore procedure here once a job
+  type is added that requires durability beyond the in-flight
+  window.
 
 ### Operational runbook quick reference
 
