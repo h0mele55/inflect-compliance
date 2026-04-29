@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 describe('Vendor Audit Enhancements', () => {
     const apiBase = join(process.cwd(), 'src/app/api/t/[tenantSlug]/vendors');
@@ -98,8 +99,7 @@ describe('Vendor Audit Enhancements', () => {
 
     // ─── Schema structural checks ───
     describe('Schema models exist', () => {
-        const schemaPath = join(process.cwd(), 'prisma/schema.prisma');
-        const schema = readFileSync(schemaPath, 'utf-8');
+        const schema = readPrismaSchema();
 
         it('VendorEvidenceBundle model exists', () => {
             expect(schema).toContain('model VendorEvidenceBundle');

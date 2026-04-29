@@ -1,0 +1,26 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema (transitional sediment file)
+//
+//  Empty as of step 2: every model and enum has been relocated to
+//  its domain file. This file is retained as a marker so contributors
+//  immediately see that the schema is split, and so future
+//  not-yet-categorised models have a clear staging location.
+//
+//  See:
+//    base.prisma          — generator + datasource (the only file
+//                            that ever owns those blocks)
+//    enums.prisma         — every shared enum
+//    auth.prisma          — Tenant / User / Membership / Session / SSO / Billing
+//    compliance.prisma    — Control / Risk / Evidence / Framework / Policy /
+//                            Asset / Issue / Finding / Task (work-item) / Snapshot
+//    vendor.prisma        — Vendor + assessment graph
+//    audit.prisma         — Audit / AuditCycle / AuditPack / AuditorAccess /
+//                            AuditLog
+//    automation.prisma    — AutomationRule / Execution / Notification /
+//                            Integration / SyncMapping
+//
+//  Migration discipline: the split was purely organisational — no
+//  field, relation, index, default, or @@map changed during the
+//  move. `prisma migrate diff` against the prior committed state
+//  emits "This is an empty migration."
+// ─────────────────────────────────────────────────────────────────

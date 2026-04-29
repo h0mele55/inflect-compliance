@@ -25,6 +25,7 @@
 
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { resolve, relative } from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const SRC_ROOT = resolve(__dirname, '../../src');
 
@@ -170,10 +171,7 @@ describe('GUARDRAIL: digest-dispatcher uses shared eligibility', () => {
 
 describe('GUARDRAIL: EmailNotificationType schema-migration alignment', () => {
     test('every EmailNotificationType value has a corresponding migration', () => {
-        const schema = readFileSync(
-            resolve(__dirname, '../../prisma/schema.prisma'),
-            'utf8',
-        );
+        const schema = readPrismaSchema();
 
         const enumMatch = schema.match(
             /enum\s+EmailNotificationType\s*\{([^}]+)\}/,
@@ -214,10 +212,7 @@ describe('GUARDRAIL: EmailNotificationType schema-migration alignment', () => {
     });
 
     test('DigestCategory type in code is a subset of schema EmailNotificationType', () => {
-        const schema = readFileSync(
-            resolve(__dirname, '../../prisma/schema.prisma'),
-            'utf8',
-        );
+        const schema = readPrismaSchema();
         const dispatcher = readFileSync(
             resolve(SRC_ROOT, 'app-layer/notifications/digest-dispatcher.ts'),
             'utf8',

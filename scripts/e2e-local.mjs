@@ -97,7 +97,7 @@ if (!SKIP_DB) {
 // ── 2. Generate + Migrate + Seed ──
 run('npx prisma generate', '2/6  Generate Prisma client');
 // `prisma db push --force-reset` was the historical default but it
-// SKIPS migrations entirely — applying schema.prisma directly. That
+// SKIPS migrations entirely — applying the Prisma schema directly. That
 // means the RLS-setup migration (which `GRANT`s SELECT/INSERT/UPDATE/
 // DELETE on every table to `app_user`, plus `ALTER DEFAULT PRIVILEGES`
 // for future tables) never runs, and every `runInTenantContext` query

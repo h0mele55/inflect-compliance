@@ -1,0 +1,1068 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: COMPLIANCE
+//
+//  Core compliance domain. Owns:
+//    • Control + ControlEvidenceLink + ControlContributor +
+//      ControlTask + ControlTest models
+//    • Risk + RiskTemplate + RiskControl (M:N risk↔control)
+//    • Evidence + EvidenceLink + EvidencePackage
+//    • Framework + FrameworkRequirement + FrameworkMapping
+//    • Clause + ClauseEvidence
+//    • Policy + PolicyVersion + PolicyApproval + PolicyContributor
+//    • Asset + AssetEvidence + AssetCoverage
+//    • Issue + IssueComment + Finding + FindingTask
+//    • Task (work-item — distinct from ControlTask) + TaskLink +
+//      TaskComment + TaskWatcher
+//    • TraceabilityLink (cross-entity weave)
+//
+//  Note: Audit models (AuditCycle, AuditPack, …) live in
+//  `audit.prisma`. Vendor risk lives in `vendor.prisma`. They are
+//  separated because each has a distinct API surface, separate
+//  RLS policies, and tends to evolve on its own cadence.
+//
+//  This file is currently empty. Models will land here in focused
+//  follow-up PRs.
+// ─────────────────────────────────────────────────────────────────
+
+model Clause {
+  id          String           @id @default(cuid())
+  number      String           @unique
+  title       String
+  description String?
+  artifacts   String?
+  sortOrder   Int              @default(0)
+  progress    ClauseProgress[]
+}
+
+model ClauseProgress {
+  id        String       @id @default(cuid())
+  tenantId  String
+  clauseId  String
+  status    ClauseStatus @default(NOT_STARTED)
+  notes     String?
+  updatedAt DateTime     @updatedAt
+  clause    Clause       @relation(fields: [clauseId], references: [id])
+  tenant    Tenant       @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, clauseId])
+}
+
+model Task {
+  id              String           @id @default(cuid())
+  tenantId        String
+  type            WorkItemType     @default(TASK)
+  title           String
+  description     String?
+  severity        WorkItemSeverity @default(MEDIUM)
+  priority        WorkItemPriority @default(P2)
+  status          WorkItemStatus   @default(OPEN)
+  source          WorkItemSource?  @default(MANUAL)
+  key             String?
+  resolution      String?
+  dueAt           DateTime?
+  completedAt     DateTime?
+  createdByUserId String
+  assigneeUserId  String?
+  reviewerUserId  String?
+  controlId       String?
+  metadataJson    Json?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  deletedAt       DateTime?
+  deletedByUserId String?
+  retentionUntil  DateTime?
+  assignee        User?            @relation("TaskAssignee", fields: [assigneeUserId], references: [id])
+  control         Control?         @relation(fields: [controlId], references: [id])
+  createdBy       User             @relation("TaskCreator", fields: [createdByUserId], references: [id])
+  reviewer        User?            @relation("TaskReviewer", fields: [reviewerUserId], references: [id])
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  comments        TaskComment[]
+  links           TaskLink[]
+  watchers        TaskWatcher[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@index([tenantId, severity])
+  @@index([tenantId, assigneeUserId])
+  @@index([tenantId, dueAt])
+  @@index([tenantId, controlId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, priority, createdAt])
+  @@index([tenantId, dueAt, status])
+}
+
+model TaskLink {
+  id         String             @id @default(cuid())
+  tenantId   String
+  taskId     String
+  entityType TaskLinkEntityType
+  entityId   String
+  relation   TaskLinkRelation   @default(RELATES_TO)
+  createdAt  DateTime           @default(now())
+  task       Task               @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tenant     Tenant             @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, taskId, entityType, entityId])
+  @@index([tenantId, taskId])
+  @@index([tenantId, entityType, entityId])
+}
+
+model TaskComment {
+  id              String   @id @default(cuid())
+  tenantId        String
+  taskId          String
+  body            String
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       User     @relation("TaskCommentCreator", fields: [createdByUserId], references: [id])
+  task            Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, taskId])
+}
+
+model TaskWatcher {
+  id       String @id @default(cuid())
+  tenantId String
+  taskId   String
+  userId   String
+  task     Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  user     User   @relation(fields: [userId], references: [id])
+
+  @@unique([taskId, userId])
+  @@index([tenantId, taskId])
+}
+
+model Asset {
+  id                  String               @id @default(cuid())
+  tenantId            String
+  name                String
+  type                AssetType
+  classification      String?
+  owner               String?
+  location            String?
+  confidentiality     Int?                 @default(3)
+  integrity           Int?                 @default(3)
+  availability        Int?                 @default(3)
+  dependencies        String?
+  businessProcesses   String?
+  dataResidency       String?
+  retention           String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  ownerUserId         String?
+  criticality         Criticality?
+  status              AssetStatus          @default(ACTIVE)
+  externalRef         String?
+  tags                String?
+  deletedAt           DateTime?
+  deletedByUserId     String?
+  retentionUntil      DateTime?
+  ownerUser           User?                @relation("AssetOwner", fields: [ownerUserId], references: [id])
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  risks               AssetRiskLink[]
+  controls            ControlAsset[]
+  riskSuggestionItems RiskSuggestionItem[]
+
+  @@index([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, type])
+  @@index([tenantId, criticality])
+  @@index([tenantId, status])
+  @@index([tenantId, deletedAt])
+}
+
+model Risk {
+  id              String             @id @default(cuid())
+  tenantId        String
+  title           String
+  description     String?
+  category        String?
+  threat          String?
+  vulnerability   String?
+  likelihood      Int                @default(3)
+  impact          Int                @default(3)
+  score           Int                @default(9)
+  inherentScore   Int                @default(9)
+  status          RiskStatus         @default(OPEN)
+  treatment       TreatmentDecision?
+  treatmentOwner  String?
+  treatmentNotes  String?
+  ownerUserId     String?
+  createdByUserId String?
+  targetDate      DateTime?
+  nextReviewAt    DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?
+  deletedByUserId String?
+  retentionUntil  DateTime?
+  assetLinks      AssetRiskLink[]
+  tenant          Tenant             @relation(fields: [tenantId], references: [id])
+  controls        RiskControl[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+  @@index([tenantId, deletedAt])
+  // GAP-perf — supports `ownerUserId` filter in RiskFilters
+  @@index([tenantId, ownerUserId])
+  // GAP-perf — supports `scoreMin`/`scoreMax` range filter
+  @@index([tenantId, score])
+  // GAP-perf — backs the default unpaginated `list()` orderBy:
+  // `inherentScore desc`. Without this Postgres sorts the full
+  // tenant result set per call.
+  @@index([tenantId, inherentScore])
+}
+
+model RiskTemplate {
+  id                String   @id @default(cuid())
+  title             String
+  description       String?
+  category          String?
+  defaultLikelihood Int      @default(3)
+  defaultImpact     Int      @default(3)
+  frameworkTag      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model RiskSuggestionSession {
+  id              String                  @id @default(cuid())
+  tenantId        String
+  createdByUserId String
+  status          SuggestionSessionStatus @default(DRAFT)
+  inputJson       String
+  modelName       String?
+  provider        String                  @default("stub")
+  errorMessage    String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  items           RiskSuggestionItem[]
+  createdBy       User                    @relation("SuggestionSessionCreator", fields: [createdByUserId], references: [id])
+  tenant          Tenant                  @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+}
+
+model RiskSuggestionItem {
+  id                    String                @id @default(cuid())
+  sessionId             String
+  tenantId              String
+  assetId               String?
+  title                 String
+  description           String?
+  category              String?
+  threat                String?
+  vulnerability         String?
+  likelihoodSuggested   Int?
+  impactSuggested       Int?
+  rationale             String?
+  suggestedControlsJson String?
+  status                SuggestionItemStatus  @default(PENDING)
+  editedJson            String?
+  createdRiskId         String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  asset                 Asset?                @relation(fields: [assetId], references: [id])
+  suggestionSession     RiskSuggestionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session               Tenant                @relation(fields: [tenantId], references: [id])
+
+  @@index([sessionId])
+  @@index([tenantId])
+  @@index([tenantId, sessionId])
+}
+
+model Control {
+  id                           String                   @id @default(cuid())
+  tenantId                     String?
+  code                         String?
+  annexId                      String?                  @unique
+  name                         String
+  description                  String?
+  intent                       String?
+  category                     String?
+  status                       ControlStatus            @default(NOT_STARTED)
+  effectiveness                Int?
+  lastTested                   DateTime?
+  reviewCadence                ReviewCadence?
+  isCustom                     Boolean                  @default(false)
+  ownerUserId                  String?
+  createdByUserId              String?
+  frequency                    ControlFrequency?
+  nextDueAt                    DateTime?
+  evidenceSource               EvidenceSourceType?
+  automationKey                String?
+  applicability                Applicability            @default(APPLICABLE)
+  applicabilityJustification   String?
+  applicabilityDecidedByUserId String?
+  applicabilityDecidedAt       DateTime?
+  createdAt                    DateTime                 @default(now())
+  updatedAt                    DateTime                 @updatedAt
+  deletedAt                    DateTime?
+  deletedByUserId              String?
+  retentionUntil               DateTime?
+  applicabilityDecidedBy       User?                    @relation("ControlApplicabilityDecider", fields: [applicabilityDecidedByUserId], references: [id])
+  createdBy                    User?                    @relation("ControlCreator", fields: [createdByUserId], references: [id])
+  owner                        User?                    @relation("ControlOwner", fields: [ownerUserId], references: [id])
+  tenant                       Tenant?                  @relation(fields: [tenantId], references: [id])
+  assets                       ControlAsset[]
+  contributors                 ControlContributor[]
+  evidenceLinks                ControlEvidenceLink[]
+  requirementLinks             ControlRequirementLink[]
+  controlTasks                 ControlTask[]
+  testPlans                    ControlTestPlan[]
+  testRuns                     ControlTestRun[]
+  evidence                     Evidence[]
+  frameworkMappings            FrameworkMapping[]
+  integrationExecutions        IntegrationExecution[]
+  policyLinks                  PolicyControlLink[]
+  risks                        RiskControl[]
+  tasks                        Task[]
+
+  @@index([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([tenantId, applicability])
+  @@index([ownerUserId])
+  @@index([nextDueAt])
+  @@index([tenantId, deletedAt])
+  // GAP-perf — supports `ownerUserId` filter in tenant scope.
+  // `[ownerUserId]` alone exists but isn't tenant-prefixed, so
+  // Postgres can't selectively scan one tenant's slice for a
+  // specific owner without an additional filter pass.
+  @@index([tenantId, ownerUserId])
+  // GAP-perf — supports `category` filter (free-text exact match).
+  @@index([tenantId, category])
+}
+
+model RiskControl {
+  id              String   @id @default(cuid())
+  riskId          String
+  controlId       String
+  tenantId        String
+  rationale       String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  control         Control  @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  createdBy       User?    @relation("RiskControlCreator", fields: [createdByUserId], references: [id])
+  risk            Risk     @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, riskId, controlId])
+  @@index([tenantId])
+}
+
+model ControlAsset {
+  id              String       @id @default(cuid())
+  controlId       String
+  assetId         String
+  tenantId        String
+  coverageType    CoverageType @default(UNKNOWN)
+  rationale       String?
+  createdByUserId String?
+  createdAt       DateTime     @default(now())
+  asset           Asset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  control         Control      @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  createdBy       User?        @relation("ControlAssetCreator", fields: [createdByUserId], references: [id])
+  tenant          Tenant       @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, controlId, assetId])
+  @@index([tenantId])
+}
+
+model AssetRiskLink {
+  id              String        @id @default(cuid())
+  tenantId        String
+  assetId         String
+  riskId          String
+  exposureLevel   ExposureLevel @default(MEDIUM)
+  rationale       String?
+  createdByUserId String?
+  createdAt       DateTime      @default(now())
+  asset           Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  createdBy       User?         @relation("AssetRiskCreator", fields: [createdByUserId], references: [id])
+  risk            Risk          @relation(fields: [riskId], references: [id], onDelete: Cascade)
+  tenant          Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, assetId, riskId])
+  @@index([tenantId])
+}
+
+model ControlContributor {
+  id        String   @id @default(cuid())
+  tenantId  String
+  controlId String
+  userId    String
+  createdAt DateTime @default(now())
+  control   Control  @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([controlId, userId])
+  @@index([tenantId])
+}
+
+model ControlTask {
+  id             String            @id @default(cuid())
+  tenantId       String
+  controlId      String
+  title          String
+  description    String?
+  status         ControlTaskStatus @default(OPEN)
+  assigneeUserId String?
+  dueAt          DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  assignee       User?             @relation("ControlTaskAssignee", fields: [assigneeUserId], references: [id])
+  control        Control           @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([controlId])
+  @@index([status])
+  @@index([dueAt])
+  // GAP-perf — backs the dashboard "overdue tasks" query
+  // (status IN ('OPEN','IN_PROGRESS') AND dueAt < now()) and the
+  // refactored `runConsistencyCheck` overdue lookup. The
+  // single-column `[status]` and `[dueAt]` indexes can't satisfy
+  // the combined predicate efficiently.
+  @@index([tenantId, status, dueAt])
+}
+
+model ControlEvidenceLink {
+  id                  String           @id @default(cuid())
+  tenantId            String
+  controlId           String
+  kind                EvidenceLinkKind
+  fileId              String?
+  url                 String?
+  integrationResultId String?
+  note                String?
+  createdByUserId     String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  control             Control          @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  createdBy           User?            @relation("ControlEvidenceCreator", fields: [createdByUserId], references: [id])
+  tenant              Tenant           @relation(fields: [tenantId], references: [id])
+
+  @@unique([controlId, kind, fileId])
+  @@unique([controlId, kind, url])
+  @@index([tenantId])
+  @@index([controlId])
+}
+
+model ControlTemplate {
+  id               String                           @id @default(cuid())
+  code             String                           @unique
+  title            String
+  description      String?
+  category         String?
+  defaultFrequency ControlFrequency?
+  defaultOwnerHint String?
+  isGlobal         Boolean                          @default(true)
+  createdAt        DateTime                         @default(now())
+  requirementLinks ControlTemplateRequirementLink[]
+  tasks            ControlTemplateTask[]
+  packLinks        PackTemplateLink[]
+}
+
+model ControlTemplateTask {
+  id          String          @id @default(cuid())
+  templateId  String
+  title       String
+  description String?
+  template    ControlTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}
+
+model ControlTemplateRequirementLink {
+  id            String               @id @default(cuid())
+  templateId    String
+  requirementId String
+  requirement   FrameworkRequirement @relation(fields: [requirementId], references: [id])
+  template      ControlTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, requirementId])
+}
+
+model Evidence {
+  id                String                    @id @default(cuid())
+  tenantId          String
+  controlId         String?
+  type              EvidenceType
+  title             String
+  content           String?
+  fileName          String?
+  fileSize          Int?
+  category          String?
+  dateCollected     DateTime                  @default(now())
+  owner             String? // Legacy free-text — kept for backward compat
+  ownerUserId       String? // Real user FK — used for due-item routing & notifications
+  reviewCycle       ReviewCadence?
+  nextReviewDate    DateTime?
+  status            EvidenceStatus            @default(DRAFT)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+  deletedAt         DateTime?
+  deletedByUserId   String?
+  fileRecordId      String?
+  expiredAt         DateTime?
+  isArchived        Boolean                   @default(false)
+  retentionDays     Int?
+  retentionPolicy   RetentionPolicy           @default(NONE)
+  retentionUntil    DateTime?
+  testEvidenceLinks ControlTestEvidenceLink[]
+  control           Control?                  @relation(fields: [controlId], references: [id])
+  fileRecord        FileRecord?               @relation(fields: [fileRecordId], references: [id])
+  ownerUser         User?                     @relation("EvidenceOwner", fields: [ownerUserId], references: [id])
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id])
+  reviews           EvidenceReview[]
+  findingLinks      FindingEvidence[]
+  reminderHistories ReminderHistory[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, retentionUntil])
+  @@index([tenantId, isArchived])
+  @@index([tenantId, ownerUserId])
+  // GAP-perf — supports `status` filter (DRAFT|SUBMITTED|APPROVED|REJECTED).
+  @@index([tenantId, status])
+  // GAP-perf — supports `controlId` filter ("evidence for control X").
+  // Already a heavily-used UI surface — every control detail page
+  // pulls evidence by controlId.
+  @@index([tenantId, controlId])
+  // GAP-perf — supports `type` filter (FILE|LINK|TEXT|SCREENSHOT).
+  @@index([tenantId, type])
+}
+
+model FileRecord {
+  id               String           @id @default(cuid())
+  tenantId         String
+  pathKey          String           @unique
+  originalName     String
+  mimeType         String
+  sizeBytes        Int
+  sha256           String
+  status           FileRecordStatus @default(PENDING)
+  uploadedByUserId String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  storedAt         DateTime?
+  bucket           String?
+  domain           String           @default("general")
+  scanStatus       String           @default("PENDING")
+  storageProvider  String           @default("local")
+  scanDetails      String?
+  scannedAt        DateTime?
+  deletedAt        DateTime?
+  deletedByUserId  String?
+  retentionUntil   DateTime?
+  evidence         Evidence[]
+  tenant           Tenant           @relation(fields: [tenantId], references: [id])
+  uploadedBy       User             @relation("FileUploader", fields: [uploadedByUserId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, scanStatus])
+  @@index([tenantId, deletedAt])
+}
+
+model EvidenceReview {
+  // denorm-tenantId — Phase 2: tenantId is NOT NULL and the parent
+  // relation is composite (evidenceId, tenantId) → Evidence(id,
+  // tenantId), which structurally guarantees this row's tenantId
+  // matches its parent's. Phase 3 swaps the chained RLS policy for
+  // the trivial direct form.
+  id         String       @id @default(cuid())
+  tenantId   String
+  evidenceId String
+  reviewerId String
+  action     ReviewAction
+  comment    String?
+  createdAt  DateTime     @default(now())
+  evidence   Evidence     @relation(fields: [evidenceId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  reviewer   User         @relation(fields: [reviewerId], references: [id])
+  tenant     Tenant       @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, evidenceId])
+}
+
+model Policy {
+  id                   String              @id @default(cuid())
+  tenantId             String
+  slug                 String
+  title                String
+  description          String?
+  category             String?
+  status               PolicyStatus        @default(DRAFT)
+  currentVersionId     String?             @unique
+  ownerUserId          String?
+  reviewFrequencyDays  Int?
+  nextReviewAt         DateTime?
+  language             String?             @default("en")
+  /// Lifecycle version counter (matches CISO-Assistant editing_version).
+  /// 1 = initial content, 2+ = published. Incremented only on publish.
+  lifecycleVersion     Int                 @default(1)
+  /// Persisted history of prior published snapshots as JSON array.
+  /// Matches CISO-Assistant editing_history. Entries have fields:
+  /// version, payload, publishedAt, publishedBy, changeSummary (optional)
+  lifecycleHistoryJson Json?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  deletedAt            DateTime?
+  deletedByUserId      String?
+  retentionUntil       DateTime?
+  currentVersion       PolicyVersion?      @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  owner                User?               @relation("PolicyOwner", fields: [ownerUserId], references: [id])
+  tenant               Tenant              @relation(fields: [tenantId], references: [id])
+  approvals            PolicyApproval[]
+  controlLinks         PolicyControlLink[]
+  versions             PolicyVersion[]     @relation("PolicyVersions")
+
+  @@unique([id, tenantId])
+  @@index([tenantId, slug])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+  @@index([nextReviewAt])
+  @@index([tenantId, deletedAt])
+}
+
+model PolicyVersion {
+  id               String                  @id @default(cuid())
+  policyId         String
+  versionNumber    Int
+  contentType      PolicyContentType       @default(MARKDOWN)
+  contentText      String?
+  externalUrl      String?
+  changeSummary    String?
+  createdById      String
+  createdAt        DateTime                @default(now())
+  tenantId         String
+  currentOfPolicy  Policy?                 @relation("CurrentVersion")
+  acknowledgements PolicyAcknowledgement[]
+  approvals        PolicyApproval[]
+  createdBy        User                    @relation("PolicyVersionCreator", fields: [createdById], references: [id])
+  policy           Policy                  @relation("PolicyVersions", fields: [policyId], references: [id], onDelete: Cascade)
+  tenant           Tenant                  @relation(fields: [tenantId], references: [id])
+
+  @@unique([policyId, versionNumber])
+  @@index([tenantId])
+}
+
+model PolicyApproval {
+  id                String               @id @default(cuid())
+  policyId          String
+  policyVersionId   String
+  requestedByUserId String
+  approvedByUserId  String?
+  status            PolicyApprovalStatus @default(PENDING)
+  decidedAt         DateTime?
+  comment           String?
+  createdAt         DateTime             @default(now())
+  approvedBy        User?                @relation("PolicyApprover", fields: [approvedByUserId], references: [id])
+  policy            Policy               @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policyVersion     PolicyVersion        @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+  requestedBy       User                 @relation("PolicyApprovalRequester", fields: [requestedByUserId], references: [id])
+}
+
+model PolicyAcknowledgement {
+  id              String        @id @default(cuid())
+  policyVersionId String
+  userId          String
+  acknowledgedAt  DateTime      @default(now())
+  policyVersion   PolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@unique([policyVersionId, userId])
+}
+
+model PolicyControlLink {
+  // denorm-tenantId — direct tenantId + composite parent FK on the
+  // Policy side. The Control side stays single-column because
+  // Control.tenantId is intentionally nullable (library-derived
+  // controls are global). The pre-denorm chained RLS only walked
+  // via Policy too, so this matches the existing protection model
+  // and additionally lifts read perf into the trivial RLS path.
+  id        String  @id @default(cuid())
+  tenantId  String
+  policyId  String
+  controlId String
+  control   Control @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  policy    Policy  @relation(fields: [policyId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+
+  @@unique([policyId, controlId])
+  @@index([tenantId])
+  @@index([tenantId, policyId])
+  @@index([tenantId, controlId])
+}
+
+model PolicyTemplate {
+  id          String            @id @default(cuid())
+  title       String
+  category    String?
+  language    String?           @default("en")
+  contentType PolicyContentType @default(MARKDOWN)
+  contentText String
+  tags        String?
+  isGlobal    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model Finding {
+  id                String            @id @default(cuid())
+  tenantId          String
+  auditId           String?
+  severity          FindingSeverity
+  type              FindingType
+  title             String
+  description       String
+  rootCause         String?
+  correctiveAction  String?
+  owner             String?
+  dueDate           DateTime?
+  status            FindingStatus     @default(OPEN)
+  verificationNotes String?
+  verifiedBy        String?
+  verifiedAt        DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  deletedAt         DateTime?
+  deletedByUserId   String?
+  audit             Audit?            @relation(fields: [auditId], references: [id])
+  tenant            Tenant            @relation(fields: [tenantId], references: [id])
+  evidenceLinks     FindingEvidence[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+}
+
+model FindingEvidence {
+  // denorm-tenantId — Phase 2: junction with two composite parent
+  // FKs. Each FK references its parent's (id, tenantId) unique
+  // constraint, which transitively guarantees both parents share
+  // this row's tenantId — strictly stronger than the previous
+  // chained-RLS WITH CHECK (which was bypass-able by SECURITY
+  // DEFINER paths or admin migrations).
+  id         String   @id @default(cuid())
+  tenantId   String
+  findingId  String
+  evidenceId String
+  evidence   Evidence @relation(fields: [evidenceId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  finding    Finding  @relation(fields: [findingId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([findingId, evidenceId])
+  @@index([tenantId])
+  @@index([tenantId, findingId])
+  @@index([tenantId, evidenceId])
+}
+
+model Framework {
+  id                  String                  @id @default(cuid())
+  key                 String                  @unique
+  description         String?
+  name                String
+  version             String?
+  metadataJson        String?
+  contentHash         String?
+  sourceUrn           String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @default(now()) @updatedAt
+  kind                FrameworkKind           @default(ISO_STANDARD)
+  packs               FrameworkPack[]
+  requirements        FrameworkRequirement[]
+  mappingSetsAsSource RequirementMappingSet[] @relation("MappingSetSource")
+  mappingSetsAsTarget RequirementMappingSet[] @relation("MappingSetTarget")
+
+  @@unique([key, version])
+}
+
+model FrameworkRequirement {
+  id                      String                           @id @default(cuid())
+  frameworkId             String
+  code                    String
+  title                   String
+  description             String?
+  category                String?
+  sortOrder               Int                              @default(0)
+  theme                   String?
+  themeNumber             Int?
+  section                 String?
+  deprecatedAt            DateTime?
+  controlLinks            ControlRequirementLink[]
+  templateLinks           ControlTemplateRequirementLink[]
+  mappingsFrom            FrameworkMapping[]               @relation("MappingFrom")
+  mappingsTo              FrameworkMapping[]               @relation("MappingTo")
+  requirementMappingsFrom RequirementMapping[]             @relation("ReqMappingSource")
+  requirementMappingsTo   RequirementMapping[]             @relation("ReqMappingTarget")
+  framework               Framework                        @relation(fields: [frameworkId], references: [id])
+
+  @@unique([frameworkId, code])
+}
+
+model FrameworkPack {
+  id            String             @id @default(cuid())
+  key           String             @unique
+  name          String
+  frameworkId   String
+  version       String?
+  description   String?
+  createdAt     DateTime           @default(now())
+  framework     Framework          @relation(fields: [frameworkId], references: [id])
+  templateLinks PackTemplateLink[]
+}
+
+model PackTemplateLink {
+  id         String          @id @default(cuid())
+  packId     String
+  templateId String
+  pack       FrameworkPack   @relation(fields: [packId], references: [id], onDelete: Cascade)
+  template   ControlTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([packId, templateId])
+}
+
+model FrameworkMapping {
+  id                String                @id @default(cuid())
+  fromRequirementId String
+  toRequirementId   String?
+  toControlId       String?
+  rationale         String?
+  fromRequirement   FrameworkRequirement  @relation("MappingFrom", fields: [fromRequirementId], references: [id])
+  toControl         Control?              @relation(fields: [toControlId], references: [id])
+  toRequirement     FrameworkRequirement? @relation("MappingTo", fields: [toRequirementId], references: [id])
+
+  @@unique([fromRequirementId, toControlId])
+}
+
+model RequirementMappingSet {
+  id                String               @id @default(cuid())
+  sourceFrameworkId String
+  targetFrameworkId String
+  name              String
+  description       String?
+  version           Int                  @default(1)
+  sourceUrn         String? // Provenance URN from library system
+  contentHash       String? // Deduplication hash
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @default(now()) @updatedAt
+  sourceFramework   Framework            @relation("MappingSetSource", fields: [sourceFrameworkId], references: [id])
+  targetFramework   Framework            @relation("MappingSetTarget", fields: [targetFrameworkId], references: [id])
+  mappings          RequirementMapping[]
+
+  @@unique([sourceFrameworkId, targetFrameworkId])
+  @@index([sourceFrameworkId])
+  @@index([targetFrameworkId])
+}
+
+model RequirementMapping {
+  id                  String                @id @default(cuid())
+  mappingSetId        String
+  sourceRequirementId String
+  targetRequirementId String
+  strength            MappingStrength       @default(RELATED)
+  rationale           String?
+  metadataJson        String? // Provenance, ingestion source, extra context
+  createdAt           DateTime              @default(now())
+  mappingSet          RequirementMappingSet @relation(fields: [mappingSetId], references: [id], onDelete: Cascade)
+  sourceRequirement   FrameworkRequirement  @relation("ReqMappingSource", fields: [sourceRequirementId], references: [id])
+  targetRequirement   FrameworkRequirement  @relation("ReqMappingTarget", fields: [targetRequirementId], references: [id])
+
+  @@unique([mappingSetId, sourceRequirementId, targetRequirementId])
+  @@index([sourceRequirementId])
+  @@index([targetRequirementId])
+  @@index([mappingSetId])
+}
+
+model ControlRequirementLink {
+  id            String               @id @default(cuid())
+  tenantId      String
+  controlId     String
+  requirementId String
+  createdAt     DateTime             @default(now())
+  control       Control              @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  requirement   FrameworkRequirement @relation(fields: [requirementId], references: [id])
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+
+  @@unique([controlId, requirementId])
+  @@index([tenantId, requirementId])
+}
+
+model ControlTestPlan {
+  id               String            @id @default(cuid())
+  tenantId         String
+  controlId        String
+  name             String
+  description      String?
+  method           TestMethod        @default(MANUAL)
+  frequency        ControlFrequency  @default(AD_HOC)
+  nextDueAt        DateTime?
+  ownerUserId      String?
+  expectedEvidence Json?
+  status           TestPlanStatus    @default(ACTIVE)
+  createdByUserId  String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  control          Control           @relation(fields: [controlId], references: [id])
+  createdBy        User              @relation("TestPlanCreator", fields: [createdByUserId], references: [id])
+  owner            User?             @relation("TestPlanOwner", fields: [ownerUserId], references: [id])
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  runs             ControlTestRun[]
+  steps            ControlTestStep[]
+
+  @@index([tenantId])
+  @@index([tenantId, controlId])
+  @@index([tenantId, nextDueAt])
+  @@index([tenantId, status])
+}
+
+model ControlTestRun {
+  id               String                    @id @default(cuid())
+  tenantId         String
+  controlId        String
+  testPlanId       String
+  status           TestRunStatus             @default(PLANNED)
+  result           TestResult?
+  executedAt       DateTime?
+  executedByUserId String?
+  notes            String?
+  findingSummary   String?
+  createdByUserId  String
+  requestId        String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  evidence         ControlTestEvidenceLink[]
+  control          Control                   @relation(fields: [controlId], references: [id])
+  createdBy        User                      @relation("TestRunCreator", fields: [createdByUserId], references: [id])
+  executedBy       User?                     @relation("TestRunExecutor", fields: [executedByUserId], references: [id])
+  tenant           Tenant                    @relation(fields: [tenantId], references: [id])
+  testPlan         ControlTestPlan           @relation(fields: [testPlanId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, testPlanId])
+  @@index([tenantId, result])
+  @@index([tenantId, executedAt])
+}
+
+model ControlTestEvidenceLink {
+  id                  String           @id @default(cuid())
+  tenantId            String
+  testRunId           String
+  kind                TestEvidenceKind
+  fileId              String?
+  evidenceId          String?
+  url                 String?
+  integrationResultId String?
+  note                String?
+  createdByUserId     String
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  sha256Hash          String?
+  createdBy           User             @relation("TestEvidenceCreator", fields: [createdByUserId], references: [id])
+  evidence            Evidence?        @relation(fields: [evidenceId], references: [id])
+  tenant              Tenant           @relation(fields: [tenantId], references: [id])
+  testRun             ControlTestRun   @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+
+  @@unique([testRunId, kind, evidenceId])
+  @@unique([testRunId, kind, fileId])
+  @@index([tenantId])
+  @@index([tenantId, testRunId])
+}
+
+model ControlTestStep {
+  id             String          @id @default(cuid())
+  tenantId       String
+  testPlanId     String
+  sortOrder      Int             @default(0)
+  instruction    String
+  expectedOutput String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  testPlan       ControlTestPlan @relation(fields: [testPlanId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, testPlanId])
+}
+
+/// Daily compliance KPI snapshot for trend reporting.
+/// One row per tenant per day. Idempotent via @@unique([tenantId, snapshotDate]).
+/// Stores denormalized KPI values computed by the daily snapshot job.
+model ComplianceSnapshot {
+  id           String   @id @default(cuid())
+  tenantId     String
+  /// Calendar date (midnight UTC) — NOT a full timestamp.
+  /// Enables clean GROUP BY / ORDER BY for trend queries.
+  snapshotDate DateTime @db.Date
+
+  // ── Control Coverage ──
+  controlsTotal       Int @default(0)
+  controlsApplicable  Int @default(0)
+  controlsImplemented Int @default(0)
+  controlsInProgress  Int @default(0)
+  controlsNotStarted  Int @default(0)
+  /// Cached coverage % × 10 (e.g. 753 = 75.3%). Int avoids float precision issues.
+  controlCoverageBps  Int @default(0)
+
+  // ── Risks ──
+  risksTotal      Int @default(0)
+  risksOpen       Int @default(0)
+  risksMitigating Int @default(0)
+  risksAccepted   Int @default(0)
+  risksClosed     Int @default(0)
+  risksLow        Int @default(0)
+  risksMedium     Int @default(0)
+  risksHigh       Int @default(0)
+  risksCritical   Int @default(0)
+
+  // ── Evidence ──
+  evidenceTotal      Int @default(0)
+  evidenceOverdue    Int @default(0)
+  evidenceDueSoon7d  Int @default(0)
+  evidenceDueSoon30d Int @default(0)
+  evidenceCurrent    Int @default(0)
+
+  // ── Policies ──
+  policiesTotal         Int @default(0)
+  policiesPublished     Int @default(0)
+  policiesOverdueReview Int @default(0)
+
+  // ── Tasks ──
+  tasksTotal   Int @default(0)
+  tasksOpen    Int @default(0)
+  tasksOverdue Int @default(0)
+
+  // ── Vendors ──
+  vendorsTotal         Int @default(0)
+  vendorsOverdueReview Int @default(0)
+
+  // ── Findings ──
+  findingsOpen Int @default(0)
+
+  // ── Meta ──
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, snapshotDate])
+  @@index([tenantId, snapshotDate])
+  @@index([tenantId])
+}

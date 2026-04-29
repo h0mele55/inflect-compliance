@@ -1,0 +1,295 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: AUTOMATION & INTEGRATIONS
+//
+//  Owns:
+//    • AutomationRule + AutomationExecution + AutomationEvent
+//      (Epic 60 event-driven backbone)
+//    • IntegrationConnection + IntegrationCredential
+//    • SyncMapping (per-control external-entity mapping)
+//    • Webhook + WebhookDelivery (outbound integrations)
+//    • Notification + NotificationPreference + NotificationDelivery
+//    • NotificationRule + NotificationDispatchLog
+//
+//  Why a dedicated file: automation is the integration boundary —
+//  it touches every domain's events but owns no business state of
+//  its own beyond rule definitions and execution traces. Putting it
+//  in its own file keeps the rule-engine surface auditable in
+//  isolation from the domain models it observes.
+//
+//  This file is currently empty. Models will land here in a focused
+//  follow-up PR.
+// ─────────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  tenantId  String
+  userId    String
+  type      NotificationType @default(GENERAL)
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  linkUrl   String?
+  createdAt DateTime         @default(now())
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  user      User             @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, userId])
+}
+
+model ReminderHistory {
+  id         String   @id @default(cuid())
+  tenantId   String
+  evidenceId String
+  type       String
+  sentAt     DateTime @default(now())
+  evidence   Evidence @relation(fields: [evidenceId], references: [id])
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
+model NotificationOutbox {
+  id               String                @id @default(cuid())
+  tenantId         String
+  type             EmailNotificationType
+  toEmail          String
+  subject          String
+  bodyText         String
+  bodyHtml         String?
+  status           EmailOutboxStatus     @default(PENDING)
+  attempts         Int                   @default(0)
+  lastError        String?
+  sendAfter        DateTime              @default(now())
+  createdAt        DateTime              @default(now())
+  sentAt           DateTime?
+  dedupeKey        String                @unique
+  toEmailEncrypted String?
+  tenant           Tenant                @relation(fields: [tenantId], references: [id])
+
+  @@index([status, sendAfter])
+  @@index([tenantId])
+}
+
+model TenantNotificationSettings {
+  id                String   @id @default(cuid())
+  tenantId          String   @unique
+  enabled           Boolean  @default(true)
+  defaultFromName   String   @default("Inflect Compliance")
+  defaultFromEmail  String   @default("noreply@inflect.app")
+  complianceMailbox String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model UserNotificationPreference {
+  id        String               @id @default(cuid())
+  userId    String
+  tenantId  String
+  delivery  NotificationDelivery @default(IMMEDIATE)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  tenant    Tenant               @relation(fields: [tenantId], references: [id])
+  user      User                 @relation(fields: [userId], references: [id])
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+model IntegrationConnection {
+  id              String                   @id @default(cuid())
+  tenantId        String
+  provider        String
+  name            String
+  isEnabled       Boolean                  @default(true)
+  configJson      Json                     @default("{}")
+  secretEncrypted String?
+  lastTestedAt    DateTime?
+  lastTestStatus  String?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id])
+  executions      IntegrationExecution[]
+  syncMappings    IntegrationSyncMapping[]
+
+  @@unique([tenantId, provider, name])
+  @@index([tenantId])
+  @@index([tenantId, provider])
+}
+
+model IntegrationExecution {
+  id            String                     @id @default(cuid())
+  tenantId      String
+  connectionId  String?
+  provider      String
+  automationKey String
+  controlId     String?
+  status        IntegrationExecutionStatus @default(PENDING)
+  resultJson    Json?
+  evidenceId    String?
+  errorMessage  String?
+  durationMs    Int?
+  triggeredBy   String                     @default("scheduled")
+  jobRunId      String?
+  executedAt    DateTime                   @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime                   @default(now())
+  connection    IntegrationConnection?     @relation(fields: [connectionId], references: [id])
+  control       Control?                   @relation(fields: [controlId], references: [id])
+  tenant        Tenant                     @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, automationKey])
+  @@index([tenantId, controlId])
+  @@index([tenantId, status])
+  @@index([jobRunId])
+}
+
+model IntegrationWebhookEvent {
+  id           String    @id @default(cuid())
+  tenantId     String?
+  provider     String
+  eventType    String?
+  payloadJson  Json
+  headersJson  Json?
+  payloadHash  String?
+  status       String    @default("received")
+  errorMessage String?
+  processedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  receivedAt   DateTime  @default(now())
+  tenant       Tenant?   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([provider, receivedAt])
+  @@index([provider, payloadHash, createdAt])
+  @@index([status])
+}
+
+// Note: @@map is deliberately omitted here to conform to the repository's 
+// global Prisma convention. All models use Prisma's default exact-case tables
+// (e.g., 'IntegrationSyncMapping' instead of 'integration_sync_mappings').
+// The isolated AuthSession model mapped strictly to "Session" remains an anomaly.
+model IntegrationSyncMapping {
+  id                String                 @id @default(cuid())
+  tenantId          String
+  provider          String
+  connectionId      String?
+  localEntityType   String
+  localEntityId     String
+  remoteEntityType  String
+  remoteEntityId    String
+  syncStatus        SyncStatus             @default(PENDING)
+  lastSyncDirection SyncDirection?
+  conflictStrategy  ConflictStrategy       @default(REMOTE_WINS)
+  localUpdatedAt    DateTime?
+  remoteUpdatedAt   DateTime?
+  remoteDataJson    Json?
+  version           Int                    @default(1)
+  errorMessage      String?
+  lastSyncedAt      DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  connection        IntegrationConnection? @relation(fields: [connectionId], references: [id])
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, provider, localEntityType, localEntityId])
+  @@unique([tenantId, provider, remoteEntityType, remoteEntityId])
+  @@index([tenantId, provider])
+  @@index([tenantId, syncStatus])
+  @@index([connectionId])
+}
+
+model AutomationRule {
+  id                String               @id @default(cuid())
+  tenantId          String
+  name              String
+  description       String?
+  /// The event name this rule subscribes to. Free-form string so new
+  /// events can be emitted without a migration; the canonical catalog
+  /// lives at src/app-layer/automation/events.ts so typos are caught
+  /// at the producer side, not here.
+  triggerEvent      String
+  /// Optional filter expression (e.g. `{ severity: "CRITICAL" }`).
+  /// Evaluated by the dispatcher against the event payload before any
+  /// action fires. `null` means "match every event of this type".
+  triggerFilterJson Json?
+  actionType        AutomationActionType
+  /// Action-specific config. Shape depends on `actionType`:
+  ///   NOTIFY_USER       → { userIds: string[], message: string }
+  ///   CREATE_TASK       → { title, severity, assigneeUserId? }
+  ///   UPDATE_STATUS     → { entityType, field, toStatus }
+  ///   WEBHOOK           → { url, method, headers?, secretRef? }
+  actionConfigJson  Json
+  status            AutomationRuleStatus @default(DRAFT)
+  /// Higher priority runs first when multiple rules match the same
+  /// event. Ties broken by `createdAt`.
+  priority          Int                  @default(0)
+  /// Cheap dashboard counters. Incremented by the dispatcher; never
+  /// the source of truth (AutomationExecution is).
+  executionCount    Int                  @default(0)
+  lastTriggeredAt   DateTime?
+  createdByUserId   String?
+  updatedByUserId   String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  /// Soft-delete. Archived rules stop firing but their execution
+  /// history survives for audit.
+  deletedAt         DateTime?
+
+  tenant     Tenant                @relation(fields: [tenantId], references: [id])
+  executions AutomationExecution[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, triggerEvent])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, triggerEvent, status])
+}
+
+model AutomationExecution {
+  id                 String                    @id @default(cuid())
+  tenantId           String
+  ruleId             String
+  /// Denormalised copy of the rule's trigger event at fire time so
+  /// the event-feed index below stays single-column and the row is
+  /// still readable if the rule is later archived.
+  triggerEvent       String
+  /// Snapshot of the event payload that matched. Kept verbatim for
+  /// replay + audit — the shape depends on the event producer.
+  triggerPayloadJson Json
+  status             AutomationExecutionStatus @default(PENDING)
+  /// Action output (e.g. created task ids, notified user ids, webhook
+  /// response code). Shape mirrors the rule's `actionType`.
+  outcomeJson        Json?
+  errorMessage       String?
+  errorStack         String?
+  durationMs         Int?
+  /// Correlation to the observability job-run span so ops can trace a
+  /// specific execution in logs / traces / metrics.
+  jobRunId           String?
+  /// What caused the fire. `event` for normal event-bus dispatch,
+  /// `manual` for admin-triggered replay, `schedule` for cron
+  /// re-evaluation of pending rules.
+  triggeredBy        String                    @default("event")
+  /// Deduplication handle. The dispatcher computes this from
+  /// (ruleId, event, stable identifier in payload) so a retried
+  /// event never double-fires an action. Unique per tenant when set.
+  idempotencyKey     String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime                  @default(now())
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id])
+  rule   AutomationRule @relation(fields: [ruleId], references: [id])
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId])
+  @@index([tenantId, ruleId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([ruleId, createdAt])
+  @@index([triggerEvent, createdAt])
+  @@index([jobRunId])
+}

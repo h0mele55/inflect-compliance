@@ -1,0 +1,597 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: ENUMS
+//
+//  All shared enum declarations live in this file. Prisma enums
+//  are domain-spanning (e.g. `Role` is referenced by User,
+//  TenantMembership, OrgMembership, AuditorAccess, …) so keeping
+//  them in one file avoids the alternative — duplicating each enum
+//  to its primary domain file and risking divergence.
+//
+//  Migration policy:
+//    • Adding a new value to an existing enum is non-breaking but
+//      requires a Prisma migration (Postgres ALTER TYPE … ADD VALUE).
+//    • Removing or reordering values is breaking. Plan a forward
+//      migration with explicit data-migration of any rows.
+//    • Renaming a value: prefer @@map() on the enum case to keep
+//      the SQL value stable across rename refactors.
+//
+//  This file is currently empty. The actual enums live in the
+//  transitional `schema.prisma` and will be relocated here in the
+//  next prompt of GAP-09.
+// ─────────────────────────────────────────────────────────────────
+
+enum Role {
+  /// OWNER — tenant lifecycle (delete tenant, rotate DEK, transfer
+  /// ownership) + owner management (invite/remove OWNERs, assign OWNER
+  /// role). Strictly superset of ADMIN. The last ACTIVE OWNER of a
+  /// tenant cannot be removed or demoted (DB trigger + usecase guard).
+  OWNER
+  ADMIN
+  EDITOR
+  READER
+  AUDITOR
+}
+
+/// Hub-and-spoke organization roles (Epic O-1).
+///
+/// Distinct from `Role` (which scopes per-tenant permissions). Org
+/// roles scope portfolio-level access:
+///
+///   - ORG_ADMIN — manage the organization (create tenants, add/remove
+///     org members, view portfolio dashboard, drill into individual
+///     tenants). Triggers AUDITOR auto-provisioning into every child
+///     tenant via the Epic O-2 service. CISO-class identity.
+///
+///   - ORG_READER — portfolio-only. Sees org summary cards but is NOT
+///     auto-provisioned into child tenants. Can be elevated to
+///     ORG_ADMIN later, at which point provisioning fans out
+///     idempotently.
+enum OrgRole {
+  ORG_ADMIN
+  ORG_READER
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  DEACTIVATED
+  REMOVED
+}
+
+enum ClauseStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  READY
+  NEEDS_REVIEW
+}
+
+enum AssetType {
+  INFORMATION
+  SYSTEM
+  SERVICE
+  DATA_STORE
+  VENDOR
+  PEOPLE_PROCESS
+  APPLICATION
+  INFRASTRUCTURE
+  PROCESS
+  OTHER
+}
+
+enum Criticality {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AssetStatus {
+  ACTIVE
+  RETIRED
+}
+
+enum CoverageType {
+  FULL
+  PARTIAL
+  UNKNOWN
+}
+
+enum ExposureLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TreatmentDecision {
+  TREAT
+  TRANSFER
+  TOLERATE
+  AVOID
+}
+
+enum ControlStatus {
+  NOT_STARTED
+  PLANNED
+  IN_PROGRESS
+  IMPLEMENTING
+  IMPLEMENTED
+  NEEDS_REVIEW
+  NOT_APPLICABLE
+}
+
+enum Applicability {
+  APPLICABLE
+  NOT_APPLICABLE
+}
+
+enum ControlFrequency {
+  AD_HOC
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+}
+
+enum TestMethod {
+  MANUAL
+  AUTOMATED
+}
+
+enum TestPlanStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum TestRunStatus {
+  PLANNED
+  RUNNING
+  COMPLETED
+}
+
+enum TestResult {
+  PASS
+  FAIL
+  INCONCLUSIVE
+}
+
+enum TestEvidenceKind {
+  FILE
+  EVIDENCE
+  LINK
+  INTEGRATION_RESULT
+}
+
+enum EvidenceSourceType {
+  MANUAL
+  INTEGRATION
+}
+
+enum EvidenceLinkKind {
+  FILE
+  LINK
+  INTEGRATION_RESULT
+}
+
+enum ControlTaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum EvidenceType {
+  FILE
+  LINK
+  TEXT
+}
+
+enum FileRecordStatus {
+  PENDING
+  STORED
+  FAILED
+  DELETED
+}
+
+enum EvidenceStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum RetentionPolicy {
+  NONE
+  FIXED_DATE
+  DAYS_AFTER_UPLOAD
+}
+
+enum ReviewAction {
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum WorkItemType {
+  AUDIT_FINDING
+  CONTROL_GAP
+  INCIDENT
+  IMPROVEMENT
+  TASK
+}
+
+enum WorkItemSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum WorkItemPriority {
+  P0
+  P1
+  P2
+  P3
+}
+
+enum WorkItemStatus {
+  OPEN
+  TRIAGED
+  IN_PROGRESS
+  BLOCKED
+  RESOLVED
+  CLOSED
+  CANCELED
+}
+
+enum WorkItemSource {
+  MANUAL
+  TEMPLATE
+  POLICY_REVIEW
+  AUDIT
+  INTEGRATION
+}
+
+enum TaskLinkEntityType {
+  CONTROL
+  FRAMEWORK_REQUIREMENT
+  RISK
+  ASSET
+  POLICY
+  EVIDENCE
+  FILE
+  AUDIT_PACK
+  VENDOR
+}
+
+enum TaskLinkRelation {
+  RELATES_TO
+  EVIDENCE_FOR
+  BLOCKED_BY
+  CAUSED_BY
+  MITIGATED_BY
+}
+
+enum PolicyStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PolicyContentType {
+  MARKDOWN
+  HTML
+  EXTERNAL_LINK
+}
+
+enum PolicyApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
+enum AuditStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ChecklistResult {
+  NOT_TESTED
+  PASS
+  FAIL
+}
+
+enum RiskStatus {
+  OPEN
+  MITIGATING
+  ACCEPTED
+  CLOSED
+}
+
+enum FindingSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FindingType {
+  NONCONFORMITY
+  OBSERVATION
+  OPPORTUNITY
+}
+
+enum FindingStatus {
+  OPEN
+  IN_PROGRESS
+  READY_FOR_VERIFICATION
+  CLOSED
+}
+
+enum ReviewCadence {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUALLY
+  ANNUALLY
+}
+
+enum NotificationType {
+  EVIDENCE_DUE_SOON
+  EVIDENCE_OVERDUE
+  EVIDENCE_REJECTED
+  EVIDENCE_APPROVED
+  POLICY_APPROVAL_NEEDED
+  POLICY_ACKNOWLEDGED
+  FINDING_ASSIGNED
+  FINDING_VERIFIED
+  TASK_ASSIGNED
+  GENERAL
+}
+
+enum EmailNotificationType {
+  TASK_ASSIGNED
+  EVIDENCE_EXPIRING
+  POLICY_APPROVAL_REQUESTED
+  POLICY_APPROVED
+  POLICY_REJECTED
+  DEADLINE_DIGEST
+  EVIDENCE_EXPIRY_DIGEST
+  VENDOR_RENEWAL_DIGEST
+}
+
+enum EmailOutboxStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationDelivery {
+  IMMEDIATE
+  DAILY_DIGEST
+  DISABLED
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum SuggestionSessionStatus {
+  DRAFT
+  GENERATED
+  APPLIED
+  DISMISSED
+}
+
+enum SuggestionItemStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EDITED
+}
+
+enum IdentityProviderType {
+  SAML
+  OIDC
+}
+
+enum MfaPolicy {
+  DISABLED
+  OPTIONAL
+  REQUIRED
+}
+
+enum MfaType {
+  TOTP
+}
+
+enum FrameworkKind {
+  ISO_STANDARD
+  NIST_FRAMEWORK
+  SOC_CRITERIA
+  EU_DIRECTIVE
+  REGULATION
+  INDUSTRY_STANDARD
+  CUSTOM
+}
+
+// Defines the semantic strength of a mapping between two requirement nodes.
+// Used by RequirementMapping to express how closely two requirements align.
+enum MappingStrength {
+  EQUAL // Semantically equivalent: source and target express the same obligation
+  SUPERSET // Source fully covers target: implementing source satisfies target
+  SUBSET // Source partially covers target: implementing source only partially satisfies target
+  INTERSECT // Partial overlap: source and target share common ground but neither fully covers the other
+  RELATED // Conceptually related: useful for awareness but no direct coverage claim
+}
+
+enum VendorStatus {
+  ACTIVE
+  ONBOARDING
+  OFFBOARDING
+  OFFBOARDED
+}
+
+enum VendorCriticality {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum VendorDataAccess {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum VendorDocumentType {
+  CONTRACT
+  SOC2
+  ISO_CERT
+  DPA
+  SECURITY_POLICY
+  PEN_TEST
+  OTHER
+}
+
+enum AnswerType {
+  YES_NO
+  SINGLE_SELECT
+  MULTI_SELECT
+  TEXT
+  NUMBER
+}
+
+enum AssessmentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum VendorLinkEntityType {
+  ASSET
+  RISK
+  ISSUE
+  CONTROL
+}
+
+enum VendorLinkRelation {
+  USES
+  STORES_DATA_FOR
+  PROVIDES_SERVICE_TO
+  MITIGATES
+  RELATED
+}
+
+enum AuditCycleStatus {
+  PLANNING
+  IN_PROGRESS
+  READY
+  COMPLETE
+}
+
+enum AuditPackStatus {
+  DRAFT
+  FROZEN
+  EXPORTED
+}
+
+enum AuditorStatus {
+  INVITED
+  ACTIVE
+  REVOKED
+}
+
+enum AuditPackItemEntityType {
+  CONTROL
+  POLICY
+  EVIDENCE
+  FILE
+  ISSUE
+  READINESS_REPORT
+  FRAMEWORK_COVERAGE
+  TEST_RUN
+}
+
+enum BillingPlan {
+  FREE
+  TRIAL
+  PRO
+  ENTERPRISE
+}
+
+enum BillingStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  TRIALING
+}
+
+enum IntegrationExecutionStatus {
+  PENDING
+  RUNNING
+  PASSED
+  FAILED
+  ERROR
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  CONFLICT
+  FAILED
+  STALE
+}
+
+enum SyncDirection {
+  PUSH
+  PULL
+}
+
+enum ConflictStrategy {
+  REMOTE_WINS
+  LOCAL_WINS
+  MANUAL
+}
+
+enum AutomationRuleStatus {
+  DRAFT
+  ENABLED
+  DISABLED
+  ARCHIVED
+}
+
+enum AutomationExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+/// Closed enum of supported side-effect classes. Extend via migration
+/// when a genuinely new class of side-effect lands — not for every new
+/// webhook target or notifier. The per-action payload in
+/// `AutomationRule.actionConfigJson` absorbs config variants within
+/// a class without schema churn.
+enum AutomationActionType {
+  NOTIFY_USER
+  CREATE_TASK
+  UPDATE_STATUS
+  WEBHOOK
+}

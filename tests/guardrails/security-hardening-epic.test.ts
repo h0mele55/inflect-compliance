@@ -15,6 +15,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const ROOT = path.resolve(__dirname, '../..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf-8');
@@ -79,7 +80,7 @@ describe('CORS Hardening', () => {
 // ─── 3. OAuth Token Encryption ───────────────────────────────────────
 
 describe('OAuth Token Encryption', () => {
-    const schema = read('prisma/schema.prisma');
+    const schema = readPrismaSchema();
     const piiMiddleware = read('src/lib/security/pii-middleware.ts');
 
     test('Account model has accessTokenEncrypted column', () => {
@@ -126,7 +127,7 @@ describe('OAuth Token Encryption', () => {
 // ─── 4. Fail-Closed MFA ──────────────────────────────────────────────
 
 describe('Fail-Closed MFA', () => {
-    const schema = read('prisma/schema.prisma');
+    const schema = readPrismaSchema();
     const auth = read('src/auth.ts');
 
     test('TenantSecuritySettings has mfaFailClosed field', () => {

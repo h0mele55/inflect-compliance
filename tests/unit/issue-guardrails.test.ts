@@ -7,9 +7,9 @@
 import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const SRC_DIR = path.resolve(__dirname, '../../src');
-const PRISMA_DIR = path.resolve(__dirname, '../../prisma');
 
 function grepFiles(pattern: RegExp, dir: string, extensions: string[]): { file: string; line: number; content: string }[] {
     const results: { file: string; line: number; content: string }[] = [];
@@ -48,8 +48,7 @@ function isAllowed(file: string): boolean {
 
 describe('Issue → Task Migration Guardrails', () => {
     test('Prisma schema must NOT contain Issue model', () => {
-        const schemaPath = path.join(PRISMA_DIR, 'schema.prisma');
-        const schema = fs.readFileSync(schemaPath, 'utf-8');
+        const schema = readPrismaSchema();
         const issueModels = schema.match(/^model\s+(Issue|IssueLink|IssueComment|IssueWatcher|IssueEvidenceBundle)\s*\{/gm);
         expect(issueModels).toBeNull();
     });
@@ -73,8 +72,7 @@ describe('Issue → Task Migration Guardrails', () => {
     });
 
     test('No new Prisma model with "Issue" in the name', () => {
-        const schemaPath = path.join(PRISMA_DIR, 'schema.prisma');
-        const schema = fs.readFileSync(schemaPath, 'utf-8');
+        const schema = readPrismaSchema();
         const models = schema.match(/^model\s+\w*Issue\w*\s*\{/gm);
         expect(models).toBeNull();
     });

@@ -15,11 +15,12 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const ROOT = path.resolve(__dirname, '../..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf-8');
 
-const schema = read('prisma/schema.prisma');
+const schema = readPrismaSchema();
 const tenantContext = read('src/lib/tenant-context.ts');
 const permissions = read('src/lib/permissions.ts');
 const apiKeyAuth = read('src/lib/auth/api-key-auth.ts');

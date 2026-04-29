@@ -11,10 +11,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { glob } from 'glob';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const SRC_DIR = path.resolve(__dirname, '../../src');
-const SCHEMA_PATH = path.resolve(__dirname, '../../prisma/schema.prisma');
-
 function readSrcFile(relativePath: string): string {
     return fs.readFileSync(path.join(SRC_DIR, relativePath), 'utf-8');
 }
@@ -29,7 +28,7 @@ describe('Schema: User model has no deprecated fields', () => {
     let schema: string;
 
     beforeAll(() => {
-        schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');
+        schema = readPrismaSchema();
     });
 
     it('User model does not have tenantId field', () => {

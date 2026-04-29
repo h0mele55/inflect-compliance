@@ -14,6 +14,7 @@ import {
     isTerminalStatus,
     isActiveStatus,
 } from '../../src/app-layer/domain/work-item-status';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 // ═════════════════════════════════════════════════════════════════════
 // 1. Shared Constants
@@ -188,8 +189,7 @@ describe('Enum Drift Guard', () => {
         // Read the schema file and extract enum values
         const fs = require('fs');
         const path = require('path');
-        const schemaPath = path.resolve(__dirname, '../../prisma/schema.prisma');
-        const schema = fs.readFileSync(schemaPath, 'utf8');
+        const schema = readPrismaSchema();
 
         // Extract WorkItemStatus enum block
         const enumMatch = schema.match(/enum\s+WorkItemStatus\s*\{([^}]+)\}/);

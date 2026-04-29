@@ -6,6 +6,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const SRC_DIR = path.join(__dirname, '..', '..', 'src');
 const PRISMA_FILE = path.join(__dirname, '..', '..', 'src', 'lib', 'prisma.ts');
@@ -139,8 +140,7 @@ describe('Soft-Delete CI Guardrails', () => {
     });
 
     test('all 5 models have deletedAt field in schema', () => {
-        const schemaPath = path.join(__dirname, '..', '..', 'prisma', 'schema.prisma');
-        const schema = fs.readFileSync(schemaPath, 'utf-8');
+        const schema = readPrismaSchema();
 
         for (const model of SOFT_DELETE_MODELS) {
             // Find the model block and check it contains deletedAt

@@ -1,0 +1,258 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: VENDOR RISK
+//
+//  Owns:
+//    • Vendor + VendorContact
+//    • VendorAssessment + VendorAssessmentSection +
+//      VendorAssessmentQuestion + VendorAssessmentResponse
+//    • VendorAssessmentTemplate + VendorAssessmentTemplateSection
+//    • VendorEvidenceLink
+//
+//  Why a dedicated file: vendor assessments have a separate UI flow,
+//  a distinct retention model, and a different review cadence from
+//  the core compliance domain. Pulling them out keeps `compliance.prisma`
+//  focused on the certification surface (controls/risks/evidence)
+//  and makes vendor-specific schema changes locally reviewable.
+//
+//  This file is currently empty. Models will land here in a focused
+//  follow-up PR.
+// ─────────────────────────────────────────────────────────────────
+
+model Vendor {
+  id                  String                 @id @default(cuid())
+  tenantId            String
+  name                String
+  legalName           String?
+  websiteUrl          String?
+  domain              String?
+  country             String?
+  description         String?
+  ownerUserId         String?
+  status              VendorStatus           @default(ONBOARDING)
+  criticality         VendorCriticality      @default(MEDIUM)
+  inherentRisk        VendorCriticality?
+  residualRisk        VendorCriticality?
+  nextReviewAt        DateTime?
+  contractRenewalAt   DateTime?
+  dataAccess          VendorDataAccess?
+  isSubprocessor      Boolean                @default(false)
+  tags                Json?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  certificationsJson  Json?
+  enrichmentLastRunAt DateTime?
+  enrichmentStatus    String?
+  privacyPolicyUrl    String?
+  securityPageUrl     String?
+  deletedAt           DateTime?
+  deletedByUserId     String?
+  retentionUntil      DateTime?
+  owner               User?                  @relation("VendorOwner", fields: [ownerUserId], references: [id])
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id])
+  assessments         VendorAssessment[]
+  contacts            VendorContact[]
+  documents           VendorDocument[]
+  evidenceBundles     VendorEvidenceBundle[]
+  links               VendorLink[]
+  primaryOf           VendorRelationship[]   @relation("PrimaryRelation")
+  subprocessorOf      VendorRelationship[]   @relation("SubprocessorRelation")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([tenantId, criticality])
+  @@index([tenantId, nextReviewAt])
+  @@index([tenantId, contractRenewalAt])
+  @@index([tenantId, deletedAt])
+}
+
+model VendorContact {
+  id             String   @id @default(cuid())
+  tenantId       String
+  vendorId       String
+  name           String
+  email          String?
+  title          String?
+  phone          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  nameEncrypted  String?
+  emailEncrypted String?
+  emailHash      String?
+  phoneEncrypted String?
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  vendor         Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, vendorId])
+}
+
+model VendorDocument {
+  id               String             @id @default(cuid())
+  tenantId         String
+  vendorId         String
+  type             VendorDocumentType
+  fileId           String?
+  externalUrl      String?
+  title            String?
+  validFrom        DateTime?
+  validTo          DateTime?
+  notes            String?
+  uploadedByUserId String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  tenant           Tenant             @relation(fields: [tenantId], references: [id])
+  uploadedBy       User               @relation("VendorDocUploader", fields: [uploadedByUserId], references: [id])
+  vendor           Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, vendorId])
+  @@index([tenantId, vendorId, type])
+  @@index([tenantId, validTo])
+}
+
+model QuestionnaireTemplate {
+  id          String                  @id @default(cuid())
+  key         String                  @unique
+  name        String
+  description String?
+  version     Int                     @default(1)
+  isGlobal    Boolean                 @default(true)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  questions   QuestionnaireQuestion[]
+  assessments VendorAssessment[]
+}
+
+model QuestionnaireQuestion {
+  id             String                   @id @default(cuid())
+  templateId     String
+  section        String
+  prompt         String
+  answerType     AnswerType
+  optionsJson    Json?
+  weight         Float                    @default(1)
+  riskPointsJson Json?
+  required       Boolean                  @default(true)
+  sortOrder      Int                      @default(0)
+  template       QuestionnaireTemplate    @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  answers        VendorAssessmentAnswer[]
+
+  @@index([templateId, section, sortOrder])
+}
+
+model VendorAssessment {
+  id                   String                   @id @default(cuid())
+  tenantId             String
+  vendorId             String
+  templateId           String
+  status               AssessmentStatus         @default(DRAFT)
+  startedAt            DateTime                 @default(now())
+  submittedAt          DateTime?
+  decidedAt            DateTime?
+  requestedByUserId    String
+  decidedByUserId      String?
+  score                Float?
+  riskRating           VendorCriticality?
+  notes                String?
+  nextReviewAt         DateTime?
+  /// Lifecycle version counter (matches CISO-Assistant editing_version).
+  /// 1 = initial, 2+ = approved. Incremented on each approval cycle.
+  lifecycleVersion     Int                      @default(1)
+  /// Persisted history of prior assessment snapshots as JSON array.
+  /// Matches CISO-Assistant editing_history.
+  lifecycleHistoryJson Json?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  decidedBy            User?                    @relation("AssessmentDecider", fields: [decidedByUserId], references: [id])
+  requestedBy          User                     @relation("AssessmentRequester", fields: [requestedByUserId], references: [id])
+  template             QuestionnaireTemplate    @relation(fields: [templateId], references: [id])
+  tenant               Tenant                   @relation(fields: [tenantId], references: [id])
+  vendor               Vendor                   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  answers              VendorAssessmentAnswer[]
+
+  @@index([tenantId, vendorId])
+  @@index([tenantId, status])
+  @@index([tenantId, riskRating])
+}
+
+model VendorAssessmentAnswer {
+  id             String                @id @default(cuid())
+  tenantId       String
+  assessmentId   String
+  questionId     String
+  answerJson     Json
+  computedPoints Float                 @default(0)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  assessment     VendorAssessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  question       QuestionnaireQuestion @relation(fields: [questionId], references: [id])
+  tenant         Tenant                @relation(fields: [tenantId], references: [id])
+
+  @@unique([assessmentId, questionId])
+  @@index([tenantId, assessmentId])
+}
+
+model VendorLink {
+  id         String               @id @default(cuid())
+  tenantId   String
+  vendorId   String
+  entityType VendorLinkEntityType
+  entityId   String
+  relation   VendorLinkRelation   @default(RELATED)
+  createdAt  DateTime             @default(now())
+  tenant     Tenant               @relation(fields: [tenantId], references: [id])
+  vendor     Vendor               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, vendorId, entityType, entityId])
+  @@index([tenantId, vendorId])
+}
+
+model VendorEvidenceBundle {
+  id              String                     @id @default(cuid())
+  tenantId        String
+  vendorId        String
+  name            String
+  description     String?
+  frozenAt        DateTime?
+  createdByUserId String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  createdBy       User?                      @relation("EvidenceBundleCreator", fields: [createdByUserId], references: [id])
+  tenant          Tenant                     @relation(fields: [tenantId], references: [id])
+  vendor          Vendor                     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  items           VendorEvidenceBundleItem[]
+
+  @@index([tenantId, vendorId])
+}
+
+model VendorEvidenceBundleItem {
+  id           String               @id @default(cuid())
+  bundleId     String
+  tenantId     String
+  entityType   String
+  entityId     String
+  snapshotJson Json?
+  createdAt    DateTime             @default(now())
+  bundle       VendorEvidenceBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+
+  @@unique([bundleId, entityType, entityId])
+  @@index([tenantId, bundleId])
+}
+
+model VendorRelationship {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  primaryVendorId      String
+  subprocessorVendorId String
+  purpose              String?
+  dataTypes            String?
+  country              String?
+  createdAt            DateTime @default(now())
+  primary              Vendor   @relation("PrimaryRelation", fields: [primaryVendorId], references: [id], onDelete: Cascade)
+  subprocessor         Vendor   @relation("SubprocessorRelation", fields: [subprocessorVendorId], references: [id], onDelete: Cascade)
+  tenant               Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, primaryVendorId, subprocessorVendorId])
+  @@index([tenantId, primaryVendorId])
+}

@@ -29,9 +29,9 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
-const SCHEMA_PATH = path.join(REPO_ROOT, 'prisma/schema.prisma');
 const MIGRATION_PATH = path.join(
     REPO_ROOT,
     'prisma/migrations/20260428154941_perf_list_query_indexes/migration.sql',
@@ -99,7 +99,7 @@ const EXPECTED_INDEXES: readonly ExpectedIndex[] = [
 ];
 
 function readSchema(): string {
-    return fs.readFileSync(SCHEMA_PATH, 'utf-8');
+    return readPrismaSchema();
 }
 
 function readMigration(): string {

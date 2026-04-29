@@ -1,0 +1,605 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: AUTH & TENANCY
+//
+//  Owns:
+//    • Tenant + Organization (hub-and-spoke)
+//    • TenantMembership / OrgMembership / TenantCustomRole
+//    • User (NextAuth Prisma adapter shape)
+//    • Account / Session (NextAuth)
+//    • UserSession (Epic C.3 — server-recorded session record with
+//      ipAddress/userAgent/expiresAt for revocation)
+//    • TenantInviteToken
+//    • TenantSecuritySettings
+//    • SsoConnection / ScimToken
+//
+//  Cross-domain relations declared here that point INTO this file:
+//    • Every tenant-scoped model has a `tenant Tenant @relation(...)`
+//      and a `tenantId String` — declared on the OWNING side
+//      (i.e. the model's own domain file). The reverse relation field
+//      on Tenant is what lives here.
+//
+//  Why keep all auth/tenancy together: the back-reference fields on
+//  Tenant span every domain (controls, risks, evidence, …). Splitting
+//  Tenant out from User/Membership would force every domain file to
+//  re-import Tenant relations, scattering the join surface.
+//
+//  This file is currently empty. The actual auth/tenancy models live
+//  in `schema.prisma` and will be relocated here as a focused PR.
+// ─────────────────────────────────────────────────────────────────
+
+model Tenant {
+  id                        String                       @id @default(cuid())
+  name                      String
+  slug                      String                       @unique
+  /// Hub-and-spoke parent (Epic O-1). Nullable for backward compatibility:
+  /// existing tenants migrated before the organization layer landed have
+  /// no parent. New tenants created via `/api/org/{slug}/tenants` are
+  /// always linked. ON DELETE SET NULL so removing an org doesn't take
+  /// its tenants with it — orphaned tenants behave like the legacy
+  /// pre-org model.
+  organizationId            String?
+  industry                  String?
+  scope                     String?
+  context                   String?
+  interestedParties         String?
+  boundaries                String?
+  exclusions                String?
+  reminderDaysBefore        Int                          @default(14)
+  maxRiskScale              Int                          @default(5)
+  /// Epic B.2 — wrapped per-tenant Data Encryption Key.
+  /// Shape: the existing `encryptField()` envelope (`v1:base64(...)`),
+  /// wrapping a 32-byte random DEK. See `src/lib/security/tenant-keys.ts`.
+  /// Nullable so existing tenants continue working until the backfill
+  /// script lands. The runtime integration phase may treat `NULL` as
+  /// "use the global KEK directly" (current behaviour) or generate a
+  /// DEK lazily on first use.
+  encryptedDek              String?
+  /// Epic B — previous wrapped DEK, retained during a per-tenant DEK
+  /// rotation. Envelope: identical to `encryptedDek` — `v1:base64(...)`
+  /// produced by `wrapDek()` from `src/lib/security/tenant-keys.ts`.
+  ///
+  /// Lifecycle: non-NULL only while a per-tenant DEK rotation is in
+  /// flight (i.e. after a new DEK has been written to `encryptedDek`
+  /// but before the background re-encryption job has finished
+  /// rewriting every ciphertext that carried the old DEK). Once all
+  /// v2:<old-dek>:... ciphertexts have been re-encrypted under the new
+  /// DEK, the job clears this column back to NULL.
+  ///
+  /// Read-fallback: `getTenantDek` will try `encryptedDek` first and,
+  /// on AES-GCM authentication failure, fall back to
+  /// `previousEncryptedDek` — mirroring the master-KEK dual-key
+  /// fallback in `decryptField`. (This fallback is reserved for the
+  /// real implementation; the current `rotateTenantDek` stub throws.)
+  ///
+  /// Invariant: `previousEncryptedDek` must not equal `encryptedDek`
+  /// when non-NULL. Equality would make the old and new DEKs
+  /// indistinguishable on the decrypt path (silent key mixing). A DB
+  /// CHECK constraint (`Tenant_previousEncryptedDek_differs`) enforces
+  /// this at the storage layer so a rotation bug cannot silently
+  /// produce identical values in both columns.
+  previousEncryptedDek      String?
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+  assets                    Asset[]
+  assetRiskLinks            AssetRiskLink[]
+  audits                    Audit[]
+  auditCycles               AuditCycle[]
+  auditLogs                 AuditLog[]
+  auditPacks                AuditPack[]
+  auditPackItems            AuditPackItem[]
+  auditPackShares           AuditPackShare[]
+  auditorAccounts           AuditorAccount[]
+  billingAccount            BillingAccount?
+  billingEvents             BillingEvent[]
+  clauseProgress            ClauseProgress[]
+  controls                  Control[]
+  controlAssets             ControlAsset[]
+  controlContributors       ControlContributor[]
+  controlEvidenceLinks      ControlEvidenceLink[]
+  controlRequirementLinks   ControlRequirementLink[]
+  controlTasks              ControlTask[]
+  controlTestEvidenceLinks  ControlTestEvidenceLink[]
+  controlTestPlans          ControlTestPlan[]
+  controlTestRuns           ControlTestRun[]
+  controlTestSteps          ControlTestStep[]
+  evidence                  Evidence[]
+  fileRecords               FileRecord[]
+  findings                  Finding[]
+  integrationConnections    IntegrationConnection[]
+  integrationExecutions     IntegrationExecution[]
+  integrationWebhookEvents  IntegrationWebhookEvent[]
+  notifications             Notification[]
+  notificationOutbox        NotificationOutbox[]
+  policies                  Policy[]
+  policyVersions            PolicyVersion[]
+  reminderHistories         ReminderHistory[]
+  risks                     Risk[]
+  riskControls              RiskControl[]
+  riskSuggestionItems       RiskSuggestionItem[]
+  riskSuggestionSessions    RiskSuggestionSession[]
+  tasks                     Task[]
+  taskComments              TaskComment[]
+  taskLinks                 TaskLink[]
+  taskWatchers              TaskWatcher[]
+  identityProviders         TenantIdentityProvider[]
+  invites                   TenantInvite[]
+  memberships               TenantMembership[]
+  notificationSettings      TenantNotificationSettings?
+  onboarding                TenantOnboarding?
+  scimTokens                TenantScimToken[]
+  securitySettings          TenantSecuritySettings?
+  identityLinks             UserIdentityLink[]
+  mfaEnrollments            UserMfaEnrollment[]
+  userNotificationPrefs     UserNotificationPreference[]
+  vendors                   Vendor[]
+  vendorAssessments         VendorAssessment[]
+  vendorAssessmentAnswers   VendorAssessmentAnswer[]
+  vendorContacts            VendorContact[]
+  vendorDocuments           VendorDocument[]
+  vendorEvidenceBundles     VendorEvidenceBundle[]
+  vendorEvidenceBundleItems VendorEvidenceBundleItem[]
+  vendorLinks               VendorLink[]
+  vendorRelationships       VendorRelationship[]
+  syncMappings              IntegrationSyncMapping[]
+  customRoles               TenantCustomRole[]
+  apiKeys                   TenantApiKey[]
+  complianceSnapshots       ComplianceSnapshot[]
+  automationRules           AutomationRule[]
+  automationExecutions      AutomationExecution[]
+  // denorm-tenantId Phase 1 inverse relations.
+  evidenceReviews           EvidenceReview[]
+  auditChecklistItems       AuditChecklistItem[]
+  findingEvidences          FindingEvidence[]
+  auditorPackAccesses       AuditorPackAccess[]
+  // PolicyControlLink denormalisation (single-table follow-on).
+  policyControlLinks        PolicyControlLink[]
+  // Hub-and-spoke (Epic O-1).
+  organization              Organization?                @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+}
+
+// Hub-and-spoke organization layer (Epic O-1).
+//
+// An Organization is the parent of N tenants (typical: 100 solution-
+// owner tenants per CISO portfolio). Org-level members come in two
+// roles: ORG_ADMIN (CISO-class — gets auto-provisioned AUDITOR
+// membership in every child tenant via the Epic O-2 service) and
+// ORG_READER (portfolio-only, no per-tenant access).
+//
+// Slug is unique across the whole system, parallel to Tenant.slug.
+// URL paths are `/org/{slug}` and `/t/{slug}` — the namespaces don't
+// collide because the prefixes differ.
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenants                      Tenant[]
+  memberships                  OrgMembership[]
+  provisionedTenantMemberships TenantMembership[] @relation("OrgProvisionedTenantMemberships")
+}
+
+// Per-user, per-org role assignment.
+//
+// Two roles in the OrgRole enum: ORG_ADMIN, ORG_READER. ADMIN
+// becoming a member triggers the Epic O-2 auto-provisioning service
+// which creates an AUDITOR `TenantMembership` in every child tenant
+// (idempotent — skips users who already have a manual membership).
+//
+// Removing an ORG_ADMIN triggers the deprovisioning service which
+// deletes only auto-created memberships (the ones with
+// `provisionedByOrgId` matching this org); manually-granted
+// memberships are preserved.
+model OrgMembership {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrgRole  @default(ORG_READER)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model TenantOnboarding {
+  id             String           @id @default(cuid())
+  tenantId       String           @unique
+  status         OnboardingStatus @default(NOT_STARTED)
+  currentStep    String           @default("COMPANY_PROFILE")
+  completedSteps String[]         @default([])
+  stepData       Json             @default("{}")
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+}
+
+/// Tenant-scoped custom role with granular permission overrides.
+/// Coexists with the built-in Role enum (ADMIN/EDITOR/READER/AUDITOR).
+/// When a TenantMembership has a customRoleId, the permissionsJson from
+/// this model takes precedence over the enum-based defaults for UI gating.
+/// Backend authorization should merge/override accordingly.
+model TenantCustomRole {
+  id              String             @id @default(cuid())
+  tenantId        String
+  name            String /// Display name, e.g. "Compliance Lead"
+  description     String? /// Optional description of the role's purpose
+  baseRole        Role               @default(READER) /// Fallback enum role for coarse checks
+  permissionsJson Json /// Typed PermissionSet — see src/lib/permissions.ts
+  isActive        Boolean            @default(true) /// Soft-disable without deleting assignments
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  tenant          Tenant             @relation(fields: [tenantId], references: [id])
+  memberships     TenantMembership[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+}
+
+/// Tenant-scoped API keys for machine-to-machine authentication.
+/// Keys are stored as SHA-256 hashes — the plaintext is shown only once at creation.
+/// Supports expiry, revocation, scope restrictions, and last-used tracking.
+model TenantApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String /// Human-friendly label, e.g. "CI/CD Pipeline"
+  keyPrefix   String /// First 8 chars of the plaintext key (for identification)
+  keyHash     String /// SHA-256 hash of the full plaintext key
+  scopes      Json      @default("[]") /// JSON array of scope strings, e.g. ["controls:read","evidence:write"]
+  expiresAt   DateTime? /// Optional expiry — null = no expiry
+  revokedAt   DateTime? /// Non-null = revoked
+  lastUsedAt  DateTime? /// Updated on each successful auth
+  lastUsedIp  String? /// IP of last auth request
+  createdById String /// User who created this key
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  createdBy   User      @relation("ApiKeyCreator", fields: [createdById], references: [id])
+
+  @@unique([keyHash])
+  @@index([tenantId])
+  @@index([tenantId, revokedAt])
+}
+
+model TenantMembership {
+  id                 String            @id @default(cuid())
+  tenantId           String
+  userId             String
+  role               Role              @default(READER)
+  customRoleId       String? /// Optional FK to TenantCustomRole for granular overrides
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  deactivatedAt      DateTime?
+  invitedAt          DateTime?
+  invitedByUserId    String?
+  status             MembershipStatus  @default(ACTIVE)
+  /// Hub-and-spoke (Epic O-1). When non-NULL, this membership was
+  /// auto-created by the org auto-provisioning service in response to
+  /// the user gaining ORG_ADMIN on the named Organization. The
+  /// deprovisioning service deletes ONLY rows with this column set,
+  /// so manually-granted ADMIN/EDITOR/READER/AUDITOR memberships
+  /// survive an ORG_ADMIN removal.
+  ///
+  /// NULL = manually created (the historical default, preserved for
+  /// every membership that existed before the org layer landed).
+  ///
+  /// ON DELETE SET NULL on the Organization FK so deleting the parent
+  /// org doesn't delete the auto-provisioned memberships — they
+  /// transition to "manually created" semantics and are kept.
+  /// (The deprovision usecase is the canonical cleanup path; the FK
+  /// rule is referential-integrity defence-in-depth.)
+  provisionedByOrgId String?
+  customRole         TenantCustomRole? @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  invitedBy          User?             @relation("MembershipInviter", fields: [invitedByUserId], references: [id])
+  tenant             Tenant            @relation(fields: [tenantId], references: [id])
+  user               User              @relation(fields: [userId], references: [id])
+  provisionedByOrg   Organization?     @relation("OrgProvisionedTenantMemberships", fields: [provisionedByOrgId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, userId])
+  @@index([tenantId, status])
+  @@index([customRoleId])
+  @@index([provisionedByOrgId])
+}
+
+model User {
+  id                            String                       @id @default(cuid())
+  email                         String                       @unique
+  passwordHash                  String?
+  name                          String?
+  emailVerified                 DateTime?
+  image                         String?
+  createdAt                     DateTime                     @default(now())
+  updatedAt                     DateTime                     @updatedAt
+  sessionVersion                Int                          @default(0)
+  emailEncrypted                String?
+  emailHash                     String?                      @unique
+  nameEncrypted                 String?
+  accounts                      Account[]
+  ownedAssets                   Asset[]                      @relation("AssetOwner")
+  assetRiskLinksCreated         AssetRiskLink[]              @relation("AssetRiskCreator")
+  auditCyclesCreated            AuditCycle[]
+  auditLogs                     AuditLog[]
+  auditPacksFrozen              AuditPack[]                  @relation("AuditPackFrozenBy")
+  auditSharesCreated            AuditPackShare[]
+  controlApplicabilityDecisions Control[]                    @relation("ControlApplicabilityDecider")
+  createdControls               Control[]                    @relation("ControlCreator")
+  ownedControls                 Control[]                    @relation("ControlOwner")
+  controlAssetsCreated          ControlAsset[]               @relation("ControlAssetCreator")
+  controlContributions          ControlContributor[]
+  controlEvidenceLinksCreated   ControlEvidenceLink[]        @relation("ControlEvidenceCreator")
+  controlTaskAssignments        ControlTask[]                @relation("ControlTaskAssignee")
+  testEvidenceLinksCreated      ControlTestEvidenceLink[]    @relation("TestEvidenceCreator")
+  createdTestPlans              ControlTestPlan[]            @relation("TestPlanCreator")
+  ownedTestPlans                ControlTestPlan[]            @relation("TestPlanOwner")
+  createdTestRuns               ControlTestRun[]             @relation("TestRunCreator")
+  executedTestRuns              ControlTestRun[]             @relation("TestRunExecutor")
+  evidenceReviews               EvidenceReview[]
+  ownedEvidence                 Evidence[]                   @relation("EvidenceOwner")
+  uploadedFiles                 FileRecord[]                 @relation("FileUploader")
+  notifications                 Notification[]
+  ownedPolicies                 Policy[]                     @relation("PolicyOwner")
+  policyAcknowledgements        PolicyAcknowledgement[]
+  policyApprovals               PolicyApproval[]             @relation("PolicyApprover")
+  policyApprovalRequests        PolicyApproval[]             @relation("PolicyApprovalRequester")
+  policyVersionsCreated         PolicyVersion[]              @relation("PolicyVersionCreator")
+  riskControlsCreated           RiskControl[]                @relation("RiskControlCreator")
+  riskSuggestionSessions        RiskSuggestionSession[]      @relation("SuggestionSessionCreator")
+  sessions                      AuthSession[]
+  assignedTasks                 Task[]                       @relation("TaskAssignee")
+  createdTasks                  Task[]                       @relation("TaskCreator")
+  reviewingTasks                Task[]                       @relation("TaskReviewer")
+  taskCommentsCreated           TaskComment[]                @relation("TaskCommentCreator")
+  taskWatches                   TaskWatcher[]
+  invitesSent                   TenantInvite[]
+  invitedMemberships            TenantMembership[]           @relation("MembershipInviter")
+  tenantMemberships             TenantMembership[]
+  identityLinks                 UserIdentityLink[]
+  mfaEnrollments                UserMfaEnrollment[]
+  notificationPreferences       UserNotificationPreference[]
+  ownedVendors                  Vendor[]                     @relation("VendorOwner")
+  assessmentsDecided            VendorAssessment[]           @relation("AssessmentDecider")
+  assessmentsRequested          VendorAssessment[]           @relation("AssessmentRequester")
+  vendorDocsUploaded            VendorDocument[]             @relation("VendorDocUploader")
+  vendorBundlesCreated          VendorEvidenceBundle[]       @relation("EvidenceBundleCreator")
+  apiKeysCreated                TenantApiKey[]               @relation("ApiKeyCreator")
+  userSessions                  UserSession[]                @relation("UserSessionOwner")
+  orgMemberships                OrgMembership[]
+}
+
+model Account {
+  id                    String  @id @default(cuid())
+  userId                String
+  type                  String
+  provider              String
+  providerAccountId     String
+  refresh_token         String?
+  access_token          String?
+  expires_at            Int?
+  token_type            String?
+  scope                 String?
+  id_token              String?
+  session_state         String?
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  user                  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model AuthSession {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("Session")
+}
+
+// Epic C.3 — operational session tracking (separate from the
+// NextAuth-adapter `AuthSession` table, which we leave untouched to
+// avoid churning the adapter contract). One row per JWT minted by the
+// `jwt` callback. Subsequent passes look this row up by `sessionId`,
+// honour `revokedAt`, and update `lastActiveAt` (throttled).
+//
+// Privacy notes:
+//   - `ipAddress` is captured from the incoming request at sign-in;
+//     stored as a string (IPv4 / IPv6) so geo-IP correlation can
+//     happen out-of-band. Acceptable under the existing PII model
+//     because it's tied to the user's own auth event.
+//   - `userAgent` is truncated to 512 chars to bound row size.
+//   - Neither field is encrypted; both are operational telemetry,
+//     not business content. If your threat model demands it, route
+//     them through the encrypted-fields manifest later.
+model UserSession {
+  id            String    @id @default(cuid())
+  /// Stable identifier embedded in the JWT so subsequent requests can
+  /// find this row without trusting any other token claim. Min-entropy
+  /// of cuid is acceptable; the token itself is signed by AUTH_SECRET
+  /// so a guessed sessionId on its own does nothing.
+  sessionId     String    @unique
+  userId        String
+  /// Tenant the user signed in against. Nullable because the very
+  /// first JWT mint may precede tenant resolution (rare but possible).
+  tenantId      String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime
+  lastActiveAt  DateTime  @default(now())
+  revokedAt     DateTime?
+  /// Free-form attribution for the revocation (e.g. "admin:abc123" or
+  /// "user:self"). Not displayed to end users; surfaced in the audit
+  /// log entry.
+  revokedReason String?
+
+  user User @relation("UserSessionOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([userId, revokedAt])
+  @@index([tenantId, revokedAt])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model BillingAccount {
+  id                   String        @id @default(cuid())
+  tenantId             String        @unique
+  stripeCustomerId     String        @unique
+  stripeSubscriptionId String?
+  plan                 BillingPlan   @default(FREE)
+  status               BillingStatus @default(ACTIVE)
+  currentPeriodEnd     DateTime?
+  trialEndsAt          DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  tenant               Tenant        @relation(fields: [tenantId], references: [id])
+}
+
+model BillingEvent {
+  id            String   @id @default(cuid())
+  tenantId      String
+  type          String
+  stripeEventId String   @unique
+  payloadJson   Json
+  createdAt     DateTime @default(now())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+}
+
+model TenantIdentityProvider {
+  id            String               @id @default(cuid())
+  tenantId      String
+  type          IdentityProviderType
+  name          String
+  isEnabled     Boolean              @default(false)
+  isEnforced    Boolean              @default(false)
+  emailDomains  String[]             @default([])
+  configJson    Json                 @default("{}")
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  identityLinks UserIdentityLink[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model UserIdentityLink {
+  id                       String                 @id @default(cuid())
+  userId                   String
+  tenantId                 String
+  providerId               String
+  externalSubject          String
+  emailAtLinkTime          String
+  lastLoginAt              DateTime?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  emailAtLinkTimeEncrypted String?
+  emailAtLinkTimeHash      String?
+  provider                 TenantIdentityProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  tenant                   Tenant                 @relation(fields: [tenantId], references: [id])
+  user                     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, externalSubject])
+  @@unique([userId, providerId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model TenantSecuritySettings {
+  id                         String    @id @default(cuid())
+  tenantId                   String    @unique
+  mfaPolicy                  MfaPolicy @default(DISABLED)
+  /// Hard cap on JWT lifetime in minutes. When set, every newly minted
+  /// session row's `expiresAt` is min(NextAuth max-age, now + this).
+  sessionMaxAgeMinutes       Int?
+  /// Maximum number of concurrent active sessions allowed per user
+  /// in this tenant. When reached, the oldest session (by
+  /// `lastActiveAt` ASC) is revoked to make room for the new sign-in.
+  /// Null = unlimited (legacy behaviour).
+  maxConcurrentSessions      Int?
+  /// Epic C.4 — outbound audit-event streaming.
+  /// `auditStreamUrl`: HTTPS endpoint the audit streamer POSTs batched
+  /// audit events to. Null disables streaming.
+  /// `auditStreamSecretEncrypted`: HMAC-SHA256 secret used to sign
+  /// each batch. Stored encrypted via the field-encryption manifest
+  /// (added to `ENCRYPTED_FIELDS.TenantSecuritySettings`).
+  auditStreamUrl             String?
+  auditStreamSecretEncrypted String?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  mfaFailClosed              Boolean   @default(false)
+  tenant                     Tenant    @relation(fields: [tenantId], references: [id])
+}
+
+model UserMfaEnrollment {
+  id                  String    @id @default(cuid())
+  userId              String
+  tenantId            String
+  type                MfaType   @default(TOTP)
+  secretEncrypted     String
+  isVerified          Boolean   @default(false)
+  verifiedAt          DateTime?
+  lastChallengeAt     DateTime?
+  backupCodesHashJson String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId, type])
+  @@index([userId])
+  @@index([tenantId])
+}
+
+model TenantInvite {
+  id          String    @id @default(cuid())
+  tenantId    String
+  email       String
+  role        Role      @default(READER)
+  token       String    @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  invitedBy   User      @relation(fields: [invitedById], references: [id])
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, email])
+  @@index([token])
+  @@index([tenantId])
+}
+
+model TenantScimToken {
+  id         String    @id @default(cuid())
+  tenantId   String
+  label      String
+  tokenHash  String    @unique
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}

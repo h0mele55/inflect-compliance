@@ -6,6 +6,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const ROOT = path.resolve(__dirname, '../..');
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf-8');
@@ -13,7 +14,7 @@ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf-8');
 describe('Connection Pooling Configuration', () => {
 
     describe('Prisma schema', () => {
-        const schema = read('prisma/schema.prisma');
+        const schema = readPrismaSchema();
 
         test('datasource has url (pooled connection)', () => {
             expect(schema).toContain('url       = env("DATABASE_URL")');
