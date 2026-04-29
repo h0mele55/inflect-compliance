@@ -238,7 +238,7 @@ if (typeof (globalThis as any).EdgeRuntime === 'undefined' && !globalForPrisma.p
     auditMiddlewareLogger.info('pii.middleware_registered', {
         component: 'pii-middleware',
         runtime: typeof (globalThis as { EdgeRuntime?: unknown }).EdgeRuntime === 'undefined' ? 'node' : 'edge',
-        nodeEnv: process.env.NODE_ENV,
+        nodeEnv: env.NODE_ENV,
     });
 }
 
