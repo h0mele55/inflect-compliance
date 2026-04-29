@@ -54,15 +54,18 @@ test.describe('Epic 56 — tooltip + copy primitives', () => {
 
         // Select the first row to make the SelectionToolbar visible.
         // The shared DataTable wraps its Radix Checkbox in a
-        // `<div role="button" title="Select">` (a plain <button>
+        // `<div role="presentation" title="Select">` (a plain <button>
         // wrapper triggers the "<button> inside <button>" hydration
-        // mismatch because Radix Checkbox already renders as <button>).
-        // The inner checkbox has `pointer-events-none` so the click
-        // reaches the wrapping div's handler.
+        // mismatch because Radix Checkbox already renders as <button>;
+        // GAP-CI-77 changed the wrapper from role="button" to
+        // role="presentation" so axe sees only the inner labelled
+        // Radix button as the canonical control). The inner checkbox
+        // has `pointer-events-none` so the click reaches the wrapping
+        // div's handler.
         const firstRowSelect = page
             .locator('tbody tr')
             .first()
-            .locator('[role="button"][title="Select"]')
+            .locator('[title="Select"]')
             .first();
         await firstRowSelect.waitFor({ state: 'visible', timeout: 30_000 });
         await firstRowSelect.click();

@@ -185,7 +185,12 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
                     <div className="min-w-0">
                         <p className="text-xs font-medium text-content-default truncate">{user.name}</p>
                         <p className="text-xs text-content-muted truncate">{tenant.tenantName}</p>
-                        <p className="text-xs text-[var(--brand-default)]">{tenant.role}</p>
+                        {/* GAP-CI-77: role uses content-muted (not brand-default).
+                            The PwC-orange brand colour on light cream is only
+                            4.25:1 — below WCAG AA's 4.5:1 for small text — and
+                            the role line is informational, not a brand
+                            accent. */}
+                        <p className="text-xs text-content-muted">{tenant.role}</p>
                     </div>
                     <ThemeToggle id="theme-toggle-desktop" />
                 </div>

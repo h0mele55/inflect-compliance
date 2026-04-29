@@ -253,7 +253,17 @@ function TasksPageInner({
             cols.push({
                 id: 'select',
                 header: () => (
-                    <input type="checkbox" checked={selected.size === tasks.length && tasks.length > 0} onChange={toggleSelectAll} id="select-all-checkbox" />
+                    <input
+                        type="checkbox"
+                        checked={selected.size === tasks.length && tasks.length > 0}
+                        onChange={toggleSelectAll}
+                        id="select-all-checkbox"
+                        // GAP-CI-77: aria-label so the checkbox satisfies
+                        // the axe-core `label` rule (no surrounding
+                        // <label> element wraps it; the column header is
+                        // visual only).
+                        aria-label="Select all tasks"
+                    />
                 ),
                 cell: ({ row }) => (
                     <input
@@ -262,6 +272,7 @@ function TasksPageInner({
                         onChange={() => toggleSelect(row.original.id)}
                         onClick={e => e.stopPropagation()}
                         className="task-checkbox"
+                        aria-label={`Select task ${row.original.title}`}
                     />
                 ),
                 enableHiding: false,

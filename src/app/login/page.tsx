@@ -247,7 +247,7 @@ function LoginForm() {
                                     <div className="w-full border-t border-slate-700/50" />
                                 </div>
                                 <div className="relative flex justify-center text-xs">
-                                    <span className="px-2 bg-slate-900 text-slate-500">or continue with email</span>
+                                    <span className="px-2 bg-slate-900 text-slate-400">or continue with email</span>
                                 </div>
                             </div>
 

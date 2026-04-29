@@ -37,6 +37,20 @@ function pctColor(pct: number): string {
     return '#ef4444';
 }
 
+/**
+ * GAP-CI-77: text variant of pctColor — returns a Tailwind class that
+ * targets a semantic status token. Hex Tailwind mid-tones above fail
+ * WCAG AA against light-theme cream (~3.0:1); the semantic tokens are
+ * tuned to ≥4.5:1 in both themes. Used wherever the colour is applied
+ * to actual text; DonutChart segments still use the hex directly via
+ * `pctColor` because SVG fills aren't gated by WCAG text rules.
+ */
+function pctTextClass(pct: number): string {
+    if (pct >= 80) return 'text-content-success';
+    if (pct >= 50) return 'text-content-warning';
+    return 'text-content-error';
+}
+
 function pctGradient(pct: number): string {
     if (pct >= 80) return 'from-emerald-500 to-teal-500';
     if (pct >= 50) return 'from-amber-500 to-yellow-500';
@@ -84,7 +98,7 @@ export function CoverageClient({ data, tenantSlug }: CoverageClientProps) {
                 const score = getValue() as number;
                 return (
                     <span className={`text-sm font-semibold tabular-nums ${
-                        score >= 15 ? 'text-red-400' : score >= 9 ? 'text-amber-400' : 'text-emerald-400'
+                        score >= 15 ? 'text-content-error' : score >= 9 ? 'text-content-warning' : 'text-content-success'
                     }`}>
                         {score}
                     </span>
@@ -135,8 +149,9 @@ export function CoverageClient({ data, tenantSlug }: CoverageClientProps) {
                         href={tenantHref('/assets')}
                         className="text-content-muted hover:text-content-emphasis transition"
                         id="coverage-back-link"
+                        aria-label="Back to assets"
                     >
-                        <ArrowLeft className="w-5 h-5" />
+                        <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                     </Link>
                     <div>
                         <h1 className="text-2xl font-bold text-content-emphasis" id="coverage-heading">
@@ -360,7 +375,7 @@ function CoverageBar({
     pct: number;
     detail: string;
 }) {
-    const color = pctColor(pct);
+    const textClass = pctTextClass(pct);
     // Epic 59 — pick ProgressBar variant by the same score bands the
     // inline Tailwind class list used. Light-mode compatible via
     // token-backed variant colours.
@@ -372,7 +387,7 @@ function CoverageBar({
                 <span className="text-xs text-content-muted">{label}</span>
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-content-subtle">{detail}</span>
-                    <span className="text-xs font-semibold" style={{ color }}>{pct}%</span>
+                    <span className={`text-xs font-semibold ${textClass}`}>{pct}%</span>
                 </div>
             </div>
             <ProgressBar

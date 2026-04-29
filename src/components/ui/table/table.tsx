@@ -172,7 +172,14 @@ export function useTable<T extends any>(
               // wrapper exists only to widen the click target.
               header: ({ table }: { table: TableType<T> }) => (
                 <div
-                  role="button"
+                  // GAP-CI-77: presentation role on the wrapping click
+                  // area — the actual focusable+labelled control is the
+                  // inner <Checkbox>. role="button" here was creating a
+                  // button-name violation because axe inspected both the
+                  // outer wrapper (had aria-label but no real button
+                  // semantics) and the inner Radix button (now correctly
+                  // labelled).
+                  role="presentation"
                   tabIndex={-1}
                   className="flex size-full cursor-pointer items-center justify-center"
                   onClick={(e) => {
@@ -182,6 +189,7 @@ export function useTable<T extends any>(
                   title="Select all"
                 >
                   <Checkbox
+                    aria-label="Select all rows"
                     className="border-border-emphasis pointer-events-none size-4 rounded data-[state=checked]:bg-[var(--brand-emphasis)] data-[state=indeterminate]:bg-[var(--brand-emphasis)]"
                     checked={
                       table.getIsAllRowsSelected()
@@ -257,13 +265,16 @@ export function useTable<T extends any>(
 
                 return (
                   <div
-                    role="button"
+                    // GAP-CI-77: see select-all wrapper above for the same
+                    // role="presentation" rationale.
+                    role="presentation"
                     tabIndex={-1}
                     className="flex size-full cursor-pointer items-center justify-center"
                     onClick={onSelectRow}
                     title="Select"
                   >
                     <Checkbox
+                      aria-label="Select row"
                       className="border-border-emphasis pointer-events-none size-4 rounded data-[state=checked]:bg-[var(--brand-emphasis)] data-[state=indeterminate]:bg-[var(--brand-emphasis)]"
                       checked={row.getIsSelected()}
                     />
