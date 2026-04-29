@@ -32,6 +32,13 @@ import {
     _resetTenantDekCache,
 } from '@/lib/security/tenant-key-manager';
 import { generateDek, wrapDek, unwrapDek } from '@/lib/security/tenant-keys';
+import {
+    encryptWithKey,
+    decryptWithKey,
+    decryptWithKeyOrPrevious,
+} from '@/lib/security/encryption';
+import { runTenantDekRotation } from '@/app-layer/jobs/tenant-dek-rotation';
+import type { TenantDekRotationProgress } from '@/app-layer/jobs/tenant-dek-rotation';
 import { DB_AVAILABLE } from './db-helper';
 import { prismaTestClient } from '../helpers/db';
 import type { PrismaClient } from '@prisma/client';
@@ -55,7 +62,36 @@ describeFn('rotateTenantDek (integration — real DB)', () => {
     });
 
     afterAll(async () => {
+        // Best-effort cleanup. The lifecycle test seeds Risk rows
+        // and the rotation engine writes AuditLog rows — both have
+        // FK -> Tenant, so they must go before the tenant rows.
+        // AuditLog has an immutability trigger that blocks DELETE
+        // outside `session_replication_role = 'replica'`; same
+        // bypass pattern as audit-immutability.test.ts.
         try {
+            const ids = await prisma.tenant.findMany({
+                where: { slug: { in: slugs } },
+                select: { id: true },
+            });
+            const tenantIds = ids.map((t) => t.id);
+            if (tenantIds.length > 0) {
+                await prisma
+                    .$transaction(async (tx) => {
+                        await tx.$executeRawUnsafe(
+                            `SET LOCAL session_replication_role = 'replica'`,
+                        );
+                        for (const tid of tenantIds) {
+                            await tx.$executeRawUnsafe(
+                                `DELETE FROM "AuditLog" WHERE "tenantId" = $1`,
+                                tid,
+                            );
+                        }
+                    })
+                    .catch(() => undefined);
+                await prisma.risk
+                    .deleteMany({ where: { tenantId: { in: tenantIds } } })
+                    .catch(() => undefined);
+            }
             await prisma.tenant.deleteMany({
                 where: { slug: { in: slugs } },
             });
@@ -157,4 +193,216 @@ describeFn('rotateTenantDek (integration — real DB)', () => {
             }),
         ).rejects.toThrow(/Tenant_previousEncryptedDek_differs|check constraint/i);
     });
+
+    // ── GAP-22 lifecycle proof ──────────────────────────────────────
+    //
+    // The earlier tests cover the SWAP correctness (atomic, idempotent,
+    // CHECK-constrained). This test proves the FULL LIFECYCLE — that
+    // ciphertext written before rotation is still readable after the
+    // swap (via the dual-DEK fallback) AND that, after the sweep job
+    // runs, every row decrypts under the new DEK alone.
+    //
+    // Why this matters: the swap is atomic and fast, but the
+    // re-encrypt sweep is the long pole. Between `rotateTenantDek`
+    // returning and the BullMQ job clearing `previousEncryptedDek`,
+    // the system is in dual-DEK mode. The middleware's
+    // `decryptWithKeyOrPrevious` is what makes that mode safe; this
+    // test exercises the contract end-to-end.
+
+    test('full lifecycle: pre-rotation ciphertext stays readable, post-sweep all v2 under new DEK', async () => {
+        const slug = `rot-lifecycle-${Date.now()}`;
+        slugs.push(slug);
+
+        // Create a real user so the rotation engine's audit entries
+        // (TENANT_DEK_ROTATION_STARTED / _COMPLETED) clear their
+        // AuditLog.userId FK. The other tests in this file don't run
+        // the engine job, so they didn't need this; we do.
+        const userEmail = `rot-lifecycle-${Date.now()}@test.local`;
+        const { hashForLookup } = await import('@/lib/security/encryption');
+        const lifecycleUser = await prisma.user.create({
+            data: {
+                email: userEmail,
+                emailHash: hashForLookup(userEmail),
+                name: 'Lifecycle User',
+            },
+        });
+
+        // ── Setup: tenant + initial DEK ─────────────────────────────
+        const initialDek = generateDek();
+        const initialWrapped = wrapDek(initialDek);
+        const tenant = await prisma.tenant.create({
+            data: {
+                name: 'rot-lifecycle',
+                slug,
+                encryptedDek: initialWrapped,
+            },
+        });
+
+        // ── Seed v2 ciphertexts under the INITIAL DEK ───────────────
+        // Risk.threat is in the encrypted-fields manifest and Risk
+        // carries a tenantId column — so the rotation sweep will
+        // pick these rows up. Write directly via Prisma + a pre-
+        // computed v2 ciphertext (bypasses the runtime middleware
+        // which is conditional on audit context).
+        const PLAINTEXTS = [
+            'phishing campaign targeting finance team',
+            'unpatched VPN concentrator (CVE-2024-XXXX)',
+            'shared service-account credential in legacy script',
+        ];
+        const seeded: Array<{ id: string; plaintext: string }> = [];
+        for (const plaintext of PLAINTEXTS) {
+            const v2 = encryptWithKey(initialDek, plaintext);
+            const risk = await prisma.risk.create({
+                data: {
+                    tenantId: tenant.id,
+                    title: `lifecycle-${seeded.length}`,
+                    threat: v2,
+                },
+            });
+            seeded.push({ id: risk.id, plaintext });
+        }
+
+        // Sanity — ciphertexts on disk are v2: shape and decrypt
+        // cleanly under the initial DEK.
+        const seededRows = await prisma.$queryRawUnsafe<
+            Array<{ id: string; threat: string }>
+        >(`SELECT id, "threat" FROM "Risk" WHERE "tenantId" = $1 ORDER BY id`, tenant.id);
+        expect(seededRows).toHaveLength(PLAINTEXTS.length);
+        for (const row of seededRows) {
+            expect(row.threat.startsWith('v2:')).toBe(true);
+            const seedMatch = seeded.find((s) => s.id === row.id)!;
+            expect(decryptWithKey(initialDek, row.threat)).toBe(seedMatch.plaintext);
+        }
+
+        // ── Phase 1: rotateTenantDek (sync swap) ────────────────────
+        const result = await rotateTenantDek({
+            tenantId: tenant.id,
+            initiatedByUserId: lifecycleUser.id,
+        });
+        expect(result.tenantId).toBe(tenant.id);
+
+        const afterSwap = await prisma.tenant.findUnique({
+            where: { id: tenant.id },
+            select: { encryptedDek: true, previousEncryptedDek: true },
+        });
+        expect(afterSwap?.previousEncryptedDek).toBe(initialWrapped);
+        expect(afterSwap?.encryptedDek).not.toBe(initialWrapped);
+        const newDek = unwrapDek(afterSwap!.encryptedDek!);
+        const previousDek = unwrapDek(afterSwap!.previousEncryptedDek!);
+
+        // Pre-sweep, the seeded rows are STILL ENCRYPTED UNDER THE
+        // PREVIOUS DEK on disk — the swap moved DEKs, not data. The
+        // middleware's `decryptWithKeyOrPrevious` is what keeps reads
+        // working: it tries the new (primary) DEK, fails AES-GCM
+        // auth, and falls back to the previous DEK.
+        for (const row of seededRows) {
+            // Under the NEW DEK directly: must FAIL (different key).
+            expect(() => decryptWithKey(newDek, row.threat)).toThrow();
+            // Under the PREVIOUS DEK directly: still works.
+            const seedMatch = seeded.find((s) => s.id === row.id)!;
+            expect(decryptWithKey(previousDek, row.threat)).toBe(seedMatch.plaintext);
+            // Via the production fallback: works without the caller
+            // having to know which DEK is active.
+            expect(
+                decryptWithKeyOrPrevious(newDek, previousDek, row.threat),
+            ).toBe(seedMatch.plaintext);
+        }
+
+        // ── Phase 2: run the sweep ──────────────────────────────────
+        // Capture progress payloads so we can assert live observability.
+        const progressEvents: TenantDekRotationProgress[] = [];
+        const sweepResult = await runTenantDekRotation({
+            tenantId: tenant.id,
+            initiatedByUserId: lifecycleUser.id,
+            batchSize: 2, // small so the per-batch progress hook fires
+            onProgress: async (p) => {
+                progressEvents.push(p);
+            },
+        });
+
+        expect(sweepResult.tenantId).toBe(tenant.id);
+        expect(sweepResult.previousEncryptedDekCleared).toBe(true);
+        expect(sweepResult.totalErrors).toBe(0);
+        // The Risk.threat column carried 3 v2 rows — they all get
+        // rewritten. The sweep walks every (model, field) so its
+        // counters span the whole manifest, but `totalRewritten` is
+        // bounded below by what we seeded.
+        expect(sweepResult.totalRewritten).toBeGreaterThanOrEqual(PLAINTEXTS.length);
+
+        // Progress hook fired with at least: starting → sweeping →
+        // finalising → complete.
+        const phases = progressEvents.map((p) => p.phase);
+        expect(phases[0]).toBe('starting');
+        expect(phases).toContain('sweeping');
+        expect(phases).toContain('finalising');
+        expect(phases[phases.length - 1]).toBe('complete');
+        // Final cumulative totals match the result.
+        const final = progressEvents[progressEvents.length - 1];
+        expect(final.totalRewritten).toBe(sweepResult.totalRewritten);
+        expect(final.totalErrors).toBe(sweepResult.totalErrors);
+
+        // ── Phase 3: post-sweep — DEK column cleared, all v2 under new DEK ──
+        const afterSweep = await prisma.tenant.findUnique({
+            where: { id: tenant.id },
+            select: { encryptedDek: true, previousEncryptedDek: true },
+        });
+        // previousEncryptedDek MUST be NULL — the only signal that
+        // the rotation is "done"; subsequent rotations key off it.
+        expect(afterSweep?.previousEncryptedDek).toBeNull();
+        expect(afterSweep?.encryptedDek).toBe(afterSwap?.encryptedDek);
+
+        const sweptRows = await prisma.$queryRawUnsafe<
+            Array<{ id: string; threat: string }>
+        >(`SELECT id, "threat" FROM "Risk" WHERE "tenantId" = $1 ORDER BY id`, tenant.id);
+        expect(sweptRows).toHaveLength(PLAINTEXTS.length);
+        for (const row of sweptRows) {
+            const seedMatch = seeded.find((s) => s.id === row.id)!;
+            // Plaintext recovers correctly under the NEW DEK alone —
+            // no fallback needed.
+            expect(row.threat.startsWith('v2:')).toBe(true);
+            expect(decryptWithKey(newDek, row.threat)).toBe(seedMatch.plaintext);
+            // Under the PREVIOUS DEK: must FAIL (the row is no
+            // longer encrypted under that key).
+            expect(() => decryptWithKey(previousDek, row.threat)).toThrow();
+        }
+
+        // ── Phase 4: a brand-new write uses the new DEK ─────────────
+        // This proves the post-rotation steady state — no stale
+        // tenant DEK is hanging around in any cache or middleware
+        // path that would silently encrypt under the old key.
+        const freshPlaintext = 'newly-discovered insider threat';
+        const freshV2 = encryptWithKey(newDek, freshPlaintext);
+        const freshRisk = await prisma.risk.create({
+            data: {
+                tenantId: tenant.id,
+                title: 'lifecycle-fresh',
+                threat: freshV2,
+            },
+        });
+        const [freshRow] = await prisma.$queryRawUnsafe<
+            Array<{ threat: string }>
+        >(`SELECT "threat" FROM "Risk" WHERE id = $1`, freshRisk.id);
+        expect(freshRow.threat.startsWith('v2:')).toBe(true);
+        expect(decryptWithKey(newDek, freshRow.threat)).toBe(freshPlaintext);
+        // And the previous DEK doesn't decrypt it.
+        expect(() => decryptWithKey(previousDek, freshRow.threat)).toThrow();
+
+        // ── Cleanup ────────────────────────────────────────────────
+        // AuditLog has an immutability trigger; bypass with
+        // `SET LOCAL session_replication_role = 'replica'` inside a
+        // transaction (same pattern as audit-immutability.test.ts).
+        await prisma.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(
+                `SET LOCAL session_replication_role = 'replica'`,
+            );
+            await tx.$executeRawUnsafe(
+                `DELETE FROM "AuditLog" WHERE "tenantId" = $1`,
+                tenant.id,
+            );
+        });
+        await prisma.risk.deleteMany({ where: { tenantId: tenant.id } });
+        await prisma.user
+            .delete({ where: { id: lifecycleUser.id } })
+            .catch(() => undefined);
+    }, 30_000);
 });

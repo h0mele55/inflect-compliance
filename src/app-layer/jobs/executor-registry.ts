@@ -36,6 +36,30 @@ import type { JobName, JobPayload, JobRunResult } from './types';
 // ─── Executor Contract ──────────────────────────────────────────────
 
 /**
+ * Optional context the worker passes to executors that benefit from
+ * mid-run observability hooks. Today only `updateProgress` is wired —
+ * forwarded by the BullMQ worker as `(p) => job.updateProgress(p)`.
+ * The Vercel Cron / node-cron / CLI entrypoints don't supply this
+ * (they run outside a BullMQ Job), so executors must treat the
+ * callbacks as optional and degrade gracefully when absent.
+ *
+ * Payload shape is intentionally `unknown` — each executor designs
+ * its own progress JSON. The shape MUST NOT carry secrets, raw
+ * keys, or anything sensitive: it's surfaced via the public job-
+ * status endpoints.
+ */
+export interface JobExecutorContext {
+    /**
+     * Report mid-run progress. Called per meaningful boundary
+     * (typically per batch / per phase). The callback awaits the
+     * underlying transport (BullMQ -> Redis); executors should
+     * `await` it so the GET status endpoint sees the latest value
+     * immediately.
+     */
+    updateProgress?: (progress: unknown) => Promise<void>;
+}
+
+/**
  * A job executor function.
  *
  * Takes a typed payload and returns a `JobRunResult`.
@@ -44,9 +68,15 @@ import type { JobName, JobPayload, JobRunResult } from './types';
  *   - Using `runJob()` for observability
  *   - Returning a consistent `JobRunResult`
  *   - NOT catching errors (let the registry handle fault isolation)
+ *
+ * The optional `ctx` argument carries worker-injected hooks (e.g.
+ * BullMQ progress reporting). Executors that don't need it can
+ * ignore it; entrypoints that don't supply it (cron, CLI) pass
+ * nothing.
  */
 export type JobExecutor<T extends JobName> = (
     payload: JobPayload<T>,
+    ctx?: JobExecutorContext,
 ) => Promise<JobRunResult>;
 
 // ─── Registry Implementation ────────────────────────────────────────
@@ -94,11 +124,15 @@ export const executorRegistry = {
      *
      * @param name — job name
      * @param payload — typed payload
+     * @param ctx — optional hooks (e.g. BullMQ progress callback)
+     *   forwarded by the worker. Cron / CLI entrypoints leave this
+     *   unset; executors that need progress must guard the calls.
      * @returns JobRunResult (always — never throws)
      */
     async execute<T extends JobName>(
         name: T,
         payload: JobPayload<T>,
+        ctx?: JobExecutorContext,
     ): Promise<JobRunResult> {
         const executor = executors.get(name);
         const startedAt = new Date().toISOString();
@@ -125,7 +159,7 @@ export const executorRegistry = {
         }
 
         try {
-            const result = await executor(payload);
+            const result = await executor(payload, ctx);
             // ── Record job success metric ──
             recordJobMetrics({
                 jobName: name,
@@ -469,7 +503,7 @@ executorRegistry.register('key-rotation', async (payload) => {
 
 // ── tenant-dek-rotation (Epic F.2 follow-up) ────────────────────────
 
-executorRegistry.register('tenant-dek-rotation', async (payload) => {
+executorRegistry.register('tenant-dek-rotation', async (payload, ctx) => {
     const startedAt = new Date().toISOString();
     const startMs = performance.now();
     const { runTenantDekRotation } = await import('./tenant-dek-rotation');
@@ -478,6 +512,11 @@ executorRegistry.register('tenant-dek-rotation', async (payload) => {
         initiatedByUserId: payload.initiatedByUserId,
         requestId: payload.requestId,
         batchSize: payload.batchSize,
+        // GAP-22: forward the worker's progress callback so the GET
+        // /admin/tenant-dek-rotation status endpoint sees live
+        // counters mid-rotation, not just empty progress until the
+        // job completes.
+        onProgress: ctx?.updateProgress,
     });
     return makeResult(
         'tenant-dek-rotation',

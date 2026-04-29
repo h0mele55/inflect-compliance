@@ -140,7 +140,13 @@ const worker = new Worker(
 
         log.info({ jobName, jobId: job.id, payload: job.data }, 'processing job');
 
-        const result = await executorRegistry.execute(jobName, job.data);
+        // GAP-22: forward the BullMQ Job's progress channel so
+        // executors that report mid-run progress (currently
+        // tenant-dek-rotation) surface it via `GET .../?jobId=…`
+        // without depending on bullmq from the executor side.
+        const result = await executorRegistry.execute(jobName, job.data, {
+            updateProgress: (p) => job.updateProgress(p as object | number),
+        });
         const durationMs = Math.round(performance.now() - startTime);
 
         if (!result.success) {
