@@ -1,0 +1,271 @@
+/**
+ * Playwright global teardown — GAP-23.
+ *
+ * Reads `tests/e2e/.tenant-tracker.jsonl` (appended by every
+ * `createIsolatedTenant()` invocation) and hard-deletes the rows so
+ * a CI run leaves the test database exactly as it found it (modulo
+ * the seeded fixture tenant).
+ *
+ * Cleanup order per tenant (FK-respecting, with the AuditLog
+ * immutability trigger bypassed via
+ * `SET LOCAL session_replication_role = 'replica'` — same pattern
+ * as `tests/integration/audit-immutability.test.ts`):
+ *
+ *   1. AuditLog rows where tenantId = X
+ *   2. Tenant-scoped child tables (the most common ones — see
+ *      TENANT_CHILD_TABLES below). Best-effort, table by table; a
+ *      missing/empty table is fine.
+ *   3. Tenant row itself.
+ *   4. Owner User row (User has no tenantId — we track the id from
+ *      the factory's response).
+ *
+ * Failure handling:
+ *   - We DO NOT abort the teardown on per-tenant errors. A single
+ *     row that won't delete (e.g. cross-tenant FK to seeded data)
+ *     gets logged and the loop continues so other tenants still
+ *     clean up.
+ *   - We DO NOT delete the tracker file if any tenant deletion
+ *     failed — leaving the file lets the operator inspect the
+ *     residue. The next run's teardown picks it up + retries.
+ *   - DB unreachable → log + return cleanly. CI's per-job DB is
+ *     ephemeral so the tenants vanish with it anyway; the only
+ *     real cost is dev iteration on a shared local DB.
+ *
+ * Why not use Prisma's relation cascades / `tenant.delete()`:
+ * the schema has selective `onDelete: Cascade` clauses (audit
+ * checklist items, evidence-finding links, etc.) but Tenant itself
+ * is the parent of dozens of tables, not all of which cascade.
+ * Explicit per-table deletion is simpler than chasing the schema
+ * graph at runtime.
+ */
+import type { FullConfig } from '@playwright/test';
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
+import { PrismaClient } from '@prisma/client';
+
+const TRACKER_PATH = resolvePath(__dirname, '.tenant-tracker.jsonl');
+
+interface TenantTrackerEntry {
+    tenantId: string;
+    tenantSlug: string;
+    ownerUserId: string;
+    createdAt: string;
+}
+
+/**
+ * Tables that carry `tenantId` and that we DELETE before the Tenant
+ * row goes. List is hand-maintained; the order doesn't matter
+ * because `session_replication_role = 'replica'` skips FK checks.
+ *
+ * Rows in tables NOT in this list will become orphans. That's
+ * acceptable — orphan rows in the test DB never collide with
+ * future test runs (each test tenant gets a fresh, unique id) and
+ * the cost is just storage we ignore. Add a table here when a new
+ * spec writes to it and you want truly clean teardown.
+ */
+const TENANT_CHILD_TABLES: readonly string[] = [
+    // Audit + identity
+    'AuditLog',
+    'TenantOnboarding',
+    'TenantMembership',
+    'TenantSecuritySettings',
+    'TenantNotificationSettings',
+    'TenantInvite',
+    'TenantApiKey',
+    'TenantCustomRole',
+    'TenantIdentityProvider',
+    'UserIdentityLink',
+    // Compliance entities (and their tenant-scoped children)
+    'TaskLink',
+    'TaskComment',
+    'TaskWatcher',
+    'Task',
+    'EvidenceReview',
+    'Evidence',
+    'FindingEvidence',
+    'Finding',
+    'PolicyAcknowledgement',
+    'PolicyApproval',
+    'PolicyControlLink',
+    'PolicyVersion',
+    'Policy',
+    'ControlAsset',
+    'ControlEvidenceLink',
+    'ControlContributor',
+    'ControlTestEvidenceLink',
+    'ControlTestStep',
+    'ControlTestRun',
+    'ControlTestPlan',
+    'ControlTask',
+    'AssetRiskLink',
+    'RiskControl',
+    'Risk',
+    'RiskSuggestionItem',
+    'RiskSuggestionSession',
+    'Control',
+    'Asset',
+    'ClauseProgress',
+    'AuditChecklistItem',
+    'AuditPackItem',
+    'AuditPackShare',
+    'AuditPack',
+    'AuditCycle',
+    'AuditorPackAccess',
+    'AuditorAccount',
+    'Audit',
+    // Vendor + assessments
+    'VendorEvidenceBundleItem',
+    'VendorEvidenceBundle',
+    'VendorRelationship',
+    'VendorLink',
+    'VendorAssessmentAnswer',
+    'VendorAssessment',
+    'VendorDocument',
+    'VendorContact',
+    'Vendor',
+    // Notifications + automations
+    'NotificationOutbox',
+    'ReminderHistory',
+    'Notification',
+    'AutomationExecution',
+    'AutomationRule',
+    'IntegrationSyncMapping',
+    'IntegrationConnection',
+    'IntegrationEvent',
+    // Billing
+    'BillingEvent',
+    'BillingAccount',
+    // RLS / observability
+    'UserNotificationPreference',
+    'UserSession',
+    // File storage
+    'FileRecord',
+];
+
+async function deleteTenant(
+    prisma: PrismaClient,
+    entry: TenantTrackerEntry,
+): Promise<{ ok: boolean; reason?: string }> {
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(
+                `SET LOCAL session_replication_role = 'replica'`,
+            );
+            for (const table of TENANT_CHILD_TABLES) {
+                await tx
+                    .$executeRawUnsafe(
+                        `DELETE FROM "${table}" WHERE "tenantId" = $1`,
+                        entry.tenantId,
+                    )
+                    .catch(() => undefined); // table may not exist or schema may have changed
+            }
+            await tx.$executeRawUnsafe(
+                `DELETE FROM "Tenant" WHERE id = $1`,
+                entry.tenantId,
+            );
+        });
+
+        // User cleanup — separate transaction. The user has memberships
+        // in (potentially) multiple tenants if the same email was
+        // re-used; the membership row was already deleted above.
+        // Owner-user records created by createIsolatedTenant carry the
+        // unique e2e.test domain so accidentally targeting a real
+        // user is impossible.
+        await prisma.user
+            .delete({ where: { id: entry.ownerUserId } })
+            .catch(() => undefined);
+
+        return { ok: true };
+    } catch (err) {
+        return {
+            ok: false,
+            reason: err instanceof Error ? err.message : String(err),
+        };
+    }
+}
+
+export default async function globalTeardown(_config: FullConfig): Promise<void> {
+    if (!existsSync(TRACKER_PATH)) {
+        // Most CI runs that don't use the factory leave no file.
+        // Nothing to do.
+        return;
+    }
+
+    const raw = readFileSync(TRACKER_PATH, 'utf8');
+    const entries: TenantTrackerEntry[] = [];
+    for (const line of raw.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+            entries.push(JSON.parse(trimmed) as TenantTrackerEntry);
+        } catch {
+            // Malformed line — log + skip.
+            // eslint-disable-next-line no-console
+            console.warn(
+                `[global-teardown] skipping malformed tracker line: ${trimmed.slice(0, 120)}`,
+            );
+        }
+    }
+
+    if (entries.length === 0) {
+        // Empty file — clean it up and exit.
+        try {
+            unlinkSync(TRACKER_PATH);
+        } catch {
+            /* best-effort */
+        }
+        return;
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(
+        `[global-teardown] cleaning up ${entries.length} test tenant(s)…`,
+    );
+
+    const prisma = new PrismaClient();
+    let deleted = 0;
+    let failed = 0;
+    const failures: string[] = [];
+
+    try {
+        await prisma.$connect();
+        for (const entry of entries) {
+            const r = await deleteTenant(prisma, entry);
+            if (r.ok) {
+                deleted++;
+            } else {
+                failed++;
+                failures.push(`${entry.tenantSlug}: ${r.reason}`);
+            }
+        }
+    } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn(
+            `[global-teardown] DB connection failed (test DB is likely ephemeral): ` +
+                `${err instanceof Error ? err.message : String(err)}`,
+        );
+    } finally {
+        await prisma.$disconnect().catch(() => undefined);
+    }
+
+    // eslint-disable-next-line no-console
+    console.log(
+        `[global-teardown] cleanup complete: ${deleted} deleted, ${failed} failed`,
+    );
+    if (failures.length > 0) {
+        // eslint-disable-next-line no-console
+        console.warn('[global-teardown] failures:');
+        for (const f of failures) {
+            // eslint-disable-next-line no-console
+            console.warn(`  - ${f}`);
+        }
+        // Leave the tracker file in place so the next run retries.
+        return;
+    }
+
+    try {
+        unlinkSync(TRACKER_PATH);
+    } catch {
+        /* best-effort */
+    }
+}

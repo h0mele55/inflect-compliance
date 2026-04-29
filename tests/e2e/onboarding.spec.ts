@@ -1,11 +1,22 @@
 import { test, expect, type Page } from '@playwright/test';
-import { loginAndGetTenant as loginAsAdmin, gotoAndVerify } from './e2e-utils';
+import {
+    createIsolatedTenant,
+    gotoAndVerify,
+    loginAndGetTenant as loginAsAdmin,
+    signInAs,
+    type IsolatedTenantCredentials,
+} from './e2e-utils';
 
 /**
  * Onboarding Wizard E2E Tests
  *
  * Tests the full onboarding flow: start → steps → resume → finish → dashboard.
  * Uses relative URLs so playwright.config.ts baseURL is respected.
+ *
+ * GAP-23: provisions its own tenant. Onboarding state is per-tenant
+ * by design — running this against a shared seed pulled the test
+ * into "already complete" branches that masked regressions in the
+ * actual welcome → wizard flow.
  */
 
 // ─── Tests ───
@@ -13,8 +24,14 @@ import { loginAndGetTenant as loginAsAdmin, gotoAndVerify } from './e2e-utils';
 test.describe('Onboarding Wizard', () => {
     test.describe.configure({ mode: 'serial' });
 
+    let tenant: IsolatedTenantCredentials;
+
+    test.beforeAll(async ({ request }) => {
+        tenant = await createIsolatedTenant({ request, namePrefix: 'onb' });
+    });
+
     test('admin starts onboarding and sees the wizard', async ({ page }) => {
-        const slug = await loginAsAdmin(page);
+        const slug = await signInAs(page, tenant);
         await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
         await page.waitForLoadState('networkidle');
 
@@ -37,7 +54,7 @@ test.describe('Onboarding Wizard', () => {
     });
 
     test('admin completes Company Profile step', async ({ page }) => {
-        const slug = await loginAsAdmin(page);
+        const slug = await signInAs(page, tenant);
         await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
 
         // Start onboarding if on welcome screen
@@ -62,7 +79,7 @@ test.describe('Onboarding Wizard', () => {
     });
 
     test('wizard resumes on refresh', async ({ page }) => {
-        const slug = await loginAsAdmin(page);
+        const slug = await signInAs(page, tenant);
         await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
 
         // Should NOT show the welcome screen — should show the wizard with progress
@@ -79,8 +96,13 @@ test.describe('Onboarding Wizard', () => {
     });
 
     test('non-admin cannot access onboarding', async ({ page }) => {
-        // Use the resilient login helper — direct `waitForURL` after submit is flaky
-        // because the dev server occasionally returns MissingCSRF on first attempt.
+        // GAP-23 carve-out: this test exercises the seeded `viewer@acme.com`
+        // (READER role) to prove the onboarding wizard rejects non-admins.
+        // The isolation factory currently provisions only OWNER users —
+        // a future PR will add a multi-role provisioner so this test can
+        // run against its own tenant. Until then, the assertion is
+        // independent of the rest of this describe block's tenant state,
+        // so the shared-seed dependency is bounded to a single test.
         const slug = await loginAsAdmin(page, { email: 'viewer@acme.com', password: 'password123' });
 
         await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
