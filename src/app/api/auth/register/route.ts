@@ -134,7 +134,12 @@ async function handleRegister(body: any) {
 
     const response = jsonResponse({
         user: { id: user.id, email: user.email, name: user.name, role: membership.role },
-        tenant: { id: tenant.id, name: tenant.name },
+        // GAP-23: slug exposed alongside id/name so callers (notably
+        // E2E test fixtures via `createIsolatedTenant`) can navigate
+        // to `/t/<slug>/...` without having to look the slug up
+        // post-registration. Slug is a public routing identifier,
+        // not sensitive — it appears in every authenticated URL.
+        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
         emailVerificationRequired: env.AUTH_REQUIRE_EMAIL_VERIFICATION === '1',
     });
 

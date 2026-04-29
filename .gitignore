@@ -38,6 +38,9 @@ test-results/
 tests/load/results/
 playwright-report/
 blob-report/
+# GAP-23: Playwright tenant-tracker (created by createIsolatedTenant,
+# consumed by tests/e2e/global-teardown.ts). Per-run artefact.
+tests/e2e/.tenant-tracker.jsonl
 jest_out.json
 jest_out_utf8.txt
 jest-debug.txt

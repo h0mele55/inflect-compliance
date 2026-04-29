@@ -15,11 +15,27 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { loginAndGetTenant, safeGoto } from './e2e-utils';
-
-const ADMIN_USER = { email: 'admin@acme.com', password: 'password123' };
+import {
+    createIsolatedTenant,
+    safeGoto,
+    signInAs,
+    type IsolatedTenantCredentials,
+} from './e2e-utils';
 
 test.describe('Epic 51 — theme toggle', () => {
+    // GAP-23: provision a dedicated tenant per describe block so the
+    // theme-toggle test doesn't contend with parallel suites' UI state
+    // on the seeded acme-corp tenant. The tenant + owner are
+    // hard-deleted in the global teardown.
+    let tenant: IsolatedTenantCredentials;
+
+    test.beforeAll(async ({ request }) => {
+        tenant = await createIsolatedTenant({
+            request,
+            namePrefix: 'theme',
+        });
+    });
+
     test('flips html[data-theme] between dark and light and persists across reload', async ({
         page,
     }) => {
@@ -38,7 +54,7 @@ test.describe('Epic 51 — theme toggle', () => {
             }
         });
 
-        const tenantSlug = await loginAndGetTenant(page, ADMIN_USER);
+        const tenantSlug = await signInAs(page, tenant);
 
         await safeGoto(page, `/t/${tenantSlug}/dashboard`, {
             waitUntil: 'domcontentloaded',

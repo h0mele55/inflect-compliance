@@ -8,6 +8,12 @@ const port = 3006;
 export default defineConfig({
     testDir: './tests/e2e',
     globalSetup: './tests/e2e/global-setup.ts',
+    // GAP-23: hard-deletes any tenants the suite created via
+    // `createIsolatedTenant` (tracked in
+    // `tests/e2e/.tenant-tracker.jsonl`). Idempotent — does
+    // nothing when the file is absent. Failures don't abort the
+    // run; the tracker file is preserved so the next run retries.
+    globalTeardown: './tests/e2e/global-teardown.ts',
     timeout: 180_000,
     fullyParallel: false,
     forbidOnly: isCI,

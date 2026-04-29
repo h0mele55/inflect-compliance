@@ -3,6 +3,14 @@ import { loginAndGetTenant } from './e2e-utils';
 
 const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
+// GAP-23 carve-out: this spec depends on the seeded acme-corp tenant
+// having ISO27001 / SOC2 / NIS2 / ISO9001 / ISO28000 / ISO39001
+// frameworks installed. createIsolatedTenant produces an empty
+// tenant with no installed frameworks. Migrating this spec is gated
+// on the factory gaining a `installFrameworks: ['ISO27001', …]`
+// option (or a sibling helper that calls the framework-install
+// usecase for a freshly-created tenant).
+
 test.describe('Framework Coverage UI', () => {
     test.describe.configure({ mode: 'serial' });
 

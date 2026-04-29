@@ -1,5 +1,10 @@
 import { test, expect, Page } from '@playwright/test';
-import { loginAndGetTenant as login, gotoAndVerify } from './e2e-utils';
+import {
+    createIsolatedTenant,
+    gotoAndVerify,
+    signInAs,
+    type IsolatedTenantCredentials,
+} from './e2e-utils';
 
 /**
  * Responsive layout E2E tests.
@@ -8,9 +13,11 @@ import { loginAndGetTenant as login, gotoAndVerify } from './e2e-utils';
  * horizontal overflow across mobile and desktop viewports.
  *
  * Uses AUTH_TEST_MODE=1 (configured in playwright.config.ts webServer).
+ *
+ * GAP-23: each viewport scope provisions its own tenant. The actual
+ * test bodies don't depend on tenant-specific data — they just need
+ * an authenticated session that can reach `/t/<slug>/dashboard`.
  */
-
-const TEST_USER = { email: 'admin@acme.com', password: 'password123' };
 
 /**
  * Check whether the page has horizontal overflow.
@@ -27,10 +34,15 @@ async function hasNoHorizontalOverflow(page: Page): Promise<boolean> {
 test.describe('Mobile viewport (375×812)', () => {
     test.use({ viewport: { width: 375, height: 812 } });
 
+    let tenant: IsolatedTenantCredentials;
     let slug: string;
 
+    test.beforeAll(async ({ request }) => {
+        tenant = await createIsolatedTenant({ request, namePrefix: 'rsp-m' });
+    });
+
     test('sidebar hidden and hamburger visible', async ({ page }) => {
-        slug = await login(page);
+        slug = await signInAs(page, tenant);
         await gotoAndVerify(page, `/t/${slug}/dashboard`, 'main');
 
         // Desktop sidebar should be hidden (display:none via md:flex)
@@ -43,7 +55,7 @@ test.describe('Mobile viewport (375×812)', () => {
     });
 
     test('drawer opens and closes on nav click', async ({ page }) => {
-        slug = await login(page);
+        slug = await signInAs(page, tenant);
         await gotoAndVerify(page, `/t/${slug}/dashboard`, 'main');
 
         // Open drawer
@@ -65,7 +77,7 @@ test.describe('Mobile viewport (375×812)', () => {
     });
 
     test('controls list has no horizontal overflow', async ({ page }) => {
-        slug = await login(page);
+        slug = await signInAs(page, tenant);
         await gotoAndVerify(page, `/t/${slug}/controls`, 'h1');
 
         const noOverflow = await hasNoHorizontalOverflow(page);
@@ -78,10 +90,15 @@ test.describe('Mobile viewport (375×812)', () => {
 test.describe('Desktop viewport (1280×720)', () => {
     test.use({ viewport: { width: 1280, height: 720 } });
 
+    let tenant: IsolatedTenantCredentials;
     let slug: string;
 
+    test.beforeAll(async ({ request }) => {
+        tenant = await createIsolatedTenant({ request, namePrefix: 'rsp-d' });
+    });
+
     test('sidebar visible, no hamburger', async ({ page }) => {
-        slug = await login(page);
+        slug = await signInAs(page, tenant);
         await gotoAndVerify(page, `/t/${slug}/dashboard`, 'aside');
 
         // Wait for CSS parsing and hydration to finalize layout
@@ -97,7 +114,7 @@ test.describe('Desktop viewport (1280×720)', () => {
     });
 
     test('controls page renders without horizontal overflow', async ({ page }) => {
-        slug = await login(page);
+        slug = await signInAs(page, tenant);
         await gotoAndVerify(page, `/t/${slug}/controls`, 'h1');
 
         const noOverflow = await hasNoHorizontalOverflow(page);

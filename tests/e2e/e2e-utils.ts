@@ -4,7 +4,10 @@
  * Centralises login, navigation, and retry logic so every spec file
  * benefits from the same cold-start / net-error resilience.
  */
-import { type Page } from '@playwright/test';
+import { randomUUID, randomBytes } from 'node:crypto';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname, resolve as resolvePath } from 'node:path';
+import { request as playwrightRequest, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
  * Pick an option from one of the shared `<Combobox>` controls (Epic 55
@@ -252,4 +255,260 @@ export async function gotoAndVerify(
         attempts--;
         if (attempts > 0) await page.waitForTimeout(3000);
     }
+}
+
+// ─── GAP-23 — Tenant tracker for global teardown ────────────────────
+//
+// The factory below appends every created tenant + owner user id to a
+// JSONL file. `tests/e2e/global-teardown.ts` reads the file at
+// end-of-suite and hard-deletes the rows so a CI run leaves the test
+// DB exactly as it found it (modulo the seeded fixture tenant).
+//
+// File format: one JSON object per line, each carrying
+// { tenantId, tenantSlug, ownerUserId, createdAt }.
+//
+// Why a file, not in-memory: Playwright workers run as separate
+// processes; an in-memory list would only see the current worker's
+// state. The teardown's a separate process too. A file is the
+// cheapest cross-process queue. Append-only writes are atomic for
+// the small payload we emit — no need for locking.
+
+export const TENANT_TRACKER_PATH = resolvePath(
+    __dirname,
+    '.tenant-tracker.jsonl',
+);
+
+export interface TenantTrackerEntry {
+    tenantId: string;
+    tenantSlug: string;
+    ownerUserId: string;
+    createdAt: string;
+}
+
+function appendTenantToTracker(entry: TenantTrackerEntry): void {
+    try {
+        mkdirSync(dirname(TENANT_TRACKER_PATH), { recursive: true });
+        appendFileSync(TENANT_TRACKER_PATH, JSON.stringify(entry) + '\n', {
+            encoding: 'utf8',
+        });
+    } catch (err) {
+        // Tracker write failures must not abort the test. Worst case
+        // we leave a tenant behind for the next nightly cleanup. Log
+        // for operator visibility.
+        // eslint-disable-next-line no-console
+        console.warn(
+            `[e2e-utils] failed to append tenant tracker (continuing): ${
+                err instanceof Error ? err.message : String(err)
+            }`,
+        );
+    }
+}
+
+// ─── GAP-23 — Test-data isolation factory ───────────────────────────
+//
+// `createIsolatedTenant()` provisions a fresh tenant + OWNER user via
+// the production `/api/auth/register` route and hands the spec back
+// everything it needs to authenticate and navigate. Each call yields
+// a globally-unique tenant slug + user email so two concurrent
+// invocations CANNOT collide, which is the precondition for moving
+// the suite off `fullyParallel: false`.
+//
+// Why API-driven rather than direct Prisma writes:
+//   - Exercises the same code path real users hit (PII middleware,
+//     onboarding row, audit log, tenant DEK creation).
+//   - Keeps test code free of schema knowledge — a future schema
+//     change updates the route, not every fixture.
+//   - The HIBP and password-policy gates apply, ensuring our test
+//     credentials are realistic (we use crypto-random passwords for
+//     this same reason — predictable test passwords like "password123"
+//     fail the HIBP check).
+//
+// Identity-collision strategy:
+//   - `randomUUID().slice(0, 12)` (96 bits of entropy) is appended to
+//     orgName + email + name. The register route's slug derivation
+//     adds a `Date.now().toString(36)` suffix, so even if two workers
+//     hit register in the same millisecond the slug PREFIX (from the
+//     UUID-bearing orgName) already differs.
+
+export interface IsolatedTenantCredentials {
+    /** Tenant slug — use to build URLs like `/t/{slug}/dashboard`. */
+    tenantSlug: string;
+    /** Tenant id (cuid). For DB-side cleanup or assertions. */
+    tenantId: string;
+    /** Tenant display name as it appears in the UI. */
+    tenantName: string;
+    /** Owner user's email — pass to `loginAndGetTenant` or any
+     *  credentials-form interaction. */
+    ownerEmail: string;
+    /** Plaintext password — present ONLY to enable login from the
+     *  same factory call; never written anywhere persistent. */
+    ownerPassword: string;
+    /** Owner user id (cuid). For audit-row assertions. */
+    ownerUserId: string;
+    /** Owner display name. */
+    ownerName: string;
+}
+
+export interface CreateIsolatedTenantOptions {
+    /**
+     * A live `APIRequestContext`. If omitted, an ephemeral one is
+     * created against `process.env.URL` (or the Playwright
+     * `baseURL`) and disposed inside this call. Specs inside a
+     * Playwright test should pass `request` from the test fixture
+     * so cookies / session state stay coherent with the rest of
+     * the spec.
+     */
+    request?: APIRequestContext;
+    /**
+     * Optional base URL override. Defaults to `process.env.URL`
+     * then `'http://localhost:3006'` (matches the Playwright
+     * config's webServer port).
+     */
+    baseURL?: string;
+    /**
+     * Friendly prefix used in the generated org/user names for
+     * easier log-grepping. Sanitised to `[a-z0-9-]`. Defaults to
+     * `'iso'`.
+     */
+    namePrefix?: string;
+}
+
+const DEFAULT_BASE_URL = 'http://localhost:3006';
+
+function generateOwnerPassword(): string {
+    // Strong entropy + mixed character classes so the password
+    // policy AND the HIBP screen at /api/auth/register accept it.
+    // 32 hex chars = 128 bits + a fixed mixed-case prefix.
+    return `Iso!${randomBytes(16).toString('hex')}`;
+}
+
+function sanitisePrefix(prefix: string): string {
+    const cleaned = prefix.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/(^-|-$)/g, '');
+    return cleaned.length > 0 ? cleaned : 'iso';
+}
+
+/**
+ * Provision a fresh tenant + OWNER user dedicated to a single spec
+ * (or describe block). Returns the credentials and tenant slug so
+ * the spec can authenticate and navigate without depending on any
+ * shared seed state.
+ *
+ * Usage:
+ * ```ts
+ * import { test } from '@playwright/test';
+ * import { createIsolatedTenant, signInAs } from './e2e-utils';
+ *
+ * test.describe('feature X with isolated state', () => {
+ *     test.beforeEach(async ({ page, request }) => {
+ *         const tenant = await createIsolatedTenant({ request });
+ *         await signInAs(page, tenant);
+ *         // page is now at /t/<slug>/dashboard
+ *     });
+ * });
+ * ```
+ */
+export async function createIsolatedTenant(
+    options: CreateIsolatedTenantOptions = {},
+): Promise<IsolatedTenantCredentials> {
+    const baseURL =
+        options.baseURL ?? process.env.URL ?? DEFAULT_BASE_URL;
+    const prefix = sanitisePrefix(options.namePrefix ?? 'iso');
+    // Truncate to keep the resulting slug under Prisma's 80-char limit
+    // and visually scannable. 12 chars of a UUIDv4 = 48 bits — well
+    // beyond what the per-millisecond tenant-create rate could ever
+    // collide on.
+    const id = randomUUID().replace(/-/g, '').slice(0, 12);
+
+    const ownerEmail = `${prefix}-${id}@e2e.test`;
+    const ownerName = `${prefix} ${id}`;
+    const orgName = `${prefix} ${id}`;
+    const ownerPassword = generateOwnerPassword();
+
+    // Use the caller's request context if supplied so it shares
+    // cookies / fixtures with the rest of the test; otherwise spin
+    // one up and dispose it inside this call.
+    const request =
+        options.request ?? (await playwrightRequest.newContext({ baseURL }));
+    const ownsRequest = !options.request;
+
+    try {
+        const res = await request.post('/api/auth/register', {
+            data: {
+                action: 'register',
+                email: ownerEmail,
+                password: ownerPassword,
+                name: ownerName,
+                orgName,
+            },
+            failOnStatusCode: false,
+        });
+        if (!res.ok()) {
+            const body = await res.text();
+            throw new Error(
+                `createIsolatedTenant: /api/auth/register failed ` +
+                    `(status ${res.status()}): ${body.slice(0, 400)}`,
+            );
+        }
+        const json = (await res.json()) as {
+            user: { id: string; email: string; name: string };
+            tenant: { id: string; name: string; slug: string };
+        };
+        if (!json?.tenant?.slug) {
+            throw new Error(
+                'createIsolatedTenant: register response missing tenant.slug — ' +
+                    'check src/app/api/auth/register/route.ts response shape.',
+            );
+        }
+        // Track for global-teardown — appended even on a partially
+        // failing test so the cleanup phase reclaims rows whose owning
+        // test errored mid-flow.
+        appendTenantToTracker({
+            tenantId: json.tenant.id,
+            tenantSlug: json.tenant.slug,
+            ownerUserId: json.user.id,
+            createdAt: new Date().toISOString(),
+        });
+
+        return {
+            tenantSlug: json.tenant.slug,
+            tenantId: json.tenant.id,
+            tenantName: json.tenant.name,
+            ownerEmail: json.user.email,
+            ownerPassword,
+            ownerUserId: json.user.id,
+            ownerName: json.user.name,
+        };
+    } finally {
+        if (ownsRequest) {
+            await request.dispose().catch(() => undefined);
+        }
+    }
+}
+
+/**
+ * Sign in via the credentials form using the provided owner
+ * credentials and verify the URL settled on `/t/<slug>/dashboard`.
+ *
+ * Designed as the natural follow-up to `createIsolatedTenant` —
+ * the credentials passed in are typically the factory's return
+ * value. Returns the resolved tenant slug for callers that didn't
+ * already capture it.
+ */
+export async function signInAs(
+    page: Page,
+    credentials: { ownerEmail: string; ownerPassword: string; tenantSlug?: string },
+): Promise<string> {
+    const slug = await loginAndGetTenant(page, {
+        email: credentials.ownerEmail,
+        password: credentials.ownerPassword,
+    });
+    if (credentials.tenantSlug && slug !== credentials.tenantSlug) {
+        throw new Error(
+            `signInAs: signed in but landed on tenant '${slug}', expected ` +
+                `'${credentials.tenantSlug}'. Likely cause: the user has ` +
+                `additional memberships and the JWT's default tenantSlug ` +
+                `differs from what createIsolatedTenant returned.`,
+        );
+    }
+    return slug;
 }
