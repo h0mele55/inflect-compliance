@@ -358,18 +358,18 @@ function RisksPageInner({
                     </div>
                     <div className="glass-card p-5 text-center">
                         <p className="text-xs text-content-muted uppercase tracking-wider">{t.avgScore}</p>
-                        <p className="text-3xl font-bold mt-2 text-amber-400">{avgScore}</p>
+                        <p className="text-3xl font-bold mt-2 text-content-warning">{avgScore}</p>
                     </div>
                     <div
                         className="glass-card p-5 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition"
                         onClick={() => filterCtx.set('status', 'OPEN')}
                     >
                         <p className="text-xs text-content-muted uppercase tracking-wider">{t.openRisks}</p>
-                        <p className="text-3xl font-bold mt-2 text-emerald-400">{openCount}</p>
+                        <p className="text-3xl font-bold mt-2 text-content-success">{openCount}</p>
                     </div>
                     <div className="glass-card p-5 text-center">
                         <p className="text-xs text-content-muted uppercase tracking-wider">{t.overdueReviews}</p>
-                        <p className="text-3xl font-bold mt-2 text-red-400">{overdueRisks.length}</p>
+                        <p className="text-3xl font-bold mt-2 text-content-error">{overdueRisks.length}</p>
                     </div>
                 </div>
 
