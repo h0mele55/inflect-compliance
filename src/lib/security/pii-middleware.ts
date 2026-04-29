@@ -377,13 +377,30 @@ function rewriteArgsWhere(
 // ─── Middleware ──────────────────────────────────────────────────────
 
 /**
- * Prisma middleware for transparent PII encryption.
+ * Diagnostic — fires exactly once, the first time a Prisma query
+ * actually flows through this middleware. If we never see this log
+ * line in production, the middleware is registered but not invoked
+ * (suspected on prod 2026-04-29: Next.js bundling / module-graph
+ * issue causing NextAuth's PrismaAdapter to use a different prisma
+ * instance than the one with `$use(piiEncryptionMiddleware)` attached).
  *
- * Usage:
- *   import { piiEncryptionMiddleware } from '@/lib/security/pii-middleware';
- *   prisma.$use(piiEncryptionMiddleware);
+ * Combined with `pii.middleware_registered` (emitted from
+ * `src/lib/prisma.ts` at $use time), the two signals tell us:
+ *   • registered + first_invocation seen   → middleware works
+ *   • registered + no first_invocation     → registration/runtime split
+ *   • no registered                        → $use never called (Edge Runtime?)
  */
+let _firstInvocationLogged = false;
+
 export const piiEncryptionMiddleware: Prisma.Middleware = async (params, next) => {
+    if (!_firstInvocationLogged) {
+        _firstInvocationLogged = true;
+        logger.info('pii.middleware_first_invocation', {
+            component: 'pii-middleware',
+            firstAction: params.action,
+            firstModel: params.model ?? null,
+        });
+    }
     const fields = params.model ? PII_FIELD_MAP[params.model] : undefined;
 
     // We MUST NOT early-out when `fields` is undefined: a non-managed

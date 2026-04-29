@@ -226,6 +226,20 @@ if (typeof (globalThis as any).EdgeRuntime === 'undefined' && !globalForPrisma.p
     registerSoftDeleteMiddleware(prisma);
     registerAuditMiddleware(prisma);
     globalForPrisma.prismaAuditMiddlewareRegistered = true;
+
+    // Diagnostic — observed on prod 2026-04-29 that PII decryption
+    // wasn't running on NextAuth's adapter reads even though this
+    // module was imported. Pair this `registered` log with
+    // `pii.middleware_first_invocation` (emitted from
+    // pii-middleware.ts on first query) to distinguish:
+    //   • both seen           → middleware works
+    //   • registered, no inv. → adapter is on a different prisma instance
+    //   • no registered       → $use skipped (Edge Runtime / bundling)
+    auditMiddlewareLogger.info('pii.middleware_registered', {
+        component: 'pii-middleware',
+        runtime: typeof (globalThis as { EdgeRuntime?: unknown }).EdgeRuntime === 'undefined' ? 'node' : 'edge',
+        nodeEnv: process.env.NODE_ENV,
+    });
 }
 
 /**
