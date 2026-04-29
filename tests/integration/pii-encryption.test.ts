@@ -236,7 +236,7 @@ describeFn('PII Encryption', () => {
     // ─── DB Value Verification ───
 
     describe('DB value security', () => {
-        it('encrypted columns in DB do not contain plaintext', async () => {
+        it('encrypted columns in DB do not contain plaintext (GAP-21: legacy email/name columns dropped)', async () => {
             const email = `pii-security-${Date.now()}@example.com`;
             const name = 'Sensitive Name';
 
@@ -245,22 +245,17 @@ describeFn('PII Encryption', () => {
             });
             testIds.push(user.id);
 
-            // Query raw DB
+            // GAP-21: the legacy plaintext email/name columns are
+            // gone — only the encrypted versions remain at the DB.
             const [raw] = await prisma.$queryRawUnsafe<Array<{
-                email: string;
                 emailEncrypted: string;
-                name: string;
                 nameEncrypted: string;
             }>>(
-                'SELECT "email", "emailEncrypted", "name", "nameEncrypted" FROM "User" WHERE "id" = $1',
+                'SELECT "emailEncrypted", "nameEncrypted" FROM "User" WHERE "id" = $1',
                 user.id,
             );
 
-            // Plaintext columns still have values (dual-write)
-            expect(raw.email).toBe(email);
-            expect(raw.name).toBe(name);
-
-            // Encrypted columns have ciphertext
+            // Encrypted columns have ciphertext.
             expect(raw.emailEncrypted).not.toBe(email);
             expect(raw.nameEncrypted).not.toBe(name);
             expect(raw.emailEncrypted).toMatch(/^v1:/);

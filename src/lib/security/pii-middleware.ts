@@ -173,19 +173,89 @@ function decryptOnRead(
     }
 }
 
-function decryptResult(result: unknown, model: string): unknown {
-    const fields = PII_FIELD_MAP[model];
-    if (!fields) return result;
+/**
+ * Maps the Prisma relation key (lowerCamel) to the model name used as
+ * the key in `PII_FIELD_MAP`. When a result row exposes a nested
+ * relation (e.g. `OrgMembership.user`, `TenantMembership.user`,
+ * `AuditLog.user`) the schema field name is the lowerCamel singular
+ * of the model. We map back here so `decryptResultDeep` can locate
+ * the right manifest entry.
+ *
+ * Add a row when you introduce a managed model with a different
+ * relation key. Generic walking of every key is intentionally NOT
+ * done — it would over-eagerly inspect non-PII relations on every
+ * read, which is a perf regression for a tiny ergonomic gain.
+ */
+const RELATION_KEY_TO_MODEL: Record<string, string> = {
+    user: 'User',
+    inviter: 'User',
+    invitedBy: 'User',
+    invitedByUser: 'User',
+    creator: 'User',
+    owner: 'User',
+    assignee: 'User',
+    auditor: 'AuditorAccount',
+    identityLink: 'UserIdentityLink',
+};
 
-    if (Array.isArray(result)) {
-        for (const item of result) {
-            if (item && typeof item === 'object') {
-                decryptOnRead(item as Record<string, unknown>, fields);
+/**
+ * Walks a result tree and decrypts any embedded nested relation that
+ * points at a managed model. Recurses through arrays + objects but
+ * caps depth so an unbounded includes chain can't OOM us.
+ */
+function decryptNested(
+    record: unknown,
+    depth: number,
+): void {
+    if (depth >= 4 || !record || typeof record !== 'object') return;
+    if (Array.isArray(record)) {
+        for (const item of record) decryptNested(item, depth + 1);
+        return;
+    }
+    const obj = record as Record<string, unknown>;
+    for (const [key, value] of Object.entries(obj)) {
+        if (!value || typeof value !== 'object') continue;
+        const nestedModel = RELATION_KEY_TO_MODEL[key];
+        if (nestedModel) {
+            const nestedFields = PII_FIELD_MAP[nestedModel];
+            if (nestedFields) {
+                if (Array.isArray(value)) {
+                    for (const item of value) {
+                        if (item && typeof item === 'object') {
+                            decryptOnRead(item as Record<string, unknown>, nestedFields);
+                        }
+                    }
+                } else {
+                    decryptOnRead(value as Record<string, unknown>, nestedFields);
+                }
             }
         }
-    } else if (result && typeof result === 'object') {
-        decryptOnRead(result as Record<string, unknown>, fields);
+        // Recurse — even non-PII relations may have PII relations
+        // beneath them (e.g. TenantMembership.tenant.someUser).
+        decryptNested(value, depth + 1);
     }
+}
+
+function decryptResult(result: unknown, model: string): unknown {
+    const fields = PII_FIELD_MAP[model];
+
+    // Top-level decrypt for the queried model (when managed).
+    if (fields) {
+        if (Array.isArray(result)) {
+            for (const item of result) {
+                if (item && typeof item === 'object') {
+                    decryptOnRead(item as Record<string, unknown>, fields);
+                }
+            }
+        } else if (result && typeof result === 'object') {
+            decryptOnRead(result as Record<string, unknown>, fields);
+        }
+    }
+
+    // Nested decrypt for relations into managed models, regardless of
+    // whether the top-level model is itself managed (e.g.
+    // OrgMembership.findMany({ include: { user: ... } })).
+    decryptNested(result, 0);
 
     return result;
 }
@@ -294,73 +364,70 @@ function rewriteArgsWhere(
 export const piiEncryptionMiddleware: Prisma.Middleware = async (params, next) => {
     const fields = params.model ? PII_FIELD_MAP[params.model] : undefined;
 
-    if (!fields) {
-        return next(params);
-    }
+    // We MUST NOT early-out when `fields` is undefined: a non-managed
+    // model like `OrgMembership` or `AuditLog` may include nested
+    // relations (`user`, `auditor`, …) that ARE managed, and the
+    // result-side decryption walks those. Encryption / WHERE
+    // rewriting is gated on `fields` further down.
 
     // ─── Encrypt on write ───
-    if (
-        params.action === 'create' ||
-        params.action === 'update' ||
-        params.action === 'upsert' ||
-        params.action === 'updateMany'
-    ) {
-        if (params.action === 'upsert') {
-            if (params.args.create && typeof params.args.create === 'object') {
-                encryptOnWrite(params.args.create as Record<string, unknown>, fields);
-            }
-            if (params.args.update && typeof params.args.update === 'object') {
-                encryptOnWrite(params.args.update as Record<string, unknown>, fields);
-            }
-        } else {
-            if (params.args.data && typeof params.args.data === 'object') {
-                encryptOnWrite(params.args.data as Record<string, unknown>, fields);
-            }
-        }
-    }
-
-    // createMany
-    if (params.action === 'createMany' && Array.isArray(params.args?.data)) {
-        for (const item of params.args.data) {
-            if (item && typeof item === 'object') {
-                encryptOnWrite(item as Record<string, unknown>, fields);
+    if (fields) {
+        if (
+            params.action === 'create' ||
+            params.action === 'update' ||
+            params.action === 'upsert' ||
+            params.action === 'updateMany'
+        ) {
+            if (params.action === 'upsert') {
+                if (params.args.create && typeof params.args.create === 'object') {
+                    encryptOnWrite(params.args.create as Record<string, unknown>, fields);
+                }
+                if (params.args.update && typeof params.args.update === 'object') {
+                    encryptOnWrite(params.args.update as Record<string, unknown>, fields);
+                }
+            } else {
+                if (params.args.data && typeof params.args.data === 'object') {
+                    encryptOnWrite(params.args.data as Record<string, unknown>, fields);
+                }
             }
         }
-    }
 
-    // ─── Rewrite WHERE → hash for read/scoped-write actions ───
-    //
-    // `findUnique` callers use `where: { email: '...' }` — that has
-    // to redirect to the hash column on mapped models.
-    // `update` / `updateMany` / `delete` / `deleteMany` callers can
-    // also pass a where clause; same treatment.
-    const whereActions = [
-        'findUnique',
-        'findUniqueOrThrow',
-        'findFirst',
-        'findFirstOrThrow',
-        'findMany',
-        'count',
-        'aggregate',
-        'groupBy',
-        'update',
-        'updateMany',
-        'delete',
-        'deleteMany',
-    ];
-    if (whereActions.includes(params.action)) {
-        rewriteArgsWhere(
-            params.args as Record<string, unknown> | undefined,
-            fields,
-        );
-    }
+        // createMany
+        if (params.action === 'createMany' && Array.isArray(params.args?.data)) {
+            for (const item of params.args.data) {
+                if (item && typeof item === 'object') {
+                    encryptOnWrite(item as Record<string, unknown>, fields);
+                }
+            }
+        }
 
-    // `upsert` carries a `where` for the find side.
-    if (params.action === 'upsert') {
-        rewriteArgsWhere(
-            params.args as Record<string, unknown> | undefined,
-            fields,
-        );
+        // ─── Rewrite WHERE → hash for read/scoped-write actions ───
+        //
+        // `findUnique` callers use `where: { email: '...' }` — that
+        // has to redirect to the hash column on mapped models.
+        // `update` / `updateMany` / `delete` / `deleteMany` callers
+        // can also pass a where clause; same treatment.
+        const whereActions = [
+            'findUnique',
+            'findUniqueOrThrow',
+            'findFirst',
+            'findFirstOrThrow',
+            'findMany',
+            'count',
+            'aggregate',
+            'groupBy',
+            'update',
+            'updateMany',
+            'delete',
+            'deleteMany',
+            'upsert',
+        ];
+        if (whereActions.includes(params.action)) {
+            rewriteArgsWhere(
+                params.args as Record<string, unknown> | undefined,
+                fields,
+            );
+        }
     }
 
     // ─── Execute query ───
@@ -375,7 +442,10 @@ export const piiEncryptionMiddleware: Prisma.Middleware = async (params, next) =
     ];
 
     if (readActions.includes(params.action)) {
-        return decryptResult(result, params.model!);
+        // Always pass through — decryptResult handles both top-level
+        // (when params.model is managed) AND nested relations into
+        // managed models, regardless of the top-level model.
+        return decryptResult(result, params.model ?? '');
     }
 
     return result;
