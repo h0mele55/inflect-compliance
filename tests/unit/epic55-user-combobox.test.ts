@@ -107,8 +107,12 @@ describe('UserCombobox — contract', () => {
 
     it('projects members into "Name · email" labels for fuzzy search', () => {
         expect(USER_COMBO_SRC).toMatch(/memberLabel/);
+        // Either `${member.email}` (legacy) or `${email}` (current — local
+        // var so the null-fallback chain can reuse it) is acceptable; the
+        // contract is the literal "name · email" template, not the source
+        // of the email expression.
         expect(USER_COMBO_SRC).toMatch(
-            /`\$\{name\}\s*·\s*\$\{member\.email\}`/,
+            /`\$\{name\}\s*·\s*\$\{(member\.)?email\}`/,
         );
     });
 

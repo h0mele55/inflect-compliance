@@ -39,7 +39,10 @@ import { queryKeys } from "@/lib/queryKeys";
 export interface Member {
     id: string;
     name: string | null;
-    email: string;
+    // Email may be null when the PII middleware can't decrypt the
+    // stored value (e.g. KEK mismatch). We render whatever we have and
+    // fall back to a stable "User <shortId>" label when both are missing.
+    email: string | null;
     image: string | null;
 }
 
@@ -53,7 +56,7 @@ interface AdminMembershipEntry {
     user: {
         id: string;
         name: string | null;
-        email: string;
+        email: string | null;
         image: string | null;
     };
     status: string;
@@ -149,8 +152,15 @@ export function useTenantMembers(
 
 function memberLabel(member: Member): string {
     const name = member.name?.trim();
-    if (name) return `${name} · ${member.email}`;
-    return member.email;
+    const email = member.email?.trim();
+    if (name && email) return `${name} · ${email}`;
+    if (name) return name;
+    if (email) return email;
+    // Both fields unreadable (PII decrypt failure). Fall back to a
+    // stable opaque handle so the picker still renders + the row is
+    // distinguishable. Operators chasing "why is this label opaque?"
+    // see `pii.decrypt_failure` in logs.
+    return `User ${member.id.slice(0, 8)}`;
 }
 
 function toOption(member: Member): ComboboxOption<Member> {
