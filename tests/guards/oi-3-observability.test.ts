@@ -24,9 +24,14 @@ describe('OI-3 — readyz dependency checks', () => {
         expect(src).toMatch(/import\s+\{[^}]*HeadBucketCommand[^}]*\}\s+from\s+'@aws-sdk\/client-s3'/);
     });
 
-    it('imports getRedis from @/lib/redis', () => {
+    it('loads getRedis from @/lib/redis (lazy require so Redis is optional)', () => {
+        // GAP-13 fix-forward: Redis is loaded via a try/require so the
+        // module evaluation never fails when @/lib/redis throws. The
+        // probe degrades to a Redis-error check rather than crashing
+        // the entire readyz endpoint. Guard now matches the dynamic
+        // require shape that lives on main.
         const src = read(SRC);
-        expect(src).toMatch(/import\s+\{\s*getRedis\s*\}\s+from\s+'@\/lib\/redis'/);
+        expect(src).toMatch(/require\(['"]@\/lib\/redis['"]\)/);
     });
 
     it('uses Prisma $queryRaw SELECT 1 for the database check', () => {
