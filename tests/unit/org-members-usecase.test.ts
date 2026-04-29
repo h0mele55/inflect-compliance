@@ -49,6 +49,7 @@ import {
     removeOrgMember,
 } from '@/app-layer/usecases/org-members';
 import type { OrgContext } from '@/app-layer/types';
+import { hashForLookup } from '@/lib/security/encryption';
 
 function ctxFor(overrides: Partial<OrgContext> = {}): OrgContext {
     return {
@@ -108,10 +109,13 @@ describe('addOrgMember', () => {
             role: 'ORG_ADMIN',
         });
 
-        // Email normalised to lowercase + trimmed at upsert.
+        // GAP-21: lookup is anchored on emailHash. The expected hash
+        // is computed from the normalised form, so this assertion
+        // proves both that normalisation happens AND that the call
+        // site has been migrated off the plaintext column.
         expect(userUpsertMock).toHaveBeenCalledTimes(1);
         const upsertArg = userUpsertMock.mock.calls[0][0];
-        expect(upsertArg.where.email).toBe('ciso@example.com');
+        expect(upsertArg.where.emailHash).toBe(hashForLookup('ciso@example.com'));
 
         // Provisioning fired with the correct (orgId, userId).
         expect(provisionOrgAdminMock).toHaveBeenCalledTimes(1);

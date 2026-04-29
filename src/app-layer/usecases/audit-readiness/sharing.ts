@@ -8,6 +8,7 @@ import {
 import { logEvent } from '../../events/audit';
 import { runInTenantContext, runInGlobalContext } from '@/lib/db-context';
 import { notFound, badRequest, forbidden } from '@/lib/errors/types';
+import { hashForLookup } from '@/lib/security/encryption';
 import crypto from 'crypto';
 
 // РІвЂќР‚РІвЂќР‚РІвЂќР‚ Token Hashing РІвЂќР‚РІвЂќР‚РІвЂќР‚
@@ -91,9 +92,10 @@ export async function getPackByShareToken(token: string) {
 export async function inviteAuditor(ctx: RequestContext, email: string, name?: string) {
     assertCanManageAuditors(ctx);
     return runInTenantContext(ctx, async (tdb) => {
+        const emailHash = hashForLookup(email);
         const auditor = await tdb.auditorAccount.upsert({
-            where: { tenantId_email: { tenantId: ctx.tenantId, email } },
-            create: { tenantId: ctx.tenantId, email, name, status: 'INVITED' },
+            where: { tenantId_emailHash: { tenantId: ctx.tenantId, emailHash } },
+            create: { tenantId: ctx.tenantId, email, emailHash, name, status: 'INVITED' },
             update: { name, status: 'ACTIVE' },
         });
         await logEvent(tdb, ctx, { action: 'AUDITOR_INVITED', entityType: 'AuditorAccount', entityId: auditor.id, details: JSON.stringify({ email }), detailsJson: { category: 'access', operation: 'permission_changed', targetUserId: auditor.id, detail: `Auditor invited: ${email}` } });

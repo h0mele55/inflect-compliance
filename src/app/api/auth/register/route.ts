@@ -15,6 +15,7 @@ import { signToken } from '@/lib/auth';
 import { issueEmailVerification } from '@/lib/auth/email-verification';
 import { hashPassword, validatePasswordPolicy } from '@/lib/auth/passwords';
 import { checkPasswordAgainstHIBP } from '@/lib/security/password-check';
+import { hashForLookup } from '@/lib/security/encryption';
 import { createTenantWithDek } from '@/lib/security/tenant-key-manager';
 import { withValidatedBody } from '@/lib/validation/route';
 import { AuthActionSchema } from '@/lib/schemas';
@@ -78,8 +79,13 @@ async function handleRegister(body: any) {
 
     const email = String(rawEmail).trim().toLowerCase();
 
-    // Check if email already used
-    const existing = await prisma.user.findFirst({ where: { email } });
+    // GAP-21: identity is anchored on `emailHash` (deterministic
+    // HMAC of the normalised email). Checking by hash is what the
+    // unique constraint enforces, so a duplicate signup races
+    // through the same gate as the DB.
+    const existing = await prisma.user.findUnique({
+        where: { emailHash: hashForLookup(email) },
+    });
     if (existing) {
         return jsonResponse({ error: 'Email already registered' }, { status: 409 });
     }
@@ -97,6 +103,7 @@ async function handleRegister(body: any) {
     const user = await prisma.user.create({
         data: {
             email,
+            emailHash: hashForLookup(email),
             passwordHash,
             name,
         },

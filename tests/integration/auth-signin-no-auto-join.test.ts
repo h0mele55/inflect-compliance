@@ -24,6 +24,7 @@ import type { PrismaClient } from '@prisma/client';
 
 import { createInviteToken, redeemInvite } from '@/app-layer/usecases/tenant-invites';
 import { createTenantWithOwner } from '@/app-layer/usecases/tenant-lifecycle';
+import { hashForLookup } from '@/lib/security/encryption';
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 
@@ -95,7 +96,7 @@ describeFn('auth signIn — no auto-join (GAP-01 closure)', () => {
 
     async function createUser(email: string) {
         return prisma.user.upsert({
-            where: { email },
+            where: { emailHash: hashForLookup(email) },
             create: { email, name: email.split('@')[0] },
             update: {},
         });

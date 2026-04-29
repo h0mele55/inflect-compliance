@@ -21,6 +21,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { checkCredentialsAttempt } from '@/lib/auth/credential-rate-limit';
 import { issueEmailVerification } from '@/lib/auth/email-verification';
+import { hashForLookup } from '@/lib/security/encryption';
 import { logger } from '@/lib/observability/logger';
 
 interface ResendBody {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     try {
         const user = await prisma.user.findUnique({
-            where: { email },
+            where: { emailHash: hashForLookup(email) },
             select: { id: true, emailVerified: true },
         });
         if (!user) return uniformOk;            // Unknown email — uniform response

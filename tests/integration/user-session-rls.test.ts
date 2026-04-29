@@ -30,6 +30,7 @@ import { PrismaClient } from '@prisma/client';
 import { withTenantDb } from '@/lib/db-context';
 import { randomUUID } from 'crypto';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
+import { hashForLookup } from '@/lib/security/encryption';
 
 const globalPrisma = new PrismaClient({
     datasources: { db: { url: DB_URL } },
@@ -79,10 +80,12 @@ describeFn('Epic D.1 — UserSession RLS', () => {
         if (existing) {
             USER_ID = existing.id;
         } else {
+            const userEmail = `rls-${randomUUID()}@example.test`;
             await globalPrisma.user.create({
                 data: {
                     id: USER_ID,
-                    email: `rls-${randomUUID()}@example.test`,
+                    email: userEmail,
+                    emailHash: hashForLookup(userEmail),
                 },
             });
         }

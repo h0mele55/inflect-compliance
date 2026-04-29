@@ -10,8 +10,10 @@ import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
 import { computeNextDueAt } from '@/app-layer/utils/cadence';
+import { piiEncryptionMiddleware } from '@/lib/security/pii-middleware';
 
 const prisma = new PrismaClient({ datasources: { db: { url: DB_URL } } });
+prisma.$use(piiEncryptionMiddleware);
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 

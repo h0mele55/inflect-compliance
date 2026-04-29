@@ -23,6 +23,7 @@ import {
     redeemInvite,
 } from '@/app-layer/usecases/tenant-invites';
 import { createTenantWithOwner } from '@/app-layer/usecases/tenant-lifecycle';
+import { hashForLookup } from '@/lib/security/encryption';
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 
@@ -88,7 +89,7 @@ describeFn('invite routes — usecase-level HTTP contract', () => {
     }
     async function createUser(email: string) {
         return prisma.user.upsert({
-            where: { email },
+            where: { emailHash: hashForLookup(email) },
             create: { email, name: email.split('@')[0] },
             update: {},
         });

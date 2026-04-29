@@ -42,6 +42,7 @@
  */
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/observability/logger';
+import { hashForLookup } from '@/lib/security/encryption';
 import type { ScimContext } from '@/lib/scim/auth';
 import { SCIM_SCHEMAS, type ScimUser } from '@/lib/scim/types';
 import { appendAuditEntry } from '@/lib/audit/audit-writer';
@@ -255,7 +256,7 @@ export async function scimCreateUser(
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-        where: { email },
+        where: { emailHash: hashForLookup(email) },
         select: { id: true, email: true, name: true, createdAt: true, updatedAt: true },
     });
 
@@ -310,7 +311,7 @@ export async function scimCreateUser(
     // Create new user + membership in transaction
     const result = await prisma.$transaction(async (tx) => {
         const newUser = await tx.user.create({
-            data: { email, name: displayName },
+            data: { email, emailHash: hashForLookup(email), name: displayName },
         });
 
         const membership = await tx.tenantMembership.create({

@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '@/lib/observability/logger';
 import { jsonResponse } from '@/lib/api-response';
+import { hashForLookup } from '@/lib/security/encryption';
 
 export async function POST(req: NextRequest) {
     // ── Gate 1: Environment check ──
@@ -55,10 +56,11 @@ export async function POST(req: NextRequest) {
             create: { name: 'Acme Corp', slug: 'acme-corp', industry: 'Technology', maxRiskScale: 5 },
         });
 
+        const adminEmail = 'admin@acme.com';
         const admin = await prisma.user.upsert({
-            where: { email: 'admin@acme.com' },
+            where: { emailHash: hashForLookup(adminEmail) },
             update: {},
-            create: { email: 'admin@acme.com', passwordHash: pwd, name: 'Alice Admin' },
+            create: { email: adminEmail, emailHash: hashForLookup(adminEmail), passwordHash: pwd, name: 'Alice Admin' },
         });
 
         await prisma.tenantMembership.upsert({

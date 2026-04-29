@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { withTenantDb } from '@/lib/db-context';
 import { randomUUID } from 'crypto';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
+import { hashForLookup } from '@/lib/security/encryption';
 
 const globalPrisma = new PrismaClient({
     datasources: {
@@ -116,9 +117,12 @@ describeFn('Postgres RLS Tenant Isolation', () => {
     let userAId: string;
 
     beforeAll(async () => {
-        // Create a test user (User table has no RLS — global)
+        // Create a test user (User table has no RLS — global). globalPrisma
+        // is intentionally raw (no middleware) so emailHash is provided
+        // explicitly — GAP-21 made it NOT NULL at the DB.
+        const userEmail = `rls-test-${testRunId}@test.com`;
         const userA = await globalPrisma.user.create({
-            data: { email: `rls-test-${testRunId}@test.com`, name: 'RLS Test User' },
+            data: { email: userEmail, emailHash: hashForLookup(userEmail), name: 'RLS Test User' },
         });
         userAId = userA.id;
 

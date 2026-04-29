@@ -13,6 +13,7 @@
 import { DB_AVAILABLE } from './db-helper';
 import { prismaTestClient } from '../helpers/db';
 import { PrismaClient } from '@prisma/client';
+import { hashForLookup } from '@/lib/security/encryption';
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 
@@ -46,7 +47,7 @@ describeFn('AuditLog Immutability (DB Trigger)', () => {
         tenantId = tenant.id;
 
         const user = await prisma.user.upsert({
-            where: { email: 'audit-immutable-test@test.com' },
+            where: { emailHash: hashForLookup('audit-immutable-test@test.com') },
             update: {},
             create: {
                 email: 'audit-immutable-test@test.com',

@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { createTenantWithOwner } from '@/app-layer/usecases/tenant-lifecycle';
+import { hashForLookup } from '@/lib/security/encryption';
 
 const prisma = new PrismaClient();
 
@@ -19,24 +20,24 @@ async function main() {
     const pwd = await bcrypt.hash('password123', 10);
 
     const admin = await prisma.user.upsert({
-        where: { email: 'admin@acme.com' },
+        where: { emailHash: hashForLookup('admin@acme.com') },
         update: {},
-        create: { email: 'admin@acme.com', passwordHash: pwd, name: 'Alice Admin' },
+        create: { email: 'admin@acme.com', emailHash: hashForLookup('admin@acme.com'), passwordHash: pwd, name: 'Alice Admin' },
     });
     const editor = await prisma.user.upsert({
-        where: { email: 'editor@acme.com' },
+        where: { emailHash: hashForLookup('editor@acme.com') },
         update: {},
-        create: { email: 'editor@acme.com', passwordHash: pwd, name: 'Bob Editor' },
+        create: { email: 'editor@acme.com', emailHash: hashForLookup('editor@acme.com'), passwordHash: pwd, name: 'Bob Editor' },
     });
     const reader = await prisma.user.upsert({
-        where: { email: 'viewer@acme.com' },
+        where: { emailHash: hashForLookup('viewer@acme.com') },
         update: {},
-        create: { email: 'viewer@acme.com', passwordHash: pwd, name: 'Carol Reader' },
+        create: { email: 'viewer@acme.com', emailHash: hashForLookup('viewer@acme.com'), passwordHash: pwd, name: 'Carol Reader' },
     });
     const auditor = await prisma.user.upsert({
-        where: { email: 'auditor@acme.com' },
+        where: { emailHash: hashForLookup('auditor@acme.com') },
         update: {},
-        create: { email: 'auditor@acme.com', passwordHash: pwd, name: 'Dan Auditor' },
+        create: { email: 'auditor@acme.com', emailHash: hashForLookup('auditor@acme.com'), passwordHash: pwd, name: 'Dan Auditor' },
     });
     console.log('✅ Users created');
 
@@ -142,9 +143,9 @@ async function main() {
     // CISO is the canonical ORG_ADMIN — sees every child tenant as
     // AUDITOR via the auto-provisioning fan-out below.
     const ciso = await prisma.user.upsert({
-        where: { email: 'ciso@acme.com' },
+        where: { emailHash: hashForLookup('ciso@acme.com') },
         update: {},
-        create: { email: 'ciso@acme.com', passwordHash: pwd, name: 'Carla CISO' },
+        create: { email: 'ciso@acme.com', emailHash: hashForLookup('ciso@acme.com'), passwordHash: pwd, name: 'Carla CISO' },
     });
 
     await prisma.orgMembership.upsert({

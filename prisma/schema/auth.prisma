@@ -312,17 +312,30 @@ model TenantMembership {
 
 model User {
   id                            String                       @id @default(cuid())
-  email                         String                       @unique
+  // GAP-21: `email` and `name` are stored encrypted at rest. The
+  // schema field names map to the encrypted DB columns; the
+  // pii-middleware encrypts on write and decrypts on read so
+  // callers continue to pass plaintext at the API boundary.
+  // `emailHash` carries the deterministic lookup hash and is the
+  // sole uniqueness anchor.
+  //
+  // emailHash is declared optional at the schema/TS level so callers
+  // who don't pass it explicitly type-check (the middleware
+  // populates it from `email` on every write). The DB column is
+  // NOT NULL — enforced by migration
+  // 20260429000000_gap21_drop_pii_plaintext_columns + the
+  // structural ratchet at
+  // tests/guardrails/pii-hash-not-null.test.ts. The schema-DB
+  // drift on this single field is intentional and documented.
+  email                         String                       @map("emailEncrypted")
+  emailHash                     String?                      @unique
   passwordHash                  String?
-  name                          String?
+  name                          String?                      @map("nameEncrypted")
   emailVerified                 DateTime?
   image                         String?
   createdAt                     DateTime                     @default(now())
   updatedAt                     DateTime                     @updatedAt
   sessionVersion                Int                          @default(0)
-  emailEncrypted                String?
-  emailHash                     String?                      @unique
-  nameEncrypted                 String?
   accounts                      Account[]
   ownedAssets                   Asset[]                      @relation("AssetOwner")
   assetRiskLinksCreated         AssetRiskLink[]              @relation("AssetRiskCreator")
@@ -508,12 +521,15 @@ model UserIdentityLink {
   tenantId                 String
   providerId               String
   externalSubject          String
-  emailAtLinkTime          String
+  // GAP-21: stored encrypted at rest, mapped to the encrypted column.
+  // `emailAtLinkTimeHash` is nullable in TS (middleware populates) /
+  // NOT NULL in DB (migration enforced). Same drift pattern as
+  // User.emailHash — see that comment for rationale.
+  emailAtLinkTime          String                 @map("emailAtLinkTimeEncrypted")
+  emailAtLinkTimeHash      String?
   lastLoginAt              DateTime?
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
-  emailAtLinkTimeEncrypted String?
-  emailAtLinkTimeHash      String?
   provider                 TenantIdentityProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
   tenant                   Tenant                 @relation(fields: [tenantId], references: [id])
   user                     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)

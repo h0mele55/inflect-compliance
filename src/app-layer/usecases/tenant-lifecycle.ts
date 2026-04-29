@@ -21,6 +21,7 @@
 
 import prisma from '@/lib/prisma';
 import { createTenantWithDek } from '@/lib/security/tenant-key-manager';
+import { hashForLookup } from '@/lib/security/encryption';
 import { appendAuditEntry } from '@/lib/audit/audit-writer';
 import { logger } from '@/lib/observability/logger';
 import { ValidationError, NotFoundError, ConflictError } from '@/lib/errors/types';
@@ -60,10 +61,11 @@ export async function createTenantWithOwner(
 
     // 1. Find-or-create the User row outside the main transaction so
     //    the upsert is idempotent and visible to the transaction below.
+    const emailHash = hashForLookup(email);
     const user = await prisma.user.upsert({
-        where: { email },
+        where: { emailHash },
         update: {},
-        create: { email },
+        create: { email, emailHash },
         select: { id: true },
     });
 
@@ -212,7 +214,7 @@ export async function transferTenantOwnership(
 
     // 1. Resolve the new owner's User row.
     const newOwnerUser = await prisma.user.findUnique({
-        where: { email },
+        where: { emailHash: hashForLookup(email) },
         select: { id: true },
     });
     if (!newOwnerUser) {

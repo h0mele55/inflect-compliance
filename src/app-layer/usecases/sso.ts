@@ -7,6 +7,7 @@ import { forbidden, notFound } from '@/lib/errors/types';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/observability/logger';
 import { traceUsecase } from '@/lib/observability/tracing';
+import { hashForLookup } from '@/lib/security/encryption';
 
 /**
  * Enterprise SSO Usecases
@@ -328,7 +329,7 @@ export async function linkExternalIdentity(
 
     // ── Step 4: Match by email ──
     const user = await prisma.user.findUnique({
-        where: { email: normalizedEmail },
+        where: { emailHash: hashForLookup(normalizedEmail) },
         select: { id: true },
     });
 
@@ -361,6 +362,7 @@ export async function linkExternalIdentity(
             providerId,
             externalSubject,
             emailAtLinkTime: normalizedEmail,
+            emailAtLinkTimeHash: hashForLookup(normalizedEmail),
         });
 
         logger.info('sso identity link resolved', { component: 'sso', status: 'linked', isNewLink: true });
@@ -383,6 +385,7 @@ export async function linkExternalIdentity(
         const created = await tx.user.create({
             data: {
                 email: normalizedEmail,
+                emailHash: hashForLookup(normalizedEmail),
                 name: normalizedEmail.split('@')[0],
             },
         });
@@ -404,6 +407,7 @@ export async function linkExternalIdentity(
                 providerId,
                 externalSubject,
                 emailAtLinkTime: normalizedEmail,
+                emailAtLinkTimeHash: hashForLookup(normalizedEmail),
             },
         });
 
@@ -493,7 +497,7 @@ export async function checkSsoEnforcementForEmail(
 
     // Find user
     const user = await prisma.user.findUnique({
-        where: { email: normalizedEmail },
+        where: { emailHash: hashForLookup(normalizedEmail) },
         select: {
             id: true,
             passwordHash: true,

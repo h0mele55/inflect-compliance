@@ -5,7 +5,9 @@
  *   1. PII encryption infrastructure is present and functional
  *   2. Hash-based lookups work for encrypted fields
  *   3. Soft-delete middleware intercepts all critical entity deletes
- *   4. Plaintext columns still populated (dual-write)
+ *   4. (GAP-21 post-condition) Legacy plaintext columns are GONE on
+ *      auth-identity models — there is no `User.email` plaintext
+ *      column to query.
  *   5. Hard-delete is only possible via explicit raw SQL (purge path)
  *
  * Failing any of these tests means Epic 8 protections have regressed.
@@ -132,13 +134,24 @@ describeFn('Dual-Write Verification', () => {
         expect(raw[0].emailHash!.length).toBeGreaterThan(10);
     });
 
-    it('User.email plaintext is still populated (dual-write)', async () => {
-        const raw = await prisma.$queryRawUnsafe<Array<{ email: string }>>(
-            'SELECT "email" FROM "User" WHERE "id" = $1',
-            testUserId,
-        );
-        expect(raw).toHaveLength(1);
-        expect(raw[0].email).toBe(testEmail);
+    it('User.email plaintext column is GONE post-GAP-21', async () => {
+        // Querying the dropped column raises a Postgres "column does
+        // not exist" error. We assert the failure shape rather than a
+        // returned value — the column is intentionally absent.
+        const result = await prisma
+            .$queryRawUnsafe<Array<{ email: string }>>(
+                'SELECT "email" FROM "User" WHERE "id" = $1',
+                testUserId,
+            )
+            .then(() => ({ ok: true as const }))
+            .catch((err: unknown) => ({
+                ok: false as const,
+                msg: err instanceof Error ? err.message : String(err),
+            }));
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.msg).toMatch(/column .* does not exist/i);
+        }
     });
 
     it('emailHash matches hashForLookup of the plaintext email', async () => {
