@@ -62,6 +62,7 @@ import {
 } from '@/app-layer/usecases/tenant-lifecycle';
 import prisma from '@/lib/prisma';
 import { appendAuditEntry } from '@/lib/audit/audit-writer';
+import { hashForLookup } from '@/lib/security/encryption';
 
 const mockUserUpsert = prisma.user.upsert as jest.MockedFunction<typeof prisma.user.upsert>;
 const mockUserFind = prisma.user.findUnique as jest.MockedFunction<typeof prisma.user.findUnique>;
@@ -104,14 +105,18 @@ describe('createTenantWithOwner', () => {
             requestId: 'req-1',
         });
 
+        // GAP-21: lookup is anchored on emailHash. The expected hash
+        // is computed from the normalised form, so this assertion
+        // proves both that normalisation happens AND that the call
+        // site has been migrated off the plaintext column.
         expect(mockUserUpsert).toHaveBeenCalledWith(
             expect.objectContaining({
-                where: { email: 'alice@example.com' },
+                where: { emailHash: hashForLookup('alice@example.com') },
             }),
         );
-        // Regression: a missed normalisation would create two distinct
-        // users for "Alice@Example.com" and "alice@example.com" and the
-        // OAuth callback would not match the membership.
+        // Regression: a missed normalisation would produce a different
+        // hash for "Alice@Example.com" vs "alice@example.com" and the
+        // unique constraint would let two distinct rows coexist.
     });
 
     it('upserts the user (idempotent — reuses existing row by email)', async () => {
@@ -125,9 +130,15 @@ describe('createTenantWithOwner', () => {
         const args = mockUserUpsert.mock.calls[0][0] as any;
         // The `update: {}` is the idempotency contract — if the email
         // already exists, do nothing; otherwise create a placeholder
-        // User with only the email populated.
+        // User. GAP-21: the create payload now also carries
+        // `emailHash` (deterministic) so the DB-level NOT NULL is
+        // satisfied without relying on the middleware to populate it
+        // — making the call site self-evident at audit time.
         expect(args.update).toEqual({});
-        expect(args.create).toEqual({ email: 'a@b.com' });
+        expect(args.create).toEqual({
+            email: 'a@b.com',
+            emailHash: hashForLookup('a@b.com'),
+        });
     });
 
     it('creates tenant + membership + onboarding inside one $transaction', async () => {

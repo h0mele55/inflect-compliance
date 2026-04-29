@@ -40,7 +40,7 @@ async function seedStaging() {
         console.error(`❌ Tenant "${STAGING_TENANT_SLUG}" not found. Did the base seed run?`);
         process.exit(1);
     }
-    const admin = await stagingPrisma.user.findUnique({ where: { email: STAGING_ADMIN_EMAIL } });
+    const admin = await stagingPrisma.user.findUnique({ where: { emailHash: hashForLookup(STAGING_ADMIN_EMAIL) } });
     if (!admin) {
         console.error(`❌ Admin user "${STAGING_ADMIN_EMAIL}" not found.`);
         process.exit(1);

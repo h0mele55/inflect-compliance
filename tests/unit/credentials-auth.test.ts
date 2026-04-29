@@ -76,6 +76,7 @@ jest.mock('@/lib/auth/security-events', () => ({
 
 import { authenticateWithPassword } from '@/lib/auth/credentials';
 import { BCRYPT_COST } from '@/lib/auth/passwords';
+import { hashForLookup } from '@/lib/security/encryption';
 
 beforeEach(() => {
     mockFindUnique.mockReset();
@@ -140,7 +141,7 @@ describe('authenticateWithPassword — success', () => {
         });
     });
 
-    it('lowercases and trims the input email before lookup', async () => {
+    it('lowercases and trims the input email before hashed lookup', async () => {
         const u = await makeUser({ email: 'alice@example.com' });
         mockFindUnique.mockResolvedValue(u);
 
@@ -149,8 +150,14 @@ describe('authenticateWithPassword — success', () => {
             password: u._plaintext,
         });
 
+        // GAP-21: lookup is now anchored on emailHash. The expected
+        // hash is computed from the normalised (lowercased + trimmed)
+        // form — proving both that normalisation happens AND that
+        // the call site no longer references the plaintext column.
         expect(mockFindUnique).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { email: 'alice@example.com' } }),
+            expect.objectContaining({
+                where: { emailHash: hashForLookup('alice@example.com') },
+            }),
         );
     });
 });
@@ -182,7 +189,7 @@ describe('authenticateWithPassword — failure modes collapse to credentials_inv
         mockFindUnique.mockResolvedValue(u);
         const result = await authenticateWithPassword({
             email: u.email,
-            password: 'definitely-not-the-right-one',
+            password: 'definitely-not-the-right-one', // pragma: allowlist secret -- test fixture
         });
         expect(result).toEqual({ ok: false, reason: 'credentials_invalid' });
     });

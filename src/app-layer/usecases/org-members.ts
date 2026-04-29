@@ -58,6 +58,7 @@ import {
     type DeprovisionResult,
 } from './org-provisioning';
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors/types';
+import { hashForLookup } from '@/lib/security/encryption';
 import type { OrgContext } from '@/app-layer/types';
 import type { OrgRole } from '@prisma/client';
 import { logger } from '@/lib/observability/logger';
@@ -226,10 +227,11 @@ export async function addOrgMember(
     // Find-or-create the User row. Mirrors `createTenantWithOwner` —
     // a placeholder lets an admin add a member by email before that
     // user has signed in for the first time.
+    const emailHash = hashForLookup(email);
     const user = await prisma.user.upsert({
-        where: { email },
+        where: { emailHash },
         update: {},
-        create: { email },
+        create: { email, emailHash },
         select: { id: true, email: true },
     });
 

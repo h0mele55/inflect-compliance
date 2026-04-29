@@ -59,6 +59,12 @@ export async function linkIdentity(data: {
     providerId: string;
     externalSubject: string;
     emailAtLinkTime: string;
+    /**
+     * Deterministic HMAC of `emailAtLinkTime` (HKDF-derived). Required —
+     * the schema's NOT NULL constraint depends on it. Callers compute
+     * via `hashForLookup` from `@/lib/security/encryption`.
+     */
+    emailAtLinkTimeHash: string;
 }): Promise<UserIdentityLink> {
     return prisma.userIdentityLink.create({
         data: {
@@ -67,6 +73,7 @@ export async function linkIdentity(data: {
             providerId: data.providerId,
             externalSubject: data.externalSubject,
             emailAtLinkTime: data.emailAtLinkTime,
+            emailAtLinkTimeHash: data.emailAtLinkTimeHash,
             lastLoginAt: new Date(),
         },
     });

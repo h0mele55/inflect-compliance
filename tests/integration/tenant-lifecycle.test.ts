@@ -9,6 +9,7 @@
 import { DB_AVAILABLE } from './db-helper';
 import { prismaTestClient } from '../helpers/db';
 import type { PrismaClient } from '@prisma/client';
+import { hashForLookup } from '@/lib/security/encryption';
 
 // Must import after env skip is set (jest.setup.js sets SKIP_ENV_VALIDATION=1).
 import {
@@ -196,7 +197,7 @@ describeFn('tenant-lifecycle usecases', () => {
 
         // Add the new owner as an ADMIN first.
         const user2 = await prisma.user.upsert({
-            where: { email: email2 },
+            where: { emailHash: hashForLookup(email2) },
             update: {},
             create: { email: email2 },
             select: { id: true },
@@ -247,7 +248,7 @@ describeFn('tenant-lifecycle usecases', () => {
 
         // Create user2 but do NOT add them to the tenant.
         await prisma.user.upsert({
-            where: { email: email2 },
+            where: { emailHash: hashForLookup(email2) },
             update: {},
             create: { email: email2 },
             select: { id: true },

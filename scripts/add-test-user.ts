@@ -4,6 +4,7 @@
  */
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { hashForLookup } from '@/lib/security/encryption';
 
 const prisma = new PrismaClient();
 
@@ -24,7 +25,7 @@ async function main() {
 
     for (const u of users) {
         // Create or find user
-        let user = await prisma.user.findUnique({ where: { email: u.email } });
+        let user = await prisma.user.findUnique({ where: { emailHash: hashForLookup(u.email) } });
         if (!user) {
             user = await prisma.user.create({
                 data: { email: u.email, name: u.name, passwordHash },

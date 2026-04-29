@@ -148,7 +148,7 @@ describeFn('PII Encryption', () => {
             const email = `pii-upsert-${Date.now()}@example.com`;
 
             const user = await prisma.user.upsert({
-                where: { email },
+                where: { emailHash: hashForLookup(email) },
                 create: { email, name: 'Upsert Create' },
                 update: { name: 'Upsert Update' },
             });

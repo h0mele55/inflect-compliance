@@ -174,21 +174,24 @@ model AuditPackShare {
 }
 
 model AuditorAccount {
-  id             String              @id @default(cuid())
-  tenantId       String
-  email          String
-  name           String?
-  status         AuditorStatus       @default(INVITED)
-  createdAt      DateTime            @default(now())
-  emailEncrypted String?
-  emailHash      String?
-  nameEncrypted  String?
-  tenant         Tenant              @relation(fields: [tenantId], references: [id])
-  packAccess     AuditorPackAccess[]
+  id         String              @id @default(cuid())
+  tenantId   String
+  // GAP-21: stored encrypted at rest. Lookup uniqueness is enforced
+  // on (tenantId, emailHash) — the random-IV ciphertext column
+  // cannot anchor uniqueness on its own.
+  // `emailHash` is nullable in TS (middleware populates) / NOT NULL
+  // in DB (migration enforced). Same drift pattern as User.emailHash
+  // — see that comment for rationale.
+  email      String              @map("emailEncrypted")
+  emailHash  String?
+  name       String?             @map("nameEncrypted")
+  status     AuditorStatus       @default(INVITED)
+  createdAt  DateTime            @default(now())
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  packAccess AuditorPackAccess[]
 
   @@unique([id, tenantId])
-  @@unique([tenantId, email])
-  @@index([emailHash])
+  @@unique([tenantId, emailHash])
 }
 
 model AuditorPackAccess {

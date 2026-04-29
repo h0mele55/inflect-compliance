@@ -44,6 +44,7 @@ import { authenticateWithPassword } from '@/lib/auth/credentials';
 import { isTokenExpired, refreshAccessToken } from '@/lib/auth/refresh';
 import type { Role } from '@prisma/client';
 import { edgeLogger } from '@/lib/observability/edge-logger';
+import { hashForLookup } from '@/lib/security/encryption';
 
 // ─── Type augmentation ──────────────────────────────────────────────
 //
@@ -267,7 +268,7 @@ export const authOptions: NextAuthOptions = {
             // 1. Account linking for OAuth (not credentials).
             if (account.provider !== 'credentials' && user.email) {
                 const existingUser = await prisma.user.findUnique({
-                    where: { email: user.email },
+                    where: { emailHash: hashForLookup(user.email) },
                 });
 
                 if (existingUser && user.id !== existingUser.id) {
@@ -326,7 +327,7 @@ export const authOptions: NextAuthOptions = {
             // Initial sign in.
             if (account && user) {
                 const dbUser = await prisma.user.findUnique({
-                    where: { email: token.email! },
+                    where: { emailHash: hashForLookup(token.email!) },
                     include: {
                         tenantMemberships: {
                             where: { status: 'ACTIVE' },
