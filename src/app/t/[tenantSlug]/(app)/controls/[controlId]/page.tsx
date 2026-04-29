@@ -87,20 +87,36 @@ export default function ControlDetailPage() {
     const controlId = params?.controlId as string;
     const queryClient = useQueryClient();
 
-    // ─── Query: control detail ───
-    const controlQuery = useQuery<ControlDetailDTO>({
+    // ─── Query: control + sync (single page-data call) ───
+    //
+    // Hits `/controls/:id/page-data` which collapses the previous
+    // serial waterfall (GET /controls/:id THEN GET /controls/:id/sync)
+    // into one round-trip. The sync sub-payload is null for controls
+    // without an automationKey, or when the mapping lookup fails — the
+    // page renders the conflict badge unconditionally against it.
+    interface ControlPageDataDTO {
+        control: ControlDetailDTO;
+        syncStatus: {
+            syncStatus: string | null;
+            lastSyncedAt: string | null;
+            errorMessage: string | null;
+            provider: string | null;
+        } | null;
+    }
+    const pageDataQuery = useQuery<ControlPageDataDTO>({
         queryKey: queryKeys.controls.detail(tenantSlug, controlId),
         queryFn: async () => {
-            const res = await fetch(apiUrl(`/controls/${controlId}`));
+            const res = await fetch(apiUrl(`/controls/${controlId}/page-data`));
             if (!res.ok) throw new Error('Control not found');
             return res.json();
         },
         enabled: !!controlId,
     });
-    const control = controlQuery.data ?? null;
-    const loading = controlQuery.isLoading;
-    const error = controlQuery.error?.message ?? '';
-    const refetch = controlQuery.refetch;
+    const control = pageDataQuery.data?.control ?? null;
+    const loading = pageDataQuery.isLoading;
+    const error = pageDataQuery.error?.message ?? '';
+    const refetch = pageDataQuery.refetch;
+    const initialSyncStatus = pageDataQuery.data?.syncStatus ?? null;
     const [tab, setTab] = useState<Tab>('overview');
 
     // Status change
@@ -292,20 +308,23 @@ export default function ControlDetailPage() {
         fetch(apiUrl(`/controls/${controlId}/activity`)).then(r => r.ok ? r.json() : []).then(setActivity).catch(() => { }).finally(() => setActivityLoading(false));
     }, [tab, apiUrl, controlId]);
 
-    // Fetch sync status on load (only when control has an automationKey)
+    // Hydrate sync status from the page-data response (one round-trip
+    // instead of the previous control-then-sync waterfall). The
+    // dependency on the data identity — not just on automationKey —
+    // ensures the badge updates after `refetch()` lands a fresh
+    // page-data payload (e.g. after Sync Now or after an edit that
+    // changes the automationKey).
     useEffect(() => {
-        if (!control?.automationKey) return;
-        fetch(apiUrl(`/controls/${controlId}/sync`))
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-                if (data) {
-                    setSyncStatus(data.syncStatus ?? null);
-                    setSyncLastAt(data.lastSyncedAt ?? null);
-                    setSyncError(data.errorMessage ?? null);
-                }
-            })
-            .catch(() => { });
-    }, [control?.automationKey, apiUrl, controlId]);
+        if (!initialSyncStatus) {
+            setSyncStatus(null);
+            setSyncLastAt(null);
+            setSyncError(null);
+            return;
+        }
+        setSyncStatus(initialSyncStatus.syncStatus ?? null);
+        setSyncLastAt(initialSyncStatus.lastSyncedAt ?? null);
+        setSyncError(initialSyncStatus.errorMessage ?? null);
+    }, [initialSyncStatus]);
 
     const handleSyncNow = async () => {
         setSyncing(true);
@@ -315,14 +334,11 @@ export default function ControlDetailPage() {
             const data = await res.json();
             if (res.ok && data.execution) {
                 setSyncResult({ status: data.execution.status, summary: data.execution.summary });
-                // Refresh sync status
-                const statusRes = await fetch(apiUrl(`/controls/${controlId}/sync`));
-                if (statusRes.ok) {
-                    const statusData = await statusRes.json();
-                    setSyncStatus(statusData.syncStatus ?? null);
-                    setSyncLastAt(statusData.lastSyncedAt ?? null);
-                    setSyncError(statusData.errorMessage ?? null);
-                }
+                // One refetch — the page-data payload re-runs the
+                // sync-mapping lookup server-side, so we get the
+                // post-sync status without a second round-trip. The
+                // useEffect on `initialSyncStatus` writes the new
+                // values into the badge state.
                 await refetch();
             } else {
                 setSyncResult({ status: 'ERROR', summary: data.error || 'Sync failed' });
