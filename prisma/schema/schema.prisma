@@ -1,16 +1,31 @@
-generator client {
-  provider      = "prisma-client-js"
-  // linux-musl-openssl-3.0.x → Alpine 3.19+ / node:22-alpine runtime.
-  // native → local dev. Both required for the image to run on any
-  // target without regenerating.
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
-}
-
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
-}
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema (transitional)
+//
+//  This file currently holds every model + enum that has NOT yet
+//  been relocated to its domain file under prisma/schema/. It is
+//  the sediment layer of the split: as future PRs move models into
+//  enums.prisma / auth.prisma / compliance.prisma / vendor.prisma /
+//  audit.prisma / automation.prisma, this file SHRINKS toward empty.
+//
+//  Why we keep one transitional file rather than a flag-day move:
+//
+//    • Prisma's `prismaSchemaFolder` feature concatenates every
+//      `.prisma` file in the directory. The model graph is global,
+//      so splits can land incrementally without breaking the build —
+//      a model can move from this file to `compliance.prisma` in a
+//      single commit and Prisma sees no change.
+//
+//    • Splitting domain by domain in separate PRs keeps the diffs
+//      small and reviewable. A monolithic flag-day move would be a
+//      ~3,000-line diff that nobody can meaningfully review.
+//
+//    • Migration drift is detected by `prisma migrate diff` regardless
+//      of how the schema is split, so each PR must show "no schema
+//      drift" as a precondition.
+//
+//  See prisma/schema/README.md for the full split plan and
+//  prisma/schema/base.prisma for the generator/datasource owner.
+// ─────────────────────────────────────────────────────────────────
 
 model Tenant {
   id                        String                       @id @default(cuid())

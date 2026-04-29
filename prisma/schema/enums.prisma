@@ -1,0 +1,21 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: ENUMS
+//
+//  All shared enum declarations live in this file. Prisma enums
+//  are domain-spanning (e.g. `Role` is referenced by User,
+//  TenantMembership, OrgMembership, AuditorAccess, …) so keeping
+//  them in one file avoids the alternative — duplicating each enum
+//  to its primary domain file and risking divergence.
+//
+//  Migration policy:
+//    • Adding a new value to an existing enum is non-breaking but
+//      requires a Prisma migration (Postgres ALTER TYPE … ADD VALUE).
+//    • Removing or reordering values is breaking. Plan a forward
+//      migration with explicit data-migration of any rows.
+//    • Renaming a value: prefer @@map() on the enum case to keep
+//      the SQL value stable across rename refactors.
+//
+//  This file is currently empty. The actual enums live in the
+//  transitional `schema.prisma` and will be relocated here in the
+//  next prompt of GAP-09.
+// ─────────────────────────────────────────────────────────────────

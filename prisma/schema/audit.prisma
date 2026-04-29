@@ -1,0 +1,24 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: AUDIT (cycles, packs, log)
+//
+//  Owns:
+//    • AuditCycle + AuditPack + AuditPackItem + AuditPackShare
+//    • AuditorAccess (external auditor RBAC tier)
+//    • AuditLog (hash-chained immutable audit trail — Epic A.1)
+//    • AuditStreamConfig (Epic C.4 — outbound webhook config per tenant)
+//
+//  Note: this is the EXTERNAL-AUDITOR domain — readiness scoring,
+//  evidence packs shared with auditors, hash-chained event log.
+//  Internal "audit-of-controls" tasks live with `Control*` in
+//  `compliance.prisma` because they're written and read by the
+//  compliance team, not auditors.
+//
+//  AuditLog policy:
+//    • Append-only at the application layer (`logEvent`). Direct
+//      writes are blocked by guard tests and DB triggers.
+//    • Hash-chained (each row's hash includes the previous row's
+//      hash). Schema changes here MUST preserve the chain layout.
+//
+//  This file is currently empty. Models will land here in a focused
+//  follow-up PR.
+// ─────────────────────────────────────────────────────────────────

@@ -1,0 +1,19 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: VENDOR RISK
+//
+//  Owns:
+//    • Vendor + VendorContact
+//    • VendorAssessment + VendorAssessmentSection +
+//      VendorAssessmentQuestion + VendorAssessmentResponse
+//    • VendorAssessmentTemplate + VendorAssessmentTemplateSection
+//    • VendorEvidenceLink
+//
+//  Why a dedicated file: vendor assessments have a separate UI flow,
+//  a distinct retention model, and a different review cadence from
+//  the core compliance domain. Pulling them out keeps `compliance.prisma`
+//  focused on the certification surface (controls/risks/evidence)
+//  and makes vendor-specific schema changes locally reviewable.
+//
+//  This file is currently empty. Models will land here in a focused
+//  follow-up PR.
+// ─────────────────────────────────────────────────────────────────

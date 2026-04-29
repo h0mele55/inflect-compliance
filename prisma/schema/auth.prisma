@@ -1,0 +1,28 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: AUTH & TENANCY
+//
+//  Owns:
+//    • Tenant + Organization (hub-and-spoke)
+//    • TenantMembership / OrgMembership / TenantCustomRole
+//    • User (NextAuth Prisma adapter shape)
+//    • Account / Session (NextAuth)
+//    • UserSession (Epic C.3 — server-recorded session record with
+//      ipAddress/userAgent/expiresAt for revocation)
+//    • TenantInviteToken
+//    • TenantSecuritySettings
+//    • SsoConnection / ScimToken
+//
+//  Cross-domain relations declared here that point INTO this file:
+//    • Every tenant-scoped model has a `tenant Tenant @relation(...)`
+//      and a `tenantId String` — declared on the OWNING side
+//      (i.e. the model's own domain file). The reverse relation field
+//      on Tenant is what lives here.
+//
+//  Why keep all auth/tenancy together: the back-reference fields on
+//  Tenant span every domain (controls, risks, evidence, …). Splitting
+//  Tenant out from User/Membership would force every domain file to
+//  re-import Tenant relations, scattering the join surface.
+//
+//  This file is currently empty. The actual auth/tenancy models live
+//  in `schema.prisma` and will be relocated here as a focused PR.
+// ─────────────────────────────────────────────────────────────────

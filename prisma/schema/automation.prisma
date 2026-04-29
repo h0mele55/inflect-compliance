@@ -1,0 +1,21 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: AUTOMATION & INTEGRATIONS
+//
+//  Owns:
+//    • AutomationRule + AutomationExecution + AutomationEvent
+//      (Epic 60 event-driven backbone)
+//    • IntegrationConnection + IntegrationCredential
+//    • SyncMapping (per-control external-entity mapping)
+//    • Webhook + WebhookDelivery (outbound integrations)
+//    • Notification + NotificationPreference + NotificationDelivery
+//    • NotificationRule + NotificationDispatchLog
+//
+//  Why a dedicated file: automation is the integration boundary —
+//  it touches every domain's events but owns no business state of
+//  its own beyond rule definitions and execution traces. Putting it
+//  in its own file keeps the rule-engine surface auditable in
+//  isolation from the domain models it observes.
+//
+//  This file is currently empty. Models will land here in a focused
+//  follow-up PR.
+// ─────────────────────────────────────────────────────────────────

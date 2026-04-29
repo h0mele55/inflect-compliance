@@ -15,7 +15,7 @@ echo "╚═══════════════════════�
 # 2026. Pinning forces the known-good resolver.
 echo ""
 echo "→ Applying database migrations..."
-npx --yes prisma@5.22.0 migrate deploy --schema=./prisma/schema.prisma
+npx --yes prisma@5.22.0 migrate deploy --schema=./prisma/schema
 echo "✓ Migrations applied"
 
 # ── 2. Create upload directory if missing ──

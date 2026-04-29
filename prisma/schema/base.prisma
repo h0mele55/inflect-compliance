@@ -1,0 +1,49 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema
+//
+//  This is the FOUNDATION file. It owns:
+//
+//    • The `generator client` block — including the
+//      `prismaSchemaFolder` preview feature flag that tells Prisma
+//      to read every `.prisma` file in this directory rather than
+//      a single `schema.prisma`.
+//
+//    • The `datasource db` block — Postgres connection + direct URL
+//      for migrations. There is exactly one datasource per Prisma
+//      project; it lives here.
+//
+//  No models, enums, or relations live in base.prisma. Any future
+//  contributor adding a new domain file (e.g. notifications.prisma)
+//  must NOT redeclare generator or datasource here — Prisma rejects
+//  duplicates across the folder.
+//
+//  Domain split (see prisma/schema/README.md):
+//    base.prisma         (this file — generator + datasource)
+//    enums.prisma        (shared enums)
+//    auth.prisma         (User / Tenant / Membership / Session)
+//    compliance.prisma   (Control / Risk / Evidence / Framework)
+//    vendor.prisma       (Vendor / VendorAssessment)
+//    audit.prisma        (AuditCycle / AuditPack / AuditLog)
+//    automation.prisma   (AutomationRule / AutomationExecution / Integration)
+//    schema.prisma       (transitional — holds models not yet
+//                         relocated to a domain file. Will shrink to
+//                         empty as the split lands across PRs.)
+// ─────────────────────────────────────────────────────────────────
+
+generator client {
+  provider        = "prisma-client-js"
+  // linux-musl-openssl-3.0.x → Alpine 3.19+ / node:22-alpine runtime.
+  // native → local dev. Both required for the image to run on any
+  // target without regenerating.
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+  // GAP-09 — multi-file schema support. Prisma 5.x reads every
+  // `.prisma` file under `prisma/schema/` only when this preview
+  // feature is enabled. GA in Prisma 6.0+; on 5.x it must stay opt-in.
+  previewFeatures = ["prismaSchemaFolder"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}

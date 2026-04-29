@@ -1,0 +1,25 @@
+// ─────────────────────────────────────────────────────────────────
+//  GAP-09 — multi-file schema: COMPLIANCE
+//
+//  Core compliance domain. Owns:
+//    • Control + ControlEvidenceLink + ControlContributor +
+//      ControlTask + ControlTest models
+//    • Risk + RiskTemplate + RiskControl (M:N risk↔control)
+//    • Evidence + EvidenceLink + EvidencePackage
+//    • Framework + FrameworkRequirement + FrameworkMapping
+//    • Clause + ClauseEvidence
+//    • Policy + PolicyVersion + PolicyApproval + PolicyContributor
+//    • Asset + AssetEvidence + AssetCoverage
+//    • Issue + IssueComment + Finding + FindingTask
+//    • Task (work-item — distinct from ControlTask) + TaskLink +
+//      TaskComment + TaskWatcher
+//    • TraceabilityLink (cross-entity weave)
+//
+//  Note: Audit models (AuditCycle, AuditPack, …) live in
+//  `audit.prisma`. Vendor risk lives in `vendor.prisma`. They are
+//  separated because each has a distinct API surface, separate
+//  RLS policies, and tends to evolve on its own cadence.
+//
+//  This file is currently empty. Models will land here in focused
+//  follow-up PRs.
+// ─────────────────────────────────────────────────────────────────
