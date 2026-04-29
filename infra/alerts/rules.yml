@@ -297,4 +297,193 @@ groups:
             2. Check for stuck/active jobs
             3. Verify Redis connectivity
             4. Consider scaling worker concurrency
-          dashboard: "/d/inflect-compliance-slos"
+          dashboard: "/d/inflect-bullmq"
+
+      # Critical: queue depth exceeds 1000 — operator action required.
+      # OI-3 spec threshold. Distinct from the 100-job warning above
+      # because at 1k+ the backlog is no longer self-recoverable
+      # within the maintenance window — workers can't drain fast
+      # enough without scaling.
+      - alert: QueueDepthBacklogCritical
+        expr: |
+          job_queue_depth{queue_state="waiting"} > 1000
+        for: 5m
+        labels:
+          severity: critical
+          service: inflect-compliance
+          slo: job_health
+        annotations:
+          summary: "Job queue backlog exceeds 1000 waiting jobs (CRITICAL)"
+          description: |
+            The BullMQ queue has {{ $value }} jobs waiting. At this
+            level the backlog is no longer self-recoverable —
+            operator intervention needed.
+
+            Runbook:
+            1. Scale worker replicas: helm upgrade --set worker.replicaCount=N
+            2. Identify the slow job type via the BullMQ dashboard
+            3. Check for poison-pill jobs blocking the queue
+            4. If Redis-bound: check ElastiCache CPU + memory
+          dashboard: "/d/inflect-bullmq"
+
+  # ─── Database (Repository / Connection Pool) ─────────────────────────
+  - name: inflect.database
+    interval: 30s
+    rules:
+      # Critical: DB connection pool exhausted.
+      # Manifests as a sustained spike in repo-method errors with
+      # Prisma error types — the pool times out trying to acquire a
+      # connection (P1008) or refuses outright. Spec OI-3 calls this
+      # "DB connection pool exhausted"; in practice it surfaces as
+      # rapid Prisma errors across multiple repo methods at once.
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          (
+            sum(rate(repo_method_errors{error_type=~"PrismaClient.*"}[2m]))
+            /
+            clamp_min(sum(rate(repo_method_calls[2m])), 1)
+          ) > 0.20
+        for: 3m
+        labels:
+          severity: critical
+          service: inflect-compliance
+          slo: database
+        annotations:
+          summary: "Database connection pool likely exhausted (>20% Prisma errors)"
+          description: |
+            More than 20% of repository calls are failing with Prisma
+            errors over 3 minutes. The most common cause is connection
+            pool exhaustion (queries waiting longer than the pool
+            timeout for a free connection).
+
+            Runbook:
+            1. Check the database dashboard: /d/inflect-database
+            2. Check PgBouncer pool stats:
+                 kubectl exec <app-pod> -c pgbouncer -- \
+                   psql -h 127.0.0.1 -p 5432 -d pgbouncer -U postgres \
+                   -c "SHOW POOLS;"
+            3. Check RDS connection count via CloudWatch
+            4. Scale app replicas down (back-pressure) OR
+               scale RDS / increase PgBouncer pool size in values
+          dashboard: "/d/inflect-database"
+
+  # ─── Redis / ElastiCache ─────────────────────────────────────────────
+  # These metrics come from a CloudWatch exporter (cloudwatch_exporter
+  # or YACE) wired to ElastiCache. The Redis dashboard documents the
+  # dependency.
+  - name: inflect.redis
+    interval: 60s
+    rules:
+      # Warning: ElastiCache memory > 80%.
+      # OI-3 spec threshold. BullMQ uses noeviction (chart enforces
+      # via parameter group) so once memory fills, the cache STARTS
+      # REJECTING WRITES — workers can't enqueue new jobs.
+      - alert: RedisMemoryHighWarning
+        expr: |
+          avg(aws_elasticache_database_memory_usage_percentage_average) > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: inflect-compliance
+          slo: cache
+        annotations:
+          summary: "ElastiCache memory usage exceeds 80%"
+          description: |
+            ElastiCache database memory is at {{ $value | humanizePercentage }}.
+            With maxmemory-policy=noeviction (BullMQ requirement),
+            reaching 100% causes write rejection — workers will fail
+            to enqueue jobs.
+
+            Runbook:
+            1. Check the Redis dashboard: /d/inflect-redis
+            2. Identify the memory consumer:
+                 kubectl exec <app-pod> -c pgbouncer -- \
+                   redis-cli -h <redis-host> --tls INFO memory
+            3. Scale cache node up: helm upgrade --set redis_node_type=...
+               (Terraform — Epic OI-1 module)
+            4. Or evict completed jobs:
+                 BullMQ: queue.clean(0, 'completed') / queue.clean(0, 'failed')
+          dashboard: "/d/inflect-redis"
+
+      # Critical: ElastiCache memory > 95% — write rejection imminent.
+      - alert: RedisMemoryHighCritical
+        expr: |
+          avg(aws_elasticache_database_memory_usage_percentage_average) > 95
+        for: 5m
+        labels:
+          severity: critical
+          service: inflect-compliance
+          slo: cache
+        annotations:
+          summary: "ElastiCache memory CRITICAL (>95%) — write rejection imminent"
+          description: |
+            ElastiCache memory at {{ $value | humanizePercentage }}.
+            Write rejection imminent. Worker pods will start failing
+            to enqueue jobs within minutes.
+
+            Runbook: same as RedisMemoryHighWarning, but ESCALATE —
+            scale the cache node up via Terraform NOW. The chart's
+            maxmemory-policy=noeviction means the cache will REJECT
+            writes once full, not silently evict. Workers will
+            immediately fail to enqueue.
+          dashboard: "/d/inflect-redis"
+
+  # ─── TLS Certificate Expiry ──────────────────────────────────────────
+  # `probe_ssl_earliest_cert_expiry` comes from the Prometheus
+  # blackbox_exporter probing the public ingress URL. Operators wire
+  # the blackbox_exporter ServiceMonitor (or its Helm chart) to scrape
+  # the production hostname.
+  - name: inflect.certificates
+    interval: 5m
+    rules:
+      # Warning: certificate expires within 14 days. OI-3 spec.
+      # Earlier than the 30-day default many shops use because
+      # cert-manager renews at 30 days remaining; if it hasn't
+      # renewed by 14 days, automation has failed.
+      - alert: CertificateExpiryWarning
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 14
+        for: 1h
+        labels:
+          severity: warning
+          service: inflect-compliance
+          slo: tls
+        annotations:
+          summary: "TLS certificate expires in {{ $value | printf \"%.1f\" }} days"
+          description: |
+            The probed certificate expires soon. cert-manager (or
+            equivalent) should have renewed by now. Manual
+            intervention may be required.
+
+            Runbook:
+            1. Check cert-manager status:
+                 kubectl get certificate -A
+                 kubectl describe certificate <name>
+            2. Check ACME order state:
+                 kubectl describe order -A
+                 kubectl describe challenge -A
+            3. If cert-manager is stuck: re-issue manually via the
+               Ingress's TLS Secret reference.
+          dashboard: "/d/inflect-app-overview"
+
+      # Critical: certificate expires within 3 days — site outage imminent.
+      - alert: CertificateExpiryCritical
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 3
+        for: 5m
+        labels:
+          severity: critical
+          service: inflect-compliance
+          slo: tls
+        annotations:
+          summary: "TLS certificate expires in {{ $value | printf \"%.1f\" }} days (CRITICAL)"
+          description: |
+            Certificate expiry imminent. Browsers will reject HTTPS
+            connections once it lapses.
+
+            Runbook: same as CertificateExpiryWarning, but ESCALATE —
+            the automated renewal flow has failed and manual cert
+            issuance is required NOW. If cert-manager is stuck,
+            issue a manual cert via Let's Encrypt acme.sh or
+            equivalent and replace the Ingress's TLS Secret directly.
+          dashboard: "/d/inflect-app-overview"

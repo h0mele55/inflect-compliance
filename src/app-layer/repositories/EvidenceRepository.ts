@@ -3,6 +3,7 @@ import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
 import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
 import type { PaginatedResponse } from '@/lib/dto/pagination';
+import { traceRepository } from '@/lib/observability/repository-tracing';
 
 export interface EvidenceListFilters {
     type?: string;
@@ -22,43 +23,47 @@ export interface EvidenceListParams {
 
 export class EvidenceRepository {
     static async list(db: PrismaTx, ctx: RequestContext, filters?: EvidenceListFilters) {
-        const where = EvidenceRepository._buildWhere(ctx, filters);
-        return db.evidence.findMany({
-            where,
-            orderBy: { createdAt: 'desc' },
-            include: {
-                control: { select: { id: true, name: true, annexId: true } },
-                reviews: { orderBy: { createdAt: 'desc' }, take: 1 },
-            },
+        return traceRepository('evidence.list', ctx, async () => {
+            const where = EvidenceRepository._buildWhere(ctx, filters);
+            return db.evidence.findMany({
+                where,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    control: { select: { id: true, name: true, annexId: true } },
+                    reviews: { orderBy: { createdAt: 'desc' }, take: 1 },
+                },
+            });
         });
     }
 
     static async listPaginated(db: PrismaTx, ctx: RequestContext, params: EvidenceListParams): Promise<PaginatedResponse<unknown>> {
-        const limit = clampLimit(params.limit);
-        const where = EvidenceRepository._buildWhere(ctx, params.filters);
+        return traceRepository('evidence.listPaginated', ctx, async () => {
+            const limit = clampLimit(params.limit);
+            const where = EvidenceRepository._buildWhere(ctx, params.filters);
 
-        // Apply cursor
-        const cursorWhere = buildCursorWhere(params.cursor);
-        if (cursorWhere) {
-            if (where.AND) {
-                (where.AND as Prisma.EvidenceWhereInput[]).push(cursorWhere as Prisma.EvidenceWhereInput);
-            } else {
-                where.AND = [cursorWhere as Prisma.EvidenceWhereInput];
+            // Apply cursor
+            const cursorWhere = buildCursorWhere(params.cursor);
+            if (cursorWhere) {
+                if (where.AND) {
+                    (where.AND as Prisma.EvidenceWhereInput[]).push(cursorWhere as Prisma.EvidenceWhereInput);
+                } else {
+                    where.AND = [cursorWhere as Prisma.EvidenceWhereInput];
+                }
             }
-        }
 
-        const items = await db.evidence.findMany({
-            where,
-            orderBy: CURSOR_ORDER_BY,
-            take: limit + 1,
-            include: {
-                control: { select: { id: true, name: true, annexId: true } },
-                reviews: { orderBy: { createdAt: 'desc' }, take: 1 },
-            },
+            const items = await db.evidence.findMany({
+                where,
+                orderBy: CURSOR_ORDER_BY,
+                take: limit + 1,
+                include: {
+                    control: { select: { id: true, name: true, annexId: true } },
+                    reviews: { orderBy: { createdAt: 'desc' }, take: 1 },
+                },
+            });
+
+            const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+            return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
         });
-
-        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
-        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
     }
 
     private static _buildWhere(ctx: RequestContext, filters?: EvidenceListFilters): Prisma.EvidenceWhereInput {
@@ -103,21 +108,25 @@ export class EvidenceRepository {
     }
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {
-        return db.evidence.findFirst({
-            where: { id, tenantId: ctx.tenantId },
-            include: {
-                control: true,
-                reviews: { include: { reviewer: { select: { name: true, email: true } } }, orderBy: { createdAt: 'desc' } },
-            },
+        return traceRepository('evidence.getById', ctx, async () => {
+            return db.evidence.findFirst({
+                where: { id, tenantId: ctx.tenantId },
+                include: {
+                    control: true,
+                    reviews: { include: { reviewer: { select: { name: true, email: true } } }, orderBy: { createdAt: 'desc' } },
+                },
+            });
         });
     }
 
     static async create(db: PrismaTx, ctx: RequestContext, data: Omit<Prisma.EvidenceUncheckedCreateInput, 'tenantId'>) {
-        return db.evidence.create({
-            data: {
-                ...data,
-                tenantId: ctx.tenantId,
-            },
+        return traceRepository('evidence.create', ctx, async () => {
+            return db.evidence.create({
+                data: {
+                    ...data,
+                    tenantId: ctx.tenantId,
+                },
+            });
         });
     }
 

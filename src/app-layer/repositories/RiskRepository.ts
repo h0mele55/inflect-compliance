@@ -3,6 +3,7 @@ import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
 import { buildCursorWhere, CURSOR_ORDER_BY, computePageInfo, clampLimit } from '@/lib/pagination';
 import type { PaginatedResponse } from '@/lib/dto/pagination';
+import { traceRepository } from '@/lib/observability/repository-tracing';
 
 export interface RiskFilters {
     status?: string;
@@ -28,32 +29,36 @@ export class RiskRepository {
      * List risks scoped to tenant (unpaginated — backward compat).
      */
     static async list(db: PrismaTx, ctx: RequestContext, filters: RiskFilters = {}) {
-        const where = RiskRepository._buildWhere(ctx, filters);
-        return db.risk.findMany({
-            where,
-            orderBy: { inherentScore: 'desc' },
-            include: riskIncludes,
+        return traceRepository('risk.list', ctx, async () => {
+            const where = RiskRepository._buildWhere(ctx, filters);
+            return db.risk.findMany({
+                where,
+                orderBy: { inherentScore: 'desc' },
+                include: riskIncludes,
+            });
         });
     }
 
     static async listPaginated(db: PrismaTx, ctx: RequestContext, params: RiskListParams): Promise<PaginatedResponse<unknown>> {
-        const limit = clampLimit(params.limit);
-        const where = RiskRepository._buildWhere(ctx, params.filters);
+        return traceRepository('risk.listPaginated', ctx, async () => {
+            const limit = clampLimit(params.limit);
+            const where = RiskRepository._buildWhere(ctx, params.filters);
 
-        const cursorWhere = buildCursorWhere(params.cursor);
-        if (cursorWhere) {
-            where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), cursorWhere as Prisma.RiskWhereInput];
-        }
+            const cursorWhere = buildCursorWhere(params.cursor);
+            if (cursorWhere) {
+                where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), cursorWhere as Prisma.RiskWhereInput];
+            }
 
-        const items = await db.risk.findMany({
-            where,
-            orderBy: CURSOR_ORDER_BY,
-            take: limit + 1,
-            include: riskIncludes,
+            const items = await db.risk.findMany({
+                where,
+                orderBy: CURSOR_ORDER_BY,
+                take: limit + 1,
+                include: riskIncludes,
+            });
+
+            const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
+            return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
         });
-
-        const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);
-        return { items: trimmedItems, pageInfo: { nextCursor, hasNextPage } };
     }
 
     private static _buildWhere(ctx: RequestContext, filters: RiskFilters = {}): Prisma.RiskWhereInput {
@@ -83,11 +88,13 @@ export class RiskRepository {
      * Get a single risk by ID, scoped to tenant.
      */
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {
-        return db.risk.findFirst({
-            where: { id, tenantId: ctx.tenantId },
-            include: {
-                controls: { include: { control: true } },
-            },
+        return traceRepository('risk.getById', ctx, async () => {
+            return db.risk.findFirst({
+                where: { id, tenantId: ctx.tenantId },
+                include: {
+                    controls: { include: { control: true } },
+                },
+            });
         });
     }
 
@@ -95,11 +102,13 @@ export class RiskRepository {
      * Create a risk scoped to tenant.
      */
     static async create(db: PrismaTx, ctx: RequestContext, data: Omit<Prisma.RiskUncheckedCreateInput, 'tenantId'>) {
-        return db.risk.create({
-            data: {
-                ...data,
-                tenantId: ctx.tenantId,
-            },
+        return traceRepository('risk.create', ctx, async () => {
+            return db.risk.create({
+                data: {
+                    ...data,
+                    tenantId: ctx.tenantId,
+                },
+            });
         });
     }
 

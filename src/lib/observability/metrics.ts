@@ -6,6 +6,17 @@
  *   api.request.duration   — Histogram (method, route, status) [ms]
  *   api.request.errors     — Counter   (method, route, errorCode)
  *
+ * ── REPOSITORY METRICS (Epic OI-3) ──
+ *   repo.method.duration     — Histogram (repo.method, outcome) [ms]
+ *   repo.method.calls        — Counter   (repo.method, outcome)
+ *   repo.method.errors       — Counter   (repo.method, error.type)
+ *   repo.method.result_count — Histogram (repo.method)
+ *
+ *   tenant_id is intentionally NOT a metric label (would explode
+ *   cardinality on multi-tenant deployments). It IS recorded as a
+ *   span attribute (`repo.tenant_id`) so trace search can still
+ *   pivot per-tenant.
+ *
  * ── JOB METRICS ──
  *   job.execution.count    — Counter   (job_name, status: success|failure)
  *   job.execution.duration — Histogram (job_name, status) [ms]
@@ -98,6 +109,15 @@ let _requestCount: ReturnType<ReturnType<typeof getMeter>['createCounter']> | nu
 let _requestDuration: ReturnType<ReturnType<typeof getMeter>['createHistogram']> | null = null;
 let _requestErrors: ReturnType<ReturnType<typeof getMeter>['createCounter']> | null = null;
 
+// Repository instruments — Epic OI-3.
+// Cardinality safety: labels are { 'repo.method', 'outcome' } only.
+// tenant_id, user_id are SPAN attributes (queryable in trace search)
+// but NOT metric labels (where they'd explode cardinality).
+let _repoDuration: ReturnType<ReturnType<typeof getMeter>['createHistogram']> | null = null;
+let _repoCalls: ReturnType<ReturnType<typeof getMeter>['createCounter']> | null = null;
+let _repoErrors: ReturnType<ReturnType<typeof getMeter>['createCounter']> | null = null;
+let _repoResultCount: ReturnType<ReturnType<typeof getMeter>['createHistogram']> | null = null;
+
 function getRequestCount() {
     if (!_requestCount) {
         _requestCount = getMeter().createCounter('api.request.count', {
@@ -167,6 +187,55 @@ export function recordRequestError(attrs: {
         'http.route': normalizeRoute(attrs.route),
         'error.code': attrs.errorCode,
     });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// REPOSITORY METRICS — Epic OI-3
+//
+// Emitted by src/lib/observability/repository-tracing.ts::traceRepository.
+// Labels are restricted to { 'repo.method', 'outcome' } to keep
+// cardinality bounded. Use trace span attributes (tenant.id, user.id)
+// for tenant-aware debugging — those don't explode metric storage.
+// ════════════════════════════════════════════════════════════════════════
+
+export function getRepositoryDurationHistogram() {
+    if (!_repoDuration) {
+        _repoDuration = getMeter().createHistogram('repo.method.duration', {
+            description: 'Repository method execution duration in milliseconds',
+            unit: 'ms',
+        });
+    }
+    return _repoDuration;
+}
+
+export function getRepositoryCallCounter() {
+    if (!_repoCalls) {
+        _repoCalls = getMeter().createCounter('repo.method.calls', {
+            description: 'Total number of repository method invocations',
+            unit: '1',
+        });
+    }
+    return _repoCalls;
+}
+
+export function getRepositoryErrorCounter() {
+    if (!_repoErrors) {
+        _repoErrors = getMeter().createCounter('repo.method.errors', {
+            description: 'Total number of repository method errors',
+            unit: '1',
+        });
+    }
+    return _repoErrors;
+}
+
+export function getRepositoryResultCountHistogram() {
+    if (!_repoResultCount) {
+        _repoResultCount = getMeter().createHistogram('repo.method.result_count', {
+            description: 'Distribution of result counts returned by repository methods',
+            unit: '1',
+        });
+    }
+    return _repoResultCount;
 }
 
 // ════════════════════════════════════════════════════════════════════════

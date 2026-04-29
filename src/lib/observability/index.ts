@@ -4,7 +4,7 @@
  * Public API:
  *   Context:  runWithRequestContext, getRequestContext, getRequestId, mergeRequestContext
  *   Logger:   logger, log, extractErrorMeta, createChildLogger, pinoInstance
- *   Tracing:  getTracer, traceUsecase, traceOperation
+ *   Tracing:  getTracer, traceUsecase, traceOperation, traceRepository
  *   Metrics:  recordRequestMetrics, recordRequestError
  *   Sentry:   initSentry, captureError, setSentryContext
  *   Bootstrap: initTelemetry, isTelemetryInitialized
@@ -32,6 +32,11 @@ export {
     traceUsecase,
     traceOperation,
 } from './tracing';
+
+export {
+    traceRepository,
+    detectResultCount,
+} from './repository-tracing';
 
 export {
     recordRequestMetrics,
