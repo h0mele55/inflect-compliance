@@ -42,6 +42,9 @@ const cycle = (id: string, name = 'X') =>
     >[number];
 
 const score = (n: number) =>
+    // Cast through unknown — the test fixture is a partial of the
+    // full ReadinessResult; we only assert on `.score` so the rest
+    // is intentionally minimal.
     ({
         score: n,
         breakdown: {
@@ -51,7 +54,7 @@ const score = (n: number) =>
         },
         gaps: [],
         recommendations: [],
-    }) as Awaited<ReturnType<typeof computeReadiness>>;
+    }) as unknown as Awaited<ReturnType<typeof computeReadiness>>;
 
 describe('getReadinessOverview', () => {
     it('returns cycles plus a score per cycle when all computations succeed', async () => {
