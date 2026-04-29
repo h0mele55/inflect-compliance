@@ -252,6 +252,97 @@ describe('pii-middleware — full middleware propagation', () => {
     });
 });
 
+describe('pii-middleware — decrypt-failure containment', () => {
+    // When a stored ciphertext can't be decrypted (KEK mismatch,
+    // missing DATA_ENCRYPTION_KEY_PREVIOUS during rotation, corruption),
+    // the read path MUST replace the field with null instead of leaking
+    // the raw `v1:...`/`v2:...` envelope into downstream renderers
+    // (UI labels, PDF exports, audit-pack share links, SDK consumers).
+    // Symptom this regression-tests against: a task-assignee dropdown
+    // that displayed `v1:xko7...==` because the middleware silently
+    // fell through with ciphertext on AES-GCM auth-tag failure.
+    test('User row with undecryptable email/name → both fields nulled', async () => {
+        const next = jest.fn(async () => ({
+            id: 'u1',
+            // Looks like a v1 envelope (passes isEncryptedValue) but
+            // the base64 body is too short for a valid IV+tag pair, so
+            // decryptField throws on the GCM auth check.
+            email: 'v1:bm90LXJlYWwK',
+            name: 'v1:bm90LXJlYWwK',
+        }));
+        const result = await piiEncryptionMiddleware(
+            {
+                model: 'User',
+                action: 'findFirst',
+                args: { where: { id: 'u1' } },
+                dataPath: [],
+                runInTransaction: false,
+            },
+            next as unknown as (p: unknown) => Promise<unknown>,
+        );
+        const row = result as { id: string; email: unknown; name: unknown };
+        expect(row.id).toBe('u1');
+        expect(row.email).toBeNull();
+        expect(row.name).toBeNull();
+    });
+
+    test('plaintext stored in mapped field is left alone', async () => {
+        // A row that was written before encryption was enabled (or
+        // bypassed the middleware) carries plaintext in the mapped
+        // column. isEncryptedValue returns false → decrypt path is
+        // skipped entirely; the value passes through untouched.
+        const next = jest.fn(async () => ({
+            id: 'u2',
+            email: 'plain@example.com',
+            name: 'Plain User',
+        }));
+        const result = await piiEncryptionMiddleware(
+            {
+                model: 'User',
+                action: 'findFirst',
+                args: { where: { id: 'u2' } },
+                dataPath: [],
+                runInTransaction: false,
+            },
+            next as unknown as (p: unknown) => Promise<unknown>,
+        );
+        const row = result as { email: unknown; name: unknown };
+        expect(row.email).toBe('plain@example.com');
+        expect(row.name).toBe('Plain User');
+    });
+
+    test('nested relation (TenantMembership.user) — undecryptable user fields nulled', async () => {
+        // The picker fetch flows through this exact shape:
+        //   tenantMembership.findMany({ include: { user: ... } })
+        // so the nested-relation code path must apply the same
+        // null-on-failure rule, not just the top-level decryptOnRead.
+        const next = jest.fn(async () => [
+            {
+                id: 'm1',
+                userId: 'u1',
+                user: {
+                    id: 'u1',
+                    email: 'v1:bm90LXJlYWwK',
+                    name: 'v1:bm90LXJlYWwK',
+                },
+            },
+        ]);
+        const result = await piiEncryptionMiddleware(
+            {
+                model: 'TenantMembership',
+                action: 'findMany',
+                args: {},
+                dataPath: [],
+                runInTransaction: false,
+            },
+            next as unknown as (p: unknown) => Promise<unknown>,
+        );
+        const rows = result as Array<{ user: { email: unknown; name: unknown } }>;
+        expect(rows[0].user.email).toBeNull();
+        expect(rows[0].user.name).toBeNull();
+    });
+});
+
 describe('pii-middleware — duplicate-registration prevention', () => {
     test('two registrations with same email produce same hash → DB unique catches dupe', () => {
         const a = hashForLookup('alice@example.com');

@@ -41,6 +41,7 @@
  */
 import { Prisma } from '@prisma/client';
 import { encryptField, decryptField, hashForLookup, isEncryptedValue } from './encryption';
+import { logger } from '@/lib/observability/logger';
 
 // ─── Field Mappings ─────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ function encryptOnWrite(
 function decryptOnRead(
     record: Record<string, unknown>,
     fields: PiiFieldSpec[],
+    model?: string,
 ): void {
     for (const spec of fields) {
         if (spec.mapped) {
@@ -149,24 +151,44 @@ function decryptOnRead(
                 try {
                     record[spec.plain] = decryptField(value);
                 } catch {
-                    // Decryption failed (key rotation in flight, or
-                    // corruption). Leave the ciphertext in place —
-                    // callers downstream can detect via
-                    // `isEncryptedValue` and decide; we do not
-                    // fall back to logging the failure with the
-                    // value, only the structural shape upstream.
+                    // Decryption failed — most likely a KEK mismatch
+                    // (the row was encrypted under a key that's no
+                    // longer in env, even with
+                    // DATA_ENCRYPTION_KEY_PREVIOUS as fallback). Replace
+                    // the value with null instead of leaving raw
+                    // ciphertext: downstream renderers (UI labels,
+                    // PDF exports, audit-pack share links, SDK
+                    // consumers reading the row verbatim) would
+                    // otherwise display `v1:base64...` as if it were
+                    // user content. Operators see the failure via
+                    // the structural log; the value itself is never
+                    // logged.
+                    record[spec.plain] = null;
+                    logger.warn('pii.decrypt_failure', {
+                        component: 'pii-middleware',
+                        model,
+                        field: spec.plain,
+                    });
                 }
             }
         } else {
-            // Legacy: decrypt encrypted column INTO plain field.
+            // Legacy: decrypt encrypted column INTO plain field. The
+            // plaintext column is still present on legacy models, so
+            // a decrypt failure leaves record[spec.plain] populated
+            // from the dual-write source — no ciphertext-leak risk
+            // here, but we still log so operators can see the
+            // discrepancy.
             const encValue = record[spec.encrypted];
             if (typeof encValue === 'string' && isEncryptedValue(encValue)) {
                 try {
                     record[spec.plain] = decryptField(encValue);
                 } catch {
-                    // Same fail-safe as above; the plaintext column
-                    // is still present on legacy models so reads
-                    // continue to function via the dual-write source.
+                    logger.warn('pii.decrypt_failure', {
+                        component: 'pii-middleware',
+                        model,
+                        field: spec.plain,
+                        legacy: true,
+                    });
                 }
             }
         }
@@ -222,11 +244,11 @@ function decryptNested(
                 if (Array.isArray(value)) {
                     for (const item of value) {
                         if (item && typeof item === 'object') {
-                            decryptOnRead(item as Record<string, unknown>, nestedFields);
+                            decryptOnRead(item as Record<string, unknown>, nestedFields, nestedModel);
                         }
                     }
                 } else {
-                    decryptOnRead(value as Record<string, unknown>, nestedFields);
+                    decryptOnRead(value as Record<string, unknown>, nestedFields, nestedModel);
                 }
             }
         }
@@ -244,11 +266,11 @@ function decryptResult(result: unknown, model: string): unknown {
         if (Array.isArray(result)) {
             for (const item of result) {
                 if (item && typeof item === 'object') {
-                    decryptOnRead(item as Record<string, unknown>, fields);
+                    decryptOnRead(item as Record<string, unknown>, fields, model);
                 }
             }
         } else if (result && typeof result === 'object') {
-            decryptOnRead(result as Record<string, unknown>, fields);
+            decryptOnRead(result as Record<string, unknown>, fields, model);
         }
     }
 
