@@ -1,5 +1,5 @@
 /**
- * Per-tenant DEK rotation — admin API.
+ * Per-tenant DEK rotation — admin API (canonical path).
  *
  *   POST  /api/t/:tenantSlug/admin/tenant-dek-rotation
  *     Generates a fresh DEK, atomically swaps `Tenant.encryptedDek`
@@ -24,54 +24,25 @@
  * Tight rate limit (`API_KEY_CREATE_LIMIT` — 5/hr) because rotation
  * is a high-privilege, expensive operation. Legitimate use cases
  * (responding to a leak) need at most one rotation per tenant.
+ *
+ * GAP-22: an alias of this same handler is exposed at
+ * `/admin/rotate-dek` to satisfy the GAP-22 URL spec. Both routes
+ * import from `../_lib/rotate-dek-handlers` and wrap independently
+ * with `requirePermission` so the api-permission-coverage and
+ * admin-route-coverage guardrails see the literal text in each
+ * route file (the guardrails are text-match-based).
  */
 
-import { NextRequest, NextResponse } from 'next/server';
 import { requirePermission } from '@/lib/security/permission-middleware';
 import { withApiErrorHandling } from '@/lib/errors/api';
-import { getQueue } from '@/app-layer/jobs/queue';
 import { API_KEY_CREATE_LIMIT } from '@/lib/security/rate-limit-middleware';
-import { logEvent } from '@/app-layer/events/audit';
-import { prisma } from '@/lib/prisma';
-import { rotateTenantDek } from '@/lib/security/tenant-key-manager';
-
-// ─── POST — initiate rotation ──────────────────────────────────────
+import {
+    rotateDekPostHandler,
+    rotateDekGetHandler,
+} from '../_lib/rotate-dek-handlers';
 
 export const POST = withApiErrorHandling(
-    requirePermission('admin.tenant_lifecycle', async (_req: NextRequest, _routeArgs, ctx) => {
-
-        // The DEK swap happens synchronously in `rotateTenantDek`; the
-        // sweep job runs async. By the time `rotateTenantDek` returns,
-        // new writes already use the new DEK and reads transparently
-        // fall back to the previous DEK for stale rows. The job id
-        // lets the operator poll for sweep completion.
-        const { jobId, tenantId } = await rotateTenantDek({
-            tenantId: ctx.tenantId,
-            initiatedByUserId: ctx.userId,
-            requestId: ctx.requestId,
-        });
-
-        // The user-facing audit row — captures attribution for the
-        // moment the DEK was swapped (the security-relevant event,
-        // distinct from the sweep job's STARTED/COMPLETED entries).
-        await logEvent(prisma, ctx, {
-            action: 'TENANT_DEK_ROTATED',
-            entityType: 'TenantKey',
-            entityId: tenantId,
-            details: `Per-tenant DEK rotated by admin user ${ctx.userId}`,
-            metadata: { jobId, sweepJob: 'tenant-dek-rotation' },
-        });
-
-        return NextResponse.json(
-            {
-                status: 'queued',
-                jobId,
-                tenantId,
-                initiatedByUserId: ctx.userId,
-            },
-            { status: 202 },
-        );
-    }),
+    requirePermission('admin.tenant_lifecycle', rotateDekPostHandler),
     {
         rateLimit: {
             config: API_KEY_CREATE_LIMIT,
@@ -80,60 +51,6 @@ export const POST = withApiErrorHandling(
     },
 );
 
-// ─── GET — poll job status ─────────────────────────────────────────
-
 export const GET = withApiErrorHandling(
-    requirePermission('admin.tenant_lifecycle', async (req: NextRequest, _routeArgs, ctx) => {
-        const url = new URL(req.url);
-        const jobId = url.searchParams.get('jobId');
-        if (!jobId) {
-            return NextResponse.json(
-                { error: { code: 'BAD_REQUEST', message: 'jobId required' } },
-                { status: 400 },
-            );
-        }
-
-        const queue = getQueue();
-        const job = await queue.getJob(jobId);
-        if (!job) {
-            return NextResponse.json(
-                {
-                    error: {
-                        code: 'NOT_FOUND',
-                        message: `No job with id ${jobId}`,
-                    },
-                },
-                { status: 404 },
-            );
-        }
-
-        // Defensive — never leak a sibling tenant's job, even if the
-        // operator guessed a job id. Same shape as the master-KEK
-        // route's defence in `key-rotation/route.ts`.
-        const payload = job.data as { tenantId?: string } | undefined;
-        if (payload?.tenantId && payload.tenantId !== ctx.tenantId) {
-            return NextResponse.json(
-                {
-                    error: {
-                        code: 'NOT_FOUND',
-                        message: `No job with id ${jobId}`,
-                    },
-                },
-                { status: 404 },
-            );
-        }
-
-        const state = await job.getState();
-        const progress = job.progress;
-        const returnvalue = job.returnvalue ?? null;
-        const failedReason = job.failedReason ?? null;
-
-        return NextResponse.json({
-            jobId,
-            state,
-            progress,
-            result: returnvalue,
-            failedReason,
-        });
-    }),
+    requirePermission('admin.tenant_lifecycle', rotateDekGetHandler),
 );

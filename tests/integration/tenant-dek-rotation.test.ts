@@ -200,6 +200,20 @@ describeFn('rotateTenantDek (integration — real DB)', () => {
         const slug = `rot-lifecycle-${Date.now()}`;
         slugs.push(slug);
 
+        // Create a real user so the rotation engine's audit entries
+        // (TENANT_DEK_ROTATION_STARTED / _COMPLETED) clear their
+        // AuditLog.userId FK. The other tests in this file don't run
+        // the engine job, so they didn't need this; we do.
+        const userEmail = `rot-lifecycle-${Date.now()}@test.local`;
+        const { hashForLookup } = await import('@/lib/security/encryption');
+        const lifecycleUser = await prisma.user.create({
+            data: {
+                email: userEmail,
+                emailHash: hashForLookup(userEmail),
+                name: 'Lifecycle User',
+            },
+        });
+
         // ── Setup: tenant + initial DEK ─────────────────────────────
         const initialDek = generateDek();
         const initialWrapped = wrapDek(initialDek);
@@ -250,7 +264,7 @@ describeFn('rotateTenantDek (integration — real DB)', () => {
         // ── Phase 1: rotateTenantDek (sync swap) ────────────────────
         const result = await rotateTenantDek({
             tenantId: tenant.id,
-            initiatedByUserId: 'lifecycle-user',
+            initiatedByUserId: lifecycleUser.id,
         });
         expect(result.tenantId).toBe(tenant.id);
 
@@ -286,7 +300,7 @@ describeFn('rotateTenantDek (integration — real DB)', () => {
         const progressEvents: TenantDekRotationProgress[] = [];
         const sweepResult = await runTenantDekRotation({
             tenantId: tenant.id,
-            initiatedByUserId: 'lifecycle-user',
+            initiatedByUserId: lifecycleUser.id,
             batchSize: 2, // small so the per-batch progress hook fires
             onProgress: async (p) => {
                 progressEvents.push(p);
@@ -361,6 +375,10 @@ describeFn('rotateTenantDek (integration — real DB)', () => {
         expect(() => decryptWithKey(previousDek, freshRow.threat)).toThrow();
 
         // ── Cleanup ────────────────────────────────────────────────
+        await prisma.auditLog.deleteMany({ where: { tenantId: tenant.id } });
         await prisma.risk.deleteMany({ where: { tenantId: tenant.id } });
+        await prisma.user
+            .delete({ where: { id: lifecycleUser.id } })
+            .catch(() => undefined);
     }, 30_000);
 });
