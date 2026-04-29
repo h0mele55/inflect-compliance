@@ -578,6 +578,33 @@ NextAuth v4.24.14 (stable) is configured in `src/auth.ts`. Providers: Google OAu
 
 Job definitions are in `src/app-layer/jobs/`. The executor registry is `src/app-layer/jobs/executor-registry.ts`. Jobs run inside `traceUsecase` spans and inherit request context.
 
+### Billing & entitlements (GAP-18)
+
+The codebase has two billing modes, decided by a single env var:
+
+  • `STRIPE_SECRET_KEY` set → **SaaS mode**. Per-tenant plan
+    (`FREE` / `TRIAL` / `PRO` / `ENTERPRISE`) is read from
+    `BillingAccount.plan` and enforced at the mutation boundary
+    via `assertWithinLimit(ctx, resource)` from
+    `src/lib/billing/entitlements.ts`. SaaS tenants without a
+    `BillingAccount` row resolve to `FREE`.
+
+  • `STRIPE_SECRET_KEY` unset/empty → **self-hosted mode**.
+    Every tenant resolves to `ENTERPRISE` and per-resource limits
+    are unlimited. No DB query happens for plan resolution.
+
+The decision is read once at module load. Today only `control`
+creation is gated (FREE: 10, TRIAL/PRO: 100, ENTERPRISE: unlimited).
+Adding a new gated resource is a one-line change in `PLAN_LIMITS`,
+a `switch` arm in `getCurrentCount`, and one
+`await assertWithinLimit(ctx, '<resource>')` call at the create-site.
+
+**See `docs/billing.md`** for the full operator + developer runbook,
+the reasoning behind plan limits, the failure-shape contract
+(`forbidden('plan_limit_exceeded: …')` → 403), and the "what NOT to
+do" list (no UI-only gating, no second mode-detection mechanism, no
+duplicating the limits table).
+
 ## Testing Conventions
 
 - **Unit tests**: Mock dependencies with `jest.mock()` declared **before** imports. Use `buildRequestContext()` helper from `tests/helpers/make-context.ts` to construct test contexts.
