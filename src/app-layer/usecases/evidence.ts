@@ -440,7 +440,7 @@ export async function uploadEvidenceFile(
     const writeResult = await storage.write(pathKey, readable, { mimeType });
 
     // Create FileRecord + Evidence in a transaction
-    return runInTenantContext(ctx, async (db) => {
+    const result = await runInTenantContext(ctx, async (db) => {
         const controlId = metadata.controlId || null;
 
         // Validate control belongs to the same tenant
@@ -538,6 +538,7 @@ export async function uploadEvidenceFile(
 
         return {
             ...evidence,
+            controlId,
             fileRecord: {
                 id: fileRecordId,
                 originalName,
@@ -550,6 +551,15 @@ export async function uploadEvidenceFile(
             },
         };
     });
+    // List-cache invalidation — same pair as createEvidence(): a new
+    // Evidence row should appear in the evidence list immediately,
+    // and if linked to a control the control's evidence-count is now
+    // stale too. Without these bumps the list cache returns the
+    // pre-upload view for up to 60s (TTL), and the e2e
+    // upload-then-verify flow times out waiting for the new row.
+    await bumpEntityCacheVersion(ctx, 'evidence');
+    if (result.controlId) await bumpEntityCacheVersion(ctx, 'control');
+    return result;
 }
 
 /**
