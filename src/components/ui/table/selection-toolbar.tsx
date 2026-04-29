@@ -201,25 +201,29 @@ export function SelectionToolbar<T>({
                 : `Select all ${totalCount}`
             }
           >
-            {/* NB: <div role="button">, not <button>. Radix Checkbox
-                inside renders its own <button>, so a <button> wrapper
-                causes the "<button> cannot be a descendant of <button>"
-                hydration mismatch. */}
+            {/* NB: <div>, not <button>. Radix Checkbox inside renders
+                its own <button>, so a <button> wrapper causes the
+                "<button> cannot be a descendant of <button>" hydration
+                mismatch.
+                GAP-CI-77: role="presentation" so the labelled inner
+                Checkbox is the canonical button. role="button" here
+                created a button-name violation because axe inspected
+                both layers. */}
             <div
-              role="button"
+              role="presentation"
               tabIndex={-1}
               className="absolute inset-0 flex cursor-pointer items-center justify-center"
               onClick={(e) => {
                 e.stopPropagation();
                 table.toggleAllRowsSelected();
               }}
-              aria-label={
-                table.getIsAllRowsSelected()
-                  ? "Deselect all rows"
-                  : "Select all rows"
-              }
             >
               <Checkbox
+                aria-label={
+                  table.getIsAllRowsSelected()
+                    ? "Deselect all rows"
+                    : "Select all rows"
+                }
                 className="border-border-emphasis pointer-events-none size-4 rounded data-[state=checked]:bg-[var(--brand-emphasis)] data-[state=indeterminate]:bg-[var(--brand-emphasis)]"
                 checked={
                   table.getIsAllRowsSelected()

@@ -98,7 +98,7 @@ export function CoverageClient({ data, tenantSlug }: CoverageClientProps) {
                 const score = getValue() as number;
                 return (
                     <span className={`text-sm font-semibold tabular-nums ${
-                        score >= 15 ? 'text-red-400' : score >= 9 ? 'text-amber-400' : 'text-emerald-400'
+                        score >= 15 ? 'text-content-error' : score >= 9 ? 'text-content-warning' : 'text-content-success'
                     }`}>
                         {score}
                     </span>
@@ -149,8 +149,9 @@ export function CoverageClient({ data, tenantSlug }: CoverageClientProps) {
                         href={tenantHref('/assets')}
                         className="text-content-muted hover:text-content-emphasis transition"
                         id="coverage-back-link"
+                        aria-label="Back to assets"
                     >
-                        <ArrowLeft className="w-5 h-5" />
+                        <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                     </Link>
                     <div>
                         <h1 className="text-2xl font-bold text-content-emphasis" id="coverage-heading">
