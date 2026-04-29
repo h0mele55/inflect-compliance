@@ -150,16 +150,36 @@ export function useTenantMembers(
 
 // ─── Option projection ─────────────────────────────────────────────
 
+/**
+ * A `v1:`/`v2:` envelope coming through to the UI means the PII
+ * middleware didn't decrypt the field on its way out (decrypt failure
+ * with the OLD fail-mode, OR — observed on prod 2026-04-29 — the
+ * middleware not running on the read path at all). Treat ciphertext
+ * the same as missing: the user shouldn't see encryption artefacts.
+ */
+function isCiphertextEnvelope(value: string): boolean {
+    return value.startsWith('v1:') || value.startsWith('v2:');
+}
+
+function readableField(value: string | null | undefined): string | null {
+    const trimmed = value?.trim();
+    if (!trimmed) return null;
+    if (isCiphertextEnvelope(trimmed)) return null;
+    return trimmed;
+}
+
 function memberLabel(member: Member): string {
-    const name = member.name?.trim();
-    const email = member.email?.trim();
+    const name = readableField(member.name);
+    const email = readableField(member.email);
     if (name && email) return `${name} · ${email}`;
     if (name) return name;
     if (email) return email;
-    // Both fields unreadable (PII decrypt failure). Fall back to a
-    // stable opaque handle so the picker still renders + the row is
-    // distinguishable. Operators chasing "why is this label opaque?"
-    // see `pii.decrypt_failure` in logs.
+    // Both fields unreadable (PII decrypt failure or middleware not
+    // attached on the read path). Fall back to a stable opaque handle
+    // so the picker still renders + the row is distinguishable.
+    // Operators chasing "why is this label opaque?" see
+    // `pii.decrypt_failure` in logs (or the middleware-attachment
+    // telemetry once the diagnostic from C lands).
     return `User ${member.id.slice(0, 8)}`;
 }
 

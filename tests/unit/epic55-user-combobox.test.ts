@@ -122,6 +122,22 @@ describe('UserCombobox — contract', () => {
         );
         expect(USER_COMBO_SRC).toMatch(/export\s+interface\s+Member/);
     });
+
+    // Render-layer safety net: even if the PII middleware isn't
+    // running on the read path (observed on prod 2026-04-29), the
+    // dropdown must NEVER show raw `v1:`/`v2:` envelope text as if it
+    // were a name or email. The structural assertion locks in the
+    // ciphertext-detection helper so a future refactor can't quietly
+    // drop it.
+    it('treats v1:/v2: envelopes as unreadable (never renders ciphertext)', () => {
+        expect(USER_COMBO_SRC).toMatch(/isCiphertextEnvelope/);
+        expect(USER_COMBO_SRC).toMatch(
+            /value\.startsWith\(['"]v1:['"]\)\s*\|\|\s*value\.startsWith\(['"]v2:['"]\)/,
+        );
+        // The fallback path produces a stable opaque handle so the
+        // row is still distinguishable.
+        expect(USER_COMBO_SRC).toMatch(/`User \$\{member\.id\.slice\(0,\s*8\)\}`/);
+    });
 });
 
 // ─── 2. queryKeys.members — tenant scoping ──────────────────────
