@@ -12,6 +12,10 @@ npm run typecheck         # tsc --noEmit
 npm run lint              # Next.js lint
 
 # Database
+# The Prisma schema lives in a folder, not a single file:
+#   prisma/schema/{base,enums,auth,compliance,vendor,audit,automation,schema}.prisma
+# Prisma's `prismaSchemaFolder` preview feature (enabled in base.prisma)
+# concatenates them at generate / migrate time. See prisma/schema/README.md.
 npm run db:generate       # Regenerate Prisma client after schema changes
 npm run db:push           # Push schema to DB (no migration file)
 npm run db:migrate        # Create + apply a named migration interactively
@@ -66,6 +70,20 @@ src/app-layer/services/→ Cross-cutting domain services (library import, cross-
 src/app-layer/events/  → Audit event writers (immutable, hash-chained audit trail)
 src/lib/               → Shared infrastructure (auth, observability, storage, rate-limiting, permissions)
 src/components/        → React components
+
+prisma/schema/         → Multi-file Prisma schema (GAP-09):
+                            base.prisma         — generator + datasource (sole owners)
+                            enums.prisma        — every shared enum
+                            auth.prisma         — Tenant/User/Membership/Session/SSO/Billing
+                            compliance.prisma   — Control/Risk/Evidence/Framework/Policy/Asset/etc.
+                            vendor.prisma       — Vendor + assessment graph
+                            audit.prisma        — AuditCycle/Pack/Auditor + AuditLog
+                            automation.prisma   — AutomationRule/Execution + Notification + Integration
+                            schema.prisma       — transitional sediment file (currently empty)
+                          See prisma/schema/README.md for the full layout + conventions.
+                          Adding a new model: pick the matching domain file. Generator
+                          and datasource ONLY live in base.prisma — Prisma rejects
+                          duplicates across the folder.
 ```
 
 ### Request Context (`RequestContext`)

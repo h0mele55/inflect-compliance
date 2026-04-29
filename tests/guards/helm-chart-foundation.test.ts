@@ -309,7 +309,7 @@ describe('OI-2 — migration Job (Helm pre-install/pre-upgrade hook)', () => {
             'prisma@5.22.0',
             'migrate',
             'deploy',
-            '--schema=./prisma/schema.prisma',
+            '--schema=./prisma/schema',
         ]);
     });
 

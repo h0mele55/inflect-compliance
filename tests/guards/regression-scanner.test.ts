@@ -9,6 +9,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const SRC_ROOT = path.resolve(__dirname, '../../src');
 
@@ -194,9 +195,7 @@ describe('Regression: Import hygiene', () => {
 
 describe('Regression: Schema integrity', () => {
     test('Prisma schema has tenantId on all tenant-scoped models', () => {
-        const schemaPath = path.resolve(__dirname, '../../prisma/schema.prisma');
-        if (!fs.existsSync(schemaPath)) return;
-        const content = readSafe(schemaPath);
+        const content = readPrismaSchema();
 
         // These models MUST have tenantId
         const tenantScopedModels = ['Risk', 'Control', 'Evidence', 'Task', 'Asset'];
@@ -210,9 +209,7 @@ describe('Regression: Schema integrity', () => {
     });
 
     test('Prisma schema has deletedAt on soft-deletable models', () => {
-        const schemaPath = path.resolve(__dirname, '../../prisma/schema.prisma');
-        if (!fs.existsSync(schemaPath)) return;
-        const content = readSafe(schemaPath);
+        const content = readPrismaSchema();
 
         const softDeleteModels = ['Risk', 'Control'];
 

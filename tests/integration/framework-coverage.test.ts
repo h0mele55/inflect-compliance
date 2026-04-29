@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 describe('Framework Coverage & Templates', () => {
     const basePath = process.cwd();
@@ -48,7 +49,7 @@ describe('Framework Coverage & Templates', () => {
 
     // ─── Schema structural checks ───
     describe('Schema models', () => {
-        const schema = readFileSync(join(basePath, 'prisma/schema.prisma'), 'utf-8');
+        const schema = readPrismaSchema();
 
         it('Framework model has kind field', () => {
             // Whitespace-tolerant: prisma format re-aligns columns

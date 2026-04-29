@@ -400,6 +400,7 @@ jest.mock('@/lib/observability/logger', () => ({
 }));
 
 import { importTenantData } from '../../src/app-layer/services/import-service';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 describe('Import service: rejects unsafe bundles', () => {
     test('rejects bundle with cross-tenant references', async () => {
@@ -441,10 +442,7 @@ describe('Import service: rejects unsafe bundles', () => {
 
 describe('GUARDRAIL: Prisma schema has no unregistered self-referencing models', () => {
     test('no model has a FK pointing to itself', () => {
-        const schemaContent = readFileSync(
-            resolve(__dirname, '../../prisma/schema.prisma'),
-            'utf8',
-        );
+        const schemaContent = readPrismaSchema();
 
         // Parse model blocks
         const modelRegex = /model\s+(\w+)\s*\{([^}]+)\}/g;

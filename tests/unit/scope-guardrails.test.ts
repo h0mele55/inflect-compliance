@@ -6,10 +6,10 @@
  */
 import path from 'path';
 import fs from 'fs';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 const ROOT = path.resolve(__dirname, '../..');
 const SRC = path.join(ROOT, 'src');
-const PRISMA = path.join(ROOT, 'prisma', 'schema.prisma');
 
 /**
  * Recursively scan all .ts/.tsx files in a directory and return
@@ -86,13 +86,13 @@ describe('Scope Reintroduction Guardrails', () => {
     // ── Schema guardrails ──
 
     it('Prisma schema has no Scope or ScopeMembership model', () => {
-        const schema = fs.readFileSync(PRISMA, 'utf-8');
+        const schema = readPrismaSchema();
         expect(schema).not.toMatch(/^model\s+Scope\s*\{/m);
         expect(schema).not.toMatch(/^model\s+ScopeMembership\s*\{/m);
     });
 
     it('Prisma schema has no scopeId fields', () => {
-        const schema = fs.readFileSync(PRISMA, 'utf-8');
+        const schema = readPrismaSchema();
         expect(schema).not.toMatch(/scopeId/);
     });
 

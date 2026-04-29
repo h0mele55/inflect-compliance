@@ -10,6 +10,7 @@
 
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
+import { readPrismaSchema } from '../helpers/prisma-schema';
 
 // ═════════════════════════════════════════════════════════════════════
 // 1. Prisma schema contains digest enum values
@@ -31,11 +32,7 @@ describe('Schema: EmailNotificationType includes digest values', () => {
     ];
 
     test('prisma schema defines all digest enum values', () => {
-        const schema = readFileSync(
-            resolve(__dirname, '../../prisma/schema.prisma'),
-            'utf8',
-        );
-
+        const schema = readPrismaSchema();
         // Extract the EmailNotificationType enum block
         const enumMatch = schema.match(
             /enum\s+EmailNotificationType\s*\{([^}]+)\}/,
@@ -49,11 +46,7 @@ describe('Schema: EmailNotificationType includes digest values', () => {
     });
 
     test('prisma schema preserves all base enum values', () => {
-        const schema = readFileSync(
-            resolve(__dirname, '../../prisma/schema.prisma'),
-            'utf8',
-        );
-
+        const schema = readPrismaSchema();
         const enumMatch = schema.match(
             /enum\s+EmailNotificationType\s*\{([^}]+)\}/,
         );
@@ -124,11 +117,7 @@ describe('Migration: digest enum migration exists and is correct', () => {
 
 describe('Code-schema alignment: digest categories match schema', () => {
     test('digest-dispatcher DigestCategory values are all in schema enum', () => {
-        const schema = readFileSync(
-            resolve(__dirname, '../../prisma/schema.prisma'),
-            'utf8',
-        );
-
+        const schema = readPrismaSchema();
         const dispatcherSource = readFileSync(
             resolve(__dirname, '../../src/app-layer/notifications/digest-dispatcher.ts'),
             'utf8',
@@ -167,10 +156,7 @@ describe('Code-schema alignment: digest categories match schema', () => {
         const usedCategories = (source.match(/'(DEADLINE_DIGEST|EVIDENCE_EXPIRY_DIGEST|VENDOR_RENEWAL_DIGEST)'/g) || [])
             .map(v => v.replace(/'/g, ''));
 
-        const schema = readFileSync(
-            resolve(__dirname, '../../prisma/schema.prisma'),
-            'utf8',
-        );
+        const schema = readPrismaSchema();
         const enumMatch = schema.match(
             /enum\s+EmailNotificationType\s*\{([^}]+)\}/,
         );
@@ -191,11 +177,7 @@ describe('Code-schema alignment: digest categories match schema', () => {
 
 describe('Guard: every EmailNotificationType value has a migration', () => {
     test('all schema enum values appear in at least one migration', () => {
-        const schema = readFileSync(
-            resolve(__dirname, '../../prisma/schema.prisma'),
-            'utf8',
-        );
-
+        const schema = readPrismaSchema();
         const enumMatch = schema.match(
             /enum\s+EmailNotificationType\s*\{([^}]+)\}/,
         );
