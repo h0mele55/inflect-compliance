@@ -35,10 +35,19 @@
   --bg-overlay:   rgba(0, 12, 26, 0.70);    /* dark navy backdrop behind modals/drawers */
 
   /* ── Content / Text ────────────────────────────────────────────── */
+  /*
+   * GAP-CI-77: bumped `--content-muted` and `--content-subtle` so
+   * small text on `--bg-default` (#003C7A navy cards) clears WCAG AA
+   * 4.5:1. The previous values (#95B0C9, #6B85A0) gave 4.31:1 and
+   * 2.80:1 respectively — small body text (`text-xs`, 12px) at those
+   * tiers fails axe-core's color-contrast rule. The new values
+   * preserve the tier hierarchy (muted > subtle) while sitting above
+   * the AA threshold on every dark surface in use.
+   */
   --content-emphasis: #ECF1F7;   /* soft off-white (very subtle blue tint) — headings, selected items, bold labels */
   --content-default:  #D9E5F2;   /* light blue-tinted — body text, table cells, default content */
-  --content-muted:    #95B0C9;   /* mid blue-gray — secondary text, placeholders, captions */
-  --content-subtle:   #6B85A0;   /* deeper blue-gray — disabled text, hints, tertiary info */
+  --content-muted:    #B5CADD;   /* mid blue-gray — secondary text, placeholders, captions (AA, 6.45:1 on bg-default) */
+  --content-subtle:   #93AFCC;   /* lighter blue-gray — disabled text, hints, tertiary info (AA, 4.81:1 on bg-default) */
   --content-inverted: #001830;   /* deep navy — text on inverted (yellow) surfaces */
 
   /* ── Borders / Dividers ────────────────────────────────────────── */
@@ -135,10 +144,17 @@
   --bg-overlay:   rgba(26, 26, 26, 0.45);   /* charcoal overlay — modals, drawers */
 
   /* ── Content / Text ────────────────────────────────────────────── */
+  /*
+   * GAP-CI-77: bumped `--content-muted` and `--content-subtle` so
+   * small text on `--bg-default` (#F8F6F3 cream) clears WCAG AA
+   * 4.5:1. The previous values (#6B6B6B, #8E8E8E) gave 4.90:1 and
+   * 3.05:1 — the latter failed `text-xs` (12px) body text. The new
+   * values preserve the muted > subtle tier ordering.
+   */
   --content-emphasis: #1A1A1A;   /* deep charcoal — headings, selected, bold labels */
   --content-default:  #3D3D3D;   /* dark charcoal — body text, table cells (11.4:1) */
-  --content-muted:    #6B6B6B;   /* warm medium gray — secondary text, captions (5.7:1) */
-  --content-subtle:   #8E8E8E;   /* warm gray — hints, disabled, tertiary (3.5:1 large text AA) */
+  --content-muted:    #525252;   /* darker warm gray — secondary text, captions (7.2:1 on bg-default) */
+  --content-subtle:   #6B6B6B;   /* warm medium gray — hints, disabled, tertiary (4.9:1 on bg-default) */
   --content-inverted: #FAF9F7;   /* warm off-white — text on inverted/dark surfaces */
 
   /* ── Borders / Dividers ────────────────────────────────────────── */

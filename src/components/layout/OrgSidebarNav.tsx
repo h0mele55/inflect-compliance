@@ -210,7 +210,10 @@ export function OrgSidebarContent({ user, onLogout, onNavClick }: OrgSidebarCont
                     <div className="min-w-0">
                         <p className="text-xs font-medium text-content-default truncate">{user.name}</p>
                         <p className="text-xs text-content-muted truncate">{org.orgName}</p>
-                        <p className="text-xs text-[var(--brand-default)]">{org.role}</p>
+                        {/* GAP-CI-77: see SidebarNav for the same fix
+                            rationale — brand orange on cream is below AA for
+                            small text. */}
+                        <p className="text-xs text-content-muted">{org.role}</p>
                     </div>
                     <ThemeToggle id="org-theme-toggle-desktop" />
                 </div>
