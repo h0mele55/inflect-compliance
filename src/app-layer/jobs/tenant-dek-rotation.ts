@@ -78,12 +78,52 @@ import { appendAuditEntry } from '@/lib/audit/audit-writer';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
+/**
+ * Mid-rotation progress payload.
+ *
+ * Stable shape — surfaced via `GET /api/t/:slug/admin/tenant-dek-rotation`
+ * (and the alias `/admin/rotate-dek`). Consumers (admin UI, ops
+ * scripts) parse this to render live status. Carries NO secrets,
+ * NO key material — only counts + structural identifiers.
+ */
+export interface TenantDekRotationProgress {
+    /**
+     * Lifecycle phase. Strict ordering:
+     *   - `starting`    job entered, fields not yet enumerated
+     *   - `sweeping`    iterating per (model, field), per-batch updates
+     *   - `finalising`  sweep done, clearing previousEncryptedDek
+     *   - `complete`    final state, no further updates
+     *   - `noop`        previousEncryptedDek already clear (sibling won)
+     */
+    phase: 'starting' | 'sweeping' | 'finalising' | 'complete' | 'noop';
+    /** Current (model, field) when phase = 'sweeping'. */
+    currentModel?: string;
+    currentField?: string;
+    /** 0-indexed position of the current field across the manifest. */
+    fieldIndex: number;
+    /** Total fields the sweep will touch. Set at phase=starting. */
+    fieldsTotal: number;
+    /** Cumulative across all fields swept so far in THIS run. */
+    totalScanned: number;
+    totalRewritten: number;
+    totalSkipped: number;
+    totalErrors: number;
+}
+
 export interface TenantDekRotationOptions {
     tenantId: string;
     initiatedByUserId: string;
     requestId?: string;
     /** Override SELECT batch size per (model, field). Default 500. */
     batchSize?: number;
+    /**
+     * GAP-22: optional progress callback. Wired from the BullMQ
+     * worker as `(p) => job.updateProgress(p)`. Cron / CLI
+     * entrypoints leave this unset; the job degrades gracefully —
+     * progress just isn't surfaced live. Awaited so the GET
+     * status endpoint sees the latest value immediately.
+     */
+    onProgress?: (progress: TenantDekRotationProgress) => Promise<void>;
 }
 
 export interface TenantDekRotationPerFieldResult {
@@ -162,6 +202,7 @@ async function sweepV2Field(
     model: string,
     field: string,
     batchSize: number,
+    onBatch?: (batch: TenantDekRotationPerFieldResult) => Promise<void>,
 ): Promise<TenantDekRotationPerFieldResult> {
     assertIdentifier(model, 'model');
     assertIdentifier(field, 'field');
@@ -286,6 +327,17 @@ async function sweepV2Field(
         // rewritten rows on the next page.
         lastId = rows[rows.length - 1].id;
 
+        // GAP-22: per-batch progress hook. Snapshot, not mutation —
+        // the caller assembles the cross-field aggregate.
+        if (onBatch) {
+            try {
+                await onBatch({ ...out });
+            } catch {
+                // Progress reporting is best-effort. A Redis blip on
+                // updateProgress must not stop the sweep.
+            }
+        }
+
         if (rows.length < batchSize) break;
     }
 
@@ -317,7 +369,21 @@ export async function runTenantDekRotation(
             const jobRunId = crypto.randomUUID();
             const started = Date.now();
             const batchSize = Math.max(1, options.batchSize ?? 500);
-            const { tenantId } = options;
+            const { tenantId, onProgress } = options;
+
+            // GAP-22: small helper that swallows progress-reporting
+            // exceptions. Live progress is informational; a transient
+            // Redis failure must never abort the rotation.
+            const reportProgress = async (
+                p: TenantDekRotationProgress,
+            ): Promise<void> => {
+                if (!onProgress) return;
+                try {
+                    await onProgress(p);
+                } catch {
+                    /* best-effort */
+                }
+            };
 
             await appendAuditEntry({
                 tenantId,
@@ -329,6 +395,16 @@ export async function runTenantDekRotation(
                 details: null,
                 metadataJson: { jobRunId },
                 requestId: options.requestId ?? null,
+            });
+
+            await reportProgress({
+                phase: 'starting',
+                fieldIndex: 0,
+                fieldsTotal: 0, // resolved below
+                totalScanned: 0,
+                totalRewritten: 0,
+                totalSkipped: 0,
+                totalErrors: 0,
             });
 
             // Resolve both DEKs. previousEncryptedDek is read directly
@@ -354,6 +430,15 @@ export async function runTenantDekRotation(
                     tenantId,
                     jobRunId,
                 });
+                await reportProgress({
+                    phase: 'noop',
+                    fieldIndex: 0,
+                    fieldsTotal: 0,
+                    totalScanned: 0,
+                    totalRewritten: 0,
+                    totalSkipped: 0,
+                    totalErrors: 0,
+                });
                 return {
                     tenantId,
                     previousEncryptedDekCleared: false,
@@ -377,26 +462,76 @@ export async function runTenantDekRotation(
             let totalSkipped = 0;
             let totalErrors = 0;
 
+            // First pass — enumerate the (model, field) pairs we'll
+            // sweep so the progress payload can include `fieldsTotal`
+            // from the very first update.
+            const fieldsToSweep: Array<{ model: string; field: string }> = [];
             for (const [model, fields] of Object.entries(ENCRYPTED_FIELDS)) {
                 const hasTenantId = await modelHasTenantIdColumn(model);
                 if (!hasTenantId) continue;
-
                 for (const field of fields) {
-                    const result = await sweepV2Field(
-                        tenantId,
-                        previousDek,
-                        newDek,
-                        model,
-                        field,
-                        batchSize,
-                    );
-                    perField.push(result);
-                    totalScanned += result.scanned;
-                    totalRewritten += result.rewritten;
-                    totalSkipped += result.skipped;
-                    totalErrors += result.errors;
+                    fieldsToSweep.push({ model, field });
                 }
             }
+            const fieldsTotal = fieldsToSweep.length;
+
+            for (let idx = 0; idx < fieldsToSweep.length; idx++) {
+                const { model, field } = fieldsToSweep[idx];
+
+                // Initial per-field update — useful for surfacing the
+                // model+field name even before the first batch lands.
+                await reportProgress({
+                    phase: 'sweeping',
+                    currentModel: model,
+                    currentField: field,
+                    fieldIndex: idx,
+                    fieldsTotal,
+                    totalScanned,
+                    totalRewritten,
+                    totalSkipped,
+                    totalErrors,
+                });
+
+                const result = await sweepV2Field(
+                    tenantId,
+                    previousDek,
+                    newDek,
+                    model,
+                    field,
+                    batchSize,
+                    // Per-batch progress: roll the running per-field
+                    // counters into the cumulative totals so the GET
+                    // status endpoint shows monotonic increase.
+                    async (batch) => {
+                        await reportProgress({
+                            phase: 'sweeping',
+                            currentModel: model,
+                            currentField: field,
+                            fieldIndex: idx,
+                            fieldsTotal,
+                            totalScanned: totalScanned + batch.scanned,
+                            totalRewritten: totalRewritten + batch.rewritten,
+                            totalSkipped: totalSkipped + batch.skipped,
+                            totalErrors: totalErrors + batch.errors,
+                        });
+                    },
+                );
+                perField.push(result);
+                totalScanned += result.scanned;
+                totalRewritten += result.rewritten;
+                totalSkipped += result.skipped;
+                totalErrors += result.errors;
+            }
+
+            await reportProgress({
+                phase: 'finalising',
+                fieldIndex: fieldsTotal,
+                fieldsTotal,
+                totalScanned,
+                totalRewritten,
+                totalSkipped,
+                totalErrors,
+            });
 
             // Final clear — only when the sweep is clean. A partial
             // sweep (errors > 0) leaves previousEncryptedDek
@@ -452,6 +587,16 @@ export async function runTenantDekRotation(
                 totalSkipped,
                 totalErrors,
                 durationMs,
+            });
+
+            await reportProgress({
+                phase: 'complete',
+                fieldIndex: fieldsTotal,
+                fieldsTotal,
+                totalScanned,
+                totalRewritten,
+                totalSkipped,
+                totalErrors,
             });
 
             return {

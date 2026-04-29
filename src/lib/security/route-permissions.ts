@@ -162,6 +162,17 @@ export const ROUTE_PERMISSIONS: readonly RoutePermissionRule[] = [
             'compromise — destructive on the timeline that matters ' +
             'and OWNER-only per the role model in CLAUDE.md.',
     },
+    // ── Per-tenant DEK rotation — GAP-22 alias path ─────────────────
+    {
+        path: new RegExp(`^${T}\\/admin\\/rotate-dek(\\/.*)?$`),
+        permission: 'admin.tenant_lifecycle',
+        note:
+            'Same handler as /admin/tenant-dek-rotation; aliased here ' +
+            'so the GAP-22-prescribed short URL is gated identically ' +
+            'rather than relying on path-equivalence at the runtime ' +
+            'permission middleware (the regex matcher is path-string ' +
+            'based, not handler-identity based).',
+    },
 
     // ── Billing (Epic D.3 — was legacy requireAdminCtx) ─────────────
     {
