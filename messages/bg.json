@@ -481,5 +481,18 @@
         "noAssetsAvailable": "Все още няма налични активи.",
         "linkedControls": "Свързани контроли",
         "noControlsAvailable": "Няма налични контроли. Добавете контроли от страницата за Контроли."
+    },
+    "ui": {
+        "combobox": {
+            "searchPlaceholder": "Търсене…",
+            "placeholder": "Изберете…",
+            "emptyState": "Няма съвпадения",
+            "createLabel": "Създай \"{search}\"",
+            "createLabelEmpty": "Създай нова опция…"
+        },
+        "form": {
+            "required": "Задължително",
+            "invalid": "Невалидно"
+        }
     }
 }
