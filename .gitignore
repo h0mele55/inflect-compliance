@@ -35,6 +35,7 @@ tsconfig.tsbuildinfo
 # shadowing was masking a real build in CI.
 /coverage/
 test-results/
+tests/load/results/
 playwright-report/
 blob-report/
 jest_out.json

@@ -1,0 +1,158 @@
+name: Load Test (k6)
+
+# Load tests are expensive (full app boot + sustained traffic), so we
+# run them on-demand via workflow_dispatch rather than on every PR.
+# Triggers:
+#   - manual: pick a scenario + VU count from the Actions UI
+#   - nightly main: trend-tracking baseline (smoke level — 25 VUs, 1m)
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        type: choice
+        description: Scenario to run
+        options:
+          - both
+          - auth
+          - lists
+        default: both
+      vus:
+        description: Virtual users (concurrency target)
+        default: '50'
+      duration:
+        description: Sustained duration (e.g. 2m, 5m)
+        default: '2m'
+  schedule:
+    # 03:30 UTC daily — light smoke baseline on main for trend tracking.
+    # Doesn't block anything; alerts via the artifact diff if budgets drift.
+    - cron: '30 3 * * *'
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public&pgbouncer=true
+      DIRECT_DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      REDIS_URL: redis://localhost:6379
+      AUTH_TEST_MODE: '1'
+      RATE_LIMIT_ENABLED: '0'
+      AUTH_SECRET: ci-load-test-secret-do-not-use-in-prod
+      NEXTAUTH_URL: http://localhost:3006
+      NEXTAUTH_SECRET: ci-load-test-secret-do-not-use-in-prod
+      DATA_ENCRYPTION_KEY: ci-load-test-data-encryption-key-32b
+      NODE_ENV: production
+      PORT: '3006'
+      SKIP_ENV_VALIDATION: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Apply migrations + seed
+        run: |
+          npx prisma migrate deploy
+          npm run db:seed
+
+      - name: Build app
+        run: npm run build
+
+      - name: Start app (background)
+        run: |
+          npm start > /tmp/app.log 2>&1 &
+          echo $! > /tmp/app.pid
+
+      - name: Wait for /api/health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:3006/api/health > /dev/null 2>&1; then
+              echo "App is up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "App failed to start within 60s. Last 100 lines of log:"
+          tail -n 100 /tmp/app.log || true
+          exit 1
+
+      - name: Pick parameters (manual vs scheduled)
+        id: params
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "scenario=${{ inputs.scenario }}" >> "$GITHUB_OUTPUT"
+            echo "vus=${{ inputs.vus }}" >> "$GITHUB_OUTPUT"
+            echo "duration=${{ inputs.duration }}" >> "$GITHUB_OUTPUT"
+          else
+            # Nightly smoke — keep it light and fast.
+            echo "scenario=both" >> "$GITHUB_OUTPUT"
+            echo "vus=25" >> "$GITHUB_OUTPUT"
+            echo "duration=1m" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run k6 — auth scenario
+        if: steps.params.outputs.scenario == 'auth' || steps.params.outputs.scenario == 'both'
+        run: |
+          k6 run \
+            -e VUS=${{ steps.params.outputs.vus }} \
+            -e DURATION=${{ steps.params.outputs.duration }} \
+            tests/load/auth.js
+
+      - name: Run k6 — lists scenario
+        if: steps.params.outputs.scenario == 'lists' || steps.params.outputs.scenario == 'both'
+        run: |
+          k6 run \
+            -e VUS=${{ steps.params.outputs.vus }} \
+            -e DURATION=${{ steps.params.outputs.duration }} \
+            tests/load/lists.js
+
+      - name: Stop app
+        if: always()
+        run: |
+          if [ -f /tmp/app.pid ]; then
+            kill "$(cat /tmp/app.pid)" 2>/dev/null || true
+          fi
+
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-results-${{ github.run_id }}
+          path: |
+            tests/load/results/*.json
+            /tmp/app.log
+          retention-days: 30

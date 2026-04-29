@@ -393,6 +393,183 @@ The RTO assumes operator availability at the time of the incident. Out-of-hours 
 
 ---
 
+## Load-Test Validation of SLOs
+
+The four SLOs above are **production targets** measured against live OTel
+telemetry. The k6 scenarios in `tests/load/` are **synthetic validators**
+that exercise the same code paths under controlled load to surface
+regressions *before* they reach production. Together they form the
+performance-governance loop:
+
+```
+production OTel  ──→  SLOs (this doc)  ──→  k6 thresholds  ──→  CI smoke
+       ↑                                                              ↓
+       └──────────── monthly full-baseline runs ←────────────────────┘
+```
+
+### Critical user journeys → k6 scenarios → SLOs
+
+| Critical journey                   | k6 scenario             | Validates SLO        |
+|------------------------------------|-------------------------|----------------------|
+| Cold credentials login             | `tests/load/auth.js`    | SLO 1, 2, 3          |
+| Authenticated controls/risks/evidence list reads | `tests/load/lists.js`   | SLO 1, 2, 3          |
+| Control creation + evidence upload | `tests/load/mutations.js` | SLO 1, 2, 3        |
+
+`/api/livez` and `/api/readyz` (SLO 4) are not k6-tested — they're the
+job of synthetic probes (Blackbox Exporter or platform health checks).
+
+### Per-scenario metric → SLO mapping
+
+| k6 scenario      | k6 metric (tagged)                                    | Maps to        | What it tells you                        |
+|------------------|-------------------------------------------------------|----------------|------------------------------------------|
+| auth.js          | `http_req_duration{step:csrf}`                        | SLO 2          | CSRF endpoint p95.                       |
+| auth.js          | `http_req_duration{step:login}`                       | SLO 2 (write)  | bcrypt-bound login latency.              |
+| auth.js          | `http_req_duration{step:session}`                     | SLO 2          | Session-verify latency.                  |
+| auth.js          | `auth_full_login_ms` (custom Trend)                   | SLO 2 (E2E)    | End-to-end login transaction.            |
+| auth.js          | `http_req_failed{step:*}`                             | SLO 1, 3       | Per-step error rate.                     |
+| lists.js         | `http_req_duration{endpoint:controls\|risks\|evidence}` | SLO 2 (read) | Per-endpoint read p95.                   |
+| lists.js         | `http_req_failed{type:list}`                          | SLO 1, 3       | Aggregate read error rate.               |
+| lists.js         | `list_success_rate` (custom Rate)                     | SLO 1          | Aggregate availability across reads.     |
+| mutations.js     | `http_req_duration{op:create_control}`                | SLO 2 (write)  | Control INSERT + audit p95.              |
+| mutations.js     | `http_req_duration{op:upload_evidence}`               | SLO 2 (write)  | File-write + 2 INSERTs + audit p95.      |
+| mutations.js     | `http_req_failed{op:*}`                               | SLO 1, 3       | Per-op error rate.                       |
+| mutations.js     | `mutation_loop_ms` (custom Trend)                     | SLO 2 (E2E)    | Full create + upload transaction.        |
+
+### Why k6 thresholds are not identical to production SLOs
+
+The production p95 SLO is **< 500ms across ALL API requests**. The k6
+thresholds are intentionally **looser**:
+
+| Reason                                                                                    | Effect                                            |
+|-------------------------------------------------------------------------------------------|---------------------------------------------------|
+| k6 runs against a single CI runner (4 vCPU, 16 GB RAM); production runs multi-replica.    | ~2× absolute latency floor.                       |
+| k6 hits a freshly seeded DB with cold caches; production has warm caches + connection pools. | First-iteration latency dominated by cold paths. |
+| Mutations write to RLS + audit log + encryption — all serialized at the row level.        | Mutation budget naturally wider than read budget. |
+| The smoke profile (10 VUs × 30s) yields ~200 samples per op; production p95 is computed over millions. | A single retry can move a k6 rate noticeably.    |
+
+The k6 budgets are calibrated as **regression detectors**, not as the
+SLO itself: a breach implies a 2–3× regression that will *also* breach
+the production SLO once the change ships and the cache warms up. They
+are deliberately not a substitute for the production SLO measurement.
+
+### CI smoke vs full-baseline thresholds
+
+There are two performance gates with different jobs:
+
+#### CI smoke — runs on every PR
+
+`Load Smoke (k6)` job in `.github/workflows/ci.yml`. **10 VUs × 30s**.
+Runs `tests/load/mutations.js` only — that's where regressions are most
+likely (RLS + audit + encryption + storage all interact on the write
+path). Auth and read-path baselines stay in the on-demand workflow.
+
+| Metric                                       | CI smoke gate    | Behavior on breach |
+|----------------------------------------------|------------------|--------------------|
+| `http_req_failed{op:create_control}`         | rate < 2%        | **PR CI fails**    |
+| `http_req_failed{op:upload_evidence}`        | rate < 2%        | **PR CI fails**    |
+| `http_req_duration{op:create_control}`       | p95 < 1500ms     | **PR CI fails**    |
+| `http_req_duration{op:create_control}`       | p99 < 3000ms     | **PR CI fails**    |
+| `http_req_duration{op:upload_evidence}`      | p95 < 2000ms     | **PR CI fails**    |
+| `http_req_duration{op:upload_evidence}`      | p99 < 4000ms     | **PR CI fails**    |
+| `mutation_loop_ms`                           | p95 < 3000ms     | **PR CI fails**    |
+| `checks{check:control_created}`              | rate > 98%       | **PR CI fails**    |
+| `checks{check:evidence_uploaded}`            | rate > 98%       | **PR CI fails**    |
+
+Sized for signal-per-dollar: ~5 minutes added to PR CI; ~200 samples
+per op (enough for p95 to be meaningful without flaking).
+
+#### Full baselines — manual `workflow_dispatch` + nightly main smoke
+
+`Load Test (k6)` workflow at `.github/workflows/load-test.yml`. Runs
+all three scenarios. The script-level thresholds in each scenario apply;
+they are tighter than the CI smoke because the sample size is larger.
+
+| Scenario     | Profile          | Tightest threshold                              | Closest production SLO                |
+|--------------|------------------|-------------------------------------------------|---------------------------------------|
+| auth.js      | 50 / 100 / 200 VUs × 2m | `http_req_duration{step:login}` p95 < 1500ms | SLO 2 (write — bcrypt is the floor)   |
+| auth.js      | "                | `auth_full_login_ms` p95 < 2000ms                | SLO 2 (E2E)                           |
+| auth.js      | "                | `http_req_failed{step:*}` rate < 1%              | SLO 1 + 3                             |
+| lists.js     | 50 / 100 / 200 VUs × 2m | `http_req_duration{endpoint:*}` p95 < 800ms   | SLO 2 (read — looser than 500ms ceiling because of cold-cache + tenant RLS overhead in test env) |
+| lists.js     | "                | `http_req_failed{type:list}` rate < 1%          | SLO 1 + 3                             |
+| mutations.js | 50 / 100 / 200 VUs × 2m | `http_req_duration{op:create_control}` p95 < 1500ms | SLO 2 (write)                  |
+| mutations.js | "                | `http_req_duration{op:upload_evidence}` p95 < 2000ms | SLO 2 (write — multipart + storage) |
+| mutations.js | "                | `http_req_failed{op:*}` rate < 2%                | SLO 1 + 3                             |
+
+Run cadence:
+- **PR**: CI smoke (mutations only, 10 VUs × 30s) — automatic.
+- **Nightly main**: 25 VUs × 1m smoke across both auth + lists for trend tracking — automatic via cron in `load-test.yml`. Failures don't block deploys but populate the trend graph.
+- **On-demand**: 50/100/200 VU baselines via manual `workflow_dispatch`. Run before a release, after a major hot-path change, or when investigating a production p95 drift.
+
+### How to read a k6 result
+
+A k6 run produces three things you care about:
+
+1. **Pass/fail status** — exit code 0 if every threshold held; non-zero if any breached. CI keys off this. The console output ends with either nothing (pass) or `error msg="thresholds on metrics '...' have been crossed"`.
+
+2. **Per-metric stats** — for each metric the run prints `avg / min / med / max / p(90) / p(95) / p(99)`. Read **p(95)** for SLO comparison; p(99) is your tail-latency regression detector. Don't trust avg — it's pulled around by outliers in either direction.
+
+3. **req/s and VUs** — `http_reqs / iterations` rate at the end shows sustained throughput. Compare against the previous baseline run for the same VU count: a drop of >15% req/s under the same VU is a throughput regression even if latency thresholds pass.
+
+| Number you see       | What it means                                                  | Compare to                              |
+|----------------------|----------------------------------------------------------------|-----------------------------------------|
+| `p(95)` per metric   | 95th-percentile latency under the test load                    | The threshold for that metric.          |
+| `http_req_failed`    | Fraction of requests that returned ≥ 4xx OR network-failed     | The error-rate threshold (1% or 2%).    |
+| `checks` rate        | Fraction of correctness assertions that passed                 | Should be ~100%; <98% means broken.     |
+| `http_reqs/s`        | Sustained throughput over the steady-state window              | Previous baseline run at same VU count. |
+| `iterations/s`       | VU-loop completion rate                                        | Same.                                   |
+
+The `tests/load/results/*-summary.json` files written by `handleSummary`
+carry the full structured output for diff-against-baseline tooling.
+
+### Operating procedure
+
+#### When CI smoke fails on a PR
+
+The Load Smoke job exited non-zero. Open the artifact at
+`load-smoke-results-<run_id>` and the GitHub Actions log:
+
+1. Identify the breached threshold from the trailing `error msg=...` line.
+2. Pull `mutations-summary.json` from the artifact; the metric structure
+   gives you avg/p95/p99 directly.
+3. Compare against the most recent successful main-branch run's artifact
+   (retention is 14 days). Look for the same metric.
+4. Decide:
+   - **Real regression** — the PR introduced a slower path. Fix or revert. Latency-cliff regressions usually trace to: a new sync DB call inside a loop, a missing index, a serialised audit-log write, or unintended encryption of a hot field.
+   - **Flake** — single attempt only, no other CI signal. Re-run the job. Two failures in a row = treat as real.
+   - **Infra noise** — the runner was on a slow shared VM. Check the same job's runtime: if `Wait for /api/health` took >30s, the runner was congested. Re-run.
+
+If you must merge a PR with the smoke job failing (e.g. the regression is upstream of your change), document the reason in the PR description and open an issue tagged `slo:investigate`.
+
+#### When the full baseline misses an SLO
+
+The 50/100/200 VU `workflow_dispatch` run breached a threshold tighter than the CI smoke:
+
+1. Re-run the same scenario against staging or another runner to rule out CI variance.
+2. Pull production OTel data (`api_request_duration` histogram for the same `http_route`) for the prior week. If production p95 is also drifting → real regression in the running deploy. If production is healthy → CI-environment-only issue.
+3. Open an SLO-watch ticket. Decide: tighten the k6 threshold (and fix the cause), refactor the hot path, or escalate the SLO target if user-facing expectations have shifted.
+
+#### Updating thresholds
+
+**Loosening a k6 threshold is a regression signal.** Don't do it to make a red CI green. The flow:
+
+1. If the threshold is unrealistic for the workload, change the *production SLO* in this doc first. The k6 threshold then follows.
+2. If the threshold is realistic but the code regressed, fix the code.
+3. If neither — investigate before relaxing. A loosened threshold without an SLO update silently hides regressions from future PRs.
+
+The k6 thresholds are calibrated as a >2× margin against the production
+SLO. Tightening them as the codebase improves (and the absolute latency
+floor drops) is the long-term direction; loosening them is a last resort.
+
+### Cross-references
+
+- **k6 runbook**: [`tests/load/README.md`](../tests/load/README.md) — install, env, run commands, threshold tables.
+- **Workflows**:
+  - PR smoke: `Load Smoke (k6)` job in `.github/workflows/ci.yml`.
+  - Manual + nightly: `.github/workflows/load-test.yml`.
+- **Production telemetry**: see SLO 1–3 above for the OTel metric names and PromQL.
+
+---
+
 ## Metric Dependencies
 
 ### Available Today (Phase 1)
@@ -431,3 +608,4 @@ App (metrics.ts)
 |---|---|
 | 2026-04-18 | Initial SLO definitions (Epic 19 Phase 2) |
 | 2026-04-27 | Epic OI-3: split SLO 2 into reads (<500ms) and writes (<1000ms); add SLO 5 (repository P95 from `repo_method_*` metrics); add SLO 6 (RPO 1h, met by RDS PITR + monthly `restore-test.sh`); add SLO 7 (RTO 4h, met by `helm rollback` / `restore-db-instance` paths documented in `docs/incident-response.md`) |
+| 2026-04-28 | Added Load-Test Validation section: k6 scenario → SLO mapping, CI smoke vs full-baseline thresholds, operating procedure (GAP-11 closure). |
