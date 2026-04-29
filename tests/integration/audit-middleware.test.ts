@@ -12,6 +12,7 @@ import { randomUUID } from 'crypto';
 import { runWithAuditContext, getAuditContext } from '@/lib/audit-context';
 import { redactSensitiveFields, extractChangedFields } from '@/lib/audit-redact';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
+import { hashForLookup } from '@/lib/security/encryption';
 
 const RealDbUrl = DB_URL;
 
@@ -122,8 +123,11 @@ describeFn('Audit Middleware — Integration Tests', () => {
 
     beforeAll(async () => {
 
+        // rawPrisma is intentionally raw (no middleware) — provide
+        // emailHash explicitly since GAP-21 made it NOT NULL at the DB.
+        const userEmail = `audit-mw-${testRunId}@test.com`;
         const user = await rawPrisma.user.create({
-            data: { email: `audit-mw-${testRunId}@test.com`, name: 'Audit MW Test' },
+            data: { email: userEmail, emailHash: hashForLookup(userEmail), name: 'Audit MW Test' },
         });
         userId = user.id;
 

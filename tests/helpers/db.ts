@@ -80,6 +80,19 @@ export function prismaTestClient(): PrismaClient {
     if (!_client) {
         const url = getTestDatabaseUrl();
         _client = new PrismaClient({ datasources: { db: { url } } });
+        // GAP-21: register the same PII middleware production uses so
+        // integration tests that write to encrypted-only models
+        // (User, AuditorAccount, UserIdentityLink) auto-populate the
+        // *Hash columns. Tests that need to bypass the middleware
+        // (e.g. rls-isolation.test.ts) construct their own raw
+        // PrismaClient and provide emailHash explicitly.
+        //
+        // Lazy require keeps this file importable from jest's
+        // globalSetup context (which doesn't apply the moduleNameMapper
+        // for the `@/` alias).
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { piiEncryptionMiddleware } = require('../../src/lib/security/pii-middleware');
+        _client.$use(piiEncryptionMiddleware);
     }
     return _client;
 }
