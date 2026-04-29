@@ -72,6 +72,16 @@ describe('Static Analysis: No process.env fallbacks', () => {
             // routes above — env.ts snapshot freezes at import time and
             // the route MUST refuse to render under prod.
             if (file.endsWith('docs/route.ts')) continue;
+            // GAP-18 billing entitlements reads STRIPE_SECRET_KEY at
+            // module load to decide SaaS vs self-hosted mode. The
+            // decision MUST happen before env.ts validation runs
+            // because self-hosted deployments deliberately do not
+            // configure STRIPE_SECRET_KEY (the variable is treated as
+            // optional under that mode). Routing through env.ts
+            // would force every self-hosted operator to set the
+            // variable to satisfy schema validation, contradicting
+            // the operating model documented in docs/billing.md.
+            if (file.endsWith('billing/entitlements.ts')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 
