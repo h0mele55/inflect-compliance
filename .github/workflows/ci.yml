@@ -528,6 +528,14 @@ jobs:
       DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DATABASE_URL_TEST: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
       DIRECT_DATABASE_URL: postgresql://ci:ci_password@localhost:5432/ci_testdb?schema=public
+      # GAP-13: `next start` refuses to boot in prod mode without
+      # REDIS_URL. The previous RATE_LIMIT_ENABLED=0 escape hatch was
+      # removed (see src/instrumentation.ts) — Redis underpins more
+      # than rate-limiting. The redis service container below
+      # satisfies the boot check; RATE_LIMIT_ENABLED stays "0" so
+      # 429 backpressure doesn't interfere with mutation-throughput
+      # measurements.
+      REDIS_URL: redis://localhost:6379
       RATE_LIMIT_ENABLED: "0"
       DATA_ENCRYPTION_KEY: ci-test-data-encryption-key-32-chars-or-more-deterministic-x
 
@@ -542,6 +550,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd="pg_isready -U ci -d ci_testdb"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
           --health-interval=5s
           --health-timeout=5s
           --health-retries=10
