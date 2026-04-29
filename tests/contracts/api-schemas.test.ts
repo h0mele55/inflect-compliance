@@ -83,7 +83,23 @@ describe('API contract — full-spec drift check', () => {
 
         const committed = fs.readFileSync(COMMITTED_SPEC_PATH, 'utf-8');
 
-        if (generated !== committed) {
+        // Normalise the `info.version` field on both sides before
+        // comparing. semantic-release bumps package.json::version
+        // on every merge to main, which makes the generated spec's
+        // version-string differ from the committed one until the
+        // next openapi:generate run. That drift is mechanical, not
+        // a real contract change — the contract is the schema
+        // shape, not the package version. Stripping it here keeps
+        // the test focused on what actually matters.
+        const stripVersion = (jsonText: string): string =>
+            jsonText.replace(
+                /("version"\s*:\s*)"[^"]+"/,
+                '$1"<package-json>"',
+            );
+        const generatedNoVersion = stripVersion(generated);
+        const committedNoVersion = stripVersion(committed);
+
+        if (generatedNoVersion !== committedNoVersion) {
             // Surface a useful failure message — Jest's default
             // toBe() diff on a 4400-line string is unreadable.
             // The hint at the bottom is the action item.
@@ -108,7 +124,7 @@ describe('API contract — full-spec drift check', () => {
             ].join('\n');
             throw new Error(message);
         }
-        expect(generated).toBe(committed);
+        expect(generatedNoVersion).toBe(committedNoVersion);
     });
 });
 
