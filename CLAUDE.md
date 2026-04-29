@@ -94,17 +94,41 @@ Guard tests: `tests/guardrails/rls-coverage.test.ts` (DB-backed — CI
 fails if a tenant table is missing RLS) and
 `tests/unit/tenant-isolation-structural.test.ts` (code-pattern scanner).
 
-### API Rate Limiting (Epic A.2)
+### API Rate Limiting (Epic A.2 + GAP-17)
 
-Every route wrapped with `withApiErrorHandling` gets
-`API_MUTATION_LIMIT` (60/min) on POST/PUT/DELETE/PATCH by default.
-Stricter presets (`LOGIN_LIMIT`, `API_KEY_CREATE_LIMIT`,
-`EMAIL_DISPATCH_LIMIT`) are applied via `{ rateLimit: { config, scope } }`
-options on specific routes. Reads are never rate-limited by this
-layer. 429 responses carry `Retry-After` + `X-RateLimit-*` +
-`x-request-id`. Bypass via `RATE_LIMIT_ENABLED=0` env or inside tests
-(automatic). All presets live in `src/lib/security/rate-limit.ts`;
-the wrapper is `src/lib/security/rate-limit-middleware.ts`.
+Three tiers, each scoped to a different traffic class. Full operator
+runbook in `docs/rate-limiting.md`.
+
+**Mutation tier** (Epic A.2). Every route wrapped with
+`withApiErrorHandling` gets `API_MUTATION_LIMIT` (60/min) on
+POST/PUT/DELETE/PATCH by default. Stricter presets (`LOGIN_LIMIT`,
+`API_KEY_CREATE_LIMIT`, `EMAIL_DISPATCH_LIMIT`) are applied via
+`{ rateLimit: { config, scope } }` options on specific routes. Keyed
+`(IP, userId)`. Storage: in-process Map (Node runtime).
+
+**Read tier** (GAP-17). Tenant-scoped GETs on `/api/t/<slug>/...` go
+through `API_READ_LIMIT` (120/min) at the Edge middleware via
+`src/lib/rate-limit/apiReadRateLimit.ts`. Keyed `(IP, userId,
+tenantSlug)` for per-tenant + per-user isolation. Health probes
+(`/api/health`, `/api/livez`, `/api/readyz`) and `/api/docs` are
+explicitly excluded — operators must keep monitoring access during
+attacks. Storage: Upstash + memory fallback (mirrors `authRateLimit.ts`).
+The wire-up sits AFTER the JWT verify + tenant-access gate so
+unauthorized requests get the cheaper 401/403 first; structural
+ratchet at `tests/guardrails/api-read-rate-limit.test.ts` enforces
+the ordering + exclusion list.
+
+**Auth tier** (covered separately by `src/lib/rate-limit/authRateLimit.ts`).
+Tiered per-endpoint policy at the Edge: 10/min for sign-in callbacks,
+30/min for session probes, 60/min for csrf/providers. Keyed `(IP,
+ua-hash)` because it runs pre-authentication.
+
+429 responses carry `Retry-After` + `X-RateLimit-*` + `x-request-id`.
+Body never contains IP/userId/tenantSlug. Bypass via
+`RATE_LIMIT_ENABLED=0` env or inside tests (automatic). All presets
+live in `src/lib/security/rate-limit.ts`; the Node wrapper is
+`src/lib/security/rate-limit-middleware.ts`; the edge enforcement
+modules live under `src/lib/rate-limit/`.
 
 ### Auth Brute-Force Protection (Epic A.3)
 
