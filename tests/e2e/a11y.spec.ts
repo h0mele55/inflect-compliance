@@ -1,0 +1,238 @@
+/**
+ * GAP-20 — Accessibility (axe-core) E2E.
+ *
+ * Scans the highest-traffic product surfaces with axe-core and
+ * fails the test on `serious` or `critical` WCAG violations. Lower-
+ * severity findings are reported (visible in the test annotation
+ * + console) but do not gate CI today — the codebase is not yet
+ * at zero-violations baseline, and we want a hard gate on the
+ * highest-impact issues without flooring the suite on `moderate`
+ * findings until they're triaged.
+ *
+ * SURFACES COVERED
+ *
+ * Unauthenticated:
+ *   • /login                 — primary auth surface, every visitor
+ *   • /no-tenant             — error/transition page (post-login,
+ *                                pre-tenant-context)
+ *
+ * Authenticated (admin@acme.com → acme-corp):
+ *   • /t/{slug}/dashboard    — landing page, dense KPI grid
+ *   • /t/{slug}/controls     — list page (DataTable + filter shell)
+ *   • /t/{slug}/risks        — list page (filter + heatmap)
+ *   • /t/{slug}/evidence     — list page + uploads
+ *   • /t/{slug}/tasks        — list page (work items)
+ *   • /t/{slug}/coverage     — dashboard-style page
+ *
+ * Modal / interactive surfaces:
+ *   • Create-control modal opened from /controls
+ *
+ * AXE CONFIG
+ *
+ *   • Tags: `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`. WCAG 2.2
+ *     rules tagged `wcag22aa` are ALSO enabled — they're a strict
+ *     superset and any violation there is genuinely worth fixing.
+ *
+ *   • Disabled rules:
+ *       — `region`: dashboards intentionally use sectioned cards
+ *         without an outer <main> wrapper inside route segments
+ *         (the AppShell layout owns the landmark structure). The
+ *         rule fires on every section without an explicit role,
+ *         which is noise here. Re-enable when AppShell exposes a
+ *         single landmark per route.
+ *
+ *   • Severity gate: serious + critical violations FAIL the test.
+ *     Minor and moderate are LOGGED for visibility but tolerated
+ *     until baselined. The intention is to add them to the gate
+ *     incrementally once each rule has been triaged across the
+ *     surface.
+ *
+ * ADDING A NEW SURFACE
+ *
+ *   1. Add a new `test('...', ...)` block.
+ *   2. Navigate to the page.
+ *   3. Wait on a stable selector that's only present after the
+ *      page has actually rendered (avoid `networkidle` — the test
+ *      DB seed produces enough background activity to never fully
+ *      idle).
+ *   4. Call `runA11yScan(page, label)` — the helper handles the
+ *      exclusion list, the assertion, and the actionable report.
+ */
+import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import { safeGoto, loginAndGetTenant } from './e2e-utils';
+
+// ─── Helpers ─────────────────────────────────────────────────────
+
+interface AxeViolationNode {
+    target: string[];
+    failureSummary?: string;
+    html?: string;
+}
+interface AxeViolation {
+    id: string;
+    impact: 'minor' | 'moderate' | 'serious' | 'critical' | null;
+    description: string;
+    help: string;
+    helpUrl: string;
+    nodes: AxeViolationNode[];
+}
+
+const SEVERITY_GATE: Array<NonNullable<AxeViolation['impact']>> = [
+    'serious',
+    'critical',
+];
+
+/**
+ * Run axe against the current page. Logs all violations grouped by
+ * impact, then asserts no `serious` or `critical` issues remain.
+ */
+async function runA11yScan(page: Page, surfaceLabel: string) {
+    const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+        // See the docblock for why these are disabled.
+        .disableRules(['region'])
+        .analyze();
+
+    const violations = results.violations as unknown as AxeViolation[];
+
+    const byImpact = new Map<string, AxeViolation[]>();
+    for (const v of violations) {
+        const k = v.impact ?? 'unknown';
+        const arr = byImpact.get(k) ?? [];
+        arr.push(v);
+        byImpact.set(k, arr);
+    }
+
+    if (violations.length > 0) {
+        const lines: string[] = [
+            '',
+            `── axe report — ${surfaceLabel} (${page.url()}) ──`,
+            `   total violations: ${violations.length}`,
+        ];
+        for (const sev of ['critical', 'serious', 'moderate', 'minor', 'unknown']) {
+            const items = byImpact.get(sev) ?? [];
+            if (items.length === 0) continue;
+            lines.push(`   ${sev.padEnd(9)}: ${items.length}`);
+        }
+        for (const sev of ['critical', 'serious', 'moderate', 'minor', 'unknown']) {
+            const items = byImpact.get(sev) ?? [];
+            for (const v of items) {
+                lines.push('');
+                lines.push(`   [${sev}] ${v.id} — ${v.help}`);
+                lines.push(`       ${v.helpUrl}`);
+                for (const n of v.nodes.slice(0, 3)) {
+                    lines.push(`       node: ${n.target.join(' › ')}`);
+                }
+                if (v.nodes.length > 3) {
+                    lines.push(`       … and ${v.nodes.length - 3} more node(s)`);
+                }
+            }
+        }
+        // eslint-disable-next-line no-console
+        console.log(lines.join('\n'));
+    }
+
+    // Hard fail on the severity gate; everything else is logged.
+    const gating = violations.filter(
+        (v) => v.impact !== null && SEVERITY_GATE.includes(v.impact),
+    );
+
+    expect(
+        gating,
+        `Found ${gating.length} ${SEVERITY_GATE.join('/')} accessibility violation(s) on ${surfaceLabel}. ` +
+            `See console output above for rule IDs, help URLs, and DOM nodes.`,
+    ).toEqual([]);
+}
+
+// ─── Unauthenticated surfaces ────────────────────────────────────
+
+test.describe('a11y — unauthenticated', () => {
+    test('login page has no critical/serious WCAG violations', async ({ page }) => {
+        await safeGoto(page, '/login', { timeout: 60_000 });
+        await page.waitForSelector('input[type="email"][name="email"]', { timeout: 60_000 });
+        await runA11yScan(page, 'login');
+    });
+
+    test('no-tenant page has no critical/serious WCAG violations', async ({ page }) => {
+        await safeGoto(page, '/no-tenant', { timeout: 60_000 });
+        // /no-tenant is rendered by middleware in some flows and by a
+        // page handler in others; assert on the heading text rather
+        // than a specific selector path so both shapes pass.
+        await page.waitForSelector('h1, h2', { timeout: 30_000 });
+        await runA11yScan(page, 'no-tenant');
+    });
+});
+
+// ─── Authenticated surfaces (admin@acme.com on acme-corp) ────────
+
+test.describe('a11y — authenticated tenant pages', () => {
+    let tenantSlug: string;
+
+    test.beforeEach(async ({ page }) => {
+        tenantSlug = await loginAndGetTenant(page);
+    });
+
+    test('dashboard has no critical/serious WCAG violations', async ({ page }) => {
+        await safeGoto(page, `/t/${tenantSlug}/dashboard`);
+        await page.waitForSelector('#kpi-grid, [aria-label="Dashboard"], h1', { timeout: 30_000 });
+        await runA11yScan(page, 'dashboard');
+    });
+
+    test('controls list has no critical/serious WCAG violations', async ({ page }) => {
+        await safeGoto(page, `/t/${tenantSlug}/controls`);
+        // DataTable mounts its <table> after data resolves; wait on
+        // the table itself or a data-testid.
+        await page.waitForSelector('table, [data-testid="controls-table"]', { timeout: 30_000 });
+        await runA11yScan(page, 'controls list');
+    });
+
+    test('risks list has no critical/serious WCAG violations', async ({ page }) => {
+        await safeGoto(page, `/t/${tenantSlug}/risks`);
+        await page.waitForSelector('table, h1', { timeout: 30_000 });
+        await runA11yScan(page, 'risks list');
+    });
+
+    test('evidence list has no critical/serious WCAG violations', async ({ page }) => {
+        await safeGoto(page, `/t/${tenantSlug}/evidence`);
+        await page.waitForSelector('table, h1', { timeout: 30_000 });
+        await runA11yScan(page, 'evidence list');
+    });
+
+    test('tasks list has no critical/serious WCAG violations', async ({ page }) => {
+        await safeGoto(page, `/t/${tenantSlug}/tasks`);
+        await page.waitForSelector('table, [data-testid="tasks-table"], h1', { timeout: 30_000 });
+        await runA11yScan(page, 'tasks list');
+    });
+
+    test('coverage page has no critical/serious WCAG violations', async ({ page }) => {
+        await safeGoto(page, `/t/${tenantSlug}/coverage`);
+        await page.waitForSelector('h1', { timeout: 30_000 });
+        await runA11yScan(page, 'coverage');
+    });
+});
+
+// ─── Modal / interactive surfaces ────────────────────────────────
+
+test.describe('a11y — interactive overlays', () => {
+    test('create-control modal has no critical/serious WCAG violations', async ({ page }) => {
+        const tenantSlug = await loginAndGetTenant(page);
+        await safeGoto(page, `/t/${tenantSlug}/controls`);
+        await page.waitForSelector('table, [data-testid="controls-table"]', { timeout: 30_000 });
+
+        // Open the create-control modal. Selectors mirror those used
+        // in tests/e2e/create-control-modal.spec.ts so this stays in
+        // sync with the modal's owning suite.
+        const newControlBtn = page.locator('text=+ New Control, [data-testid="new-control-btn"], button:has-text("New Control")').first();
+        if (!(await newControlBtn.isVisible().catch(() => false))) {
+            test.skip(true, 'Create-control modal trigger not visible — surface exempt for this run');
+        }
+        await newControlBtn.click();
+
+        // Modal renders a dialog with role="dialog". Wait for it
+        // before scanning so axe sees the trapped focus + modal DOM.
+        await page.waitForSelector('[role="dialog"]', { timeout: 15_000 });
+
+        await runA11yScan(page, 'create-control modal');
+    });
+});

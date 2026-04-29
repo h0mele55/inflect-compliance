@@ -263,22 +263,22 @@ function LoginForm() {
                                 {mode === 'register' && (
                                     <>
                                         <div>
-                                            <label className="input-label">{t('name')}</label>
-                                            <input className="input" name="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder={t('namePlaceholder')} />
+                                            <label htmlFor="login-name" className="input-label">{t('name')}</label>
+                                            <input id="login-name" className="input" name="name" value={name} onChange={(e) => setName(e.target.value)} required placeholder={t('namePlaceholder')} />
                                         </div>
                                         <div>
-                                            <label className="input-label">{t('orgName')}</label>
-                                            <input className="input" name="orgName" value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder={t('orgPlaceholder')} />
+                                            <label htmlFor="login-org-name" className="input-label">{t('orgName')}</label>
+                                            <input id="login-org-name" className="input" name="orgName" value={orgName} onChange={(e) => setOrgName(e.target.value)} required placeholder={t('orgPlaceholder')} />
                                         </div>
                                     </>
                                 )}
                                 <div>
-                                    <label className="input-label">{t('email')}</label>
-                                    <input className="input" type="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder={t('emailPlaceholder')} />
+                                    <label htmlFor="login-email" className="input-label">{t('email')}</label>
+                                    <input id="login-email" className="input" type="email" name="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder={t('emailPlaceholder')} />
                                 </div>
                                 <div>
-                                    <label className="input-label">{t('password')}</label>
-                                    <input className="input" type="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder={t('passwordPlaceholder')} minLength={6} />
+                                    <label htmlFor="login-password" className="input-label">{t('password')}</label>
+                                    <input id="login-password" className="input" type="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder={t('passwordPlaceholder')} minLength={6} />
                                 </div>
                                 <button type="submit" disabled={loading} className="btn btn-primary w-full py-2.5">
                                     {loading ? t('pleaseWait') : mode === 'login' ? t('submitLogin') : t('submitRegister')}
@@ -315,6 +315,7 @@ function LoginForm() {
                                         <input
                                             type="email"
                                             name="resendEmail"
+                                            aria-label="Email for verification resend"
                                             className="input flex-1 text-xs"
                                             placeholder="Didn't get a verification email?"
                                             value={resendEmail}

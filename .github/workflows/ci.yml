@@ -457,8 +457,24 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
+      # ── GAP-20: accessibility gate ──
+      # The a11y spec runs first as a NAMED step so its pass/fail
+      # signal is visible at a glance in the CI annotation, separate
+      # from the broader functional E2E suite. The spec itself
+      # (`tests/e2e/a11y.spec.ts`) hard-fails on `serious` and
+      # `critical` axe violations across login, dashboard, the four
+      # main list pages, coverage, and the create-control modal.
+      # `moderate` and `minor` findings are LOGGED for triage but
+      # do not block — the policy is intentional, see the docblock
+      # at the top of the spec.
+      - name: "Gate: accessibility (axe) — GAP-20"
+        run: npx playwright test tests/e2e/a11y.spec.ts
+        env:
+          CI: "true"
+
       - name: Run E2E tests
-        run: npx playwright test
+        # Skip the a11y spec here — already executed as the gate above.
+        run: npx playwright test --grep-invert "a11y"
         env:
           CI: "true"
 
