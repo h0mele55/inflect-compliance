@@ -65,6 +65,9 @@ describeFn('rotateTenantDek (integration — real DB)', () => {
         // Best-effort cleanup. The lifecycle test seeds Risk rows
         // and the rotation engine writes AuditLog rows — both have
         // FK -> Tenant, so they must go before the tenant rows.
+        // AuditLog has an immutability trigger that blocks DELETE
+        // outside `session_replication_role = 'replica'`; same
+        // bypass pattern as audit-immutability.test.ts.
         try {
             const ids = await prisma.tenant.findMany({
                 where: { slug: { in: slugs } },
@@ -72,8 +75,18 @@ describeFn('rotateTenantDek (integration — real DB)', () => {
             });
             const tenantIds = ids.map((t) => t.id);
             if (tenantIds.length > 0) {
-                await prisma.auditLog
-                    .deleteMany({ where: { tenantId: { in: tenantIds } } })
+                await prisma
+                    .$transaction(async (tx) => {
+                        await tx.$executeRawUnsafe(
+                            `SET LOCAL session_replication_role = 'replica'`,
+                        );
+                        for (const tid of tenantIds) {
+                            await tx.$executeRawUnsafe(
+                                `DELETE FROM "AuditLog" WHERE "tenantId" = $1`,
+                                tid,
+                            );
+                        }
+                    })
                     .catch(() => undefined);
                 await prisma.risk
                     .deleteMany({ where: { tenantId: { in: tenantIds } } })
@@ -375,7 +388,18 @@ describeFn('rotateTenantDek (integration — real DB)', () => {
         expect(() => decryptWithKey(previousDek, freshRow.threat)).toThrow();
 
         // ── Cleanup ────────────────────────────────────────────────
-        await prisma.auditLog.deleteMany({ where: { tenantId: tenant.id } });
+        // AuditLog has an immutability trigger; bypass with
+        // `SET LOCAL session_replication_role = 'replica'` inside a
+        // transaction (same pattern as audit-immutability.test.ts).
+        await prisma.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe(
+                `SET LOCAL session_replication_role = 'replica'`,
+            );
+            await tx.$executeRawUnsafe(
+                `DELETE FROM "AuditLog" WHERE "tenantId" = $1`,
+                tenant.id,
+            );
+        });
         await prisma.risk.deleteMany({ where: { tenantId: tenant.id } });
         await prisma.user
             .delete({ where: { id: lifecycleUser.id } })
