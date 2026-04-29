@@ -36,3 +36,6 @@ export {
     grantAuditorAccess,
     revokeAuditorAccess,
 } from './sharing';
+
+// Page-data orchestration (collapses 1+N waterfall on the overview page)
+export { getReadinessOverview, type ReadinessOverviewPayload } from './overview';

@@ -52,3 +52,6 @@ export {
     mapRequirementToControl,
     unmapRequirementFromControl,
 } from './templates';
+
+// Page-data orchestration (collapses control + sync waterfall on detail page)
+export { getControlPageData, type ControlPageDataPayload, type SyncStatusPayload } from './page-data';
