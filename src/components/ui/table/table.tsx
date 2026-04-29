@@ -182,6 +182,7 @@ export function useTable<T extends any>(
                   title="Select all"
                 >
                   <Checkbox
+                    aria-label="Select all rows"
                     className="border-border-emphasis pointer-events-none size-4 rounded data-[state=checked]:bg-[var(--brand-emphasis)] data-[state=indeterminate]:bg-[var(--brand-emphasis)]"
                     checked={
                       table.getIsAllRowsSelected()
@@ -264,6 +265,7 @@ export function useTable<T extends any>(
                     title="Select"
                   >
                     <Checkbox
+                      aria-label="Select row"
                       className="border-border-emphasis pointer-events-none size-4 rounded data-[state=checked]:bg-[var(--brand-emphasis)] data-[state=indeterminate]:bg-[var(--brand-emphasis)]"
                       checked={row.getIsSelected()}
                     />

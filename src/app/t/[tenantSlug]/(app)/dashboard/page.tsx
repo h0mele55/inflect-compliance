@@ -244,8 +244,12 @@ function ControlCoverageSection({ exec, href, t }: {
                 { label: 'In Progress', value: controlCoverage.inProgress, color: 'bg-amber-500' },
                 { label: 'Not Started', value: controlCoverage.notStarted, color: 'bg-border-emphasis' },
             ]}
+            // GAP-CI-77: brand-emphasis (not brand-default) for AA on
+            // light cream — orange #D04A02 only hits 4.13:1 on cream
+            // while #B83D00 sits at 5.8:1. Dark-theme yellow remains
+            // high contrast either way.
             footer={
-                <Link href={href('/clauses')} className="text-[var(--brand-default)] hover:text-[var(--brand-muted)]">
+                <Link href={href('/clauses')} className="text-[var(--brand-emphasis)] hover:text-[var(--brand-muted)]">
                     {t('viewAllClauses')}
                 </Link>
             }
@@ -425,31 +429,36 @@ async function TrendSection({ ctx }: { ctx: Parameters<typeof getComplianceTrend
                 <h3 className="text-sm font-semibold text-content-default">Compliance Trends</h3>
                 <span className="text-xs text-content-subtle">{trends.daysAvailable} day{trends.daysAvailable !== 1 ? 's' : ''} of data</span>
             </div>
+            {/* GAP-CI-77: TrendCard label colours use semantic status
+                tokens (not raw Tailwind palette) so theme-aware contrast
+                is enforced. Tailwind text-amber-500 / text-red-500 fail
+                AA against light-theme cream (~3.5:1); the status tokens
+                are tuned to 5+:1 in both themes. */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <TrendCard
                     label="Coverage"
                     value={coveragePoints[coveragePoints.length - 1].value}
                     format="%"
                     points={coveragePoints}
-                    colorClassName="text-emerald-500"
+                    colorClassName="text-content-success"
                 />
                 <TrendCard
                     label="Open Risks"
                     value={risksOpenPoints[risksOpenPoints.length - 1].value}
                     points={risksOpenPoints}
-                    colorClassName="text-amber-500"
+                    colorClassName="text-content-warning"
                 />
                 <TrendCard
                     label="Overdue Evidence"
                     value={evidenceOverduePoints[evidenceOverduePoints.length - 1].value}
                     points={evidenceOverduePoints}
-                    colorClassName="text-red-500"
+                    colorClassName="text-content-error"
                 />
                 <TrendCard
                     label="Open Findings"
                     value={findingsPoints[findingsPoints.length - 1].value}
                     points={findingsPoints}
-                    colorClassName="text-purple-500"
+                    colorClassName="text-content-info"
                 />
             </div>
         </div>

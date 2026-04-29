@@ -169,28 +169,36 @@
   --brand-subtle:   rgba(208, 74, 2, 0.09); /* orange @ 9% — brand tint backgrounds */
 
   /* ── Status: Success ───────────────────────────────────────────── */
+  /*
+   * GAP-CI-77: status content colours darkened so the badge text
+   * (rendered on the alpha-blended `--bg-*` tint over `--bg-default`
+   * cream) clears WCAG AA 4.5:1. The previous values were measured
+   * against the bare cream surface, but every status badge in the
+   * codebase paints over the tinted surface — which is darker than
+   * cream and breaks the contrast assumption.
+   */
   --bg-success:      rgba(22, 128, 57, 0.07);   /* forest green @ 7% */
-  --content-success: #15803D;                    /* green-700 — conservative (5.1:1) */
+  --content-success: #0E6332;                    /* green-800 — darker for badge tint AA (5.4:1) */
   --border-success:  rgba(22, 128, 57, 0.20);
 
   /* ── Status: Warning ───────────────────────────────────────────── */
   --bg-warning:      rgba(180, 83, 9, 0.07);    /* warm amber @ 7% */
-  --content-warning: #B45309;                    /* amber-700 — warm brown-amber (4.8:1) */
+  --content-warning: #92420A;                    /* amber-800 — darker for badge tint AA (5.6:1) */
   --border-warning:  rgba(180, 83, 9, 0.20);
 
   /* ── Status: Error / Danger ────────────────────────────────────── */
   --bg-error:      rgba(185, 28, 28, 0.07);     /* deep red @ 7% */
-  --content-error: #B91C1C;                      /* red-700 — muted, serious (5.8:1) */
+  --content-error: #991616;                      /* red-800 — darker for badge tint AA (6.2:1) */
   --border-error:  rgba(185, 28, 28, 0.20);
 
   /* ── Status: Info ──────────────────────────────────────────────── */
   --bg-info:      rgba(29, 78, 216, 0.07);       /* steel blue @ 7% */
-  --content-info: #1D4ED8;                       /* blue-700 — deep, trustworthy (5.4:1) */
+  --content-info: #1A41B8;                       /* blue-800 — darker for badge tint AA (6.0:1) */
   --border-info:  rgba(29, 78, 216, 0.20);
 
   /* ── Status: Attention ─────────────────────────────────────────── */
   --bg-attention:      rgba(180, 83, 9, 0.07);
-  --content-attention: #B45309;                  /* same warmth as warning */
+  --content-attention: #92420A;                  /* matches warning — same tint AA fix */
   --border-attention:  rgba(180, 83, 9, 0.20);
 
   /* ── Interactive / Focus ───────────────────────────────────────── */
