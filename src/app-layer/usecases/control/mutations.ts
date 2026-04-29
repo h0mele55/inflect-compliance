@@ -11,6 +11,7 @@ import { computeNextDueAt } from '../../utils/cadence';
 import { restoreEntity, purgeEntity } from '../soft-delete-operations';
 import { assertCanAdmin } from '../../policies/common';
 import { bumpEntityCacheVersion } from '@/lib/cache/list-cache';
+import { assertWithinLimit } from '@/lib/billing/entitlements';
 
 // ─── Create / Update ───
 
@@ -29,6 +30,12 @@ export async function createControl(ctx: RequestContext, data: {
     isCustom?: boolean;
 }) {
     assertCanCreateControl(ctx);
+    // GAP-18 — plan-limit gate. SaaS FREE tenants cap at 10 controls;
+    // self-hosted is always unlimited (entitlements module resolves
+    // ENTERPRISE when STRIPE_SECRET_KEY is unset). Throws
+    // `forbidden('plan_limit_exceeded: …')` at the cap, surfacing
+    // as 403 to the client.
+    await assertWithinLimit(ctx, 'control');
 
     const created = await runInTenantContext(ctx, async (db) => {
         const control = await ControlRepository.create(db, ctx, {
