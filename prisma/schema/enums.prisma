@@ -51,6 +51,20 @@ enum OrgRole {
   ORG_READER
 }
 
+/// Epic B — actions tracked in the OrgAuditLog ledger.
+///
+/// New actions added here MUST be wired into the org-audit emission
+/// surface AND covered by the guardrail at
+/// `tests/guardrails/org-audit-coverage.test.ts`. Postgres enum
+/// extension (ALTER TYPE ADD VALUE) is forward-compatible.
+enum OrgAuditAction {
+  ORG_MEMBER_ADDED
+  ORG_MEMBER_REMOVED
+  ORG_MEMBER_ROLE_CHANGED
+  ORG_ADMIN_PROVISIONED_TO_TENANTS
+  ORG_ADMIN_DEPROVISIONED_FROM_TENANTS
+}
+
 enum MembershipStatus {
   INVITED
   ACTIVE

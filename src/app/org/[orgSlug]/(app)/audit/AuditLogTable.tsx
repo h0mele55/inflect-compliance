@@ -1,0 +1,247 @@
+'use client';
+
+import { useCallback, useMemo, useState } from 'react';
+import { ScrollText } from 'lucide-react';
+
+import { ListPageShell } from '@/components/layout/ListPageShell';
+import { DataTable, createColumns, TableEmptyState } from '@/components/ui/table';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
+import { formatDateTime } from '@/lib/format-date';
+
+interface UserRef {
+    id: string;
+    email: string | null;
+    name: string | null;
+}
+
+interface AuditRow {
+    id: string;
+    occurredAt: string;
+    action:
+        | 'ORG_MEMBER_ADDED'
+        | 'ORG_MEMBER_REMOVED'
+        | 'ORG_MEMBER_ROLE_CHANGED'
+        | 'ORG_ADMIN_PROVISIONED_TO_TENANTS'
+        | 'ORG_ADMIN_DEPROVISIONED_FROM_TENANTS';
+    actorType: string;
+    actor: UserRef | null;
+    target: UserRef | null;
+    detailsJson: unknown;
+    requestId: string | null;
+    entryHash: string;
+    previousHash: string | null;
+    version: number;
+}
+
+interface Props {
+    orgSlug: string;
+    initialRows: AuditRow[];
+    initialNextCursor: string | null;
+}
+
+const ACTION_LABEL: Record<AuditRow['action'], string> = {
+    ORG_MEMBER_ADDED: 'Member added',
+    ORG_MEMBER_REMOVED: 'Member removed',
+    ORG_MEMBER_ROLE_CHANGED: 'Role changed',
+    ORG_ADMIN_PROVISIONED_TO_TENANTS: 'Provisioned to tenants',
+    ORG_ADMIN_DEPROVISIONED_FROM_TENANTS: 'Deprovisioned from tenants',
+};
+
+const ACTION_VARIANT: Record<AuditRow['action'], 'success' | 'error' | 'info' | 'warning'> = {
+    ORG_MEMBER_ADDED: 'success',
+    ORG_MEMBER_REMOVED: 'error',
+    ORG_MEMBER_ROLE_CHANGED: 'warning',
+    ORG_ADMIN_PROVISIONED_TO_TENANTS: 'info',
+    ORG_ADMIN_DEPROVISIONED_FROM_TENANTS: 'info',
+};
+
+/**
+ * Defensive renderer — strips PII ciphertext envelopes that may leak
+ * through if the read-side decryption fails. Same pattern as
+ * `user-combobox.tsx::isCiphertextEnvelope` (PR #82).
+ */
+function readableField(value: string | null | undefined): string | null {
+    const trimmed = value?.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('v1:') || trimmed.startsWith('v2:')) return null;
+    return trimmed;
+}
+
+function userLabel(u: UserRef | null): string {
+    if (!u) return '—';
+    const name = readableField(u.name);
+    const email = readableField(u.email);
+    if (name && email) return `${name} (${email})`;
+    if (name) return name;
+    if (email) return email;
+    return `User ${u.id.slice(0, 8)}`;
+}
+
+/**
+ * Compact, human-readable summary of the row's `detailsJson`. Each
+ * action shape carries different fields — the details payload is
+ * authoritative; this is just a glance-friendly projection.
+ */
+function summarize(row: AuditRow): string {
+    const d = row.detailsJson as Record<string, unknown> | null;
+    if (!d) return '';
+    switch (row.action) {
+        case 'ORG_MEMBER_ADDED':
+            return `Role: ${d.role ?? '—'}` +
+                (typeof d.provisionedTenantCount === 'number' && d.provisionedTenantCount > 0
+                    ? ` · ${d.provisionedTenantCount} tenant${d.provisionedTenantCount === 1 ? '' : 's'} provisioned`
+                    : '');
+        case 'ORG_MEMBER_REMOVED':
+            return `Was: ${d.previousRole ?? '—'}` +
+                (typeof d.deprovisionedTenantCount === 'number' && d.deprovisionedTenantCount > 0
+                    ? ` · ${d.deprovisionedTenantCount} tenant${d.deprovisionedTenantCount === 1 ? '' : 's'} deprovisioned`
+                    : '');
+        case 'ORG_MEMBER_ROLE_CHANGED':
+            return `${d.previousRole ?? '—'} → ${d.newRole ?? '—'}`;
+        case 'ORG_ADMIN_PROVISIONED_TO_TENANTS':
+        case 'ORG_ADMIN_DEPROVISIONED_FROM_TENANTS':
+            return typeof d.tenantCount === 'number'
+                ? `${d.tenantCount} tenant${d.tenantCount === 1 ? '' : 's'} (${d.role ?? 'AUDITOR'})`
+                : '';
+        default:
+            return '';
+    }
+}
+
+export function AuditLogTable({ orgSlug, initialRows, initialNextCursor }: Props) {
+    const [rows, setRows] = useState<AuditRow[]>(initialRows);
+    const [cursor, setCursor] = useState<string | null>(initialNextCursor);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadMore = useCallback(async () => {
+        if (!cursor || loading) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const url = `/api/org/${orgSlug}/audit-log?cursor=${encodeURIComponent(cursor)}&limit=20`;
+            const res = await fetch(url);
+            if (!res.ok) {
+                throw new Error(`Audit log fetch failed: ${res.status}`);
+            }
+            const data = (await res.json()) as { rows: AuditRow[]; nextCursor: string | null };
+            setRows((prev) => [...prev, ...data.rows]);
+            setCursor(data.nextCursor);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Audit log fetch failed');
+        } finally {
+            setLoading(false);
+        }
+    }, [orgSlug, cursor, loading]);
+
+    const columns = useMemo(
+        () =>
+            createColumns<AuditRow>([
+                {
+                    id: 'occurredAt',
+                    header: 'Time',
+                    cell: ({ row }) => (
+                        <span
+                            className="font-mono text-xs text-content-muted"
+                            data-testid={`org-audit-time-${row.original.id}`}
+                        >
+                            {formatDateTime(row.original.occurredAt)}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'action',
+                    header: 'Action',
+                    cell: ({ row }) => (
+                        <StatusBadge variant={ACTION_VARIANT[row.original.action]}>
+                            {ACTION_LABEL[row.original.action]}
+                        </StatusBadge>
+                    ),
+                },
+                {
+                    id: 'actor',
+                    header: 'Actor',
+                    cell: ({ row }) => (
+                        <span className="text-sm text-content-default">
+                            {userLabel(row.original.actor)}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'target',
+                    header: 'Target',
+                    cell: ({ row }) => (
+                        <span className="text-sm text-content-default">
+                            {userLabel(row.original.target)}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'summary',
+                    header: 'Summary',
+                    cell: ({ row }) => (
+                        <span className="text-sm text-content-muted">
+                            {summarize(row.original)}
+                        </span>
+                    ),
+                },
+            ]),
+        [],
+    );
+
+    return (
+        <ListPageShell>
+            <ListPageShell.Header>
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h1 className="text-xl font-semibold text-content-emphasis flex items-center gap-2">
+                            <ScrollText className="w-5 h-5" aria-hidden="true" />
+                            Audit Log
+                        </h1>
+                        <p className="text-sm text-content-muted mt-1">
+                            Immutable, hash-chained record of org-level privilege changes.
+                            Append-only — entries cannot be modified or removed.
+                        </p>
+                    </div>
+                </div>
+            </ListPageShell.Header>
+            <ListPageShell.Body>
+                {rows.length === 0 ? (
+                    <TableEmptyState
+                        title="No audit events yet"
+                        description="Member additions, removals, role changes, and provisioning fan-out will appear here as they happen."
+                    />
+                ) : (
+                    <DataTable
+                        fillBody
+                        data={rows}
+                        columns={columns}
+                        getRowId={(r) => r.id}
+                    />
+                )}
+                {error && (
+                    <p
+                        role="alert"
+                        className="mt-3 text-sm text-status-error"
+                        data-testid="org-audit-error"
+                    >
+                        {error}
+                    </p>
+                )}
+                {cursor && (
+                    <div className="mt-4 flex justify-center">
+                        <Button
+                            variant="secondary"
+                            onClick={loadMore}
+                            disabled={loading}
+                            data-testid="org-audit-load-more"
+                        >
+                            {loading ? 'Loading…' : 'Load older entries'}
+                        </Button>
+                    </div>
+                )}
+            </ListPageShell.Body>
+        </ListPageShell>
+    );
+}

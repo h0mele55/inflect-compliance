@@ -180,6 +180,7 @@ model Organization {
   tenants                      Tenant[]
   memberships                  OrgMembership[]
   provisionedTenantMemberships TenantMembership[] @relation("OrgProvisionedTenantMemberships")
+  auditLogs                    OrgAuditLog[]
 }
 
 // Per-user, per-org role assignment.
@@ -386,6 +387,8 @@ model User {
   apiKeysCreated                TenantApiKey[]               @relation("ApiKeyCreator")
   userSessions                  UserSession[]                @relation("UserSessionOwner")
   orgMemberships                OrgMembership[]
+  orgAuditLogActions            OrgAuditLog[]                @relation("OrgAuditLogActor")
+  orgAuditLogTargets            OrgAuditLog[]                @relation("OrgAuditLogTarget")
 }
 
 model Account {

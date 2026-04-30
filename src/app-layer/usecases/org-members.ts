@@ -60,13 +60,17 @@ import {
 import { ConflictError, NotFoundError, ValidationError } from '@/lib/errors/types';
 import { hashForLookup } from '@/lib/security/encryption';
 import type { OrgContext } from '@/app-layer/types';
-import type { OrgRole } from '@prisma/client';
+import { OrgAuditAction, type OrgRole } from '@prisma/client';
 import { logger } from '@/lib/observability/logger';
 import { appendAuditEntry } from '@/lib/audit';
+import { appendOrgAuditEntry } from '@/lib/audit/org-audit-writer';
 
 // ── Audit fan-out helper ──────────────────────────────────────────────
 
-type OrgAuditAction = 'ORG_AUDITOR_PROVISIONED' | 'ORG_AUDITOR_DEPROVISIONED';
+// Per-tenant fan-out action strings written into the per-tenant
+// AuditLog chain. Distinct from the Epic B `OrgAuditAction` Prisma
+// enum (imported above), which targets the org-scoped `OrgAuditLog`.
+type TenantFanoutAuditAction = 'ORG_AUDITOR_PROVISIONED' | 'ORG_AUDITOR_DEPROVISIONED';
 type OrgAuditSource =
     | 'org_member_added'
     | 'org_member_removed'
@@ -90,7 +94,7 @@ type OrgAuditSource =
 async function emitOrgMembershipAudit(
     ctx: OrgContext,
     args: {
-        action: OrgAuditAction;
+        action: TenantFanoutAuditAction;
         sourceAction: OrgAuditSource;
         targetUserId: string;
         tenantIds: ReadonlyArray<string>;
@@ -134,6 +138,51 @@ async function emitOrgMembershipAudit(
             }),
         ),
     );
+}
+
+// ── Org-level audit emission helper ───────────────────────────────────
+
+/**
+ * Append a row to the org-scoped audit chain (`OrgAuditLog`). Epic B
+ * requires every privilege-affecting org mutation to leave an
+ * immutable, hash-chained record at the org level — this helper is
+ * the single emission point.
+ *
+ * Best-effort by design (mirrors `emitOrgMembershipAudit`): the
+ * privilege change has already committed by the time this runs, so a
+ * write failure here can NOT roll the change back. We log the failure
+ * structurally; the chain-verification job picks up the gap. Failing
+ * the user-facing operation would be worse than a recoverable audit
+ * gap (the privilege change is durable; the audit row can be
+ * backfilled).
+ */
+async function emitOrgAudit(
+    ctx: OrgContext,
+    args: {
+        action: OrgAuditAction;
+        targetUserId: string | null;
+        detailsJson: Record<string, unknown>;
+    },
+): Promise<void> {
+    try {
+        await appendOrgAuditEntry({
+            organizationId: ctx.organizationId,
+            actorUserId: ctx.userId,
+            actorType: 'USER',
+            action: args.action,
+            targetUserId: args.targetUserId,
+            detailsJson: args.detailsJson,
+            requestId: ctx.requestId,
+        });
+    } catch (err) {
+        logger.warn('org-audit.emit_failed', {
+            component: 'org-members',
+            organizationId: ctx.organizationId,
+            action: args.action,
+            targetUserId: args.targetUserId,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
 }
 
 // ── listOrgMembers ────────────────────────────────────────────────────
@@ -284,6 +333,33 @@ export async function addOrgMember(
         }
     }
 
+    // Epic B — durable org-scoped audit. ORG_MEMBER_ADDED records the
+    // privilege grant itself; ORG_ADMIN_PROVISIONED_TO_TENANTS records
+    // the fan-out as a SEPARATE event so an auditor can distinguish
+    // "membership change" from "tenant access propagation". Both rows
+    // chain into the same per-org ledger so reading them in
+    // occurredAt order tells the full story.
+    await emitOrgAudit(ctx, {
+        action: OrgAuditAction.ORG_MEMBER_ADDED,
+        targetUserId: user.id,
+        detailsJson: {
+            role: input.role,
+            provisionedTenantCount: provision?.created ?? 0,
+        },
+    });
+    if (provision && provision.created > 0) {
+        await emitOrgAudit(ctx, {
+            action: OrgAuditAction.ORG_ADMIN_PROVISIONED_TO_TENANTS,
+            targetUserId: user.id,
+            detailsJson: {
+                trigger: 'org_member_added',
+                tenantCount: provision.created,
+                tenantIds: provision.tenantIds,
+                role: 'AUDITOR',
+            },
+        });
+    }
+
     logger.info('org-members.added', {
         component: 'org-members',
         organizationId: ctx.organizationId,
@@ -379,6 +455,30 @@ export async function removeOrgMember(
             targetUserId: userId,
             tenantIds: deprovision.tenantIds,
             previousOrgRole: 'ORG_ADMIN',
+        });
+    }
+
+    // Epic B — durable org-scoped audit. The ORG_MEMBER_REMOVED row
+    // is always written; the fan-in summary lands separately when
+    // the deprovision actually deleted any auto-provisioned rows.
+    await emitOrgAudit(ctx, {
+        action: OrgAuditAction.ORG_MEMBER_REMOVED,
+        targetUserId: userId,
+        detailsJson: {
+            previousRole: membership.role,
+            deprovisionedTenantCount: deprovision?.deleted ?? 0,
+        },
+    });
+    if (deprovision && deprovision.deleted > 0) {
+        await emitOrgAudit(ctx, {
+            action: OrgAuditAction.ORG_ADMIN_DEPROVISIONED_FROM_TENANTS,
+            targetUserId: userId,
+            detailsJson: {
+                trigger: 'org_member_removed',
+                tenantCount: deprovision.deleted,
+                tenantIds: deprovision.tenantIds,
+                role: 'AUDITOR',
+            },
         });
     }
 
@@ -602,6 +702,44 @@ export async function changeOrgMemberRole(
             tenantIds: result.deprovision.tenantIds,
             previousOrgRole: 'ORG_ADMIN',
             newOrgRole: 'ORG_READER',
+        });
+    }
+
+    // Epic B — durable org-scoped audit. ORG_MEMBER_ROLE_CHANGED
+    // records the role transition; the fan-out / fan-in summary lands
+    // as a separate row when it actually moved tenant access.
+    await emitOrgAudit(ctx, {
+        action: OrgAuditAction.ORG_MEMBER_ROLE_CHANGED,
+        targetUserId: userId,
+        detailsJson: {
+            previousRole: existing.role,
+            newRole,
+            transition,
+            provisionedTenantCount: result.provision?.created ?? 0,
+            deprovisionedTenantCount: result.deprovision?.deleted ?? 0,
+        },
+    });
+    if (transition === 'reader_to_admin' && result.provision && result.provision.created > 0) {
+        await emitOrgAudit(ctx, {
+            action: OrgAuditAction.ORG_ADMIN_PROVISIONED_TO_TENANTS,
+            targetUserId: userId,
+            detailsJson: {
+                trigger: 'org_member_promoted',
+                tenantCount: result.provision.created,
+                tenantIds: result.provision.tenantIds,
+                role: 'AUDITOR',
+            },
+        });
+    } else if (transition === 'admin_to_reader' && result.deprovision && result.deprovision.deleted > 0) {
+        await emitOrgAudit(ctx, {
+            action: OrgAuditAction.ORG_ADMIN_DEPROVISIONED_FROM_TENANTS,
+            targetUserId: userId,
+            detailsJson: {
+                trigger: 'org_member_demoted',
+                tenantCount: result.deprovision.deleted,
+                tenantIds: result.deprovision.tenantIds,
+                role: 'AUDITOR',
+            },
         });
     }
 

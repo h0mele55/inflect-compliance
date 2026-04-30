@@ -43,6 +43,21 @@ jest.mock('@/lib/audit', () => ({
     appendAuditEntry: (...a: unknown[]) => appendAuditEntryMock(...a),
 }));
 
+// Epic B — the org-members usecase now also emits a per-org audit
+// row through the OrgAuditLog writer. This test focuses on the
+// existing per-tenant fan-out wiring, so we stub the org writer to
+// a successful no-op. Dedicated org-audit emission assertions live
+// in `tests/unit/org-audit-emission.test.ts`.
+const appendOrgAuditEntryMock = jest.fn().mockResolvedValue({
+    id: 'oa-mock',
+    entryHash: 'h-mock',
+    previousHash: null,
+});
+jest.mock('@/lib/audit/org-audit-writer', () => ({
+    __esModule: true,
+    appendOrgAuditEntry: (...a: unknown[]) => appendOrgAuditEntryMock(...a),
+}));
+
 import {
     addOrgMember,
     changeOrgMemberRole,
