@@ -234,6 +234,49 @@ model RiskTemplate {
   updatedAt         DateTime @updatedAt
 }
 
+/// Tenant-scoped risk-matrix configuration (Epic 44).
+///
+/// Drives the dimensions, axis labels, per-level labels, and severity
+/// bands of the likelihood × impact matrix the UI renders. Existing
+/// tenants resolve to the canonical 5×5 default until an admin
+/// customises it via the admin UI — the row is absent in that case;
+/// the read usecase centralises the fallback so callers don't have
+/// to know about presence.
+///
+/// `levelLabels` and `bands` are JSON because the per-level
+/// vocabulary varies (operational vs. clinical vs. supply-chain
+/// risks all want different scale legends) and forcing a side table
+/// would buy nothing — the rows are deeply tenant-specific and
+/// validated end-to-end by Zod before write. Schema invariants:
+///   - `likelihoodLevels`, `impactLevels` ∈ [2, 10]
+///   - `levelLabels.likelihood` length === likelihoodLevels (when set)
+///   - `levelLabels.impact`     length === impactLevels (when set)
+///   - `bands` cover [1, likelihoodLevels * impactLevels] without gaps
+///     or overlaps; each entry has { name, minScore, maxScore, color }
+///
+/// One row per tenant (`@@unique([tenantId])`).
+model RiskMatrixConfig {
+  id                  String   @id @default(cuid())
+  tenantId            String   @unique
+  /// Number of likelihood levels (matrix rows). Default 5.
+  likelihoodLevels    Int      @default(5)
+  /// Number of impact levels (matrix columns). Default 5.
+  impactLevels        Int      @default(5)
+  /// Y-axis title (default "Likelihood").
+  axisLikelihoodLabel String   @default("Likelihood")
+  /// X-axis title (default "Impact").
+  axisImpactLabel     String   @default("Impact")
+  /// Per-level human labels keyed by axis. Falls back to numeric labels when absent.
+  levelLabels         Json?
+  /// Ordered severity bands. See doc above for the contract.
+  bands               Json     @default("[]")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  tenant              Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+}
+
 model RiskSuggestionSession {
   id              String                  @id @default(cuid())
   tenantId        String

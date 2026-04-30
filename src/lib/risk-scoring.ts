@@ -1,7 +1,24 @@
 /**
- * Risk scoring engine.
- * Default: Likelihood (1-5) x Impact (1-5) = Inherent score (1-25)
+ * Risk scoring engine — legacy / non-UI consumers.
+ *
+ * Default: Likelihood (1-5) × Impact (1-5) = Inherent score (1-25).
  * Supports custom max scales per tenant.
+ *
+ * ## Scope (Epic 44)
+ *
+ * This module's `getRiskLevel` uses fixed percentage thresholds
+ * (≤20% LOW, ≤48% MEDIUM, ≤72% HIGH, else CRITICAL) that pre-date
+ * the configurable matrix. It's still consumed by:
+ *   - `src/app-layer/usecases/risk.ts`     (server-side score recompute)
+ *   - `src/app-layer/ai/risk-assessment/`  (LLM prompt builder + provider)
+ *   - `src/app-layer/reports/pdf/`         (PDF risk-register exports)
+ *
+ * The UI / matrix-rendering path uses
+ * `src/lib/risk-matrix/scoring.ts → resolveBandForScore` instead,
+ * which reads bands from the tenant's `RiskMatrixConfig` and
+ * therefore honours custom band layouts. Future work: collapse the
+ * non-UI consumers onto the band-driven helper so a tenant's
+ * configured bands flow through to PDFs and AI prompts as well.
  */
 export function calculateRiskScore(
     likelihood: number,

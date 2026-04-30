@@ -1,0 +1,573 @@
+'use client';
+
+/**
+ * Risk-matrix admin editor — Epic 44.5
+ *
+ * Lets a tenant admin edit:
+ *   - dimensions (likelihood × impact, each 2..10)
+ *   - axis titles (free text, max 64)
+ *   - per-level labels (one input per row/column)
+ *   - severity bands (name + min..max + colour)
+ *
+ * Live preview on the right uses the new `<RiskMatrix>` engine with
+ * a synthetic 1-risk-per-cell payload so colour bands + axis labels
+ * are immediately visible. Save POSTs the FULL effective config
+ * (not a patch) so the merge result the user sees in preview is
+ * exactly what lands in the DB.
+ *
+ * Validation runs in two passes:
+ *   - client-side `validateBandsCoverage` + `validateLevelLabelsLength`
+ *     (fast inline feedback)
+ *   - server-side same Zod + cross-field via `updateRiskMatrixConfig`
+ *     (defence-in-depth — same rules either way)
+ */
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+
+import { NumberStepper } from '@/components/ui/number-stepper';
+import { RiskMatrix } from '@/components/ui/RiskMatrix';
+import { DEFAULT_RISK_MATRIX_CONFIG } from '@/lib/risk-matrix/defaults';
+import {
+    validateBandsCoverage,
+    validateLevelLabelsLength,
+} from '@/lib/risk-matrix/schema';
+import type {
+    RiskMatrixBand,
+    RiskMatrixConfigShape,
+} from '@/lib/risk-matrix/types';
+
+interface RiskMatrixAdminClientProps {
+    tenantSlug: string;
+    initialConfig: RiskMatrixConfigShape;
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────
+
+function cloneConfig(c: RiskMatrixConfigShape): RiskMatrixConfigShape {
+    return {
+        likelihoodLevels: c.likelihoodLevels,
+        impactLevels: c.impactLevels,
+        axisLikelihoodLabel: c.axisLikelihoodLabel,
+        axisImpactLabel: c.axisImpactLabel,
+        levelLabels: {
+            likelihood: [...c.levelLabels.likelihood],
+            impact: [...c.levelLabels.impact],
+        },
+        bands: c.bands.map((b) => ({ ...b })),
+    };
+}
+
+/**
+ * Resize a label array to the new dimension. Preserves existing
+ * labels at low indices, fills new tail entries with the numeric
+ * fallback ("6", "7", …) and drops trailing entries when shrinking.
+ */
+function resizeLabels(prev: string[], next: number): string[] {
+    if (prev.length === next) return prev;
+    if (prev.length > next) return prev.slice(0, next);
+    const out = [...prev];
+    for (let i = prev.length; i < next; i += 1) {
+        out.push(String(i + 1));
+    }
+    return out;
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+export function RiskMatrixAdminClient({
+    tenantSlug,
+    initialConfig,
+}: RiskMatrixAdminClientProps) {
+    const [config, setConfig] = useState<RiskMatrixConfigShape>(() =>
+        cloneConfig(initialConfig),
+    );
+    const [saving, setSaving] = useState(false);
+    const [serverError, setServerError] = useState<string | null>(null);
+
+    // Synthetic preview cells — every (L, I) carries one risk so the
+    // band colours light up across the whole matrix without needing
+    // real data.
+    const previewCells = useMemo(() => {
+        const cells: { likelihood: number; impact: number; count: number }[] = [];
+        for (let l = 1; l <= config.likelihoodLevels; l += 1) {
+            for (let i = 1; i <= config.impactLevels; i += 1) {
+                cells.push({ likelihood: l, impact: i, count: 1 });
+            }
+        }
+        return cells;
+    }, [config.likelihoodLevels, config.impactLevels]);
+
+    // ── Live validation ────────────────────────────────────────────
+    const validationIssues = useMemo(() => {
+        const issues: string[] = [];
+        issues.push(
+            ...validateLevelLabelsLength({
+                levelLabels: config.levelLabels,
+                likelihoodLevels: config.likelihoodLevels,
+                impactLevels: config.impactLevels,
+            }),
+        );
+        issues.push(
+            ...validateBandsCoverage(
+                config.bands,
+                config.likelihoodLevels * config.impactLevels,
+            ),
+        );
+        return issues;
+    }, [config]);
+
+    // ── Handlers ───────────────────────────────────────────────────
+    const setLikelihoodLevels = (n: number) => {
+        setConfig((p) => ({
+            ...p,
+            likelihoodLevels: n,
+            levelLabels: {
+                ...p.levelLabels,
+                likelihood: resizeLabels(p.levelLabels.likelihood, n),
+            },
+        }));
+    };
+    const setImpactLevels = (n: number) => {
+        setConfig((p) => ({
+            ...p,
+            impactLevels: n,
+            levelLabels: {
+                ...p.levelLabels,
+                impact: resizeLabels(p.levelLabels.impact, n),
+            },
+        }));
+    };
+
+    const setLikelihoodLabel = (idx: number, value: string) =>
+        setConfig((p) => ({
+            ...p,
+            levelLabels: {
+                ...p.levelLabels,
+                likelihood: p.levelLabels.likelihood.map((v, i) =>
+                    i === idx ? value : v,
+                ),
+            },
+        }));
+    const setImpactLabel = (idx: number, value: string) =>
+        setConfig((p) => ({
+            ...p,
+            levelLabels: {
+                ...p.levelLabels,
+                impact: p.levelLabels.impact.map((v, i) =>
+                    i === idx ? value : v,
+                ),
+            },
+        }));
+
+    const updateBand = (idx: number, patch: Partial<RiskMatrixBand>) =>
+        setConfig((p) => ({
+            ...p,
+            bands: p.bands.map((b, i) => (i === idx ? { ...b, ...patch } : b)),
+        }));
+    const addBand = () => {
+        setConfig((p) => {
+            const last = p.bands[p.bands.length - 1];
+            const max = p.likelihoodLevels * p.impactLevels;
+            const start = (last?.maxScore ?? 0) + 1;
+            if (start > max) {
+                toast.error('No score range left for another band.');
+                return p;
+            }
+            return {
+                ...p,
+                bands: [
+                    ...p.bands,
+                    {
+                        name: `Band ${p.bands.length + 1}`,
+                        minScore: start,
+                        maxScore: max,
+                        color: '#6b7280',
+                    },
+                ],
+            };
+        });
+    };
+    const removeBand = (idx: number) =>
+        setConfig((p) => ({
+            ...p,
+            bands: p.bands.filter((_, i) => i !== idx),
+        }));
+
+    const restoreDefaults = () => {
+        setConfig(cloneConfig(DEFAULT_RISK_MATRIX_CONFIG));
+        setServerError(null);
+    };
+
+    const save = useCallback(async () => {
+        if (validationIssues.length > 0) {
+            toast.error('Fix validation issues before saving.');
+            return;
+        }
+        setSaving(true);
+        setServerError(null);
+        try {
+            const res = await fetch(
+                `/api/t/${tenantSlug}/admin/risk-matrix-config`,
+                {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        likelihoodLevels: config.likelihoodLevels,
+                        impactLevels: config.impactLevels,
+                        axisLikelihoodLabel: config.axisLikelihoodLabel,
+                        axisImpactLabel: config.axisImpactLabel,
+                        levelLabels: config.levelLabels,
+                        bands: config.bands,
+                    }),
+                },
+            );
+            if (!res.ok) {
+                const body = (await res
+                    .json()
+                    .catch(() => ({}))) as { error?: string };
+                throw new Error(body.error || `Save failed (${res.status})`);
+            }
+            const next = (await res.json()) as RiskMatrixConfigShape;
+            setConfig(cloneConfig(next));
+            toast.success('Risk matrix configuration saved.');
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Save failed';
+            setServerError(msg);
+            toast.error(msg);
+        } finally {
+            setSaving(false);
+        }
+    }, [tenantSlug, config, validationIssues.length]);
+
+    // Re-sync if the prop ever changes (server-driven refresh).
+    useEffect(() => {
+        setConfig(cloneConfig(initialConfig));
+    }, [initialConfig]);
+
+    const totalCells = config.likelihoodLevels * config.impactLevels;
+
+    return (
+        <div
+            id="risk-matrix-admin"
+            data-testid="risk-matrix-admin"
+            className="animate-fadeIn space-y-6 p-6"
+        >
+            <header className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h1 className="text-2xl font-bold text-content-emphasis">
+                        Risk matrix configuration
+                    </h1>
+                    <p className="mt-1 text-sm text-content-muted">
+                        Tenant-scoped likelihood × impact dimensions, axis
+                        labels, and severity bands. Changes apply to every
+                        risk page in this tenant on save.
+                    </p>
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        id="risk-matrix-restore-defaults"
+                        onClick={restoreDefaults}
+                        disabled={saving}
+                    >
+                        Restore defaults
+                    </button>
+                    <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        id="risk-matrix-save-btn"
+                        onClick={save}
+                        disabled={saving || validationIssues.length > 0}
+                    >
+                        {saving ? 'Saving…' : 'Save changes'}
+                    </button>
+                </div>
+            </header>
+
+            {(validationIssues.length > 0 || serverError) && (
+                <div
+                    role="alert"
+                    className="rounded-lg border border-border-error bg-bg-error p-3 text-sm text-content-error"
+                    data-testid="risk-matrix-admin-error"
+                >
+                    {serverError && (
+                        <p className="font-medium">{serverError}</p>
+                    )}
+                    {validationIssues.length > 0 && (
+                        <ul className="list-inside list-disc">
+                            {validationIssues.map((issue, i) => (
+                                <li key={i}>{issue}</li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {/* ── Editor ─────────────────────────────────────── */}
+                <section className="space-y-6">
+                    {/* Dimensions */}
+                    <div className="glass-card space-y-4 p-5">
+                        <h2 className="text-sm font-semibold text-content-default">
+                            Dimensions
+                        </h2>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <label className="block">
+                                <span className="mb-1 block text-xs text-content-muted">
+                                    Likelihood levels
+                                </span>
+                                <NumberStepper
+                                    id="rm-likelihood-levels"
+                                    ariaLabel="Likelihood levels"
+                                    value={config.likelihoodLevels}
+                                    min={2}
+                                    max={10}
+                                    onChange={setLikelihoodLevels}
+                                />
+                            </label>
+                            <label className="block">
+                                <span className="mb-1 block text-xs text-content-muted">
+                                    Impact levels
+                                </span>
+                                <NumberStepper
+                                    id="rm-impact-levels"
+                                    ariaLabel="Impact levels"
+                                    value={config.impactLevels}
+                                    min={2}
+                                    max={10}
+                                    onChange={setImpactLevels}
+                                />
+                            </label>
+                        </div>
+                        <p className="text-xs text-content-subtle">
+                            Total cells: {totalCells}.
+                        </p>
+                    </div>
+
+                    {/* Axis titles */}
+                    <div className="glass-card space-y-4 p-5">
+                        <h2 className="text-sm font-semibold text-content-default">
+                            Axis titles
+                        </h2>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <label className="block">
+                                <span className="mb-1 block text-xs text-content-muted">
+                                    Likelihood axis title
+                                </span>
+                                <input
+                                    id="rm-axis-likelihood"
+                                    type="text"
+                                    className="input w-full"
+                                    maxLength={64}
+                                    value={config.axisLikelihoodLabel}
+                                    onChange={(e) =>
+                                        setConfig((p) => ({
+                                            ...p,
+                                            axisLikelihoodLabel: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </label>
+                            <label className="block">
+                                <span className="mb-1 block text-xs text-content-muted">
+                                    Impact axis title
+                                </span>
+                                <input
+                                    id="rm-axis-impact"
+                                    type="text"
+                                    className="input w-full"
+                                    maxLength={64}
+                                    value={config.axisImpactLabel}
+                                    onChange={(e) =>
+                                        setConfig((p) => ({
+                                            ...p,
+                                            axisImpactLabel: e.target.value,
+                                        }))
+                                    }
+                                />
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Per-level labels */}
+                    <div className="glass-card space-y-4 p-5">
+                        <h2 className="text-sm font-semibold text-content-default">
+                            Per-level labels
+                        </h2>
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <p className="mb-2 text-xs text-content-muted">
+                                    Likelihood
+                                </p>
+                                <div className="space-y-2">
+                                    {config.levelLabels.likelihood.map(
+                                        (label, idx) => (
+                                            <input
+                                                key={`l-${idx}`}
+                                                type="text"
+                                                className="input w-full text-sm"
+                                                maxLength={64}
+                                                value={label}
+                                                onChange={(e) =>
+                                                    setLikelihoodLabel(
+                                                        idx,
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                data-testid={`rm-label-likelihood-${idx}`}
+                                            />
+                                        ),
+                                    )}
+                                </div>
+                            </div>
+                            <div>
+                                <p className="mb-2 text-xs text-content-muted">
+                                    Impact
+                                </p>
+                                <div className="space-y-2">
+                                    {config.levelLabels.impact.map(
+                                        (label, idx) => (
+                                            <input
+                                                key={`i-${idx}`}
+                                                type="text"
+                                                className="input w-full text-sm"
+                                                maxLength={64}
+                                                value={label}
+                                                onChange={(e) =>
+                                                    setImpactLabel(
+                                                        idx,
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                data-testid={`rm-label-impact-${idx}`}
+                                            />
+                                        ),
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bands */}
+                    <div className="glass-card space-y-3 p-5">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-semibold text-content-default">
+                                Severity bands
+                            </h2>
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                id="rm-add-band-btn"
+                                onClick={addBand}
+                            >
+                                + Add band
+                            </button>
+                        </div>
+                        <p className="text-xs text-content-subtle">
+                            Bands must cover scores 1..{totalCells} without
+                            gaps or overlaps.
+                        </p>
+                        <ul className="space-y-2">
+                            {config.bands.map((band, idx) => (
+                                <li
+                                    key={`band-${idx}`}
+                                    className="grid grid-cols-12 items-center gap-2 rounded-md border border-border-default bg-bg-subtle p-2"
+                                    data-testid={`rm-band-row-${idx}`}
+                                >
+                                    <input
+                                        type="text"
+                                        className="input col-span-4 text-sm"
+                                        value={band.name}
+                                        onChange={(e) =>
+                                            updateBand(idx, {
+                                                name: e.target.value,
+                                            })
+                                        }
+                                        aria-label={`Band ${idx + 1} name`}
+                                        data-testid={`rm-band-name-${idx}`}
+                                    />
+                                    <input
+                                        type="number"
+                                        className="input col-span-2 text-sm tabular-nums"
+                                        value={band.minScore}
+                                        min={1}
+                                        max={totalCells}
+                                        onChange={(e) =>
+                                            updateBand(idx, {
+                                                minScore: Number(e.target.value),
+                                            })
+                                        }
+                                        aria-label={`Band ${idx + 1} min score`}
+                                        data-testid={`rm-band-min-${idx}`}
+                                    />
+                                    <input
+                                        type="number"
+                                        className="input col-span-2 text-sm tabular-nums"
+                                        value={band.maxScore}
+                                        min={1}
+                                        max={totalCells}
+                                        onChange={(e) =>
+                                            updateBand(idx, {
+                                                maxScore: Number(e.target.value),
+                                            })
+                                        }
+                                        aria-label={`Band ${idx + 1} max score`}
+                                        data-testid={`rm-band-max-${idx}`}
+                                    />
+                                    <input
+                                        type="color"
+                                        className="col-span-2 h-9 w-full cursor-pointer rounded border border-border-default bg-transparent"
+                                        value={
+                                            // <input type="color"> only
+                                            // accepts 6-digit hex.
+                                            band.color.length === 7
+                                                ? band.color
+                                                : '#888888'
+                                        }
+                                        onChange={(e) =>
+                                            updateBand(idx, {
+                                                color: e.target.value,
+                                            })
+                                        }
+                                        aria-label={`Band ${idx + 1} colour`}
+                                        data-testid={`rm-band-color-${idx}`}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary btn-sm col-span-2"
+                                        onClick={() => removeBand(idx)}
+                                        aria-label={`Remove band ${idx + 1}`}
+                                        data-testid={`rm-band-remove-${idx}`}
+                                        disabled={config.bands.length <= 1}
+                                    >
+                                        Remove
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </section>
+
+                {/* ── Live preview ───────────────────────────────── */}
+                <aside className="space-y-2">
+                    <h2 className="text-sm font-semibold text-content-default">
+                        Preview
+                    </h2>
+                    <p className="text-xs text-content-muted">
+                        Synthetic 1-risk-per-cell payload — colour bands +
+                        axis labels reflect the current draft.
+                    </p>
+                    <RiskMatrix
+                        config={config}
+                        cells={previewCells}
+                        title="Preview"
+                        showSwapToggle={false}
+                        data-testid="risk-matrix-admin-preview"
+                    />
+                </aside>
+            </div>
+        </div>
+    );
+}

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { getExecutiveDashboard } from '@/app-layer/usecases/dashboard';
+import { getRiskMatrixConfig } from '@/app-layer/usecases/risk-matrix-config';
 import { getComplianceTrends, type TrendPayload } from '@/app-layer/usecases/compliance-trends';
 import {
     ShieldCheck,
@@ -22,7 +23,7 @@ import ProgressCard from '@/components/ui/ProgressCard';
 import DonutChart from '@/components/ui/DonutChart';
 import { TrendCard } from '@/components/ui/TrendCard';
 import StatusBreakdown from '@/components/ui/StatusBreakdown';
-import RiskHeatmap from '@/components/ui/RiskHeatmap';
+import { RiskMatrix } from '@/components/ui/RiskMatrix';
 import ExpiryCalendar from '@/components/ui/ExpiryCalendar';
 import RecentActivityCard from './RecentActivityCard';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -52,7 +53,10 @@ export default async function DashboardPage({
         getTenantCtx({ tenantSlug }),
     ]);
 
-    const exec = await getExecutiveDashboard(ctx);
+    const [exec, matrixConfig] = await Promise.all([
+        getExecutiveDashboard(ctx),
+        getRiskMatrixConfig(ctx),
+    ]);
     const href = (path: string) => `/t/${tenantSlug}${path}`;
 
     return (
@@ -97,9 +101,19 @@ export default async function DashboardPage({
 
             {/* ─── Risk Heatmap + Evidence Expiry ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <RiskHeatmap
+                {/*
+                  Epic 44 — `<RiskMatrix>` replaces the legacy
+                  `<RiskHeatmap>`. Reads dimensions + axis labels +
+                  bands from the tenant's `RiskMatrixConfig`. Tenants
+                  that haven't customised resolve to the canonical
+                  5×5 default — visual parity with the prior heatmap
+                  preserved through the band's hex colours.
+                */}
+                <RiskMatrix
                     id="risk-heatmap"
+                    config={matrixConfig}
                     cells={exec.riskHeatmap}
+                    showSwapToggle={false}
                 />
                 <ExpiryCalendar
                     id="expiry-calendar"

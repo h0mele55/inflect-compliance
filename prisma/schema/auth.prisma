@@ -117,6 +117,7 @@ model Tenant {
   riskControls              RiskControl[]
   riskSuggestionItems       RiskSuggestionItem[]
   riskSuggestionSessions    RiskSuggestionSession[]
+  riskMatrixConfig          RiskMatrixConfig?
   tasks                     Task[]
   taskComments              TaskComment[]
   taskLinks                 TaskLink[]
