@@ -1054,6 +1054,71 @@ function PendingInvitesSection({ orgSlug, invites, onMutate }: PendingInvitesSec
         [orgSlug, onMutate],
     );
 
+    const inviteColumns = useMemo(
+        () =>
+            createColumns<PendingInviteRow>([
+                {
+                    id: 'email',
+                    header: 'Email',
+                    cell: ({ row }) => (
+                        <span className="text-sm text-content-default">
+                            {row.original.email}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'role',
+                    header: 'Role',
+                    cell: ({ row }) => (
+                        <StatusBadge variant={ROLE_VARIANT[row.original.role]}>
+                            {ROLE_LABEL[row.original.role]}
+                        </StatusBadge>
+                    ),
+                },
+                {
+                    id: 'invitedBy',
+                    header: 'Invited by',
+                    cell: ({ row }) => (
+                        <span className="text-xs text-content-muted">
+                            {row.original.invitedBy?.name ??
+                                row.original.invitedBy?.email ??
+                                '—'}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'expiresAt',
+                    header: 'Expires',
+                    cell: ({ row }) => (
+                        <span className="text-xs text-content-subtle tabular-nums">
+                            {formatDate(row.original.expiresAt)}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'actions',
+                    header: '',
+                    cell: ({ row }) => (
+                        <div className="flex justify-end">
+                            <Tooltip content={`Revoke invite for ${row.original.email}`}>
+                                <button
+                                    type="button"
+                                    disabled={revokingId === row.original.id}
+                                    onClick={() => revoke(row.original.id)}
+                                    className="btn btn-ghost btn-sm text-content-error"
+                                    data-testid={`org-invite-revoke-${row.original.id}`}
+                                >
+                                    <X className="size-3.5" aria-hidden="true" />
+                                    {revokingId === row.original.id ? 'Revoking…' : 'Revoke'}
+                                </button>
+                            </Tooltip>
+                        </div>
+                    ),
+                },
+            ]),
+        [revokingId, revoke],
+    );
+
     return (
         <div className="mt-8" data-testid="org-pending-invites-section">
             <h2 className="text-lg font-semibold text-content-emphasis mb-2">
@@ -1071,61 +1136,13 @@ function PendingInvitesSection({ orgSlug, invites, onMutate }: PendingInvitesSec
                     {error}
                 </p>
             )}
-            <div className="overflow-hidden rounded-lg border border-border-subtle">
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Invited by</th>
-                            <th>Expires</th>
-                            <th aria-label="Actions" />
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {invites.map((inv) => (
-                            <tr key={inv.id} data-testid={`org-invite-row-${inv.id}`}>
-                                <td>
-                                    <span className="text-sm text-content-default">
-                                        {inv.email}
-                                    </span>
-                                </td>
-                                <td>
-                                    <StatusBadge variant={ROLE_VARIANT[inv.role]}>
-                                        {ROLE_LABEL[inv.role]}
-                                    </StatusBadge>
-                                </td>
-                                <td>
-                                    <span className="text-xs text-content-muted">
-                                        {inv.invitedBy?.name ??
-                                            inv.invitedBy?.email ??
-                                            '—'}
-                                    </span>
-                                </td>
-                                <td>
-                                    <span className="text-xs text-content-subtle tabular-nums">
-                                        {formatDate(inv.expiresAt)}
-                                    </span>
-                                </td>
-                                <td className="text-right">
-                                    <Tooltip content={`Revoke invite for ${inv.email}`}>
-                                        <button
-                                            type="button"
-                                            disabled={revokingId === inv.id}
-                                            onClick={() => revoke(inv.id)}
-                                            className="btn btn-ghost btn-sm text-content-error"
-                                            data-testid={`org-invite-revoke-${inv.id}`}
-                                        >
-                                            <X className="size-3.5" aria-hidden="true" />
-                                            {revokingId === inv.id ? 'Revoking…' : 'Revoke'}
-                                        </button>
-                                    </Tooltip>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+            <DataTable<PendingInviteRow>
+                data={invites}
+                columns={inviteColumns}
+                getRowId={(r) => r.id}
+                resourceName={(plural) => (plural ? 'invitations' : 'invitation')}
+                data-testid="org-pending-invites-table"
+            />
         </div>
     );
 }
