@@ -185,6 +185,16 @@ const jsdomProject = {
         '^@/env$': '<rootDir>/tests/mocks/env.ts',
         '^@/(.*)$': '<rootDir>/src/$1',
         '^@dub/utils$': '<rootDir>/tests/rendered/dub-utils-mock.ts',
+        // Epic 41 — react-grid-layout uses the package `exports` field
+        // to map `react-grid-layout/legacy` → `dist/legacy.js`. Jest's
+        // CJS resolver doesn't honour subpath exports under all
+        // tsconfigs, so map the subpath to the resolved file directly.
+        '^react-grid-layout/legacy$':
+            '<rootDir>/node_modules/react-grid-layout/dist/legacy.js',
+        '^react-grid-layout/css/styles\\.css$':
+            '<rootDir>/tests/rendered/style-mock.ts',
+        '^react-resizable/css/styles\\.css$':
+            '<rootDir>/tests/rendered/style-mock.ts',
         // Pass-through stub for render tests that transitively touch the
         // Tooltip primitive through Button / Switch / StatusBadge (all of
         // which import it via `./tooltip`). Radix Tooltip requires a
@@ -243,6 +253,10 @@ const jsdomProject = {
             '@visx/[^/]+|' +
             'd3-[^/]+|' +
             'internmap|delaunator|robust-predicates|' +
+            // Epic 41 — react-grid-layout v2 ships ESM at the main
+            // entry. Allow it through transform so the legacy
+            // wrapper used by `<DashboardGrid>` resolves under jsdom.
+            'react-grid-layout|react-resizable|react-draggable|' +
             // NextAuth v5 ships as ESM. The edge/node auth split
             // makes middleware.ts directly `import NextAuth from
             // "next-auth"`, so any unit/integration test that

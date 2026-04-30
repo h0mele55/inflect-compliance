@@ -1,0 +1,515 @@
+"use client";
+
+/**
+ * Epic 41 — `<WidgetPicker>` modal.
+ *
+ * Production-grade picker for adding new widgets to the org-level
+ * dashboard. Built from existing Inflect primitives — Modal,
+ * RadioGroup, FormField, Input, NumberStepper — so the visual
+ * language matches every other create flow in the app (no bespoke
+ * overlay, no one-off form chrome).
+ *
+ * Flow:
+ *
+ *   1. Open the modal via `open` / `onOpenChange` (parent controls
+ *      lifecycle so the trigger button + the dialog stay decoupled).
+ *
+ *   2. The user picks a widget TYPE (radio group: KPI / DONUT / TREND /
+ *      TENANT_LIST / DRILLDOWN_CTAS).
+ *
+ *   3. The form re-derives valid CHART VARIANT options + the per-type
+ *      CONFIG inputs (e.g. KPI gets `format` + `chartType` choice; TREND
+ *      gets a `days` stepper). The variant set + config defaults match
+ *      the Zod schema in `org-dashboard-widget.schemas.ts` exactly so
+ *      the POST round-trip never 400s on a default value.
+ *
+ *   4. The user can optionally set a custom TITLE (defaults to a
+ *      human-readable label derived from the variant when blank).
+ *
+ *   5. Submit → caller's `onSubmit(input)` → modal closes on success
+ *      and fires `onCreated(widget)` so the parent can append the new
+ *      widget to its grid state.
+ *
+ * The picker does NOT decide where the new widget goes on the grid —
+ * `react-grid-layout`'s vertical compactor places new tiles at the
+ * top of the dashboard automatically, and the picker emits a default
+ * `(x, y)` of `(0, 0)` plus a per-type sensible `(w, h)`. Re-arrange
+ * is the existing drag affordance.
+ *
+ * Errors surface inline via the standard `<FormError>` slot beneath
+ * the submit row; the modal stays open so the user can correct the
+ * field that failed.
+ */
+
+import { useMemo, useState } from 'react';
+
+import { Modal } from '@/components/ui/modal';
+import { FormField } from '@/components/ui/form-field';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+
+import type {
+    CreateOrgDashboardWidgetInput,
+    OrgDashboardWidgetDto,
+    WidgetPosition,
+    WidgetSize,
+} from '@/app-layer/schemas/org-dashboard-widget.schemas';
+
+// ─── Variant catalogues ─────────────────────────────────────────────
+//
+// Each catalogue mirrors the Zod discriminated union in
+// `org-dashboard-widget.schemas.ts`. A dropdown / stepper / checkbox
+// here ALWAYS emits a value the schema accepts — that's the picker's
+// load-bearing invariant. If the schema gains a new variant, this
+// catalogue is the single edit alongside the renderer's switch arm.
+
+type WidgetTypeKey =
+    | 'KPI'
+    | 'DONUT'
+    | 'TREND'
+    | 'TENANT_LIST'
+    | 'DRILLDOWN_CTAS';
+
+interface WidgetTypeOption {
+    type: WidgetTypeKey;
+    label: string;
+    description: string;
+    /** Default `(w, h)` for newly-created widgets of this type. */
+    defaultSize: WidgetSize;
+    /** Default chartType for the dropdown initial value. */
+    defaultChartType: string;
+}
+
+const WIDGET_TYPES: ReadonlyArray<WidgetTypeOption> = [
+    {
+        type: 'KPI',
+        label: 'KPI tile',
+        description: 'Single number with label and optional sparkline.',
+        defaultSize: { w: 3, h: 2 },
+        defaultChartType: 'coverage',
+    },
+    {
+        type: 'DONUT',
+        label: 'Donut breakdown',
+        description: 'Distribution across labelled segments (e.g. RAG).',
+        defaultSize: { w: 4, h: 4 },
+        defaultChartType: 'rag-distribution',
+    },
+    {
+        type: 'TREND',
+        label: 'Trend chart',
+        description: 'Time-series area or bar chart over a window.',
+        defaultSize: { w: 6, h: 3 },
+        defaultChartType: 'risks-open',
+    },
+    {
+        type: 'TENANT_LIST',
+        label: 'Tenant coverage',
+        description: 'Per-tenant coverage list with drill-down rows.',
+        defaultSize: { w: 12, h: 6 },
+        defaultChartType: 'coverage',
+    },
+    {
+        type: 'DRILLDOWN_CTAS',
+        label: 'Drill-down CTAs',
+        description: 'Navigation cards into controls / risks / evidence.',
+        defaultSize: { w: 12, h: 2 },
+        defaultChartType: 'default',
+    },
+];
+
+const CHART_TYPE_OPTIONS: Record<WidgetTypeKey, ReadonlyArray<{ value: string; label: string }>> = {
+    KPI: [
+        { value: 'coverage', label: 'Coverage' },
+        { value: 'critical-risks', label: 'Critical risks' },
+        { value: 'overdue-evidence', label: 'Overdue evidence' },
+        { value: 'tenants', label: 'Tenants' },
+    ],
+    DONUT: [
+        { value: 'rag-distribution', label: 'RAG distribution' },
+    ],
+    TREND: [
+        { value: 'risks-open', label: 'Open risks' },
+        { value: 'controls-coverage', label: 'Controls coverage' },
+        { value: 'evidence-overdue', label: 'Overdue evidence' },
+    ],
+    TENANT_LIST: [
+        { value: 'coverage', label: 'Coverage' },
+    ],
+    DRILLDOWN_CTAS: [
+        { value: 'default', label: 'Default (controls / risks / evidence)' },
+    ],
+};
+
+function defaultConfigFor(
+    type: WidgetTypeKey,
+    chartType: string,
+): Record<string, unknown> {
+    switch (type) {
+        case 'KPI':
+            return { format: chartType === 'coverage' ? 'percent' : 'number' };
+        case 'DONUT':
+            return { showLegend: true };
+        case 'TREND':
+            return { days: 90 };
+        case 'TENANT_LIST':
+            return { sortBy: 'rag' };
+        case 'DRILLDOWN_CTAS':
+            return {};
+    }
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+export interface WidgetPickerProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    /**
+     * Caller's persistence callback. Resolves with the persisted
+     * widget so the parent can append it to its grid state.
+     */
+    onSubmit: (
+        input: CreateOrgDashboardWidgetInput,
+    ) => Promise<OrgDashboardWidgetDto>;
+    /**
+     * Fired after `onSubmit` resolves successfully. The picker closes
+     * itself; the parent can refresh local state from this hook.
+     */
+    onCreated?: (widget: OrgDashboardWidgetDto) => void;
+    /**
+     * Default top-left position for the new widget. The vertical
+     * compactor will adjust based on existing rows; the picker just
+     * provides a sane starting point. Default `(0, 0)`.
+     */
+    defaultPosition?: WidgetPosition;
+}
+
+export function WidgetPicker({
+    open,
+    onOpenChange,
+    onSubmit,
+    onCreated,
+    defaultPosition = { x: 0, y: 0 },
+}: WidgetPickerProps) {
+    const [type, setType] = useState<WidgetTypeKey>('KPI');
+    const [chartType, setChartType] = useState<string>('coverage');
+    const [title, setTitle] = useState<string>('');
+    const [days, setDays] = useState<number>(90);
+    const [showLegend, setShowLegend] = useState<boolean>(true);
+    const [kpiFormat, setKpiFormat] = useState<'number' | 'percent'>(
+        'percent',
+    );
+    const [tenantSort, setTenantSort] = useState<'rag' | 'name' | 'coverage'>(
+        'rag',
+    );
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const meta = useMemo(
+        () => WIDGET_TYPES.find((w) => w.type === type) ?? WIDGET_TYPES[0],
+        [type],
+    );
+    const variants = CHART_TYPE_OPTIONS[type];
+
+    // Reset form when modal toggles closed → open transitions are
+    // discoverable. We don't want a half-filled prior session
+    // resurfacing on the next open.
+    function resetState() {
+        setType('KPI');
+        setChartType('coverage');
+        setTitle('');
+        setDays(90);
+        setShowLegend(true);
+        setKpiFormat('percent');
+        setTenantSort('rag');
+        setError(null);
+        setSubmitting(false);
+    }
+
+    function handleTypeChange(next: string) {
+        const nextType = next as WidgetTypeKey;
+        setType(nextType);
+        const m = WIDGET_TYPES.find((w) => w.type === nextType);
+        if (m) setChartType(m.defaultChartType);
+        setError(null);
+    }
+
+    function buildConfig(): Record<string, unknown> {
+        const base = defaultConfigFor(type, chartType);
+        switch (type) {
+            case 'KPI':
+                return { ...base, format: kpiFormat };
+            case 'TREND':
+                return { ...base, days };
+            case 'DONUT':
+                return { ...base, showLegend };
+            case 'TENANT_LIST':
+                return { ...base, sortBy: tenantSort };
+            case 'DRILLDOWN_CTAS':
+                return base;
+        }
+    }
+
+    async function handleSubmit() {
+        if (submitting) return;
+        setSubmitting(true);
+        setError(null);
+        try {
+            const input = {
+                type,
+                chartType,
+                config: buildConfig(),
+                title: title.trim().length > 0 ? title.trim() : null,
+                position: defaultPosition,
+                size: meta.defaultSize,
+                enabled: true,
+            } as CreateOrgDashboardWidgetInput;
+            const widget = await onSubmit(input);
+            onCreated?.(widget);
+            onOpenChange(false);
+            resetState();
+        } catch (e) {
+            setError(
+                e instanceof Error
+                    ? e.message
+                    : 'Could not create widget. Please retry.',
+            );
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    return (
+        <Modal
+            showModal={open}
+            setShowModal={(next) => {
+                // Modal's setShowModal accepts SetStateAction<boolean>;
+                // resolve the optional updater form into a concrete
+                // boolean before forwarding to the controlled callback.
+                const resolved = typeof next === 'function' ? next(open) : next;
+                onOpenChange(resolved);
+                if (!resolved) resetState();
+            }}
+        >
+            <Modal.Header
+                title="Add widget"
+                description="Pick a widget type and a data variant. You can rearrange and resize after it lands."
+            />
+            <Modal.Body>
+                <div className="space-y-5">
+                    {/* ── Step 1: type ── */}
+                    <FormField
+                        label="Widget type"
+                        description="What kind of visualization do you want?"
+                    >
+                        <RadioGroup
+                            value={type}
+                            onValueChange={handleTypeChange}
+                            data-testid="widget-picker-type"
+                        >
+                            {WIDGET_TYPES.map((opt) => (
+                                <div
+                                    key={opt.type}
+                                    className="flex items-start gap-3 rounded-md border border-border-subtle p-3 hover:border-border-default"
+                                >
+                                    <RadioGroupItem
+                                        value={opt.type}
+                                        id={`widget-type-${opt.type}`}
+                                        aria-label={opt.label}
+                                    />
+                                    <div className="min-w-0">
+                                        <Label
+                                            htmlFor={`widget-type-${opt.type}`}
+                                            className="text-sm font-medium text-content-emphasis cursor-pointer"
+                                        >
+                                            {opt.label}
+                                        </Label>
+                                        <p className="text-xs text-content-muted mt-0.5">
+                                            {opt.description}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </RadioGroup>
+                    </FormField>
+
+                    {/* ── Step 2: chart variant ── */}
+                    <FormField
+                        label="Data source"
+                        description={
+                            type === 'TREND'
+                                ? 'Which metric should the chart track?'
+                                : 'Which slice of org data should this widget show?'
+                        }
+                    >
+                        <select
+                            value={chartType}
+                            onChange={(e) => setChartType(e.target.value)}
+                            data-testid="widget-picker-chart-type"
+                            className="block w-full rounded-md border border-border-default bg-bg-default px-3 py-2 text-sm text-content-emphasis focus:outline-none focus:ring-2 focus:ring-ring"
+                        >
+                            {variants.map((v) => (
+                                <option key={v.value} value={v.value}>
+                                    {v.label}
+                                </option>
+                            ))}
+                        </select>
+                    </FormField>
+
+                    {/* ── Step 3: per-type config ── */}
+                    {type === 'KPI' && (
+                        <FormField
+                            label="Format"
+                            description="How the headline number is rendered."
+                        >
+                            <RadioGroup
+                                value={kpiFormat}
+                                onValueChange={(v) =>
+                                    setKpiFormat(v as 'number' | 'percent')
+                                }
+                                data-testid="widget-picker-kpi-format"
+                                className="flex gap-4"
+                            >
+                                {[
+                                    { value: 'number', label: 'Number' },
+                                    { value: 'percent', label: 'Percent' },
+                                ].map((opt) => (
+                                    <div
+                                        key={opt.value}
+                                        className="flex items-center gap-2"
+                                    >
+                                        <RadioGroupItem
+                                            value={opt.value}
+                                            id={`kpi-format-${opt.value}`}
+                                            aria-label={opt.label}
+                                        />
+                                        <Label
+                                            htmlFor={`kpi-format-${opt.value}`}
+                                            className="text-sm cursor-pointer"
+                                        >
+                                            {opt.label}
+                                        </Label>
+                                    </div>
+                                ))}
+                            </RadioGroup>
+                        </FormField>
+                    )}
+
+                    {type === 'TREND' && (
+                        <FormField
+                            label="Window (days)"
+                            description="History length for the trend chart. Min 7, max 365."
+                        >
+                            <input
+                                type="number"
+                                min={7}
+                                max={365}
+                                step={1}
+                                value={days}
+                                onChange={(e) => {
+                                    const next = Number.parseInt(
+                                        e.target.value,
+                                        10,
+                                    );
+                                    if (Number.isFinite(next)) setDays(next);
+                                }}
+                                data-testid="widget-picker-trend-days"
+                                className="block w-full rounded-md border border-border-default bg-bg-default px-3 py-2 text-sm text-content-emphasis focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                        </FormField>
+                    )}
+
+                    {type === 'DONUT' && (
+                        <FormField label="Options">
+                            <label className="flex items-center gap-2 text-sm text-content-emphasis">
+                                <input
+                                    type="checkbox"
+                                    checked={showLegend}
+                                    onChange={(e) =>
+                                        setShowLegend(e.target.checked)
+                                    }
+                                    data-testid="widget-picker-donut-legend"
+                                    className="size-4 rounded border-border-default focus:ring-ring"
+                                />
+                                Show legend below the chart
+                            </label>
+                        </FormField>
+                    )}
+
+                    {type === 'TENANT_LIST' && (
+                        <FormField
+                            label="Sort by"
+                            description="How tenants are ordered in the list."
+                        >
+                            <select
+                                value={tenantSort}
+                                onChange={(e) =>
+                                    setTenantSort(
+                                        e.target.value as
+                                            | 'rag'
+                                            | 'name'
+                                            | 'coverage',
+                                    )
+                                }
+                                data-testid="widget-picker-tenant-sort"
+                                className="block w-full rounded-md border border-border-default bg-bg-default px-3 py-2 text-sm text-content-emphasis focus:outline-none focus:ring-2 focus:ring-ring"
+                            >
+                                <option value="rag">RAG (worst first)</option>
+                                <option value="name">Name (alphabetical)</option>
+                                <option value="coverage">Coverage</option>
+                            </select>
+                        </FormField>
+                    )}
+
+                    {/* ── Step 4: title (optional) ── */}
+                    <FormField
+                        label="Title"
+                        description="Leave blank to use the default title for this variant."
+                    >
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            maxLength={120}
+                            placeholder={meta.label}
+                            data-testid="widget-picker-title"
+                            className="block w-full rounded-md border border-border-default bg-bg-default px-3 py-2 text-sm text-content-emphasis placeholder:text-content-subtle focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                    </FormField>
+
+                    {error && (
+                        <div
+                            role="alert"
+                            data-testid="widget-picker-error"
+                            className="rounded-md border border-border-error bg-bg-error/10 px-3 py-2 text-sm text-content-error"
+                        >
+                            {error}
+                        </div>
+                    )}
+                </div>
+            </Modal.Body>
+            <Modal.Actions>
+                <button
+                    type="button"
+                    onClick={() => onOpenChange(false)}
+                    className="btn btn-secondary btn-sm"
+                    data-testid="widget-picker-cancel"
+                    disabled={submitting}
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        void handleSubmit();
+                    }}
+                    className="btn btn-primary btn-sm"
+                    data-testid="widget-picker-submit"
+                    disabled={submitting}
+                >
+                    {submitting ? 'Adding…' : 'Add widget'}
+                </button>
+            </Modal.Actions>
+        </Modal>
+    );
+}
