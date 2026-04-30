@@ -704,6 +704,71 @@ detail-page sub-tables / wizards (risks/import) where viewport-
 clamping doesn't fit. See `docs/epic-52-list-page-shell.md` for the
 decision tree.
 
+### Entity-page architecture (`EntityListPage` + `EntityDetailLayout`)
+
+Two composition shells live in `src/components/layout/` —
+`EntityListPage` (list pages) and `EntityDetailLayout` (detail
+pages). Both carry **layout, not business content**. Reach for them
+whenever you build a new entity page; never re-introduce the inline
+`<ListPageShell> + <FilterToolbar> + <DataTable>` block or the
+inline back-link / title / tab-bar / loading-skeleton dance.
+
+```tsx
+// List page — controls reference impl: ControlsClient.tsx
+<EntityListPage<Row>
+  header={{ title, count, actions }}
+  filters={{ defs, searchId, searchPlaceholder, toolbarActions }}
+  table={{ data, columns, getRowId, onRowClick, emptyState, … }}
+>
+  {/* page-level modals/sheets sit as children */}
+</EntityListPage>
+
+// Detail page — controls reference impl: controls/[controlId]/page.tsx
+<EntityDetailLayout
+  back={{ href, label }}
+  title={…}
+  meta={…}
+  actions={…}
+  loading={…}
+  error={…}
+  empty={…}
+  tabs={…}
+  activeTab={…}
+  onTabChange={…}
+>
+  {/* active-tab content owned by the page */}
+</EntityDetailLayout>
+```
+
+The shells are reusable; the pages stay opinionated. Column defs,
+filter defs (including runtime-derived options), data fetching,
+mutations, optimistic updates, modals, sheets, permission gates,
+and domain-specific tab bodies (e.g. `TraceabilityPanel`,
+`LinkedTasksPanel`, `TestPlansPanel`) all stay in the page.
+
+**When NOT to reach for these shells.**
+
+  - Multi-section dashboards (already in the Epic 52 `EXEMPTIONS`
+    list — Coverage, admin/api-keys, admin/notifications,
+    admin/integrations).
+  - Wizards / multi-step flows where the page isn't a single list or
+    detail (risks/import).
+  - Sub-tables nested inside a detail tab — `<DataTable>` directly
+    is the right primitive there, not `<EntityListPage>`.
+
+**Adoption ratchet.** Each adoption is locked by a structural test
+that asserts the page mounts the shell and doesn't hand-roll the
+inline composition: `controls-client-shell-adoption.test.ts` (list)
+and `control-detail-shell-adoption.test.ts` (detail). When you
+migrate a new entity page (risks / policies / vendors / audits /
+…), add a sibling `*-shell-adoption.test.ts` next to the existing
+two — same shape, same regression-class lock.
+
+See `docs/implementation-notes/2026-04-30-entity-page-architecture.md`
+for the unified architecture rationale and
+`docs/implementation-notes/2026-04-30-entity-detail-layout-extraction.md`
+for the detail-shell extraction.
+
 ### Epic 53 — Enterprise Filter System
 
 Use `FilterToolbar` + `FilterProvider` + `useFilterContext` from
