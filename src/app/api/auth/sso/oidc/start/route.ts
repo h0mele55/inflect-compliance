@@ -11,7 +11,13 @@ import {
 } from '@/lib/security/oidc-client';
 import { ssoLog, generateSsoRequestId, redactSsoUrl } from '@/lib/security/sso-logging';
 import { env } from '@/env';
-import { jsonResponse } from '@/lib/api-response';
+import { withApiErrorHandling } from '@/lib/errors/api';
+import {
+    badRequest,
+    notFound,
+    configurationError,
+    externalServiceError,
+} from '@/lib/errors/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,8 +25,12 @@ export const dynamic = 'force-dynamic';
  * GET /api/auth/sso/oidc/start?tenant=<tenantSlug>&provider=<providerId>&returnTo=<path>
  *
  * Initiates the OIDC authorization flow for a tenant-scoped IdP.
+ *
+ * Epic E — Standardized error contract via withApiErrorHandling. Failures
+ * (missing params, unknown tenant/provider, broken config, IdP unreachable)
+ * surface as ApiErrorResponse JSON, not bespoke `{error: '...'}` bodies.
  */
-export async function GET(req: NextRequest) {
+export const GET = withApiErrorHandling(async (req: NextRequest) => {
     const requestId = generateSsoRequestId();
     const { searchParams } = req.nextUrl;
     const tenantSlug = searchParams.get('tenant');
@@ -32,10 +42,7 @@ export async function GET(req: NextRequest) {
         ssoLog('warn', 'Missing required parameters', {
             requestId, stage: 'start', providerType: 'OIDC',
         });
-        return jsonResponse(
-            { error: 'Missing required parameters: tenant and provider' },
-            { status: 400 }
-        );
+        throw badRequest('Missing required parameters: tenant and provider');
     }
 
     const logCtx = { requestId, tenantSlug, providerType: 'OIDC' as const, providerId };
@@ -50,7 +57,7 @@ export async function GET(req: NextRequest) {
 
     if (!tenant) {
         ssoLog('warn', 'Tenant not found', { ...logCtx, stage: 'start' });
-        return jsonResponse({ error: 'Tenant not found' }, { status: 404 });
+        throw notFound('Tenant not found');
     }
 
     // ── Load provider config ──
@@ -65,10 +72,7 @@ export async function GET(req: NextRequest) {
 
     if (!provider) {
         ssoLog('warn', 'Provider not found or disabled', { ...logCtx, stage: 'config_load' });
-        return jsonResponse(
-            { error: 'OIDC provider not found or not enabled' },
-            { status: 404 }
-        );
+        throw notFound('OIDC provider not found or not enabled');
     }
 
     // ── Parse OIDC config ──
@@ -78,10 +82,7 @@ export async function GET(req: NextRequest) {
             ...logCtx, stage: 'config_load',
             meta: { validationError: configResult.error.message },
         });
-        return jsonResponse(
-            { error: 'SSO configuration error' },
-            { status: 500 }
-        );
+        throw configurationError('SSO configuration error');
     }
     const oidcConfig = configResult.data;
 
@@ -95,10 +96,7 @@ export async function GET(req: NextRequest) {
             ...logCtx, stage: 'discovery',
             meta: { error: (err as Error).message },
         });
-        return jsonResponse(
-            { error: 'Failed to contact identity provider' },
-            { status: 502 }
-        );
+        throw externalServiceError('Failed to contact identity provider');
     }
 
     // ── Generate PKCE + state ──
@@ -134,4 +132,4 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.redirect(authUrl);
-}
+});

@@ -24,12 +24,16 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/env';
+import { withApiErrorHandling } from '@/lib/errors/api';
 
-export async function GET(
+// Epic E — wrapped for x-request-id + standardized error contract.
+// The redirect itself is the success contract (any AppError thrown
+// inside would surface as a normal JSON 4xx/5xx, not the redirect).
+export const GET = withApiErrorHandling(async (
     req: NextRequest,
-    ctx: { params: Promise<{ token: string }> },
-): Promise<NextResponse> {
-    const { token } = await ctx.params;
+    ctx: { params: { token: string } },
+): Promise<NextResponse> => {
+    const { token } = ctx.params;
 
     const response = NextResponse.redirect(
         new URL('/login', req.nextUrl.origin),
@@ -44,4 +48,4 @@ export async function GET(
     });
 
     return response;
-}
+});
