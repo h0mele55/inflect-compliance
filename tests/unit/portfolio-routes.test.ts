@@ -61,6 +61,7 @@ const adminCtx = {
         canExportReports: true,
         canManageTenants: true,
         canManageMembers: true,
+            canConfigureDashboard: true,
     },
 };
 const readerCtx = {
@@ -72,6 +73,7 @@ const readerCtx = {
         canExportReports: true,
         canManageTenants: false,
         canManageMembers: false,
+            canConfigureDashboard: false,
     },
 };
 
