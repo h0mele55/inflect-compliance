@@ -51,6 +51,65 @@ model AuditLog {
   @@index([tenantId, entryHash])
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Epic B — Org Audit Trail & Compliance Integrity (SOC 2 CC6.1)
+//
+// Immutable, hash-chained ledger for org-level privilege changes.
+// Distinct from AuditLog because:
+//   • org events are NOT tenant-scoped — AuditLog requires tenantId
+//     and uses a per-tenant chain anchored on
+//     pg_advisory_xact_lock(hashtext(tenantId)). Forcing tenantId
+//     nullable to host org events would break the load-bearing
+//     chain semantics, the audit-stream batching, and the tenant
+//     RLS policies on AuditLog.
+//   • org chain is per-organization (one chain per org), keyed
+//     independently from tenant chains.
+//
+// Append-only:
+//   • DB trigger forbids UPDATE/DELETE (mirrors AuditLog).
+//   • REVOKE UPDATE,DELETE FROM app_user; GRANT SELECT,INSERT.
+//
+// Hash chain:
+//   • SHA-256(canonical(actorType, actorUserId, action, detailsJson,
+//     occurredAt, organizationId, previousHash, targetUserId, version))
+//   • previousHash links to entryHash of the prior row in this org's
+//     chain. First entry per org has previousHash = null.
+//
+// Action taxonomy (OrgAuditAction enum):
+//   ORG_MEMBER_ADDED                   — addOrgMember
+//   ORG_MEMBER_REMOVED                 — removeOrgMember
+//   ORG_MEMBER_ROLE_CHANGED            — changeOrgMemberRole
+//   ORG_ADMIN_PROVISIONED_TO_TENANTS   — fan-out summary (one row,
+//                                        not per tenant noise)
+//   ORG_ADMIN_DEPROVISIONED_FROM_TENANTS — fan-in summary
+//
+// Provisioning fan-out is summarized as ONE org audit row carrying
+// `{ tenantCount, tenantIds[], role: 'AUDITOR' }` in detailsJson.
+// Per-tenant rows still land in AuditLog (existing behaviour) so
+// each tenant's own ledger remains complete.
+model OrgAuditLog {
+  id             String         @id @default(cuid())
+  organizationId String
+  actorUserId    String?
+  actorType      String         @default("USER")
+  action         OrgAuditAction
+  targetUserId   String?
+  detailsJson    Json?
+  requestId      String?
+  occurredAt     DateTime       @default(now())
+  entryHash      String
+  previousHash   String?
+  version        Int            @default(1)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation("OrgAuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  target       User?        @relation("OrgAuditLogTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, occurredAt])
+  @@index([organizationId, action])
+  @@index([organizationId, entryHash])
+}
+
 model Audit {
   id              String               @id @default(cuid())
   tenantId        String

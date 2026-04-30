@@ -10,6 +10,7 @@ import {
     Paperclip,
     Users,
     Settings,
+    ScrollText,
     LogOut,
     type LucideIcon,
 } from 'lucide-react';
@@ -83,6 +84,15 @@ export function useOrgNavSections(): OrgNavSectionDef[] {
                     href: orgHref('/members'),
                     label: 'Members',
                     icon: Users,
+                    requiresManageMembers: true,
+                },
+                {
+                    href: orgHref('/audit'),
+                    label: 'Audit Log',
+                    icon: ScrollText,
+                    // Epic B — immutable per-org privilege ledger.
+                    // Same gate as Members: ORG_ADMIN can review who
+                    // was added/removed/role-changed and when.
                     requiresManageMembers: true,
                 },
                 {
