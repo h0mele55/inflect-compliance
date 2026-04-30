@@ -106,6 +106,11 @@ export async function addAuditPackItems(
 
 // РІвЂќР‚РІвЂќР‚РІвЂќР‚ Snapshot Creation РІвЂќР‚РІвЂќР‚РІвЂќР‚
 
+// TODO(epic-c-followup): tightening tdb to PrismaTx exposed schema
+// drift (dueDate vs dueAt; ownerId vs ownerUserId) — the snapshot
+// payload appears to reference fields that don't exist on the
+// current schema. Fixing requires audit-pack regression tests; left
+// as a documented exception.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function createControlSnapshot(tdb: any, controlId: string, tenantId: string): Promise<string> {
     const ctrl = await tdb.control.findFirst({
@@ -132,6 +137,9 @@ async function createControlSnapshot(tdb: any, controlId: string, tenantId: stri
     });
 }
 
+// TODO(epic-c-followup): same schema-drift situation as
+// createControlSnapshot — versions[0].status doesn't exist on
+// the current PolicyVersion select shape.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function createPolicySnapshot(tdb: any, policyId: string, tenantId: string): Promise<string> {
     const pol = await tdb.policy.findFirst({
@@ -231,7 +239,7 @@ export async function freezeAuditPack(ctx: RequestContext, packId: string) {
             generatedAt: soaReport.generatedAt,
             summary: soaReport.summary,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            entries: soaReport.entries.map((e: any) => ({
+            entries: soaReport.entries.map((e) => ({
                 code: e.requirementCode,
                 title: e.requirementTitle,
                 section: e.section,
@@ -239,7 +247,7 @@ export async function freezeAuditPack(ctx: RequestContext, packId: string) {
                 justification: e.justification,
                 status: e.implementationStatus,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                controlRefs: e.mappedControls.map((c: any) => `${c.code || 'вЂ”'} ${c.title}`).join('; '),
+                controlRefs: e.mappedControls.map((c) => `${c.code || 'вЂ”'} ${c.title}`).join('; '),
                 evidenceCount: e.evidenceCount,
             })),
             snapshotAt: new Date().toISOString(),
@@ -270,8 +278,7 @@ export async function previewDefaultPack(ctx: RequestContext, cycleId: string) {
 
     const cycle = await runInTenantContext(ctx, (tdb) =>
         tdb.auditCycle.findFirst({ where: { id: cycleId, tenantId: ctx.tenantId } })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any;
+    );
     if (!cycle) throw notFound('Audit cycle not found');
 
     if (cycle.frameworkKey === 'ISO27001') {
@@ -293,20 +300,18 @@ async function previewISO27001DefaultPack(ctx: RequestContext) {
                 where: { tenantId: ctx.tenantId, requirement: { frameworkId: fw.id } },
                 select: { controlId: true },
             })
+        );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ) as any[];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        controlIds = [...new Set(links.map((l: any) => l.controlId))];
+        controlIds = [...new Set(links.map((l) => l.controlId))];
     }
 
     // Fallback: all controls if no framework mapping
     if (controlIds.length === 0) {
         const controls = await runInTenantContext(ctx, (tdb) =>
             tdb.control.findMany({ where: { tenantId: ctx.tenantId }, select: { id: true } })
+        );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ) as any[];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        controlIds = controls.map((c: any) => c.id);
+        controlIds = controls.map((c) => c.id);
     }
 
     // Policies with category "Security" or any policies
@@ -315,12 +320,11 @@ async function previewISO27001DefaultPack(ctx: RequestContext) {
             where: { tenantId: ctx.tenantId },
             select: { id: true, category: true },
         })
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+    const securityPolicies = policies.filter((p) => p.category === 'Security' || p.category === 'INFORMATION_SECURITY');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const securityPolicies = policies.filter((p: any) => p.category === 'Security' || p.category === 'INFORMATION_SECURITY');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const policyIds = (securityPolicies.length > 0 ? securityPolicies : policies).map((p: any) => p.id);
+    const policyIds = (securityPolicies.length > 0 ? securityPolicies : policies).map((p) => p.id);
 
     // Evidence linked to those controls (via direct Control.evidence relation)
     const controlsWithEvidence = await runInTenantContext(ctx, (tdb) =>
@@ -328,10 +332,9 @@ async function previewISO27001DefaultPack(ctx: RequestContext) {
             where: { tenantId: ctx.tenantId, id: { in: controlIds } },
             select: { evidence: { select: { id: true } } },
         })
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const evidenceIds = [...new Set(controlsWithEvidence.flatMap((c: any) => c.evidence.map((e: any) => e.id)))];
+    const evidenceIds = [...new Set(controlsWithEvidence.flatMap((c) => c.evidence.map((e) => e.id)))];
 
     // Open issues
     const issues = await runInTenantContext(ctx, (tdb) =>
@@ -339,10 +342,9 @@ async function previewISO27001DefaultPack(ctx: RequestContext) {
             where: { tenantId: ctx.tenantId, status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] } },
             select: { id: true },
         })
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const issueIds = issues.map((i: any) => i.id);
+    const issueIds = issues.map((i) => i.id);
 
     return {
         frameworkKey: 'ISO27001',
@@ -367,19 +369,17 @@ async function previewNIS2DefaultPack(ctx: RequestContext) {
                 where: { tenantId: ctx.tenantId, requirement: { frameworkId: fw.id } },
                 select: { controlId: true },
             })
+        );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ) as any[];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        controlIds = [...new Set(links.map((l: any) => l.controlId))];
+        controlIds = [...new Set(links.map((l) => l.controlId))];
     }
 
     if (controlIds.length === 0) {
         const controls = await runInTenantContext(ctx, (tdb) =>
             tdb.control.findMany({ where: { tenantId: ctx.tenantId }, select: { id: true } })
+        );
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ) as any[];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        controlIds = controls.map((c: any) => c.id);
+        controlIds = controls.map((c) => c.id);
     }
 
     // NIS2-relevant policies: incident response, BC/DR, access control, supplier security
@@ -388,16 +388,15 @@ async function previewNIS2DefaultPack(ctx: RequestContext) {
             where: { tenantId: ctx.tenantId },
             select: { id: true, title: true, category: true },
         })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+    );
     const nis2Keywords = ['incident', 'business continuity', 'disaster recovery', 'access control', 'supplier', 'supply chain'];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nis2Policies = policies.filter((p: any) => {
+    const nis2Policies = policies.filter((p) => {
         const text = `${p.title} ${p.category || ''}`.toLowerCase();
         return nis2Keywords.some(kw => text.includes(kw));
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const policyIds = (nis2Policies.length > 0 ? nis2Policies : policies).map((p: any) => p.id);
+    const policyIds = (nis2Policies.length > 0 ? nis2Policies : policies).map((p) => p.id);
 
     // Evidence tied to controls (via direct Control.evidence relation)
     const controlsWithEvidence = await runInTenantContext(ctx, (tdb) =>
@@ -405,10 +404,9 @@ async function previewNIS2DefaultPack(ctx: RequestContext) {
             where: { tenantId: ctx.tenantId, id: { in: controlIds } },
             select: { evidence: { select: { id: true } } },
         })
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const evidenceIds = [...new Set(controlsWithEvidence.flatMap((c: any) => c.evidence.map((e: any) => e.id)))];
+    const evidenceIds = [...new Set(controlsWithEvidence.flatMap((c) => c.evidence.map((e) => e.id)))];
 
     // Issues
     const issues = await runInTenantContext(ctx, (tdb) =>
@@ -416,10 +414,9 @@ async function previewNIS2DefaultPack(ctx: RequestContext) {
             where: { tenantId: ctx.tenantId, status: { notIn: [...TERMINAL_WORK_ITEM_STATUSES] } },
             select: { id: true },
         })
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const issueIds = issues.map((i: any) => i.id);
+    const issueIds = issues.map((i) => i.id);
 
     return {
         frameworkKey: 'NIS2',
@@ -441,7 +438,7 @@ export async function exportAuditPack(ctx: RequestContext, packId: string, forma
     if (pack.status === 'DRAFT') throw badRequest('Cannot export a draft pack');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const items = pack.items.map((item: any) => ({
+    const items = pack.items.map((item) => ({
         entityType: item.entityType,
         entityId: item.entityId,
         sortOrder: item.sortOrder,

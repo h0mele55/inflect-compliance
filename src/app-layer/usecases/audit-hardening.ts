@@ -66,8 +66,7 @@ export async function storeExportArtifact(
     // Verify pack is frozen
     const pack = await runInTenantContext(ctx, (tdb) =>
         tdb.auditPack.findFirst({ where: { id: packId, tenantId: ctx.tenantId } })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any;
+    );
     if (!pack) throw notFound('Pack not found');
     if (pack.status === 'DRAFT') throw badRequest('Cannot attach exports to a DRAFT pack');
 
@@ -127,7 +126,6 @@ export async function clonePackForRetest(
     ctx: RequestContext,
     sourcePackId: string,
     name?: string,
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
     assertCanManageAuditPacks(ctx);
 
@@ -139,8 +137,7 @@ export async function clonePackForRetest(
                 cycle: true,
             },
         })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any;
+    );
     if (!sourcePack) throw notFound('Source pack not found');
     if (sourcePack.status === 'DRAFT') throw badRequest('Cannot clone a DRAFT pack — freeze first');
 
@@ -154,15 +151,14 @@ export async function clonePackForRetest(
                 status: 'DRAFT',
             },
         })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any;
+    );
 
     // Copy item selections (NOT snapshots — new snapshots will be created on freeze)
     const itemsToClone = sourcePack.items
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((i: any) => i.entityType !== 'FILE' && i.entityType !== 'READINESS_REPORT')
+        .filter((i) => i.entityType !== 'FILE' && i.entityType !== 'READINESS_REPORT')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((item: any) => ({
+        .map((item) => ({
             tenantId: ctx.tenantId,
             auditPackId: clonedPack.id,
             entityType: item.entityType,
@@ -182,13 +178,12 @@ export async function clonePackForRetest(
             select: { id: true },
             take: 50,
         })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const existingIssueIds = new Set(itemsToClone.filter((i: any) => i.entityType === 'ISSUE').map((i: any) => i.entityId));
+    const existingIssueIds = new Set(itemsToClone.filter((i) => i.entityType === 'ISSUE').map((i) => i.entityId));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let sortOrder = Math.max(...itemsToClone.map((i: any) => i.sortOrder || 0), 0) + 1;
+    let sortOrder = Math.max(...itemsToClone.map((i) => i.sortOrder || 0), 0) + 1;
 
     for (const issue of retestIssues) {
         if (!existingIssueIds.has(issue.id)) {
@@ -269,8 +264,7 @@ export async function getAuditorAssignedPacks(ctx: RequestContext): Promise<any[
         tdb.auditorAccount.findFirst({
             where: { tenantId: ctx.tenantId, email: user.email, status: 'ACTIVE' },
         })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any;
+    );
     if (!auditor) return [];
 
     // Get pack IDs assigned to this auditor
@@ -279,11 +273,10 @@ export async function getAuditorAssignedPacks(ctx: RequestContext): Promise<any[
             where: { auditorId: auditor.id },
             select: { auditPackId: true },
         })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const packIds = accesses.map((a: any) => a.auditPackId);
+    const packIds = accesses.map((a) => a.auditPackId);
     if (packIds.length === 0) return [];
 
     // Fetch packs
@@ -295,8 +288,7 @@ export async function getAuditorAssignedPacks(ctx: RequestContext): Promise<any[
                 items: { select: { id: true, entityType: true } },
             },
         })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+    );
 
     return packs;
 }

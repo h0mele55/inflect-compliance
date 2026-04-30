@@ -331,7 +331,7 @@ export async function getEvidenceMetrics(ctx: RequestContext) {
             db.evidence.count({ where: { tenantId, type: 'FILE', deletedAt: null } }),
             db.evidence.count({ where: { tenantId, type: 'FILE', controlId: { not: null }, deletedAt: null } }),
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (db as any).fileRecord.aggregate({
+            db.fileRecord.aggregate({
                 where: { tenantId, status: 'STORED' },
                 _sum: { sizeBytes: true },
                 _count: { id: true },

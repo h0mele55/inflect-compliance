@@ -67,7 +67,7 @@ export async function cleanupFailedOrPendingUploads(
 
     return withTenantDb(tenantId, async (db) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pending = await (db as any).fileRecord.findMany({
+        const pending = await db.fileRecord.findMany({
             where: {
                 tenantId,
                 status: { in: ['PENDING', 'FAILED'] },
@@ -84,7 +84,7 @@ export async function cleanupFailedOrPendingUploads(
             } catch { /* best effort */ }
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (db as any).fileRecord.update({
+            await db.fileRecord.update({
                 where: { id: record.id },
                 data: { status: 'FAILED' },
             });
@@ -116,7 +116,7 @@ export async function detectBrokenEvidence(tenantId: string) {
             }
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const record = await (db as any).fileRecord.findUnique({
+            const record = await db.fileRecord.findUnique({
                 where: { id: fileRecordId },
                 select: { status: true },
             });

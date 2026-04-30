@@ -79,9 +79,7 @@ export async function computeReadiness(ctx: RequestContext, cycleId: string): Pr
     assertCanViewPack(ctx);
 
     const cycle = await runInTenantContext(ctx, (tdb) =>
-        tdb.auditCycle.findFirst({ where: { id: cycleId, tenantId: ctx.tenantId } })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any;
+        tdb.auditCycle.findFirst({ where: { id: cycleId, tenantId: ctx.tenantId } }));
     if (!cycle) throw notFound('Audit cycle not found');
 
     let result: ReadinessResult;
@@ -123,33 +121,30 @@ async function computeISO27001Readiness(ctx: RequestContext, cycle: any): Promis
     const fw = await runInTenantContext(ctx, (tdb) => tdb.framework.findFirst({ where: { key: 'ISO27001' } }));
     let totalReqs = 0;
     let mappedReqs = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let unmappedReqs: any[] = [];
+    interface RequirementSummary { id: string; code: string; title: string }
+    let unmappedReqs: RequirementSummary[] = [];
 
     if (fw) {
         const reqs = await runInTenantContext(ctx, (tdb) => tdb.frameworkRequirement.findMany({
             where: { frameworkId: fw.id, deprecatedAt: null },
             select: { id: true, code: true, title: true },
-        })) as any[];
+        }));
         totalReqs = reqs.length;
 
         const mappedReqIds = await runInTenantContext(ctx, (tdb) =>
             tdb.controlRequirementLink.findMany({
                 where: { tenantId: ctx.tenantId, requirement: { frameworkId: fw.id } },
                 select: { requirementId: true },
-            })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ) as any[];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mappedSet = new Set(mappedReqIds.map((l: any) => l.requirementId));
+            }));
+        const mappedSet = new Set(mappedReqIds.map((l) => l.requirementId));
         mappedReqs = mappedSet.size;
-        unmappedReqs = reqs.filter((r: any) => !mappedSet.has(r.id));
+        unmappedReqs = reqs.filter((r) => !mappedSet.has(r.id));
     }
 
     const coverageScore = totalReqs > 0 ? (mappedReqs / totalReqs) * 100 : 0;
 
     // Add unmapped requirement gaps (top 10)
-    unmappedReqs.slice(0, 10).forEach((r: any) => gaps.push({
+    unmappedReqs.slice(0, 10).forEach((r) => gaps.push({
         type: 'UNMAPPED_REQUIREMENT', severity: 'HIGH',
         title: `${r.code}: ${r.title}`, details: 'Not mapped to any control', entityId: r.id,
     }));
@@ -159,12 +154,10 @@ async function computeISO27001Readiness(ctx: RequestContext, cycle: any): Promis
         tdb.control.findMany({
             where: { tenantId: ctx.tenantId, applicability: 'APPLICABLE' },
             select: { id: true, code: true, name: true, status: true },
-        })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+        }));
     const totalControls = controls.length;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const implementedControls = controls.filter((c: any) => c.status === 'IMPLEMENTED').length;
+    const implementedControls = controls.filter((c) => c.status === 'IMPLEMENTED').length;
     const implScore = totalControls > 0 ? (implementedControls / totalControls) * 100 : 0;
 
     // 3) Evidence completeness — EXCLUDES archived/deleted evidence
@@ -176,20 +169,18 @@ async function computeISO27001Readiness(ctx: RequestContext, cycle: any): Promis
                 select: { id: true },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } as any },
-        })
+        }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const withEvidence = controlsWithEvidence.filter((c: any) => c.evidence?.length > 0).length;
+    const withEvidence = controlsWithEvidence.filter((c) => c.evidence?.length > 0).length;
     const evidenceScore = totalControls > 0 ? (withEvidence / totalControls) * 100 : 0;
 
     // Controls missing evidence (top 10)
     controlsWithEvidence
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((c: any) => !c.evidence?.length)
+        .filter((c) => !c.evidence?.length)
         .slice(0, 10)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .forEach((c: any) => gaps.push({
+        .forEach((c) => gaps.push({
             type: 'MISSING_EVIDENCE', severity: 'MEDIUM',
             title: `${c.code}: ${c.name}`, details: 'No active evidence attached (archived/expired excluded)', entityId: c.id,
         }));
@@ -204,14 +195,12 @@ async function computeISO27001Readiness(ctx: RequestContext, cycle: any): Promis
             },
             select: { id: true, title: true, dueAt: true },
             take: 20,
-        })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+        }));
     const overdueCount = overdueTasks.length;
     const taskScore = Math.max(0, 100 - (overdueCount * 10));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    overdueTasks.slice(0, 5).forEach((t: any) => gaps.push({
+    overdueTasks.slice(0, 5).forEach((t) => gaps.push({
         type: 'OVERDUE_TASK', severity: 'MEDIUM',
         title: t.title, details: `Due: ${t.dueAt?.toISOString().split('T')[0] || 'unknown'}`, entityId: t.id,
     }));
@@ -226,14 +215,12 @@ async function computeISO27001Readiness(ctx: RequestContext, cycle: any): Promis
             },
             select: { id: true, title: true, severity: true },
             take: 20,
-        })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+        }));
     const issueCount = openIssues.length;
     const issueScore = Math.max(0, 100 - (issueCount * 15));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    openIssues.slice(0, 5).forEach((i: any) => gaps.push({
+    openIssues.slice(0, 5).forEach((i) => gaps.push({
         type: 'OPEN_ISSUE', severity: i.severity === 'CRITICAL' ? 'HIGH' : 'MEDIUM',
         title: i.title, details: `Severity: ${i.severity}`, entityId: i.id,
     }));
@@ -273,32 +260,29 @@ async function computeNIS2Readiness(ctx: RequestContext, cycle: any): Promise<Re
     const fw = await runInTenantContext(ctx, (tdb) => tdb.framework.findFirst({ where: { key: 'NIS2' } }));
     let totalReqs = 0;
     let mappedReqs = 0;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let unmappedReqs: any[] = [];
+    interface RequirementSummary { id: string; code: string; title: string }
+    let unmappedReqs: RequirementSummary[] = [];
 
     if (fw) {
         const reqs = await runInTenantContext(ctx, (tdb) => tdb.frameworkRequirement.findMany({
             where: { frameworkId: fw.id, deprecatedAt: null },
             select: { id: true, code: true, title: true },
-        })) as any[];
+        }));
         totalReqs = reqs.length;
 
         const mappedReqIds = await runInTenantContext(ctx, (tdb) =>
             tdb.controlRequirementLink.findMany({
                 where: { tenantId: ctx.tenantId, requirement: { frameworkId: fw.id } },
                 select: { requirementId: true },
-            })
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ) as any[];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mappedSet = new Set(mappedReqIds.map((l: any) => l.requirementId));
+            }));
+        const mappedSet = new Set(mappedReqIds.map((l) => l.requirementId));
         mappedReqs = mappedSet.size;
-        unmappedReqs = reqs.filter((r: any) => !mappedSet.has(r.id));
+        unmappedReqs = reqs.filter((r) => !mappedSet.has(r.id));
     }
 
     const coverageScore = totalReqs > 0 ? (mappedReqs / totalReqs) * 100 : 0;
 
-    unmappedReqs.slice(0, 10).forEach((r: any) => gaps.push({
+    unmappedReqs.slice(0, 10).forEach((r) => gaps.push({
         type: 'UNMAPPED_REQUIREMENT', severity: 'HIGH',
         title: `${r.code}: ${r.title}`, details: 'Not mapped to any measure', entityId: r.id,
     }));
@@ -310,19 +294,15 @@ async function computeNIS2Readiness(ctx: RequestContext, cycle: any): Promise<Re
             tdb.controlRequirementLink.findMany({
                 where: { tenantId: ctx.tenantId, requirement: { frameworkId: fw.id } },
                 select: { controlId: true },
-            })
+            }));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ) as any[];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        controlIds = [...new Set(links.map((l: any) => l.controlId))];
+        controlIds = [...new Set(links.map((l) => l.controlId))];
     }
     if (controlIds.length === 0) {
         const allControls = await runInTenantContext(ctx, (tdb) =>
-            tdb.control.findMany({ where: { tenantId: ctx.tenantId }, select: { id: true } })
+            tdb.control.findMany({ where: { tenantId: ctx.tenantId }, select: { id: true } }));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ) as any[];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        controlIds = allControls.map((c: any) => c.id);
+        controlIds = allControls.map((c) => c.id);
     }
 
     const controlsWithEv = await runInTenantContext(ctx, (tdb) =>
@@ -333,20 +313,18 @@ async function computeNIS2Readiness(ctx: RequestContext, cycle: any): Promise<Re
                 select: { id: true },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } as any },
-        })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+        }));
     const totalControls = controlsWithEv.length;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const withEvidence = controlsWithEv.filter((c: any) => c.evidence?.length > 0).length;
+    const withEvidence = controlsWithEv.filter((c) => c.evidence?.length > 0).length;
     const evidenceScore = totalControls > 0 ? (withEvidence / totalControls) * 100 : 0;
 
     controlsWithEv
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((c: any) => !c.evidence?.length)
+        .filter((c) => !c.evidence?.length)
         .slice(0, 10)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .forEach((c: any) => gaps.push({
+        .forEach((c) => gaps.push({
             type: 'MISSING_EVIDENCE', severity: 'MEDIUM',
             title: `${c.code}: ${c.name}`, details: 'No active evidence for this control (archived/expired excluded)', entityId: c.id,
         }));
@@ -356,16 +334,14 @@ async function computeNIS2Readiness(ctx: RequestContext, cycle: any): Promise<Re
         tdb.policy.findMany({
             where: { tenantId: ctx.tenantId },
             select: { id: true, title: true, category: true },
-        })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+        }));
 
     const foundPolicies: string[] = [];
-    const expectedPolicies = NIS2_KEY_POLICIES.map((p: any) => p.label);
+    const expectedPolicies = NIS2_KEY_POLICIES.map((p) => p.label);
 
     for (const kp of NIS2_KEY_POLICIES) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const found = policies.some((p: any) => {
+        const found = policies.some((p) => {
             const text = `${p.title} ${p.category || ''}`.toLowerCase();
             return text.includes(kp.keyword);
         });
@@ -387,14 +363,12 @@ async function computeNIS2Readiness(ctx: RequestContext, cycle: any): Promise<Re
             },
             select: { id: true, title: true, severity: true, type: true },
             take: 20,
-        })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ) as any[];
+        }));
     const issueCount = openIssues.length;
     const issueScore = Math.max(0, 100 - (issueCount * 10));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    openIssues.slice(0, 5).forEach((i: any) => gaps.push({
+    openIssues.slice(0, 5).forEach((i) => gaps.push({
         type: 'OPEN_ISSUE', severity: i.severity === 'CRITICAL' ? 'HIGH' : 'MEDIUM',
         title: i.title, details: `${i.type} · Severity: ${i.severity}`, entityId: i.id,
     }));
@@ -473,12 +447,12 @@ export async function exportReadinessJson(ctx: RequestContext, cycleId: string):
 
 export async function exportUnmappedCsv(ctx: RequestContext, cycleId: string): Promise<{ csv: string; filename: string }> {
     const result = await computeReadiness(ctx, cycleId);
-    const unmapped = result.gaps.filter((g: any) => g.type === 'UNMAPPED_REQUIREMENT');
+    const unmapped = result.gaps.filter((g) => g.type === 'UNMAPPED_REQUIREMENT');
 
     const rows = [['Requirement', 'Details', 'Severity']];
-    unmapped.forEach((g: any) => rows.push([g.title, g.details, g.severity]));
+    unmapped.forEach((g) => rows.push([g.title, g.details, g.severity]));
 
-    const csv = rows.map((r: any) => r.map((c: any) => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map((r) => r.map((c) => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
 
     await runInTenantContext(ctx, (tdb) =>
         logEvent(tdb, ctx, {
@@ -500,12 +474,12 @@ export async function exportUnmappedCsv(ctx: RequestContext, cycleId: string): P
 
 export async function exportControlGapsCsv(ctx: RequestContext, cycleId: string): Promise<{ csv: string; filename: string }> {
     const result = await computeReadiness(ctx, cycleId);
-    const gapItems = result.gaps.filter((g: any) => g.type === 'MISSING_EVIDENCE' || g.type === 'OVERDUE_TASK' || g.type === 'OPEN_ISSUE');
+    const gapItems = result.gaps.filter((g) => g.type === 'MISSING_EVIDENCE' || g.type === 'OVERDUE_TASK' || g.type === 'OPEN_ISSUE');
 
     const rows = [['Type', 'Title', 'Details', 'Severity']];
-    gapItems.forEach((g: any) => rows.push([g.type, g.title, g.details, g.severity]));
+    gapItems.forEach((g) => rows.push([g.type, g.title, g.details, g.severity]));
 
-    const csv = rows.map((r: any) => r.map((c: any) => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map((r) => r.map((c) => `"${(c || '').replace(/"/g, '""')}"`).join(',')).join('\n');
 
     await runInTenantContext(ctx, (tdb) =>
         logEvent(tdb, ctx, {

@@ -64,7 +64,7 @@ export async function runEvidenceRetentionNotifications(
                         entityId: ev.id,
                     },
                 },
-            } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+            } as any,
         });
 
         if (existingTask) {
@@ -83,12 +83,12 @@ export async function runEvidenceRetentionNotifications(
                 status: 'OPEN',
                 priority: daysLeft <= 7 ? 'HIGH' : 'MEDIUM',
                 ...(ev.controlId ? { controlId: ev.controlId } : {}),
-            } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+            } as any,
         });
 
         // Create task link to evidence
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (prisma as any).taskLink.create({
+        await prisma.taskLink.create({
             data: {
                 taskId: task.id,
                 tenantId: ev.tenantId,
@@ -126,7 +126,7 @@ export async function runEvidenceRetentionNotifications(
                 for (const m of members) {
                     if (!m.user.email) continue;
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    await (prisma as any).notificationOutbox.create({
+                    await prisma.notificationOutbox.create({
                         data: {
                             tenantId: ev.tenantId,
                             type: 'EVIDENCE_EXPIRING',

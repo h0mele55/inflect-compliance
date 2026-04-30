@@ -18,6 +18,7 @@ import crypto from 'crypto';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/observability/logger';
 import { jsonResponse } from '@/lib/api-response';
+import { appendAuditEntry } from '@/lib/audit/audit-writer';
 
 // Use shared prisma instance to ensure audit middleware is active
 
@@ -118,12 +119,12 @@ export async function POST(req: NextRequest) {
         let fileRecord: any;
         if (payload.fileId) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            fileRecord = await (prisma as any).fileRecord.findUnique({
+            fileRecord = await prisma.fileRecord.findUnique({
                 where: { id: payload.fileId },
             });
         } else if (payload.pathKey) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            fileRecord = await (prisma as any).fileRecord.findFirst({
+            fileRecord = await prisma.fileRecord.findFirst({
                 where: { pathKey: payload.pathKey },
             });
         }
@@ -155,7 +156,7 @@ export async function POST(req: NextRequest) {
 
         // ─── Update file record ───
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (prisma as any).fileRecord.update({
+        await prisma.fileRecord.update({
             where: { id: fileRecord.id },
             data: {
                 scanStatus,
@@ -184,21 +185,27 @@ export async function POST(req: NextRequest) {
 
             // Quarantine: mark file as FAILED to prevent downloads
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (prisma as any).fileRecord.update({
+            await prisma.fileRecord.update({
                 where: { id: fileRecord.id },
                 data: { status: 'FAILED' },
             });
 
-            // Log audit event
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (prisma as any).auditEvent.create({
-                data: {
-                    tenantId: fileRecord.tenantId,
-                    userId: fileRecord.uploadedByUserId,
-                    action: 'FILE_QUARANTINED',
-                    entityType: 'FileRecord',
-                    entityId: fileRecord.id,
-                    details: `File quarantined: malware detected by ${payload.engine || 'AV scanner'}. ${payload.details || ''}`,
+            // Log via the canonical hash-chained audit writer. The
+            // earlier `(prisma as any).auditEvent.create({...})` hid
+            // the fact that no `AuditEvent` model exists — this write
+            // never landed. Route to the real `AuditLog` chain so
+            // quarantine events are durably evidence-grade.
+            await appendAuditEntry({
+                tenantId: fileRecord.tenantId,
+                userId: fileRecord.uploadedByUserId,
+                actorType: 'SYSTEM',
+                action: 'FILE_QUARANTINED',
+                entity: 'FileRecord',
+                entityId: fileRecord.id,
+                detailsJson: {
+                    category: 'access',
+                    engine: payload.engine ?? null,
+                    avDetails: payload.details ?? null,
                 },
             });
         }

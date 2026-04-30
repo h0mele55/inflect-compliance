@@ -250,7 +250,7 @@ export async function getIssueActivity(ctx: RequestContext, issueId: string) {
     assertCanReadIssues(ctx);
     return runInTenantContext(ctx, (db) =>
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (db as any).auditLog.findMany({
+        db.auditLog.findMany({
             where: { tenantId: ctx.tenantId, entity: 'Issue', entityId: issueId },
             orderBy: { createdAt: 'desc' },
             take: 50,

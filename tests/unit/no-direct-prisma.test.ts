@@ -159,6 +159,14 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
         // tenant — see `src/app-layer/usecases/portfolio.ts` security-
         // invariant block.
         'org',
+        // System-level callbacks invoked by external services without
+        // a tenant context. The AV webhook in particular is called by
+        // ClamAV / Defender ATP after a scan — it looks up a
+        // FileRecord by id (cross-tenant) and updates scan status.
+        // The Epic C cast removal exposed this previously-hidden
+        // direct-prisma usage; the access pattern is correct, the
+        // allowlist entry codifies it.
+        'storage',
     ];
 
     const apiDir = path.join(SRC_ROOT, 'app/api');

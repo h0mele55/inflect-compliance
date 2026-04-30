@@ -43,7 +43,7 @@ export async function findOrCreateCustomer(
 
     // Check for existing billing account
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const existing = await (prisma as any).billingAccount.findUnique({
+    const existing = await prisma.billingAccount.findUnique({
         where: { tenantId },
     });
 
@@ -63,7 +63,7 @@ export async function findOrCreateCustomer(
 
     // Create billing account
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const billingAccount = await (prisma as any).billingAccount.create({
+    const billingAccount = await prisma.billingAccount.create({
         data: {
             tenantId,
             stripeCustomerId: customer.id,
