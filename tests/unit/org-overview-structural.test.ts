@@ -1,17 +1,31 @@
 /**
- * Epic O-4 — structural contract for the portfolio overview page.
+ * Epic O-4 + Epic 41 — structural contract for the portfolio overview page.
  *
- * Static-file checks (no jsdom, no React render). Locks the load-
- * bearing properties of the CISO landing page so a refactor cannot
- * silently:
+ * Static-file checks (no jsdom, no React render). After the Epic 41
+ * page rewire, the load-bearing properties shifted from "the page
+ * itself renders four hardcoded sections" to "the page fetches
+ * widgets + portfolio data and delegates to a client island".
  *
- *   - drop one of the four spec'd sections (stats, RAG, risk trend,
- *     coverage-by-tenant, drill-down CTAs)
- *   - serialise the three portfolio fetches (must stay parallel)
- *   - leak the slug on a forbidden/missing org (catch must collapse
- *     to notFound())
- *   - break the drill-down hrefs the spec requires
+ * Locks:
+ *
+ *   1. The page exists at the canonical (app)/page.tsx path
+ *   2. dynamic = "force-dynamic" (per-request freshness)
+ *   3. OrgContext resolved via getOrgCtx; errors collapse to notFound()
+ *      (no slug echo on forbidden / missing)
+ *   4. Page consumes BOTH:
+ *        - listOrgDashboardWidgets (Epic 41 — persisted layout)
+ *        - getPortfolioOverview with trendDays: 90 (Epic E.3 single-fetch
+ *          orchestrator, NOT the three independent usecases)
+ *   5. Server hands serialised props to <PortfolioDashboard> (the
+ *      client island that owns edit-mode + drag/resize wiring)
+ *   6. canConfigureDashboard from OrgPermissionSet drives the canEdit
+ *      prop (the ORG_ADMIN-only edit affordance)
+ *   7. Server-side toPlainJson boundary on both prop drops
+ *      (Date / Decimal sanitisation per the existing convention)
+ *   8. Page does NOT reintroduce hardcoded sections — the visual
+ *      composition lives in widget rows now, not in this file
  */
+
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -19,13 +33,15 @@ const ROOT = path.resolve(__dirname, '../..');
 const PAGE_PATH = 'src/app/org/[orgSlug]/(app)/page.tsx';
 const read = () => fs.readFileSync(path.join(ROOT, PAGE_PATH), 'utf-8');
 
-describe('Epic O-4 — portfolio overview structural contract', () => {
+describe('Epic 41 — portfolio overview structural contract (post-rewire)', () => {
     it('page exists at the canonical (app)/page.tsx path', () => {
         expect(fs.existsSync(path.join(ROOT, PAGE_PATH))).toBe(true);
     });
 
     it('declares dynamic = "force-dynamic" (per-request freshness)', () => {
-        expect(read()).toMatch(/export\s+const\s+dynamic\s*=\s*['"]force-dynamic['"]/);
+        expect(read()).toMatch(
+            /export\s+const\s+dynamic\s*=\s*['"]force-dynamic['"]/,
+        );
     });
 
     it('resolves OrgContext via getOrgCtx and collapses errors to notFound()', () => {
@@ -36,111 +52,76 @@ describe('Epic O-4 — portfolio overview structural contract', () => {
         expect(src).toMatch(/}\s*catch\b[\s\S]*?notFound\s*\(\s*\)/);
     });
 
-    it('uses the single-fetch orchestrator from the portfolio barrel', () => {
+    it('fetches persisted widgets via listOrgDashboardWidgets', () => {
         const src = read();
-        // Locks the shared-fetch optimisation: the page MUST consume
-        // `getPortfolioOverview` (one repo round-trip) instead of three
-        // independent usecases (which fired duplicated `getOrgTenantIds`
-        // × 3 + `getLatestSnapshots` × 2 against the DB).
-        expect(src).toMatch(/from\s+['"]@\/app-layer\/usecases\/portfolio['"]/);
-        expect(src).toMatch(/getPortfolioOverview/);
-        // The page MUST NOT fall back to the three separate usecases
-        // — that pattern is the regression class this test guards.
-        expect(src).not.toMatch(/import\s*\{[^}]*getPortfolioSummary[^}]*\}\s*from\s+['"]@\/app-layer\/usecases\/portfolio['"]/);
+        // Epic 41 — the page reads widget rows from the DB, not a
+        // hardcoded composition.
+        expect(src).toMatch(/from\s+['"]@\/app-layer\/usecases\/org-dashboard-widgets['"]/);
+        expect(src).toMatch(/listOrgDashboardWidgets/);
     });
 
-    it('passes the 90-day trend window to the orchestrator (matches spec default)', () => {
-        // Locks the default trend window. Lifting this is fine — but
-        // requires updating the test alongside the change.
+    it('fetches live portfolio data via the single-fetch orchestrator', () => {
+        const src = read();
+        // Epic E.3 invariant — the page uses the orchestrator (one
+        // round-trip) instead of three independent usecases that fired
+        // duplicated `getOrgTenantIds` × 3 + `getLatestSnapshots` × 2.
+        expect(src).toMatch(/from\s+['"]@\/app-layer\/usecases\/portfolio['"]/);
+        expect(src).toMatch(/getPortfolioOverview/);
+        // Must NOT fall back to the three separate usecases.
+        expect(src).not.toMatch(
+            /import\s*\{[^}]*getPortfolioSummary[^}]*\}\s*from\s+['"]@\/app-layer\/usecases\/portfolio['"]/,
+        );
+    });
+
+    it('passes the 90-day trend window to the orchestrator', () => {
         expect(read()).toMatch(
             /getPortfolioOverview\s*\(\s*ctx\s*,\s*\{[^}]*trendDays:\s*90/,
         );
     });
 
-    // ── Section presence ─────────────────────────────────────────────
-
-    it('renders the four spec sections', () => {
-        const src = read();
-        // Stat-card row.
-        expect(src).toMatch(/<StatCardsRow\b/);
-        // RAG distribution + risk trend (side-by-side block).
-        expect(src).toMatch(/<RagDistributionCard\b/);
-        expect(src).toMatch(/<RiskTrendCard\b/);
-        // Coverage-by-tenant list.
-        expect(src).toMatch(/<TenantCoverageList\b/);
-        // Drill-down CTAs.
-        expect(src).toMatch(/<DrillDownCtas\b/);
+    it('runs the two server fetches in parallel (Promise.all)', () => {
+        // Sequential awaits would double the page TTFB. The
+        // parallelism is small but real — locking it prevents a
+        // future refactor from quietly serialising the calls.
+        expect(read()).toMatch(/Promise\.all\s*\(\s*\[/);
     });
 
-    it('stat-card row covers coverage, critical risks, overdue evidence, and tenants', () => {
+    it('delegates rendering to <PortfolioDashboard> client component', () => {
         const src = read();
-        // Each KpiCard carries a stable id we can assert on.
-        for (const id of [
-            'org-stat-coverage',
-            'org-stat-critical-risks',
-            'org-stat-overdue-evidence',
-            'org-stat-tenants',
-        ]) {
-            expect(src).toContain(id);
-        }
+        expect(src).toMatch(/import\s*\{[^}]*PortfolioDashboard[^}]*\}\s*from\s+['"]\.\/PortfolioDashboard['"]/);
+        expect(src).toMatch(/<PortfolioDashboard\b/);
     });
 
-    it('RAG donut covers all four bands (green / amber / red / pending)', () => {
+    it('passes initialWidgets + data through toPlainJson (RSC boundary)', () => {
         const src = read();
-        // The four labels the donut emits — locks the segment shape.
-        for (const label of ['Healthy', 'At risk', 'Critical', 'Pending snapshot']) {
-            expect(src).toContain(label);
-        }
+        expect(src).toMatch(/from\s+['"]@\/lib\/server\/to-plain-json['"]/);
+        // Both server props go through the boundary so Dates and
+        // Prisma Decimal types serialise cleanly.
+        expect(src).toMatch(/initialWidgets=\{toPlainJson\(/);
+        expect(src).toMatch(/data=\{toPlainJson\(/);
     });
 
-    it('tenant coverage list links each row to its tenant dashboard via row.drillDownUrl', () => {
+    it('drives canEdit from canConfigureDashboard (ORG_ADMIN only)', () => {
         const src = read();
-        // The Link href must be the pre-computed drillDownUrl from the
-        // usecase — never a hand-built string. The usecase emits
-        // `/t/{slug}/dashboard`; constructing the href here would let
-        // the page drift from the usecase contract.
-        expect(src).toMatch(/href=\{row\.drillDownUrl\}/);
+        expect(src).toMatch(/canEdit=\{ctx\.permissions\.canConfigureDashboard\}/);
     });
 
-    it('tenant coverage list sorts RED → AMBER → GREEN → PENDING', () => {
+    // ── Deliberately removed sections — assert they DON'T re-appear ─
+
+    it('does not reintroduce hardcoded section components in the page itself', () => {
         const src = read();
-        // Locks the sort order so a refactor doesn't bury the most
-        // actionable tenants below healthy ones.
-        expect(src).toMatch(/RED:\s*0[\s\S]*?AMBER:\s*1[\s\S]*?GREEN:\s*2[\s\S]*?PENDING:\s*3/);
+        // The visual composition is in widget rows now. A future
+        // refactor that hand-rolls a section back into the page would
+        // bypass the configurable engine — this assertion catches it.
+        expect(src).not.toMatch(/<StatCardsRow\b/);
+        expect(src).not.toMatch(/<RagDistributionCard\b/);
+        expect(src).not.toMatch(/<RiskTrendCard\b/);
     });
 
-    it('drill-down CTAs point at /org/{slug}/{controls,risks,evidence}', () => {
+    it('does not hand-roll a raw <table> or <svg>', () => {
         const src = read();
-        expect(src).toMatch(/`\/org\/\$\{orgSlug\}\/controls`/);
-        expect(src).toMatch(/`\/org\/\$\{orgSlug\}\/risks`/);
-        expect(src).toMatch(/`\/org\/\$\{orgSlug\}\/evidence`/);
-    });
-
-    // ── Empty-state coverage ─────────────────────────────────────────
-
-    it('uses EmptyState for the three "no data yet" surfaces', () => {
-        const src = read();
-        expect(src).toMatch(/from\s+['"]@\/components\/ui\/empty-state['"]/);
-        // Three empty-state callsites — RAG, trend, tenants list.
-        const matches = src.match(/<EmptyState\b/g) ?? [];
-        expect(matches.length).toBeGreaterThanOrEqual(3);
-    });
-
-    // ── Reuse of platform primitives (Epic 51/59) ────────────────────
-
-    it('reuses platform primitives (KpiCard, DonutChart, TrendCard, StatusBadge)', () => {
-        const src = read();
-        expect(src).toMatch(/from\s+['"]@\/components\/ui\/KpiCard['"]/);
-        expect(src).toMatch(/from\s+['"]@\/components\/ui\/DonutChart['"]/);
-        expect(src).toMatch(/from\s+['"]@\/components\/ui\/TrendCard['"]/);
-        expect(src).toMatch(/from\s+['"]@\/components\/ui\/status-badge['"]/);
-    });
-
-    it('does not hand-roll a raw <table> or <svg> (chart/table primitives only)', () => {
-        const src = read();
-        // Epic 52 ratchet equivalent: the overview page must not
-        // reintroduce raw tables or inline SVG. Charts route through
-        // DonutChart/TrendCard; tabular data routes through DataTable.
+        // The page is a thin server component. Tables / SVGs belong
+        // inside dispatched widgets, not the page itself.
         expect(src).not.toMatch(/<table\b/);
         expect(src).not.toMatch(/<svg\b/);
     });
