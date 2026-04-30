@@ -55,6 +55,7 @@ function ctxFor(overrides: Partial<OrgContext> = {}): OrgContext {
             canExportReports: true,
             canManageTenants: true,
             canManageMembers: true,
+            canConfigureDashboard: true,
         },
         ...overrides,
     };
@@ -69,6 +70,7 @@ function readerCtx(): OrgContext {
             canExportReports: true,
             canManageTenants: false,
             canManageMembers: false,
+            canConfigureDashboard: false,
         },
     });
 }
@@ -345,6 +347,7 @@ describe('canViewPortfolio gate', () => {
                 canExportReports: false,
                 canManageTenants: false,
                 canManageMembers: false,
+            canConfigureDashboard: false,
             },
         });
 

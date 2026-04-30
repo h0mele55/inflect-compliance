@@ -72,6 +72,7 @@ function ctxFor(overrides: Partial<OrgContext> = {}): OrgContext {
             canExportReports: true,
             canManageTenants: true,
             canManageMembers: true,
+            canConfigureDashboard: true,
         },
         ...overrides,
     };

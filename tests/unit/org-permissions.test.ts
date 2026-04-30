@@ -17,6 +17,7 @@ describe('Epic O-2 — getOrgPermissions', () => {
             canExportReports: true,
             canManageTenants: true,
             canManageMembers: true,
+            canConfigureDashboard: true,
         });
     });
 
@@ -28,6 +29,7 @@ describe('Epic O-2 — getOrgPermissions', () => {
             canExportReports: true,
             canManageTenants: false,
             canManageMembers: false,
+            canConfigureDashboard: false,
         });
     });
 

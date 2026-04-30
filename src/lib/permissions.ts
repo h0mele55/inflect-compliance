@@ -185,6 +185,12 @@ export function getPermissionsForRole(role: Role): PermissionSet {
  *                         existing tenants. ORG_ADMIN only.
  *   - canManageMembers  — add / remove / role-change org members.
  *                         ORG_ADMIN only.
+ *   - canConfigureDashboard — add / update / delete the widgets that
+ *                         compose the org-level dashboard. ORG_ADMIN
+ *                         only. Read access to the rendered dashboard
+ *                         is gated by `canViewPortfolio`; this flag
+ *                         only controls the configuration layer
+ *                         (Epic 41 — Configurable Dashboard Widget Engine).
  */
 export type OrgPermissionSet = {
     canViewPortfolio: boolean;
@@ -192,6 +198,7 @@ export type OrgPermissionSet = {
     canExportReports: boolean;
     canManageTenants: boolean;
     canManageMembers: boolean;
+    canConfigureDashboard: boolean;
 };
 
 /**
@@ -211,6 +218,7 @@ export function getOrgPermissions(role: OrgRole): OrgPermissionSet {
                 canExportReports: true,
                 canManageTenants: true,
                 canManageMembers: true,
+                canConfigureDashboard: true,
             };
         case 'ORG_READER':
             return {
@@ -223,6 +231,7 @@ export function getOrgPermissions(role: OrgRole): OrgPermissionSet {
                 canExportReports: true,
                 canManageTenants: false,
                 canManageMembers: false,
+                canConfigureDashboard: false,
             };
         default: {
             // Defensive — Prisma's enum is closed, so the runtime
@@ -237,6 +246,7 @@ export function getOrgPermissions(role: OrgRole): OrgPermissionSet {
                 canExportReports: false,
                 canManageTenants: false,
                 canManageMembers: false,
+                canConfigureDashboard: false,
             };
         }
     }
