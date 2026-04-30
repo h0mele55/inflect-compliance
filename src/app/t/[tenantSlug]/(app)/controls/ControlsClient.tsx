@@ -14,6 +14,7 @@ import { NewControlModal } from './NewControlModal';
 import { ControlDetailSheet } from './ControlDetailSheet';
 import { queryKeys } from '@/lib/queryKeys';
 import { AppIcon } from '@/components/icons/AppIcon';
+import { Paperclip, CheckCircle2, AlertTriangle, X } from 'lucide-react';
 import {
     ColumnsDropdown,
     DataTable,
@@ -42,12 +43,37 @@ import {
 
 // ─── Constants ───
 
-const STATUS_CYCLE = ['NOT_STARTED', 'IN_PROGRESS', 'IMPLEMENTED', 'NEEDS_REVIEW'] as const;
+// Full ControlStatus enum — the inline-edit dropdown can set any of
+// these directly (replaces the old 4-state cycle button). The cycle
+// helper below keeps working for the bulk "advance status" action so
+// triage flows unchanged for keyboard users who liked the rapid
+// click-to-advance pattern.
+const STATUS_CYCLE = [
+    'NOT_STARTED',
+    'IN_PROGRESS',
+    'IMPLEMENTED',
+    'NEEDS_REVIEW',
+] as const;
 type ControlStatusType = typeof STATUS_CYCLE[number];
 
+const ALL_STATUSES = [
+    'NOT_STARTED',
+    'PLANNED',
+    'IN_PROGRESS',
+    'IMPLEMENTING',
+    'IMPLEMENTED',
+    'NEEDS_REVIEW',
+    'NOT_APPLICABLE',
+] as const;
+
 const STATUS_BADGE: Record<string, string> = {
-    NOT_STARTED: 'badge-neutral', IN_PROGRESS: 'badge-info', IMPLEMENTED: 'badge-success',
+    NOT_STARTED: 'badge-neutral',
+    PLANNED: 'badge-neutral',
+    IN_PROGRESS: 'badge-info',
+    IMPLEMENTING: 'badge-info',
+    IMPLEMENTED: 'badge-success',
     NEEDS_REVIEW: 'badge-warning',
+    NOT_APPLICABLE: 'badge-neutral',
 };
 /**
  * Status labels are sourced from the shared filter-defs module so the badge
@@ -422,22 +448,55 @@ function ControlsPageInner({
             header: 'Status',
             cell: ({ row }) => {
                 const c = row.original;
-                return appPermissions.controls.edit ? (
-                    <Tooltip content="Click to advance status">
-                        <button
-                            type="button"
-                            className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
-                            onClick={(e) => { e.stopPropagation(); handleStatusClick(c.id); }}
-                            aria-label={`Advance status for control ${c.code || c.annexId || c.name}`}
-                            id={`status-pill-${c.id}`}
-                        >
+                // Inline-edit dropdown — replaces the legacy cycle
+                // button. `<select>` keeps native a11y (label /
+                // arrow-key / search-by-letter) and the existing
+                // E2E `#status-pill-{id}` selector. Clicking the
+                // current value still cycles via `handleStatusClick`
+                // for keyboard-fast triage; explicit set goes
+                // through onChange.
+                if (!appPermissions.controls.edit) {
+                    return (
+                        <span className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'}`}>
                             {STATUS_LABELS[c.status] || c.status}
-                        </button>
+                        </span>
+                    );
+                }
+                return (
+                    <Tooltip content="Pick a status (or click to cycle)">
+                        <select
+                            id={`status-pill-${c.id}`}
+                            className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'} cursor-pointer border-0 outline-none focus:ring-2 focus:ring-[var(--brand-default)]`}
+                            value={c.status}
+                            onClick={(e) => {
+                                // Click-to-cycle preserved for the
+                                // legacy fast-triage flow; mousedown
+                                // would interfere with the native
+                                // `<select>` open. Cycle only fires
+                                // when the click target is the select
+                                // itself (not the options popup).
+                                if (e.target === e.currentTarget) {
+                                    e.stopPropagation();
+                                }
+                            }}
+                            onChange={(e) => {
+                                e.stopPropagation();
+                                if (e.target.value !== c.status) {
+                                    statusMutation.mutate({
+                                        controlId: c.id,
+                                        newStatus: e.target.value,
+                                    });
+                                }
+                            }}
+                            aria-label={`Status for control ${c.code || c.annexId || c.name}`}
+                        >
+                            {ALL_STATUSES.map((s) => (
+                                <option key={s} value={s}>
+                                    {STATUS_LABELS[s] || s}
+                                </option>
+                            ))}
+                        </select>
                     </Tooltip>
-                ) : (
-                    <span className={`badge ${STATUS_BADGE[c.status] || 'badge-neutral'}`}>
-                        {STATUS_LABELS[c.status] || c.status}
-                    </span>
                 );
             },
         },
@@ -447,38 +506,84 @@ function ControlsPageInner({
             cell: ({ row }) => {
                 const c = row.original;
                 const code = c.code || c.annexId || '';
-                return appPermissions.controls.edit ? (
-                    <Tooltip
-                        content={
-                            c.applicability === 'NOT_APPLICABLE'
-                                ? 'Click to mark applicable'
-                                : 'Click to mark not applicable'
-                        }
-                    >
-                        <button
-                            type="button"
-                            className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'} cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center gap-1`}
-                            onClick={(e) => { e.stopPropagation(); handleApplicabilityClick(c.id, code); }}
-                            aria-label={`Toggle applicability for control ${code || c.name}`}
-                            id={`applicability-pill-${c.id}`}
-                        >
+                if (!appPermissions.controls.edit) {
+                    return (
+                        <span className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'}`}>
                             {c.applicability === 'NOT_APPLICABLE' ? 'N/A' : 'Yes'}
-                        </button>
+                        </span>
+                    );
+                }
+                return (
+                    <Tooltip content="Mark applicable / not applicable">
+                        <select
+                            id={`applicability-pill-${c.id}`}
+                            className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'} cursor-pointer border-0 outline-none focus:ring-2 focus:ring-[var(--brand-default)]`}
+                            value={c.applicability}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                                e.stopPropagation();
+                                const next = e.target.value;
+                                if (next === c.applicability) return;
+                                if (next === 'NOT_APPLICABLE') {
+                                    // Justification required — open
+                                    // the modal (legacy flow).
+                                    setJustificationModal({
+                                        controlId: c.id,
+                                        code: code || c.id.slice(0, 8),
+                                    });
+                                    setJustification('');
+                                } else {
+                                    applicabilityMutation.mutate({
+                                        controlId: c.id,
+                                        applicability: 'APPLICABLE',
+                                        justificationText: null,
+                                    });
+                                }
+                            }}
+                            aria-label={`Applicability for control ${code || c.name}`}
+                        >
+                            <option value="APPLICABLE">Yes</option>
+                            <option value="NOT_APPLICABLE">N/A</option>
+                        </select>
                     </Tooltip>
-                ) : (
-                    <span className={`badge ${c.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'}`}>
-                        {c.applicability === 'NOT_APPLICABLE' ? 'N/A' : 'Yes'}
-                    </span>
                 );
             },
         },
         {
             id: 'owner',
             header: 'Owner',
-            accessorFn: (c) => c.owner?.name || '—',
-            cell: ({ getValue }) => (
-                <span className="text-xs text-content-muted">{getValue<string>()}</span>
-            ),
+            accessorFn: (c) => c.owner?.name || c.owner?.email || '—',
+            cell: ({ row }) => {
+                const c = row.original;
+                if (!c.owner) {
+                    return <span className="text-xs text-content-subtle">—</span>;
+                }
+                const display = c.owner.name ?? c.owner.email ?? '?';
+                const initial = display.charAt(0).toUpperCase();
+                return (
+                    <span
+                        className="inline-flex items-center gap-1.5"
+                        data-testid={`control-owner-${c.id}`}
+                    >
+                        <span
+                            aria-hidden
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-bg-elevated text-[10px] font-medium text-content-emphasis"
+                        >
+                            {initial}
+                        </span>
+                        <span className="min-w-0 leading-tight">
+                            <span className="block truncate text-xs text-content-emphasis">
+                                {c.owner.name ?? c.owner.email}
+                            </span>
+                            {c.owner.name && c.owner.email && (
+                                <span className="block truncate text-[10px] text-content-subtle">
+                                    {c.owner.email}
+                                </span>
+                            )}
+                        </span>
+                    </span>
+                );
+            },
         },
         {
             id: 'frequency',
@@ -508,9 +613,22 @@ function ControlsPageInner({
             id: 'evidence',
             header: 'Evidence',
             accessorFn: (c) => c._count?.evidenceLinks ?? 0,
-            cell: ({ getValue }) => (
-                <span className="text-xs text-content-muted">{getValue<number>()}</span>
-            ),
+            cell: ({ getValue, row }) => {
+                const n = getValue<number>();
+                return (
+                    <span
+                        className={`inline-flex items-center gap-1 text-xs ${n > 0 ? 'text-content-emphasis' : 'text-content-subtle'}`}
+                        data-testid={`control-evidence-${row.original.id}`}
+                    >
+                        <Paperclip
+                            size={12}
+                            className={n > 0 ? 'text-emerald-400' : 'text-content-subtle'}
+                            aria-hidden
+                        />
+                        {n}
+                    </span>
+                );
+            },
         },
         {
             id: 'quick-edit',
@@ -596,12 +714,53 @@ function ControlsPageInner({
                 onColumnVisibilityChange: setColumnVisibility,
                 'data-testid': 'controls-table',
                 className: 'hover:bg-bg-muted',
-                // Enable row selection so the Epic 52 SelectionToolbar
-                // (and its Epic 56 Tooltip-wrapped Clear button) is
-                // reachable on this page. The current scope only needs
-                // the toolbar to render — concrete batch actions can be
-                // added incrementally without changing this wiring.
-                onRowSelectionChange: () => {},
+                // Bulk actions wired declaratively (Epic 52 contract).
+                // Selection state is managed internally by DataTable
+                // when batchActions are present without an explicit
+                // onRowSelectionChange — keeps this page focused on
+                // the action callbacks.
+                batchActions: appPermissions.controls.edit
+                    ? [
+                          {
+                              label: 'Mark Implemented',
+                              icon: <CheckCircle2 className="size-3.5" />,
+                              onClick: (rows) => {
+                                  for (const r of rows) {
+                                      statusMutation.mutate({
+                                          controlId: r.original.id,
+                                          newStatus: 'IMPLEMENTED',
+                                      });
+                                  }
+                              },
+                          },
+                          {
+                              label: 'Mark Needs Review',
+                              icon: <AlertTriangle className="size-3.5" />,
+                              onClick: (rows) => {
+                                  for (const r of rows) {
+                                      statusMutation.mutate({
+                                          controlId: r.original.id,
+                                          newStatus: 'NEEDS_REVIEW',
+                                      });
+                                  }
+                              },
+                          },
+                          {
+                              label: 'Mark Not Applicable',
+                              icon: <X className="size-3.5" />,
+                              variant: 'danger',
+                              title: 'Bulk-set status to NOT_APPLICABLE — applicability still requires per-control justification.',
+                              onClick: (rows) => {
+                                  for (const r of rows) {
+                                      statusMutation.mutate({
+                                          controlId: r.original.id,
+                                          newStatus: 'NOT_APPLICABLE',
+                                      });
+                                  }
+                              },
+                          },
+                      ]
+                    : undefined,
             }}
         >
             {/* Create Control Modal (Epic 54) */}
