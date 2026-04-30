@@ -29,13 +29,7 @@
 import { type LucideIcon } from 'lucide-react';
 
 import { MiniAreaChart, type MiniAreaChartVariant } from '@/components/ui/mini-area-chart';
-import {
-    computeKpiTrend,
-    formatTrendAbsolute,
-    formatTrendPercent,
-    trendDirectionIcon,
-    type TrendPolarity,
-} from '@/lib/kpi-trend';
+import { computeKpiTrend, formatTrendAbsolute, formatTrendPercent, trendDirectionIcon, type TrendPolarity } from '@/lib/kpi-trend';
 
 // ─── Props ──────────────────────────────────────────────────────────
 

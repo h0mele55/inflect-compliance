@@ -173,15 +173,24 @@ describe('Widget Dependency Guard', () => {
         }
     });
 
-    test('KpiCard only imports lucide-react + the MiniAreaChart widget', () => {
+    test('KpiCard only imports lucide-react + MiniAreaChart + kpi-trend math', () => {
         const content = fs.readFileSync(path.join(UI_DIR, 'KpiCard.tsx'), 'utf-8');
         const importLines = content.split('\n').filter(l => l.trim().startsWith('import'));
-        // Allowed externals: lucide-react (icons), MiniAreaChart (Epic 59 sparkline).
+        // Allowed externals:
+        //   - lucide-react (icons)
+        //   - MiniAreaChart (Epic 59 sparkline)
+        //   - @/lib/kpi-trend (Epic 41.5 — pure trend math: computeKpiTrend,
+        //     formatTrendAbsolute, formatTrendPercent, trendDirectionIcon,
+        //     and the TrendPolarity type. Lives outside the component so
+        //     the math is reusable + tested + server-renderable.)
         // Kept tight so new chart/state libraries don't leak in uninvited.
         const externalImports = importLines.filter(l => !l.includes('./') && !l.includes('../'));
-        expect(externalImports.length).toBeLessThanOrEqual(2);
+        expect(externalImports.length).toBeLessThanOrEqual(3);
         for (const line of externalImports) {
-            const allowed = line.includes('lucide-react') || line.includes('@/components/ui/mini-area-chart');
+            const allowed =
+                line.includes('lucide-react') ||
+                line.includes('@/components/ui/mini-area-chart') ||
+                line.includes('@/lib/kpi-trend');
             expect(allowed).toBe(true);
         }
     });
