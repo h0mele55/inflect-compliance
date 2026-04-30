@@ -29,6 +29,13 @@
 import { type LucideIcon } from 'lucide-react';
 
 import { MiniAreaChart, type MiniAreaChartVariant } from '@/components/ui/mini-area-chart';
+import {
+    computeKpiTrend,
+    formatTrendAbsolute,
+    formatTrendPercent,
+    trendDirectionIcon,
+    type TrendPolarity,
+} from '@/lib/kpi-trend';
 
 // ─── Props ──────────────────────────────────────────────────────────
 
@@ -47,10 +54,43 @@ export interface KpiCardProps {
     gradient?: string;
     /** Secondary text below the value */
     subtitle?: string;
-    /** Delta from previous period — shows as ▲/▼ with color */
+    /**
+     * Delta from previous period — shows as ▲/▼ with color.
+     *
+     * Two ways to drive the trend indicator:
+     *   1. **Pre-computed** — pass `delta` (caller owns the math).
+     *      Polarity flag still applies for colour. Right path when
+     *      "vs what" isn't a simple subtraction (running averages,
+     *      weighted scores, multi-period composite metrics).
+     *   2. **Auto-compute** — pass `previousValue` and let the card
+     *      compute delta + percent. Edge cases (null, zero baseline,
+     *      negative baseline) are handled by `computeKpiTrend`.
+     *
+     * If both are passed, `delta` wins (explicit > derived).
+     */
     delta?: number | null;
-    /** What the delta represents */
+    /** What the delta represents (e.g. "vs last quarter"). */
     deltaLabel?: string;
+    /**
+     * Previous-period value for auto-computed trend. Null = baseline
+     * missing → indicator hidden. See `computeKpiTrend` for the full
+     * edge-case matrix (zero baseline, negative baseline).
+     */
+    previousValue?: number | null;
+    /**
+     * Polarity of the metric for good/bad colouring.
+     *   - `up-good`   — positive delta is GREEN (default; matches
+     *                   the prior behaviour for back-compat).
+     *   - `down-good` — negative delta is GREEN (overdue evidence,
+     *                   critical risks, open incidents).
+     *   - `neutral`   — colour always subtle (tenant count, total
+     *                   controls — direction has no semantic).
+     *
+     * Picking the wrong polarity displays "growth in critical
+     * risks" as a green arrow, which is actively harmful — hence
+     * why this is per-widget config, not a global default.
+     */
+    trendPolarity?: TrendPolarity;
     /** Optional CSS class on the outer container */
     className?: string;
     /** Optional test-id */
@@ -80,6 +120,76 @@ function formatValue(value: number | null | undefined, format: KpiFormat): strin
     }
 }
 
+// ─── Trend resolver ─────────────────────────────────────────────────
+//
+// Token-backed colour bag per semantic. Tailwind's `text-*` classes
+// pull from CSS variables (Epic 51 token system); the shared theme
+// flips light/dark in lockstep.
+
+const SEMANTIC_TEXT_TOKEN = {
+    good: 'text-emerald-400',
+    bad: 'text-red-400',
+    neutral: 'text-content-subtle',
+} as const;
+
+interface TrendIndicator {
+    direction: 'up' | 'down' | 'flat';
+    semantic: 'good' | 'bad' | 'neutral';
+    icon: string;
+    text: string;
+}
+
+function resolveTrendIndicator(input: {
+    value: number | null;
+    delta: number | null;
+    previousValue: number | null;
+    format: KpiFormat;
+    polarity: TrendPolarity;
+}): TrendIndicator | null {
+    // Path 1 — explicit delta. Caller has done the math; we only
+    // colour + format. Polarity still applies.
+    if (input.delta !== null) {
+        const direction: 'up' | 'down' | 'flat' =
+            input.delta > 0 ? 'up' : input.delta < 0 ? 'down' : 'flat';
+        const semantic: 'good' | 'bad' | 'neutral' =
+            direction === 'flat' || input.polarity === 'neutral'
+                ? 'neutral'
+                : (input.polarity === 'up-good' && direction === 'up') ||
+                    (input.polarity === 'down-good' && direction === 'down')
+                  ? 'good'
+                  : 'bad';
+        return {
+            direction,
+            semantic,
+            icon: trendDirectionIcon(direction),
+            text: formatTrendAbsolute(input.delta, input.format),
+        };
+    }
+
+    // Path 2 — auto-compute. All edge cases live in the helper.
+    if (input.previousValue === null) return null;
+    const trend = computeKpiTrend({
+        current: input.value,
+        previous: input.previousValue,
+        polarity: input.polarity,
+    });
+    if (trend.kind === 'unavailable') return null;
+    if (trend.kind === 'flat') {
+        return {
+            direction: 'flat',
+            semantic: 'neutral',
+            icon: trendDirectionIcon('flat'),
+            text: formatTrendPercent(0),
+        };
+    }
+    return {
+        direction: trend.direction,
+        semantic: trend.semantic,
+        icon: trendDirectionIcon(trend.direction),
+        text: formatTrendPercent(trend.deltaPercent),
+    };
+}
+
 // ─── Component ──────────────────────────────────────────────────────
 
 export default function KpiCard({
@@ -91,6 +201,8 @@ export default function KpiCard({
     subtitle,
     delta,
     deltaLabel,
+    previousValue,
+    trendPolarity = 'up-good',
     className = '',
     id,
     trend,
@@ -99,6 +211,13 @@ export default function KpiCard({
 }: KpiCardProps) {
     const formatted = formatValue(value, format);
     const isEmpty = value === null || value === undefined;
+    const indicator = resolveTrendIndicator({
+        value: value ?? null,
+        delta: delta ?? null,
+        previousValue: previousValue ?? null,
+        format,
+        polarity: trendPolarity,
+    });
 
     return (
         <div
@@ -124,22 +243,17 @@ export default function KpiCard({
                 {formatted}
             </p>
 
-            {/* Delta indicator */}
-            {delta !== null && delta !== undefined && (
-                <div className="flex items-center gap-1 mt-1">
+            {/* Trend indicator (delta direction + magnitude + optional label) */}
+            {indicator && (
+                <div className="flex items-center gap-1 mt-1" data-kpi-trend-row>
                     <span
-                        className={`text-xs font-medium ${
-                            delta > 0
-                                ? 'text-emerald-400'
-                                : delta < 0
-                                  ? 'text-red-400'
-                                  : 'text-content-subtle'
-                        }`}
+                        className={`text-xs font-medium ${SEMANTIC_TEXT_TOKEN[indicator.semantic]}`}
+                        data-kpi-trend-direction={indicator.direction}
+                        data-kpi-trend-semantic={indicator.semantic}
                     >
-                        {delta > 0 ? '▲' : delta < 0 ? '▼' : '—'}
+                        {indicator.icon}
                         {' '}
-                        {Math.abs(delta).toFixed(1)}
-                        {format === 'percent' ? 'pp' : ''}
+                        {indicator.text}
                     </span>
                     {deltaLabel && (
                         <span className="text-xs text-content-subtle">{deltaLabel}</span>
