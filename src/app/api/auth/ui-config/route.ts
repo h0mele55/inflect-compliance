@@ -15,10 +15,15 @@
  */
 
 import { NextResponse } from 'next/server';
+import { withApiErrorHandling } from '@/lib/errors/api';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(): Promise<NextResponse> {
+// Epic E — wrapped for x-request-id + standardized error contract.
+// Never throws in normal operation; the wrapper is here so a future
+// runtime fault (env-loader regression, etc.) yields a consistent
+// 5xx shape rather than a Next.js stack-trace HTML page.
+export const GET = withApiErrorHandling(async () => {
     return NextResponse.json({
         // When set, the public login page hides the email/password
         // form even if the Credentials provider is registered server-
@@ -27,4 +32,4 @@ export async function GET(): Promise<NextResponse> {
         credentialsFormHidden:
             process.env.AUTH_CREDENTIALS_UI_HIDDEN === '1',
     });
-}
+});

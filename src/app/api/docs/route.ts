@@ -25,6 +25,7 @@
  * and serve its assets from `public/swagger-ui/`.
  */
 import { NextResponse } from 'next/server';
+import { withApiErrorHandling } from '@/lib/errors/api';
 
 const SWAGGER_UI_VERSION = '5.17.14';
 const SWAGGER_CSS = `https://cdn.jsdelivr.net/npm/swagger-ui-dist@${SWAGGER_UI_VERSION}/swagger-ui.css`;
@@ -49,7 +50,11 @@ function isDocsEnabled(): boolean {
     return true;
 }
 
-export async function GET(): Promise<NextResponse> {
+// Epic E — wrapped for x-request-id + standardized error contract.
+// Never throws in normal operation; an unexpected runtime error in
+// the HTML build path is now reported as a clean 5xx ApiErrorResponse
+// instead of a Next.js stack-trace page.
+export const GET = withApiErrorHandling(async (): Promise<NextResponse> => {
     if (!isDocsEnabled()) {
         // Match Next.js's default 404 shape so this route is
         // indistinguishable from a route that never existed.
@@ -116,4 +121,4 @@ export async function GET(): Promise<NextResponse> {
             'X-Robots-Tag': 'noindex, nofollow',
         },
     });
-}
+});

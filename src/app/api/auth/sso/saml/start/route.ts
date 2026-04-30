@@ -8,7 +8,13 @@ import {
 } from '@/lib/security/saml-client';
 import { ssoLog, generateSsoRequestId } from '@/lib/security/sso-logging';
 import { env } from '@/env';
-import { jsonResponse } from '@/lib/api-response';
+import { withApiErrorHandling } from '@/lib/errors/api';
+import {
+    badRequest,
+    notFound,
+    configurationError,
+    externalServiceError,
+} from '@/lib/errors/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +27,10 @@ export const dynamic = 'force-dynamic';
  * 3. Builds a SAML AuthnRequest
  * 4. Encodes tenant context in RelayState
  * 5. Redirects to IdP's SSO endpoint
+ *
+ * Epic E — Standardized error contract via withApiErrorHandling.
  */
-export async function GET(req: NextRequest) {
+export const GET = withApiErrorHandling(async (req: NextRequest) => {
     const requestId = generateSsoRequestId();
     const { searchParams } = req.nextUrl;
     const tenantSlug = searchParams.get('tenant');
@@ -31,10 +39,7 @@ export async function GET(req: NextRequest) {
 
     // ── Validate params ──
     if (!tenantSlug || !providerId) {
-        return jsonResponse(
-            { error: 'Missing required parameters: tenant and provider' },
-            { status: 400 }
-        );
+        throw badRequest('Missing required parameters: tenant and provider');
     }
 
     // ── Resolve tenant ──
@@ -44,7 +49,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!tenant) {
-        return jsonResponse({ error: 'Tenant not found' }, { status: 404 });
+        throw notFound('Tenant not found');
     }
 
     // ── Load provider config ──
@@ -58,23 +63,17 @@ export async function GET(req: NextRequest) {
     });
 
     if (!provider) {
-        return jsonResponse(
-            { error: 'SAML provider not found or not enabled' },
-            { status: 404 }
-        );
+        throw notFound('SAML provider not found or not enabled');
     }
 
     // ── Parse SAML config ──
     const configResult = SamlConfigSchema.safeParse(provider.configJson);
     if (!configResult.success) {
         ssoLog('error', 'Invalid SAML configuration', {
-            requestId, tenantSlug: tenantSlug || '', providerType: 'SAML',
+            requestId, tenantSlug, providerType: 'SAML',
             providerId: provider.id, stage: 'config_load',
         });
-        return jsonResponse(
-            { error: 'SSO configuration error' },
-            { status: 500 }
-        );
+        throw configurationError('SSO configuration error');
     }
     const samlConfig = configResult.data;
 
@@ -82,12 +81,9 @@ export async function GET(req: NextRequest) {
         // If metadataUrl was provided but not ssoUrl/entityId, we need to handle that
         // For now, require explicit ssoUrl + entityId
         ssoLog('error', 'SAML config missing ssoUrl or entityId', {
-            tenantSlug: tenantSlug || '', providerType: 'SAML', providerId: provider.id, stage: 'config_load',
+            tenantSlug, providerType: 'SAML', providerId: provider.id, stage: 'config_load',
         });
-        return jsonResponse(
-            { error: 'SAML configuration incomplete — ssoUrl and entityId required' },
-            { status: 500 }
-        );
+        throw configurationError('SAML configuration incomplete — ssoUrl and entityId required');
     }
 
     // ── Build SAML instance ──
@@ -118,10 +114,6 @@ export async function GET(req: NextRequest) {
             providerId: provider.id, stage: 'authn_request',
             meta: { error: (err as Error).message },
         });
-
-        return jsonResponse(
-            { error: 'Failed to initiate SAML authentication' },
-            { status: 500 }
-        );
+        throw externalServiceError('Failed to initiate SAML authentication');
     }
-}
+});

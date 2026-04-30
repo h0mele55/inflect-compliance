@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getOrgCtx } from '@/app-layer/context';
 import { forbidden } from '@/lib/errors/types';
 import { listOrgMembers } from '@/app-layer/usecases/org-members';
+import { listPendingOrgInvites } from '@/app-layer/usecases/org-invites';
 import { MembersTable } from './MembersTable';
 
 /**
@@ -45,7 +46,10 @@ export default async function OrgMembersPage({ params }: PageProps) {
         );
     }
 
-    const rows = await listOrgMembers(ctx);
+    const [rows, invites] = await Promise.all([
+        listOrgMembers(ctx),
+        listPendingOrgInvites(ctx),
+    ]);
     const currentUserId = ctx.userId;
 
     return (
@@ -53,6 +57,7 @@ export default async function OrgMembersPage({ params }: PageProps) {
             orgSlug={orgSlug}
             currentUserId={currentUserId}
             rows={JSON.parse(JSON.stringify(rows))}
+            invites={JSON.parse(JSON.stringify(invites))}
         />
     );
 }

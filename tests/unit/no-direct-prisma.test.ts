@@ -101,6 +101,11 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
         // `organizationId` against the global prisma instance. Same
         // shape as the other org-level usecases above.
         'org-audit.ts',
+        // Epic D — org invitation lifecycle. Same org-scoped shape:
+        // OrgInvite/OrgMembership are user-scoped not tenant-scoped,
+        // and redeemOrgInvite specifically operates pre-membership
+        // (the redeemer is not yet a member, mirroring tenant-invites).
+        'org-invites.ts',
         // Epic O-3 — portfolio aggregation uses `runInGlobalContext` for
         // ComplianceSnapshot reads (org-wide aggregates, no business data)
         // and switches to per-tenant `withTenantDb(tid, ...)` for drill-

@@ -206,16 +206,45 @@ async function ensureTenantMembershipFromInvite(
     }
 }
 
-async function readInviteTokenFromCookies(): Promise<string | null> {
+/**
+ * Epic D — same shape as ensureTenantMembershipFromInvite but for
+ * org invites. Reads the `inflect_org_invite_token` cookie set by
+ * /api/org/invite/:token/start-signin, then calls redeemOrgInvite.
+ * Best-effort; a failure logs and falls through (the user is still
+ * authenticated, they'll land on the appropriate "no access" page).
+ */
+async function ensureOrgMembershipFromInvite(
+    userId: string,
+    userEmail: string,
+    orgInviteToken: string | null,
+): Promise<void> {
+    if (!orgInviteToken) return;
+    try {
+        const { redeemOrgInvite } = await import('@/app-layer/usecases/org-invites');
+        await redeemOrgInvite({ token: orgInviteToken, userId, userEmail });
+    } catch (err) {
+        edgeLogger.warn('signIn: org invite redemption failed', {
+            component: 'auth',
+            userId,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
+async function readInviteTokenFromCookies(): Promise<{
+    tenantToken: string | null;
+    orgToken: string | null;
+}> {
     try {
         // GAP-05 — Next 15 made `cookies()` async (Promise<ReadonlyCookies>).
-        // The `await cookies()` call below already aligns with that contract.
         const { cookies } = await import('next/headers');
         const cookieStore = await cookies();
-        return cookieStore.get('inflect_invite_token')?.value ?? null;
+        return {
+            tenantToken: cookieStore.get('inflect_invite_token')?.value ?? null,
+            orgToken: cookieStore.get('inflect_org_invite_token')?.value ?? null,
+        };
     } catch {
-        // cookies() throws outside a Request context — safe to ignore.
-        return null;
+        return { tenantToken: null, orgToken: null };
     }
 }
 
@@ -240,10 +269,13 @@ export const authOptions: NextAuthOptions = {
          *      duplicate.
          *
          *   2. Invite redemption: if an `inflect_invite_token` cookie
-         *      is present (set by /api/invites/:token/start-signin),
-         *      redeem it to create a TenantMembership.
+         *      (tenant invite) or `inflect_org_invite_token` cookie
+         *      (org invite, Epic D) is present, redeem it to create
+         *      the corresponding TenantMembership / OrgMembership.
          *
-         * Sign-in alone grants AUTHENTICATION, not tenant membership.
+         * Sign-in alone grants AUTHENTICATION, not tenant or org
+         * membership. There is NO auto-join behaviour — see
+         * `tests/guardrails/no-auto-join.test.ts`.
          */
         async signIn({ user, account, profile }) {
             if (!account) return true;
@@ -263,7 +295,7 @@ export const authOptions: NextAuthOptions = {
                 return false;
             }
 
-            const inviteToken = await readInviteTokenFromCookies();
+            const inviteTokens = await readInviteTokenFromCookies();
 
             // 1. Account linking for OAuth (not credentials).
             if (account.provider !== 'credentials' && user.email) {
@@ -301,7 +333,12 @@ export const authOptions: NextAuthOptions = {
                     await ensureTenantMembershipFromInvite(
                         existingUser.id,
                         user.email,
-                        inviteToken,
+                        inviteTokens.tenantToken,
+                    );
+                    await ensureOrgMembershipFromInvite(
+                        existingUser.id,
+                        user.email,
+                        inviteTokens.orgToken,
                     );
                     return true;
                 }
@@ -312,7 +349,12 @@ export const authOptions: NextAuthOptions = {
                 await ensureTenantMembershipFromInvite(
                     user.id,
                     user.email,
-                    inviteToken,
+                    inviteTokens.tenantToken,
+                );
+                await ensureOrgMembershipFromInvite(
+                    user.id,
+                    user.email,
+                    inviteTokens.orgToken,
                 );
             }
             return true;

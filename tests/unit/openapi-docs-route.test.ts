@@ -9,10 +9,21 @@
  * response shape, not the JavaScript that swagger-ui-bundle ships.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { NextRequest } = require('next/server');
+
 function loadRouteFresh() {
     jest.resetModules();
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('@/app/api/docs/route');
+}
+
+// Epic E — the route is now wrapped with `withApiErrorHandling`,
+// which expects a real NextRequest (it reads `req.headers`,
+// `req.nextUrl.pathname`, `req.method`). The route handler itself
+// still ignores the request, so a stub URL is sufficient.
+function fakeRequest() {
+    return new NextRequest('http://localhost/api/docs', { method: 'GET' });
 }
 
 describe('GET /api/docs — Swagger UI gating', () => {
@@ -30,7 +41,7 @@ describe('GET /api/docs — Swagger UI gating', () => {
         (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
         const { GET } = loadRouteFresh();
 
-        const res = await GET();
+        const res = await GET(fakeRequest(), {});
 
         expect(res.status).toBe(404);
         const body = await res.text();
@@ -44,7 +55,7 @@ describe('GET /api/docs — Swagger UI gating', () => {
         (process.env as Record<string, string | undefined>).NODE_ENV = 'test';
         const { GET } = loadRouteFresh();
 
-        const res = await GET();
+        const res = await GET(fakeRequest(), {});
         expect(res.status).toBe(404);
     });
 
@@ -52,7 +63,7 @@ describe('GET /api/docs — Swagger UI gating', () => {
         (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
         const { GET } = loadRouteFresh();
 
-        const res = await GET();
+        const res = await GET(fakeRequest(), {});
         const body = await res.text();
 
         expect(res.status).toBe(200);
@@ -70,7 +81,7 @@ describe('GET /api/docs — Swagger UI gating', () => {
         (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
         const { GET } = loadRouteFresh();
 
-        const res = await GET();
+        const res = await GET(fakeRequest(), {});
         const body = await res.text();
 
         expect(body).toMatch(/swagger-ui-dist@\d+\.\d+\.\d+\//);
@@ -82,7 +93,7 @@ describe('GET /api/docs — Swagger UI gating', () => {
         (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
         const { GET } = loadRouteFresh();
 
-        const res = await GET();
+        const res = await GET(fakeRequest(), {});
 
         expect(res.headers.get('Cache-Control')).toBe('no-store');
         expect(res.headers.get('X-Robots-Tag')).toMatch(/noindex/);
@@ -95,7 +106,7 @@ describe('GET /api/docs — Swagger UI gating', () => {
         (process.env as Record<string, string | undefined>).NODE_ENV = 'development';
         const { GET } = loadRouteFresh();
 
-        const res = await GET();
+        const res = await GET(fakeRequest(), {});
         const body = await res.text();
 
         expect(body).toMatch(/DEVELOPMENT/);
