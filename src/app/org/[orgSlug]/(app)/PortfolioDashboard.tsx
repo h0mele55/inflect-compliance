@@ -1,0 +1,299 @@
+"use client";
+
+/**
+ * Epic 41 page rewire — main interactive dashboard component.
+ *
+ * The org overview page now reads `OrgDashboardWidget` rows from
+ * the DB (via the API at `/api/org/<slug>/dashboard/widgets`) and
+ * renders them through the typed widget dispatcher + grid + picker
+ * primitives this PR shipped.
+ *
+ * Two modes:
+ *
+ *   - **View mode** (default, ORG_READER + ORG_ADMIN) — widgets
+ *     render in their persisted positions; drag/resize disabled.
+ *     Clicks pass through to widget contents (drill-down links,
+ *     tenant rows, etc.).
+ *
+ *   - **Edit mode** (ORG_ADMIN only, via "Edit" button) — drag /
+ *     resize / per-widget delete enabled; "Add widget" button
+ *     opens the picker. Layout changes PATCH the API per row;
+ *     adds POST; deletes DELETE.
+ *
+ * Persistence is API-driven — no local-only state. A failed PATCH
+ * (e.g. 403, 500) snaps the tile back via the next render
+ * because the source of truth is the parent's `widgets` state,
+ * which is only updated on a successful response.
+ */
+
+import { useCallback, useState } from 'react';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
+
+import {
+    DashboardGrid,
+    WidgetPicker,
+    type WidgetLayoutChange,
+} from '@/components/ui/dashboard-widgets';
+import type {
+    CreateOrgDashboardWidgetInput,
+    OrgDashboardWidgetDto,
+} from '@/app-layer/schemas/org-dashboard-widget.schemas';
+
+import { DispatchedWidget, type PortfolioData } from './widget-dispatcher';
+
+// ─── Props ──────────────────────────────────────────────────────────
+
+export interface PortfolioDashboardProps {
+    initialWidgets: OrgDashboardWidgetDto[];
+    data: PortfolioData;
+    /** True when the caller is allowed to edit the dashboard. */
+    canEdit: boolean;
+}
+
+// ─── API client (small, focused on this page only) ─────────────────
+
+async function patchWidget(
+    orgSlug: string,
+    id: string,
+    body: { position?: { x: number; y: number }; size?: { w: number; h: number } },
+): Promise<OrgDashboardWidgetDto> {
+    const res = await fetch(
+        `/api/org/${orgSlug}/dashboard/widgets/${id}`,
+        {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(body),
+        },
+    );
+    if (!res.ok) throw new Error(`patch_failed_${res.status}`);
+    const json = (await res.json()) as { widget: OrgDashboardWidgetDto };
+    return json.widget;
+}
+
+async function postWidget(
+    orgSlug: string,
+    body: CreateOrgDashboardWidgetInput,
+): Promise<OrgDashboardWidgetDto> {
+    const res = await fetch(`/api/org/${orgSlug}/dashboard/widgets`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`post_failed_${res.status}`);
+    const json = (await res.json()) as { widget: OrgDashboardWidgetDto };
+    return json.widget;
+}
+
+async function deleteWidget(orgSlug: string, id: string): Promise<void> {
+    const res = await fetch(
+        `/api/org/${orgSlug}/dashboard/widgets/${id}`,
+        { method: 'DELETE', credentials: 'same-origin' },
+    );
+    if (!res.ok) throw new Error(`delete_failed_${res.status}`);
+}
+
+// ─── Component ──────────────────────────────────────────────────────
+
+export function PortfolioDashboard({
+    initialWidgets,
+    data,
+    canEdit,
+}: PortfolioDashboardProps) {
+    const [widgets, setWidgets] = useState<OrgDashboardWidgetDto[]>(
+        () => [...initialWidgets],
+    );
+    const [editMode, setEditMode] = useState(false);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // ── Layout-change handler ──
+    //
+    // Fires after every drag/resize stop. The grid emits ONLY the
+    // diff (rows whose (x,y,w,h) actually moved). For each, fire a
+    // PATCH and reflect the response in local state. Errors snap
+    // the tile back via re-render.
+    const handleLayoutChange = useCallback(
+        async (changes: WidgetLayoutChange[]) => {
+            if (changes.length === 0) return;
+            setError(null);
+            try {
+                const updates = await Promise.all(
+                    changes.map((c) =>
+                        patchWidget(data.orgSlug, c.id, {
+                            position: c.position,
+                            size: c.size,
+                        }),
+                    ),
+                );
+                setWidgets((prev) => {
+                    const byId = new Map(updates.map((u) => [u.id, u]));
+                    return prev.map((w) => byId.get(w.id) ?? w);
+                });
+            } catch (e) {
+                setError(
+                    e instanceof Error
+                        ? `Failed to save layout (${e.message})`
+                        : 'Failed to save layout',
+                );
+            }
+        },
+        [data.orgSlug],
+    );
+
+    const handleCreate = useCallback(
+        async (input: CreateOrgDashboardWidgetInput) => {
+            const created = await postWidget(data.orgSlug, input);
+            setWidgets((prev) => [...prev, created]);
+            return created;
+        },
+        [data.orgSlug],
+    );
+
+    const handleDelete = useCallback(
+        async (id: string) => {
+            if (busy) return;
+            setBusy(true);
+            setError(null);
+            try {
+                await deleteWidget(data.orgSlug, id);
+                setWidgets((prev) => prev.filter((w) => w.id !== id));
+            } catch (e) {
+                setError(
+                    e instanceof Error
+                        ? `Failed to delete widget (${e.message})`
+                        : 'Failed to delete widget',
+                );
+            } finally {
+                setBusy(false);
+            }
+        },
+        [data.orgSlug, busy],
+    );
+
+    return (
+        <div className="space-y-4" data-portfolio-dashboard>
+            {/* Header bar */}
+            <header className="flex items-end justify-between gap-4 flex-wrap">
+                <div>
+                    <h1 className="text-2xl font-semibold text-content-emphasis">
+                        Portfolio Overview
+                    </h1>
+                    <p className="text-sm text-content-muted mt-1">
+                        {data.summary.tenants.total} tenant
+                        {data.summary.tenants.total === 1 ? '' : 's'}
+                        {data.summary.tenants.pending > 0 && (
+                            <> · {data.summary.tenants.pending} pending first snapshot</>
+                        )}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    {canEdit && !editMode && (
+                        <button
+                            type="button"
+                            onClick={() => setEditMode(true)}
+                            className="btn btn-secondary btn-sm flex items-center gap-1.5"
+                            data-testid="dashboard-edit-toggle"
+                        >
+                            <Pencil className="size-3.5" aria-hidden="true" />
+                            Edit dashboard
+                        </button>
+                    )}
+                    {canEdit && editMode && (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => setPickerOpen(true)}
+                                className="btn btn-secondary btn-sm flex items-center gap-1.5"
+                                data-testid="dashboard-add-widget"
+                            >
+                                <Plus className="size-3.5" aria-hidden="true" />
+                                Add widget
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setEditMode(false)}
+                                className="btn btn-primary btn-sm flex items-center gap-1.5"
+                                data-testid="dashboard-edit-done"
+                            >
+                                <X className="size-3.5" aria-hidden="true" />
+                                Done
+                            </button>
+                        </>
+                    )}
+                </div>
+            </header>
+
+            {error && (
+                <div
+                    role="alert"
+                    data-testid="dashboard-error"
+                    className="rounded-md border border-border-error bg-bg-error/10 px-3 py-2 text-sm text-content-error"
+                >
+                    {error}
+                </div>
+            )}
+
+            {/* Empty-state for orgs that haven't been backfilled. The
+             *  POST /api/org seed lands new orgs with the preset
+             *  pre-installed; existing orgs need
+             *  `npm run db:backfill-org-widgets -- --execute`. ORG_ADMIN
+             *  sees a clear hint; ORG_READER sees a softer one. */}
+            {widgets.length === 0 && (
+                <div
+                    data-testid="dashboard-empty-state"
+                    className="rounded-md border border-border-subtle bg-bg-muted/20 px-4 py-6 text-center"
+                >
+                    <p className="text-sm font-medium text-content-emphasis">
+                        Dashboard is empty
+                    </p>
+                    <p className="text-xs text-content-muted mt-1">
+                        {canEdit
+                            ? 'Run the backfill script (`npm run db:backfill-org-widgets -- --execute`) or add widgets via the picker.'
+                            : 'No widgets configured. Contact an org admin.'}
+                    </p>
+                </div>
+            )}
+
+            {/* Grid */}
+            {widgets.length > 0 && (
+                <DashboardGrid<OrgDashboardWidgetDto>
+                    widgets={widgets}
+                    editable={editMode}
+                    onLayoutChange={handleLayoutChange}
+                    renderWidget={(w) => (
+                        <DispatchedWidget
+                            widget={w}
+                            data={data}
+                            actionsSlot={
+                                editMode ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void handleDelete(w.id);
+                                        }}
+                                        disabled={busy}
+                                        aria-label={`Delete ${w.title ?? w.chartType} widget`}
+                                        data-testid={`dashboard-delete-widget-${w.id}`}
+                                        className="text-content-subtle hover:text-content-error transition-colors p-1 rounded"
+                                    >
+                                        <Trash2 className="size-3.5" aria-hidden="true" />
+                                    </button>
+                                ) : null
+                            }
+                        />
+                    )}
+                />
+            )}
+
+            {/* Picker modal */}
+            <WidgetPicker
+                open={pickerOpen}
+                onOpenChange={setPickerOpen}
+                onSubmit={handleCreate}
+            />
+        </div>
+    );
+}
