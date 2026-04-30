@@ -96,6 +96,11 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
         'org-members.ts',
         'org-provisioning.ts',
         'org-tenants.ts',
+        // Epic B — org audit ledger is org-scoped (not tenant-scoped).
+        // The `OrgAuditLog` table has no `tenantId`; reads filter on
+        // `organizationId` against the global prisma instance. Same
+        // shape as the other org-level usecases above.
+        'org-audit.ts',
         // Epic O-3 — portfolio aggregation uses `runInGlobalContext` for
         // ComplianceSnapshot reads (org-wide aggregates, no business data)
         // and switches to per-tenant `withTenantDb(tid, ...)` for drill-

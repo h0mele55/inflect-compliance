@@ -124,6 +124,12 @@ describe('Dynamic require() usage is minimized', () => {
     const REQUIRE_ALLOWLIST: Record<string, string[]> = {
         'lib/prisma.ts': ['./audit/audit-writer'],
         'lib/audit/audit-writer.ts': ['../prisma'],
+        // Epic B — same circular-import dance as audit-writer.ts.
+        // `prisma.ts` registers middleware that lives in the audit
+        // chain; org-audit-writer is imported directly by usecases
+        // and needs the singleton prisma client at runtime, not at
+        // module-load time.
+        'lib/audit/org-audit-writer.ts': ['../prisma'],
         'lib/retention-purge.ts': ['./audit/audit-writer'],
         'lib/mailer.ts': ['@/env'],
         'lib/observability/instrumentation.ts': ['./logger'],
