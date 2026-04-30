@@ -279,6 +279,40 @@ export interface AutomationEventDispatchPayload {
     };
 }
 
+/**
+ * Bulk-import evidence from a tenant-scoped staged ZIP archive.
+ *
+ * The HTTP layer stages the upload to storage (domain
+ * `evidence-import-staging`) and enqueues this job; the worker
+ * extracts, validates each entry against the safety bounds, and
+ * funnels accepted entries through the canonical
+ * `uploadEvidenceFile` usecase so business rules (MIME allowlist,
+ * size cap, dedup, audit trail) stay identical to the single-file
+ * upload path.
+ *
+ * Payload is JSON-serialisable per the JobPayloadMap rule — no Date
+ * objects, no Buffers, no functions. The actual ZIP bytes live in
+ * storage at `stagingPathKey`; the worker streams them back.
+ */
+export interface EvidenceImportPayload {
+    /** Tenant whose evidence will be enriched. Required for isolation. */
+    tenantId: string;
+    /** User who uploaded the bundle — used for actor attribution + perm gate. */
+    initiatedByUserId: string;
+    /** Storage key of the staged ZIP (under `evidence-import-staging`). */
+    stagingPathKey: string;
+    /** Storage `FileRecord.id` of the staging upload, deleted on success. */
+    stagingFileRecordId: string;
+    /** Optional control to attach every extracted evidence to. */
+    controlId?: string | null;
+    /** Optional retention date applied to every extracted evidence. */
+    retentionUntilIso?: string | null;
+    /** Optional category tag applied to every extracted evidence. */
+    category?: string | null;
+    /** Optional log-correlation id from the upstream HTTP request. */
+    requestId?: string;
+}
+
 /** Webhook-driven sync pull */
 export interface SyncPullPayload {
     ctx: {
@@ -335,6 +369,7 @@ export interface JobPayloadMap {
     'automation-event-dispatch': AutomationEventDispatchPayload;
     'key-rotation': KeyRotationPayload;
     'tenant-dek-rotation': TenantDekRotationPayload;
+    'evidence-import': EvidenceImportPayload;
 }
 
 /** Union of all valid job names */
@@ -461,6 +496,18 @@ export const JOB_DEFAULTS: Record<JobName, {
         backoff: { type: 'fixed', delay: 0 },
         removeOnComplete: 100,
         removeOnFail: 500,
+    },
+    'evidence-import': {
+        // No auto-retry: an import that hits a safety-bound (zip-bomb,
+        // path-traversal, oversize) is a hard reject — auto-retrying
+        // would just hammer the same archive against the same checks.
+        // Transient failures (storage flakes) leave the staged ZIP
+        // intact for the operator to re-enqueue manually after
+        // investigating.
+        attempts: 1,
+        backoff: { type: 'fixed', delay: 0 },
+        removeOnComplete: 200,
+        removeOnFail: 1000,
     },
 };
 

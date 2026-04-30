@@ -566,3 +566,43 @@ executorRegistry.register('automation-event-dispatch', async (payload) => {
     );
 });
 
+// ── evidence-import (Epic 43.3) ──────────────────────────────────────
+//
+// One job invocation per uploaded ZIP. The HTTP layer stages the
+// archive under `temp/<tenantId>/...` and enqueues this job; the
+// worker streams the archive, runs the safety guards, and creates
+// individual evidence rows via `uploadEvidenceFile`. See
+// `evidence-import.ts` for the full safety bound + cleanup flow.
+
+executorRegistry.register('evidence-import', async (payload, ctx) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runEvidenceImport } = await import('./evidence-import');
+    const r = await runEvidenceImport(payload, async (progress) => {
+        // Forward live counters to the BullMQ progress channel so the
+        // GET /evidence/imports/:jobId status endpoint can show
+        // mid-flight progress instead of waiting for completion.
+        if (ctx?.updateProgress) {
+            await ctx.updateProgress(progress);
+        }
+    });
+    return makeResult(
+        'evidence-import',
+        startedAt,
+        startMs,
+        r.totalEntries,
+        r.extracted,
+        r.skipped + r.errored,
+        {
+            tenantId: r.tenantId,
+            extracted: r.extracted,
+            skipped: r.skipped,
+            errored: r.errored,
+            evidenceIds: r.evidenceIds,
+            skipReasons: r.skipReasons,
+            firstError: r.firstError,
+            jobRunId: r.jobRunId,
+        },
+    );
+});
+

@@ -13,6 +13,7 @@ import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 // acceptable and the E2E suite becomes deterministic.
 import { UploadEvidenceModal } from './UploadEvidenceModal';
 import { NewEvidenceTextModal } from './NewEvidenceTextModal';
+import { EvidenceBulkImportModal } from './EvidenceBulkImportModal';
 import { DatePicker } from '@/components/ui/date-picker/date-picker';
 import {
     parseYMD,
@@ -35,6 +36,13 @@ import {
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
 import { ListPageShell } from '@/components/layout/ListPageShell';
+import {
+    FileTypeIcon,
+    resolveFileTypeIcon,
+} from '@/components/ui/file-type-icon';
+import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
+import { EvidenceGallery } from '@/components/ui/EvidenceGallery';
+import { ToggleGroup } from '@/components/ui/toggle-group';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import {
     buildEvidenceFilters,
@@ -104,8 +112,12 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const queryClient = useQueryClient();
 
-    // Retention-tab view selector — deliberately kept separate from filter state.
-    const { filters, setFilter } = useUrlFilters(['tab']);
+    // Retention-tab + view-mode selectors — deliberately kept separate from filter state.
+    // `tab`: active | expiring | archived. `view`: list | gallery.
+    // Both URL-synced so a refresh / back-button preserves the page
+    // shape, and toggling the view doesn't clobber the active filters
+    // (filter state lives in `filterCtx`, not in `useUrlFilters`).
+    const { filters, setFilter } = useUrlFilters(['tab', 'view']);
     const filterCtx = useFilters();
     const { state, search, hasActive } = filterCtx;
 
@@ -142,8 +154,11 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [controls] = useState<any[]>(initialControls);
     const retentionFilter = (filters.tab || 'active') as RetentionFilter;
+    const viewMode: 'list' | 'gallery' =
+        filters.view === 'gallery' ? 'gallery' : 'list';
     const [showUpload, setShowUpload] = useState(false);
     const [showTextForm, setShowTextForm] = useState(false);
+    const [showBulkImport, setShowBulkImport] = useState(false);
 
     // Retention edit state
     const [editingRetention, setEditingRetention] = useState<string | null>(null);
@@ -260,8 +275,8 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     // (ListPageShell.Body + DataTable fillBody) shows all rows.
     const evidenceColumnConfig = useMemo(
         () => ({
-            all: ['title', 'type', 'control', 'retention', 'status', 'owner', 'actions'],
-            defaultVisible: ['title', 'type', 'control', 'retention', 'status', 'owner', 'actions'],
+            all: ['title', 'type', 'control', 'retention', 'freshness', 'status', 'owner', 'actions'],
+            defaultVisible: ['title', 'type', 'control', 'retention', 'freshness', 'status', 'owner', 'actions'],
             fixed: ['actions'],
         }),
         [],
@@ -280,6 +295,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             { id: 'type', label: 'Type' },
             { id: 'control', label: 'Control' },
             { id: 'retention', label: 'Retention' },
+            { id: 'freshness', label: 'Freshness' },
             { id: 'status', label: 'Status' },
             { id: 'owner', label: 'Owner' },
             { id: 'actions', label: 'Actions', alwaysVisible: true },
@@ -297,11 +313,20 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             cell: ({ row }: { row: any }) => {
                 const ev = row.original;
                 return (
-                    <div>
-                        <div className="font-medium text-content-emphasis text-sm">{ev.title}</div>
-                        {ev.fileName && ev.fileName !== ev.title && (
-                            <div className="text-xs text-content-subtle">{ev.fileName}</div>
-                        )}
+                    <div className="flex items-center gap-2 min-w-0">
+                        <FileTypeIcon
+                            fileName={ev.fileName ?? null}
+                            mime={ev.fileRecord?.mimeType ?? null}
+                            domainKind={ev.type ?? null}
+                            size={16}
+                            data-testid={`evidence-row-icon-${ev.id}`}
+                        />
+                        <div className="min-w-0">
+                            <div className="font-medium text-content-emphasis text-sm truncate">{ev.title}</div>
+                            {ev.fileName && ev.fileName !== ev.title && (
+                                <div className="text-xs text-content-subtle truncate">{ev.fileName}</div>
+                            )}
+                        </div>
                     </div>
                 );
             },
@@ -312,9 +337,25 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             cell: ({ row }: { row: any }) => {
                 const ev = row.original;
+                // Mixed-file aware: pick the actual file kind by
+                // extension/MIME when this row is a file; fall back to
+                // the domain kind (LINK / TEXT) for non-file rows.
+                const match = resolveFileTypeIcon(
+                    ev.fileName ?? null,
+                    ev.fileRecord?.mimeType ?? null,
+                    ev.type ?? null,
+                );
                 return (
-                    <span className={`badge ${ev.type === 'FILE' ? 'badge-success' : 'badge-info'}`}>
-                        {ev.type === 'FILE' ? 'FILE' : ev.type}
+                    <span
+                        className="inline-flex items-center gap-1.5 text-xs text-content-muted"
+                        data-file-kind={match.label.toLowerCase()}
+                    >
+                        <match.Icon
+                            size={14}
+                            className={match.colorClass}
+                            aria-hidden
+                        />
+                        <span>{match.label}</span>
                     </span>
                 );
             },
@@ -378,6 +419,29 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                             </div>
                         )}
                     </div>
+                );
+            },
+            meta: { disableTruncate: true },
+        },
+        {
+            id: 'freshness',
+            header: 'Freshness',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: { row: any }) => {
+                const ev = row.original;
+                // `lastRefreshedAt` is not yet a discrete column on
+                // Evidence — `updatedAt` is the closest existing
+                // signal (any review action / metadata edit / archive
+                // toggle bumps it). Wrapping it in the FreshnessBadge
+                // here keeps the page semantic in sync with the
+                // Epic 43 spec without forcing a schema migration.
+                return (
+                    <FreshnessBadge
+                        lastRefreshedAt={ev.updatedAt ?? ev.dateCollected ?? null}
+                        now={hydratedNow}
+                        compact
+                        data-testid={`evidence-row-freshness-${ev.id}`}
+                    />
                 );
             },
             meta: { disableTruncate: true },
@@ -471,6 +535,14 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                             </button>
                             <button
                                 type="button"
+                                onClick={() => setShowBulkImport(true)}
+                                className="btn btn-secondary"
+                                id="bulk-import-evidence-btn"
+                            >
+                                Import ZIP
+                            </button>
+                            <button
+                                type="button"
                                 onClick={() => setShowTextForm(true)}
                                 className="btn btn-secondary"
                                 id="add-text-evidence-btn"
@@ -497,6 +569,12 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                         tenantSlug={tenantSlug}
                         apiUrl={apiUrl}
                         controls={controls}
+                    />
+                    <EvidenceBulkImportModal
+                        open={showBulkImport}
+                        setOpen={setShowBulkImport}
+                        tenantSlug={tenantSlug}
+                        apiUrl={apiUrl}
                     />
                 </>
             )}
@@ -528,17 +606,40 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                         </button>
                     </div>
 
-                    <EvidenceFilterToolbar
-                        controls={controls}
-                        columnsDropdown={
-                            <ColumnsDropdown
-                                columns={evidenceColumnDropdown}
-                                visibility={columnVisibility}
-                                onChange={(v) => setColumnVisibility(v)}
-                                defaultVisibility={defaultEvidenceVisibility}
-                            />
-                        }
-                    />
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {/*
+                          Epic 43.2 view toggle. Filter state lives in
+                          `filterCtx`, NOT in `useUrlFilters`, so
+                          flipping the renderer doesn't disturb search,
+                          search-q, or any active filter pill — both
+                          the table and the gallery read from the same
+                          `displayEvidence` array.
+                        */}
+                        <ToggleGroup
+                            size="sm"
+                            ariaLabel="Evidence view"
+                            options={[
+                                { value: 'list', label: 'List', id: 'evidence-view-list' },
+                                { value: 'gallery', label: 'Gallery', id: 'evidence-view-gallery' },
+                            ]}
+                            selected={viewMode}
+                            selectAction={(v) => setFilter('view', v === 'list' ? '' : v)}
+                            className="shrink-0"
+                        />
+                        <EvidenceFilterToolbar
+                            controls={controls}
+                            columnsDropdown={
+                                viewMode === 'list' ? (
+                                    <ColumnsDropdown
+                                        columns={evidenceColumnDropdown}
+                                        visibility={columnVisibility}
+                                        onChange={(v) => setColumnVisibility(v)}
+                                        defaultVisibility={defaultEvidenceVisibility}
+                                    />
+                                ) : null
+                            }
+                        />
+                    </div>
                 </div>
 
                 {/* Archived warning */}
@@ -554,24 +655,49 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             </ListPageShell.Filters>
 
             <ListPageShell.Body>
-                <DataTable
-                    fillBody
-                    data={displayEvidence}
-                    columns={evidenceColumns}
-                    getRowId={(ev: any) => ev.id}
-                    emptyState={
-                        retentionFilter === 'archived'
-                            ? 'No archived evidence'
-                            : retentionFilter === 'expiring'
-                                ? 'No evidence expiring soon'
-                                : t.noEvidence
-                    }
-                    resourceName={(p) => p ? 'evidence items' : 'evidence item'}
-                    columnVisibility={columnVisibility}
-                    onColumnVisibilityChange={setColumnVisibility}
-                    data-testid="evidence-table"
-                    className="hover:bg-bg-muted"
-                />
+                {viewMode === 'gallery' ? (
+                    <EvidenceGallery
+                        rows={displayEvidence}
+                        loading={evidenceQuery.isLoading && !evidenceQuery.data}
+                        emptyState={
+                            retentionFilter === 'archived'
+                                ? 'No archived evidence'
+                                : retentionFilter === 'expiring'
+                                    ? 'No evidence expiring soon'
+                                    : t.noEvidence
+                        }
+                        fileUrl={(ev: any) =>
+                            ev.fileRecordId
+                                ? apiUrl(`/evidence/files/${ev.fileRecordId}/download`)
+                                : null
+                        }
+                        statusBadgeClass={(s) => STATUS_BADGE[s] ?? 'badge-neutral'}
+                        retentionStatus={(ev: any) => {
+                            const rs = getRetentionStatus(ev, hydratedNow);
+                            return { label: rs.label, badge: rs.badge };
+                        }}
+                        data-testid="evidence-gallery"
+                    />
+                ) : (
+                    <DataTable
+                        fillBody
+                        data={displayEvidence}
+                        columns={evidenceColumns}
+                        getRowId={(ev: any) => ev.id}
+                        emptyState={
+                            retentionFilter === 'archived'
+                                ? 'No archived evidence'
+                                : retentionFilter === 'expiring'
+                                    ? 'No evidence expiring soon'
+                                    : t.noEvidence
+                        }
+                        resourceName={(p) => p ? 'evidence items' : 'evidence item'}
+                        columnVisibility={columnVisibility}
+                        onColumnVisibilityChange={setColumnVisibility}
+                        data-testid="evidence-table"
+                        className="hover:bg-bg-muted"
+                    />
+                )}
             </ListPageShell.Body>
         </ListPageShell>
     );
