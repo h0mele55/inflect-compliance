@@ -218,6 +218,29 @@ function resolveTrendContent(
 
 // ─── Main dispatcher ──────────────────────────────────────────────
 
+/**
+ * Stable DOM ids for dispatched widgets.
+ *
+ * The org dashboard predates the configurable widget engine; the
+ * pre-Epic-41 hardcoded layout exposed `#org-stat-coverage`,
+ * `#org-stat-critical-risks`, `#org-stat-overdue-evidence`,
+ * `#org-stat-tenants`, `#org-drilldown-ctas`, and `#org-tenant-coverage`
+ * as load-bearing anchors for E2E selectors (`ciso-portfolio.spec.ts`)
+ * and deep-link navigation. The rewire to widgets must preserve them
+ * so external automation doesn't silently break.
+ *
+ * KPI widgets get one id per `chartType` (the inner stat is what the
+ * test asserts on); other widget types get one id per `type`.
+ */
+function widgetDomId(widget: OrgDashboardWidgetDto): string | undefined {
+    if (widget.type === 'KPI') {
+        return `org-stat-${widget.chartType}`;
+    }
+    if (widget.type === 'DRILLDOWN_CTAS') return 'org-drilldown-ctas';
+    if (widget.type === 'TENANT_LIST') return 'org-tenant-coverage';
+    return undefined;
+}
+
 export function DispatchedWidget({
     widget,
     data,
@@ -225,15 +248,21 @@ export function DispatchedWidget({
 }: DispatcherProps) {
     let body: React.ReactNode = null;
     let title: string | undefined = widget.title ?? undefined;
+    const domId = widgetDomId(widget);
 
     switch (widget.type) {
         case 'KPI': {
             // KPI cards have their own internal label and gradient;
             // wrapping them in a DashboardWidget with a title would
             // double-render the label. Render bare — the KpiCard IS
-            // the widget surface for this type.
+            // the widget surface for this type. The id wrapper exists
+            // so the legacy `#org-stat-*` E2E selectors keep resolving.
             const props = resolveKpiContent(widget, data);
-            return <ChartRenderer {...props} />;
+            return (
+                <div id={domId} className="h-full">
+                    <ChartRenderer {...props} />
+                </div>
+            );
         }
         case 'DONUT': {
             body = <ChartRenderer {...resolveDonutContent(widget, data)} />;
@@ -281,6 +310,7 @@ export function DispatchedWidget({
             title={title}
             actions={actionsSlot}
             data-widget-id={widget.id}
+            id={domId}
             showResizeHandle={Boolean(actionsSlot)}
         >
             {body}

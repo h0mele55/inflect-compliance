@@ -56,6 +56,14 @@ export interface DashboardWidgetProps {
     showResizeHandle?: boolean;
     /** Stable id passed through to the rendered element. */
     'data-widget-id'?: string;
+    /**
+     * Optional DOM `id` on the outer card. Used by E2E selectors that
+     * predate the configurable widget engine (e.g. `#org-stat-coverage`,
+     * `#org-drilldown-ctas`, `#org-tenant-coverage`) and by deep-link
+     * anchors. The dispatcher derives this from the widget kind so the
+     * IDs survive the rewire from hardcoded layout to widgets.
+     */
+    id?: string;
     /** Optional class merged onto the outer card. */
     className?: string;
     /** Whether the widget body should fill the card vertically. */
@@ -69,6 +77,7 @@ export function DashboardWidget({
     actions,
     showResizeHandle = true,
     'data-widget-id': dataWidgetId,
+    id,
     className,
     fillBody = true,
     children,
@@ -78,6 +87,7 @@ export function DashboardWidget({
     return (
         <section
             data-widget-id={dataWidgetId}
+            id={id}
             className={[
                 'glass-card relative flex h-full flex-col overflow-hidden',
                 className ?? '',
