@@ -13,6 +13,7 @@ import {
     type RateLimitScope,
 } from '@/lib/security/rate-limit-middleware';
 import type { RateLimitConfig } from '@/lib/security/rate-limit';
+import { API_VERSION, API_VERSION_HEADER } from '@/lib/api-version';
 
 // Depending on the Node.js / Edge runtime version, crypto.randomUUID() is natively available globally.
 // If it fails (e.g. extremely old runtimes), fallback to a simple Math.random() based ID.
@@ -168,6 +169,7 @@ export function withApiErrorHandling<Context = any>(
                                     durationMs,
                                 });
                                 rateBlocked.headers.set('x-request-id', requestId);
+                                rateBlocked.headers.set(API_VERSION_HEADER, API_VERSION);
                                 return rateBlocked;
                             }
                         }
@@ -191,13 +193,17 @@ export function withApiErrorHandling<Context = any>(
                             durationMs,
                         });
 
-                        // Apply request ID to response headers if it's a NextResponse
+                        // Apply request ID + API version header. Wrapped
+                        // (canonical-contract) routes ALL emit X-API-Version;
+                        // future breaking changes bump it in `src/lib/api-version.ts`.
                         if (response instanceof NextResponse) {
                             response.headers.set('x-request-id', requestId);
+                            response.headers.set(API_VERSION_HEADER, API_VERSION);
                         } else if (response instanceof Response) {
                             // clone and append headers if plain standard Response
                             const newHeaders = new Headers(response.headers);
                             newHeaders.set('x-request-id', requestId);
+                            newHeaders.set(API_VERSION_HEADER, API_VERSION);
                             return new Response(response.body, {
                                 status: response.status,
                                 statusText: response.statusText,
@@ -252,6 +258,7 @@ export function withApiErrorHandling<Context = any>(
                             status,
                             headers: {
                                 'x-request-id': requestId,
+                                [API_VERSION_HEADER]: API_VERSION,
                                 'Cache-Control': 'no-store, max-age=0'
                             }
                         });

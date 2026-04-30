@@ -25,8 +25,6 @@
  * invocation.
  */
 
-import type { ComplianceSnapshot } from '@prisma/client';
-
 import type { OrgContext } from '@/app-layer/types';
 import { forbidden } from '@/lib/errors/types';
 import {
@@ -48,6 +46,10 @@ import {
     MAX_DRILLDOWN_PAGE_LIMIT,
     computeRag,
 } from '@/app-layer/schemas/portfolio';
+import {
+    getPortfolioData,
+    type PortfolioBaseData,
+} from '@/app-layer/usecases/portfolio-data';
 import { withTenantDb } from '@/lib/db-context';
 import prisma from '@/lib/prisma';
 import { logger } from '@/lib/observability/logger';
@@ -109,48 +111,20 @@ function assertCanViewPortfolio(ctx: OrgContext): void {
 //   1. PortfolioRepository.getOrgTenantIds(orgId)
 //   2. PortfolioRepository.getLatestSnapshots(tenantIds)
 //
-// When the overview page calls them in parallel via `Promise.all`,
-// each does its own pair of fetches — 4 identical queries instead of
-// 2. As org size grows that overhead scales linearly with the number
-// of widgets sharing the same upstream.
+// Epic E.3 — the cross-usecase deduplication moved to the canonical
+// `getPortfolioData(orgId, options)` helper in
+// `./portfolio-data.ts`. That helper memoises both reads PER
+// REQUEST (keyed on the AsyncLocalStorage RequestContext via a
+// WeakMap), so multiple usecases composed in the same request — e.g.
+// the CSV export's summary + health + 3 drill-downs — all share a
+// single tenants fetch and a single snapshots fetch. Outside a
+// request scope the helper falls through to direct repo calls,
+// preserving the unmemoised behaviour for background jobs / scripts.
 //
-// The fix splits each downstream usecase into:
-//
-//   - a pure projection function (snapshots → DTO) that takes the
-//     base data as input
-//   - a thin public usecase that loads the base data once and calls
-//     the projection
-//
-// A new orchestrator `getPortfolioOverview(ctx)` calls the loader
-// ONCE and projects all three DTOs (summary + tenant-health + trends)
-// from the shared upstream. The overview page consumes the
-// orchestrator instead of three independent usecases — net 3 DB
-// queries (tenants + snapshots + trends) regardless of how many
-// downstream DTOs reuse the same base.
-//
-// The standalone usecases stay supported for the API route's
+// The standalone usecases below stay supported for the API route's
 // per-view dispatch (`view=summary` / `view=health` / `view=trends`)
-// where each request only needs one DTO. Both paths share the same
-// projection logic — projection bugs are a single-source fix.
-
-interface PortfolioBaseData {
-    /** Every tenant linked to the org, ordered by creation. */
-    tenants: OrgTenantMeta[];
-    /** Latest snapshot per tenant within the 14-day staleness window.
-     *  Tenants with no recent snapshot are omitted — callers detect
-     *  "snapshot pending" by diffing against `tenants`. */
-    snapshots: ComplianceSnapshot[];
-    /** Pre-built tenantId → snapshot map for O(1) lookup downstream. */
-    snapshotsByTenant: Map<string, ComplianceSnapshot>;
-}
-
-async function loadPortfolioBaseData(orgId: string): Promise<PortfolioBaseData> {
-    const tenants = await PortfolioRepository.getOrgTenantIds(orgId);
-    const tenantIds = tenants.map((t) => t.id);
-    const snapshots = await PortfolioRepository.getLatestSnapshots(tenantIds);
-    const snapshotsByTenant = new Map(snapshots.map((s) => [s.tenantId, s]));
-    return { tenants, snapshots, snapshotsByTenant };
-}
+// where each request only needs one DTO. Both the per-view path and
+// the orchestrator now share the same memoised upstream.
 
 function projectPortfolioSummary(
     ctx: OrgContext,
@@ -329,7 +303,7 @@ export async function getPortfolioSummary(
     ctx: OrgContext,
 ): Promise<PortfolioSummary> {
     assertCanViewPortfolio(ctx);
-    const base = await loadPortfolioBaseData(ctx.organizationId);
+    const base = await getPortfolioData(ctx.organizationId);
     return projectPortfolioSummary(ctx, base);
 }
 
@@ -339,7 +313,7 @@ export async function getPortfolioTenantHealth(
     ctx: OrgContext,
 ): Promise<TenantHealthRow[]> {
     assertCanViewPortfolio(ctx);
-    const base = await loadPortfolioBaseData(ctx.organizationId);
+    const base = await getPortfolioData(ctx.organizationId);
     return projectPortfolioTenantHealth(base);
 }
 
@@ -515,7 +489,12 @@ export async function getNonPerformingControls(
     ctx: OrgContext,
 ): Promise<NonPerformingControlRow[]> {
     assertCanViewPortfolio(ctx);
-    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    // Drill-down only needs the tenant list — opt out of the
+    // snapshots fetch. The tenants read still memoises in-request,
+    // so a CSV export's 5 portfolio usecases share a single fetch.
+    const { tenants } = await getPortfolioData(ctx.organizationId, {
+        includeSnapshots: false,
+    });
     const integrity = await checkAuditorFanOutIntegrity(ctx, tenants);
 
     return fanOutPerTenant<NonPerformingControlRow>(
@@ -570,7 +549,9 @@ export async function getCriticalRisksAcrossOrg(
     ctx: OrgContext,
 ): Promise<CriticalRiskRow[]> {
     assertCanViewPortfolio(ctx);
-    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const { tenants } = await getPortfolioData(ctx.organizationId, {
+        includeSnapshots: false,
+    });
     const integrity = await checkAuditorFanOutIntegrity(ctx, tenants);
 
     return fanOutPerTenant<CriticalRiskRow>(
@@ -627,7 +608,9 @@ export async function getOverdueEvidenceAcrossOrg(
     ctx: OrgContext,
 ): Promise<OverdueEvidenceRow[]> {
     assertCanViewPortfolio(ctx);
-    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const { tenants } = await getPortfolioData(ctx.organizationId, {
+        includeSnapshots: false,
+    });
     const integrity = await checkAuditorFanOutIntegrity(ctx, tenants);
     const now = new Date();
     const dayMs = 86400 * 1000;
@@ -689,7 +672,12 @@ export async function getPortfolioTrends(
 ): Promise<PortfolioTrend> {
     assertCanViewPortfolio(ctx);
     const effectiveDays = clampTrendDays(days);
-    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    // Trends only needs the tenantIds; skip the snapshots fetch.
+    // In-request memoisation still hits when the trends usecase runs
+    // alongside summary/health (e.g. inside getPortfolioOverview).
+    const { tenants } = await getPortfolioData(ctx.organizationId, {
+        includeSnapshots: false,
+    });
     const tenantIds = tenants.map((t) => t.id);
     const rows = await PortfolioRepository.getSnapshotTrends(tenantIds, effectiveDays);
     return projectPortfolioTrends(ctx.organizationId, effectiveDays, rows);
@@ -734,6 +722,14 @@ export async function getPortfolioOverview(
     assertCanViewPortfolio(ctx);
     const effectiveDays = clampTrendDays(options.trendDays ?? 90);
 
+    // Orchestrator is its own one-shot path: the overview page is
+    // the only caller, and it composes summary + health + trends in
+    // a single render. We fetch tenants once, then run snapshots +
+    // trends concurrently — one tenants call, one snapshots call,
+    // one trends call. (The shared `getPortfolioData` helper exists
+    // for cross-usecase deduplication paths like the CSV export
+    // route which composes 5 separate usecases; here we already
+    // have the shape we want.)
     const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
     const tenantIds = tenants.map((t) => t.id);
 
@@ -858,7 +854,9 @@ export async function listNonPerformingControls(
     assertCanViewPortfolio(ctx);
     const limit = clampPageLimit(input.limit);
     const cursor = decodeJson<ControlsCursor>(input.cursor);
-    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const { tenants } = await getPortfolioData(ctx.organizationId, {
+        includeSnapshots: false,
+    });
 
     // Per-tenant where clause — applies the cursor compound predicate
     // when a cursor is supplied. The compound mirrors the global sort
@@ -968,7 +966,9 @@ export async function listCriticalRisksAcrossOrg(
     assertCanViewPortfolio(ctx);
     const limit = clampPageLimit(input.limit);
     const cursor = decodeJson<RisksCursor>(input.cursor);
-    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const { tenants } = await getPortfolioData(ctx.organizationId, {
+        includeSnapshots: false,
+    });
 
     const cursorWhere = cursor
         ? {
@@ -1081,7 +1081,9 @@ export async function listOverdueEvidenceAcrossOrg(
     assertCanViewPortfolio(ctx);
     const limit = clampPageLimit(input.limit);
     const cursor = decodeJson<EvidenceCursor>(input.cursor);
-    const tenants = await PortfolioRepository.getOrgTenantIds(ctx.organizationId);
+    const { tenants } = await getPortfolioData(ctx.organizationId, {
+        includeSnapshots: false,
+    });
     const now = new Date();
     const dayMs = 86400 * 1000;
 
