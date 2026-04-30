@@ -112,6 +112,44 @@ const ALLOWLISTED_MEMBERSHIP_SITES: ReadonlyArray<AllowlistedSite> = [
 ];
 
 const MEMBERSHIP_CREATION_PATTERN = /\btenantMembership\.(create|upsert|createMany)\b/;
+const ORG_MEMBERSHIP_CREATION_PATTERN = /\borgMembership\.(create|upsert|createMany)\b/;
+
+/**
+ * Epic D — explicit allowlist for OrgMembership creation sites.
+ * Same shape as TenantMembership: a new entry is a privilege-
+ * escalation risk and must pass review.
+ */
+interface OrgAllowlistedSite {
+    file: string;
+    reason: string;
+}
+
+const ALLOWLISTED_ORG_MEMBERSHIP_SITES: ReadonlyArray<OrgAllowlistedSite> = [
+    {
+        file: 'src/app-layer/usecases/org-members.ts',
+        reason:
+            'Epic O-2 — addOrgMember / removeOrgMember / changeOrgMemberRole. ' +
+            'All three are gated at the route layer by canManageMembers ' +
+            '(ORG_ADMIN-only) and emit OrgAuditLog rows.',
+    },
+    {
+        file: 'src/app-layer/usecases/org-invites.ts',
+        reason:
+            'Epic D canonical path. redeemOrgInvite consumes an OrgInvite ' +
+            'token atomically (updateMany predicate) and email-binds to ' +
+            'the signed-in user. Audit-chained as ORG_INVITE_REDEEMED + ' +
+            'ORG_MEMBER_ADDED.',
+    },
+    {
+        file: 'src/app/api/org/route.ts',
+        reason:
+            'Epic O-2 self-service org creation. The signed-in user creates ' +
+            'their own organization and becomes its sole ORG_ADMIN — same ' +
+            '"I am my own tenant" pattern as the credentials-signup tenant ' +
+            'creation. The user only gains privilege over the org they ' +
+            'just created; they cannot affect any other org.',
+    },
+];
 
 describe('Guardrail: TenantMembership creation sites are allowlisted', () => {
     it('every call site is one of the ALLOWLISTED_MEMBERSHIP_SITES entries', async () => {
@@ -174,6 +212,82 @@ describe('Guardrail: TenantMembership creation sites are allowlisted', () => {
         for (const rel of files) {
             const content = fs.readFileSync(path.join(SRC, rel), 'utf8');
             if (/ensureDefaultTenantMembership/.test(content)) {
+                matches.push(`src/${rel}`);
+            }
+        }
+
+        expect(matches).toEqual([]);
+    });
+});
+
+// ─── Epic D — OrgMembership creation sites ───────────────────────
+
+describe('Guardrail: OrgMembership creation sites are allowlisted', () => {
+    it('every call site is one of the ALLOWLISTED_ORG_MEMBERSHIP_SITES entries', async () => {
+        const files = await glob('**/*.ts', {
+            cwd: SRC,
+            ignore: ['**/*.d.ts', '**/*.test.ts', '**/*.spec.ts'],
+            posix: true,
+        });
+
+        const allowlistedRelPaths = new Set(
+            ALLOWLISTED_ORG_MEMBERSHIP_SITES.map((s) => s.file),
+        );
+        const violations: string[] = [];
+
+        for (const rel of files) {
+            const full = path.join(SRC, rel);
+            const content = fs.readFileSync(full, 'utf8');
+            if (!ORG_MEMBERSHIP_CREATION_PATTERN.test(content)) continue;
+
+            const srcRelPath = `src/${rel}`;
+            if (!allowlistedRelPaths.has(srcRelPath)) {
+                violations.push(srcRelPath);
+            }
+        }
+
+        if (violations.length > 0) {
+            const msg = [
+                'Unallowlisted OrgMembership creation site(s):',
+                ...violations.map((v) => `  - ${v}`),
+                '',
+                'If this is a legitimate new creation path, add the file to',
+                'ALLOWLISTED_ORG_MEMBERSHIP_SITES in tests/guardrails/no-auto-join.test.ts',
+                'with a one-line reason describing why it is safe (gated by what?',
+                'audit-logged how? email-bound?).',
+            ].join('\n');
+            throw new Error(msg);
+        }
+
+        expect(violations).toEqual([]);
+    });
+
+    it('every allowlisted org-membership file actually exists + contains the pattern', () => {
+        for (const site of ALLOWLISTED_ORG_MEMBERSHIP_SITES) {
+            const full = path.join(ROOT, site.file);
+            expect(fs.existsSync(full)).toBe(true);
+            const content = fs.readFileSync(full, 'utf8');
+            expect(ORG_MEMBERSHIP_CREATION_PATTERN.test(content)).toBe(true);
+        }
+    });
+
+    it('ensureDefaultOrgMembership function name is gone from src/', async () => {
+        // Epic D explicit hardening — there is no auto-bootstrap of
+        // org membership today, and this sentinel prevents one from
+        // being introduced silently. If any future feature needs a
+        // dev-time bootstrap, it must be gated behind an env flag
+        // (default false in production) and named explicitly so
+        // operators can audit + disable.
+        const files = await glob('**/*.ts', {
+            cwd: SRC,
+            ignore: ['**/*.d.ts'],
+            posix: true,
+        });
+
+        const matches: string[] = [];
+        for (const rel of files) {
+            const content = fs.readFileSync(path.join(SRC, rel), 'utf8');
+            if (/ensureDefaultOrgMembership/.test(content)) {
                 matches.push(`src/${rel}`);
             }
         }

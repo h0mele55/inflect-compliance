@@ -179,6 +179,7 @@ model Organization {
 
   tenants                      Tenant[]
   memberships                  OrgMembership[]
+  invites                      OrgInvite[]
   provisionedTenantMemberships TenantMembership[] @relation("OrgProvisionedTenantMemberships")
   auditLogs                    OrgAuditLog[]
 }
@@ -207,6 +208,49 @@ model OrgMembership {
   @@unique([organizationId, userId])
   @@index([organizationId])
   @@index([userId])
+}
+
+// Epic D — invitation-gated org onboarding.
+//
+// Mirrors the TenantInvite model exactly (same field set, same
+// lifecycle semantics) so admins can issue an invite to an email,
+// the recipient lands on /invite/org/<token>, signs in via OAuth,
+// and the auth callback redeems the invite to create their
+// OrgMembership atomically.
+//
+// Lifecycle:
+//   • createOrgInviteToken upserts on (organizationId, email),
+//     refreshing the token + expiresAt and clearing acceptedAt /
+//     revokedAt on re-invite.
+//   • redeemOrgInvite uses an updateMany test-and-set on
+//     {token, acceptedAt: null, revokedAt: null, expiresAt: { gt: now }}
+//     so concurrent redemptions can't double-claim; email-mismatch
+//     burns the token (acceptedAt is set in the same atomic claim).
+//   • revokeOrgInvite sets revokedAt = now(); the row stays in place
+//     for audit history.
+//
+// Token: 32 random bytes, base64url-encoded, stored raw with
+// @unique. No HMAC — the entropy (256 bits) is the security
+// boundary. A 7-day TTL is enforced on creation.
+model OrgInvite {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           OrgRole   @default(ORG_READER)
+  token          String    @unique
+  invitedById    String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("OrgInviteInviter", fields: [invitedById], references: [id])
+
+  @@unique([organizationId, email])
+  @@index([token])
+  @@index([organizationId])
 }
 
 model TenantOnboarding {
@@ -389,6 +433,7 @@ model User {
   orgMemberships                OrgMembership[]
   orgAuditLogActions            OrgAuditLog[]                @relation("OrgAuditLogActor")
   orgAuditLogTargets            OrgAuditLog[]                @relation("OrgAuditLogTarget")
+  orgInvitesIssued              OrgInvite[]                  @relation("OrgInviteInviter")
 }
 
 model Account {

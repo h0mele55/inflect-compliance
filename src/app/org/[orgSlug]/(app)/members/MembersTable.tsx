@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, UserMinus, Shield, AlertTriangle } from 'lucide-react';
+import { Plus, Mail, UserMinus, Shield, AlertTriangle, X } from 'lucide-react';
 
 import { ListPageShell } from '@/components/layout/ListPageShell';
 import { DataTable, createColumns } from '@/components/ui/table';
@@ -31,6 +31,16 @@ interface Props {
     orgSlug: string;
     currentUserId: string;
     rows: MemberRow[];
+    invites: PendingInviteRow[];
+}
+
+export interface PendingInviteRow {
+    id: string;
+    email: string;
+    role: 'ORG_ADMIN' | 'ORG_READER';
+    expiresAt: string;
+    createdAt: string;
+    invitedBy: { id: string; name: string | null; email: string | null } | null;
 }
 
 const ROLE_VARIANT: Record<MemberRow['role'], 'error' | 'info'> = {
@@ -45,10 +55,11 @@ const ROLE_LABEL: Record<MemberRow['role'], string> = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function MembersTable({ orgSlug, currentUserId, rows }: Props) {
+export function MembersTable({ orgSlug, currentUserId, rows, invites }: Props) {
     const router = useRouter();
 
     const [addOpen, setAddOpen] = useState(false);
+    const [inviteOpen, setInviteOpen] = useState(false);
     const [removeTarget, setRemoveTarget] = useState<MemberRow | null>(null);
     const [roleTarget, setRoleTarget] = useState<MemberRow | null>(null);
 
@@ -161,15 +172,26 @@ export function MembersTable({ orgSlug, currentUserId, rows }: Props) {
                             see the portfolio summary only.
                         </p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setAddOpen(true)}
-                        className="btn btn-primary btn-sm"
-                        data-testid="org-members-add-button"
-                    >
-                        <Plus className="size-4" aria-hidden="true" />
-                        Add member
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setInviteOpen(true)}
+                            className="btn btn-secondary btn-sm"
+                            data-testid="org-members-invite-button"
+                        >
+                            <Mail className="size-4" aria-hidden="true" />
+                            Invite by email
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setAddOpen(true)}
+                            className="btn btn-primary btn-sm"
+                            data-testid="org-members-add-button"
+                        >
+                            <Plus className="size-4" aria-hidden="true" />
+                            Add member
+                        </button>
+                    </div>
                 </div>
             </ListPageShell.Header>
             <ListPageShell.Body>
@@ -193,6 +215,14 @@ export function MembersTable({ orgSlug, currentUserId, rows }: Props) {
                     }
                     data-testid="org-members-table"
                 />
+
+                {invites.length > 0 && (
+                    <PendingInvitesSection
+                        orgSlug={orgSlug}
+                        invites={invites}
+                        onMutate={() => router.refresh()}
+                    />
+                )}
             </ListPageShell.Body>
 
             <AddMemberModal
@@ -201,6 +231,16 @@ export function MembersTable({ orgSlug, currentUserId, rows }: Props) {
                 onClose={() => setAddOpen(false)}
                 onSuccess={useCallback(() => {
                     setAddOpen(false);
+                    router.refresh();
+                }, [router])}
+            />
+
+            <InviteMemberModal
+                orgSlug={orgSlug}
+                open={inviteOpen}
+                onClose={() => setInviteOpen(false)}
+                onSuccess={useCallback(() => {
+                    setInviteOpen(false);
                     router.refresh();
                 }, [router])}
             />
@@ -747,5 +787,345 @@ function ChangeRoleModal({
                 </Modal.Actions>
             </Modal.Footer>
         </Modal>
+    );
+}
+
+// ── Invite member (Epic D) ────────────────────────────────────────────
+
+interface InviteMemberModalProps {
+    orgSlug: string;
+    open: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
+function InviteMemberModal({ orgSlug, open, onClose, onSuccess }: InviteMemberModalProps) {
+    const [email, setEmail] = useState('');
+    const [role, setRole] = useState<MemberRow['role']>('ORG_READER');
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [issuedUrl, setIssuedUrl] = useState<string | null>(null);
+
+    const reset = () => {
+        setEmail('');
+        setRole('ORG_READER');
+        setError(null);
+        setSubmitting(false);
+        setIssuedUrl(null);
+    };
+
+    const close = () => {
+        reset();
+        onClose();
+    };
+
+    const onSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const trimmed = email.trim().toLowerCase();
+        if (!EMAIL_RE.test(trimmed)) {
+            setError('Enter a valid email address.');
+            return;
+        }
+        setSubmitting(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/org/${orgSlug}/invites`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ email: trimmed, role }),
+            });
+            if (!res.ok) {
+                let message = `Failed to create invite (${res.status}).`;
+                try {
+                    const body = (await res.json()) as { error?: { message?: string } };
+                    if (body?.error?.message) message = body.error.message;
+                } catch {
+                    /* not JSON */
+                }
+                setError(message);
+                setSubmitting(false);
+                return;
+            }
+            const body = (await res.json()) as { url?: string };
+            // The acceptance URL is shown to the admin so they can copy
+            // it into an out-of-band email/Slack message. The TenantInvite
+            // path follows the same pattern — caller-driven distribution.
+            const origin =
+                typeof window !== 'undefined' ? window.location.origin : '';
+            setIssuedUrl(body.url ? origin + body.url : null);
+            setSubmitting(false);
+        } catch (err) {
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : 'Unexpected error creating invite.',
+            );
+            setSubmitting(false);
+        }
+    };
+
+    const issued = issuedUrl !== null;
+
+    return (
+        <Modal showModal={open} setShowModal={(o) => (o ? null : close())}>
+            <Modal.Header
+                title={issued ? 'Invite created' : 'Invite by email'}
+            />
+            <Modal.Body>
+                {issued ? (
+                    <div className="space-y-3 text-sm" data-testid="org-invite-issued">
+                        <p className="text-content-default">
+                            Send the recipient this acceptance link. The invite
+                            expires in 7 days and is single-use.
+                        </p>
+                        <div className="rounded-lg border border-border-subtle bg-bg-subtle p-3 break-all font-mono text-xs">
+                            {issuedUrl}
+                        </div>
+                        <p className="text-xs text-content-muted">
+                            Tip: bookmark this — closing the dialog won&#39;t
+                            re-display the URL. The pending invite is also
+                            visible in the list below.
+                        </p>
+                    </div>
+                ) : (
+                    <form
+                        id="org-invite-member-form"
+                        onSubmit={onSubmit}
+                        noValidate
+                        className="space-y-4"
+                        data-testid="org-invite-member-form"
+                    >
+                        <FormField
+                            label="Email"
+                            description="The recipient receives a single-use acceptance link valid for 7 days."
+                            required
+                        >
+                            <Input
+                                name="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                autoComplete="off"
+                                autoFocus
+                                placeholder="alice@example.com"
+                                data-testid="org-invite-member-email"
+                            />
+                        </FormField>
+
+                        <fieldset className="space-y-2" data-testid="org-invite-member-role-group">
+                            <legend className="text-sm font-medium text-content-emphasis">
+                                Role
+                            </legend>
+                            {(['ORG_READER', 'ORG_ADMIN'] as const).map((opt) => {
+                                const id = `org-invite-member-role-${opt}`;
+                                const checked = role === opt;
+                                return (
+                                    <label
+                                        key={opt}
+                                        htmlFor={id}
+                                        className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                                            checked
+                                                ? 'border-border-emphasis bg-bg-subtle'
+                                                : 'border-border-subtle hover:bg-bg-muted'
+                                        }`}
+                                    >
+                                        <input
+                                            id={id}
+                                            type="radio"
+                                            name="role"
+                                            value={opt}
+                                            checked={checked}
+                                            onChange={() => setRole(opt)}
+                                            className="mt-0.5"
+                                            data-testid={id}
+                                        />
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-content-emphasis">
+                                                {ROLE_LABEL[opt]}
+                                            </p>
+                                            <p className="text-xs text-content-muted">
+                                                {opt === 'ORG_ADMIN'
+                                                    ? 'Manages tenants + members. Auto-provisioned as AUDITOR in every child tenant on accept.'
+                                                    : 'Sees the portfolio summary. No tenant drill-down access.'}
+                                            </p>
+                                        </div>
+                                    </label>
+                                );
+                            })}
+                        </fieldset>
+
+                        {error && (
+                            <p
+                                className="text-sm text-content-error"
+                                role="alert"
+                                data-testid="org-invite-member-error"
+                            >
+                                {error}
+                            </p>
+                        )}
+                    </form>
+                )}
+            </Modal.Body>
+            <Modal.Footer>
+                <Modal.Actions>
+                    {issued ? (
+                        <Button
+                            type="button"
+                            variant="primary"
+                            onClick={() => {
+                                onSuccess();
+                            }}
+                            data-testid="org-invite-issued-done"
+                            text="Done"
+                        />
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={close}
+                                className="btn btn-ghost btn-sm"
+                                data-testid="org-invite-member-cancel"
+                            >
+                                Cancel
+                            </button>
+                            <Button
+                                type="submit"
+                                form="org-invite-member-form"
+                                variant="primary"
+                                loading={submitting}
+                                disabled={submitting}
+                                data-testid="org-invite-member-submit"
+                                text={submitting ? 'Creating…' : 'Send invite'}
+                            />
+                        </>
+                    )}
+                </Modal.Actions>
+            </Modal.Footer>
+        </Modal>
+    );
+}
+
+// ── Pending invites section ───────────────────────────────────────────
+
+interface PendingInvitesSectionProps {
+    orgSlug: string;
+    invites: PendingInviteRow[];
+    onMutate: () => void;
+}
+
+function PendingInvitesSection({ orgSlug, invites, onMutate }: PendingInvitesSectionProps) {
+    const [revokingId, setRevokingId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const revoke = useCallback(
+        async (inviteId: string) => {
+            setRevokingId(inviteId);
+            setError(null);
+            try {
+                const res = await fetch(
+                    `/api/org/${orgSlug}/invites/${inviteId}`,
+                    { method: 'DELETE', credentials: 'same-origin' },
+                );
+                if (!res.ok) {
+                    let message = `Failed to revoke invite (${res.status}).`;
+                    try {
+                        const body = (await res.json()) as {
+                            error?: { message?: string };
+                        };
+                        if (body?.error?.message) message = body.error.message;
+                    } catch {
+                        /* not JSON */
+                    }
+                    setError(message);
+                    setRevokingId(null);
+                    return;
+                }
+                onMutate();
+            } catch (err) {
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : 'Unexpected error revoking invite.',
+                );
+                setRevokingId(null);
+            }
+        },
+        [orgSlug, onMutate],
+    );
+
+    return (
+        <div className="mt-8" data-testid="org-pending-invites-section">
+            <h2 className="text-lg font-semibold text-content-emphasis mb-2">
+                Pending invitations
+                <span className="ml-2 text-sm font-normal text-content-muted">
+                    ({invites.length})
+                </span>
+            </h2>
+            {error && (
+                <p
+                    className="text-sm text-content-error mb-2"
+                    role="alert"
+                    data-testid="org-pending-invites-error"
+                >
+                    {error}
+                </p>
+            )}
+            <div className="overflow-hidden rounded-lg border border-border-subtle">
+                <table className="data-table">
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Invited by</th>
+                            <th>Expires</th>
+                            <th aria-label="Actions" />
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {invites.map((inv) => (
+                            <tr key={inv.id} data-testid={`org-invite-row-${inv.id}`}>
+                                <td>
+                                    <span className="text-sm text-content-default">
+                                        {inv.email}
+                                    </span>
+                                </td>
+                                <td>
+                                    <StatusBadge variant={ROLE_VARIANT[inv.role]}>
+                                        {ROLE_LABEL[inv.role]}
+                                    </StatusBadge>
+                                </td>
+                                <td>
+                                    <span className="text-xs text-content-muted">
+                                        {inv.invitedBy?.name ??
+                                            inv.invitedBy?.email ??
+                                            '—'}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span className="text-xs text-content-subtle tabular-nums">
+                                        {formatDate(inv.expiresAt)}
+                                    </span>
+                                </td>
+                                <td className="text-right">
+                                    <Tooltip content={`Revoke invite for ${inv.email}`}>
+                                        <button
+                                            type="button"
+                                            disabled={revokingId === inv.id}
+                                            onClick={() => revoke(inv.id)}
+                                            className="btn btn-ghost btn-sm text-content-error"
+                                            data-testid={`org-invite-revoke-${inv.id}`}
+                                        >
+                                            <X className="size-3.5" aria-hidden="true" />
+                                            {revokingId === inv.id ? 'Revoking…' : 'Revoke'}
+                                        </button>
+                                    </Tooltip>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     );
 }

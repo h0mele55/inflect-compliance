@@ -38,6 +38,10 @@ const ENUMS_FILE = path.join(REPO_ROOT, 'prisma/schema/enums.prisma');
 const ORG_MEMBERSHIP_MUTATION_RE =
     /\b(?:prisma|tx|db)\.orgMembership\.(?:create|update|delete|upsert|createMany|updateMany|deleteMany)\b/;
 
+// Epic D — invitation lifecycle mutations also need audit coverage.
+const ORG_INVITE_MUTATION_RE =
+    /\b(?:prisma|tx|db)\.orgInvite\.(?:create|update|delete|upsert|createMany|updateMany|deleteMany)\b/;
+
 const APPEND_ORG_AUDIT_RE = /\bappendOrgAuditEntry\s*\(/;
 
 /**
@@ -70,6 +74,22 @@ function findOrgMembershipMutators(): { file: string; relPath: string; src: stri
     for (const abs of files) {
         const src = fs.readFileSync(abs, 'utf8');
         if (ORG_MEMBERSHIP_MUTATION_RE.test(src)) {
+            hits.push({
+                file: abs,
+                relPath: path.relative(REPO_ROOT, abs),
+                src,
+            });
+        }
+    }
+    return hits;
+}
+
+function findOrgInviteMutators(): { file: string; relPath: string; src: string }[] {
+    const files = listTsFiles(USECASES_DIR);
+    const hits: { file: string; relPath: string; src: string }[] = [];
+    for (const abs of files) {
+        const src = fs.readFileSync(abs, 'utf8');
+        if (ORG_INVITE_MUTATION_RE.test(src)) {
             hits.push({
                 file: abs,
                 relPath: path.relative(REPO_ROOT, abs),
@@ -158,6 +178,38 @@ describe('Epic B — org audit coverage guardrail', () => {
                         `     EXEMPT_FILES at the top of this guardrail with a`,
                         `     written reason.`,
                         exemptHint,
+                    ].join('\n'),
+                );
+            }
+        },
+    );
+
+    test.each(
+        findOrgInviteMutators()
+            .filter((h) => !isExempt(h.relPath))
+            .map((h) => [h.relPath, h] as const),
+    )(
+        '%s emits appendOrgAuditEntry alongside its OrgInvite mutation',
+        (relPath, hit) => {
+            if (!APPEND_ORG_AUDIT_RE.test(hit.src)) {
+                throw new Error(
+                    [
+                        `Org invite audit coverage gap.`,
+                        ``,
+                        `  File:    ${relPath}`,
+                        `  Pattern: ${ORG_INVITE_MUTATION_RE.source}`,
+                        `  Missing: ${APPEND_ORG_AUDIT_RE.source}`,
+                        ``,
+                        `Why:`,
+                        `  This file mutates OrgInvite rows but never calls`,
+                        `  appendOrgAuditEntry. Invitation lifecycle events`,
+                        `  (created / redeemed / revoked) must leave durable`,
+                        `  evidence — Epic D builds on this for compliance review.`,
+                        ``,
+                        `Fix:`,
+                        `  1. Import: import { appendOrgAuditEntry } from '@/lib/audit/org-audit-writer';`,
+                        `  2. Emit ORG_INVITE_CREATED / ORG_INVITE_REDEEMED /`,
+                        `     ORG_INVITE_REVOKED matching the operation.`,
                     ].join('\n'),
                 );
             }
