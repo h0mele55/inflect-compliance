@@ -211,16 +211,25 @@ describe('Dashboard Usecase Updates', () => {
 describe('Dashboard Page Integration', () => {
     const content = fs.readFileSync(DASHBOARD_FILE, 'utf-8');
 
-    test('imports RiskHeatmap', () => {
-        expect(content).toContain("from '@/components/ui/RiskHeatmap'");
+    // Epic 44 — the dashboard's heatmap migrated from the legacy
+    // hardcoded `<RiskHeatmap>` to the config-driven `<RiskMatrix>`
+    // engine. The page still surfaces a "risk-heatmap" id (E2E
+    // selector preserved); the consuming component is now
+    // `<RiskMatrix>` reading the tenant's `RiskMatrixConfig`.
+    test('imports the config-driven RiskMatrix engine', () => {
+        expect(content).toContain("from '@/components/ui/RiskMatrix'");
+    });
+
+    test('fetches the tenant matrix config server-side', () => {
+        expect(content).toContain('getRiskMatrixConfig');
     });
 
     test('imports ExpiryCalendar', () => {
         expect(content).toContain("from '@/components/ui/ExpiryCalendar'");
     });
 
-    test('renders RiskHeatmap with id', () => {
-        expect(content).toContain('<RiskHeatmap');
+    test('renders RiskMatrix with the legacy `risk-heatmap` id (E2E selector preserved)', () => {
+        expect(content).toContain('<RiskMatrix');
         expect(content).toContain('id="risk-heatmap"');
     });
 
@@ -229,8 +238,14 @@ describe('Dashboard Page Integration', () => {
         expect(content).toContain('id="expiry-calendar"');
     });
 
-    test('passes exec.riskHeatmap to RiskHeatmap', () => {
+    test('passes exec.riskHeatmap data to the matrix', () => {
+        // The data shape (sparse `{ likelihood, impact, count }[]`)
+        // is unchanged; only the consuming component swapped.
         expect(content).toContain('cells={exec.riskHeatmap}');
+    });
+
+    test('threads the tenant matrix config to the matrix', () => {
+        expect(content).toContain('config={matrixConfig}');
     });
 
     test('passes exec.upcomingExpirations to ExpiryCalendar', () => {

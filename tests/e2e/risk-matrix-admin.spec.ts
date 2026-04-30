@@ -1,0 +1,100 @@
+/**
+ * E2E test — Epic 44.5
+ *
+ * Proves the full configurable risk-matrix loop:
+ *   1. Admin opens /admin/risk-matrix
+ *   2. Edits an axis title to a recognisable string
+ *   3. Saves
+ *   4. Navigates to /risks and switches to the heatmap view
+ *   5. The new axis title surfaces in the live matrix
+ *
+ * This is the headline success criterion of the prompt — "saved
+ * config flows through to the live risk matrix rendering" — and
+ * is the only direct check that prompt 1's persistence + prompt 4's
+ * page wiring + prompt 5's editor agree at runtime.
+ *
+ * Cleanup: the test resets the axis title back to "Likelihood" at
+ * the end so subsequent serial-mode tests start from the canonical
+ * default. The DB row stays — that's fine because the row's other
+ * fields match the canonical default after reset.
+ */
+
+import { test, expect } from '@playwright/test';
+import { loginAndGetTenant, safeGoto } from './e2e-utils';
+
+const ADMIN_USER = { email: 'admin@acme.com', password: 'password123' };
+const READER_USER = { email: 'viewer@acme.com', password: 'password123' };
+const CUSTOM_LABEL = 'Probability of occurrence';
+
+test.describe('Risk matrix admin → live rendering loop', () => {
+    test('admin can edit the axis title and see it propagate to /risks', async ({ page }) => {
+        const tenantSlug = await loginAndGetTenant(page, ADMIN_USER);
+
+        // ── 1. Admin lands on the matrix config page ──────────────
+        await safeGoto(page, `/t/${tenantSlug}/admin/risk-matrix`, {
+            waitUntil: 'domcontentloaded',
+        });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        await expect(page.locator('#risk-matrix-admin')).toBeVisible({
+            timeout: 30_000,
+        });
+
+        // ── 2. Edit the likelihood axis title ─────────────────────
+        const titleInput = page.locator('#rm-axis-likelihood');
+        await expect(titleInput).toBeVisible();
+        await titleInput.fill(CUSTOM_LABEL);
+
+        // ── 3. Save ───────────────────────────────────────────────
+        await page.click('#risk-matrix-save-btn');
+        // Toast is async + portal-mounted; the URL doesn't change so
+        // we wait on the save button settling back to "Save changes".
+        await expect(page.locator('#risk-matrix-save-btn')).toHaveText(
+            /Save changes/i,
+            { timeout: 15_000 },
+        );
+
+        // ── 4. Navigate to /risks → switch to heatmap view ────────
+        await safeGoto(page, `/t/${tenantSlug}/risks`, {
+            waitUntil: 'domcontentloaded',
+        });
+        await page.waitForLoadState('networkidle').catch(() => {});
+
+        // The page header carries a Heatmap/Register toggle button.
+        const heatmapToggle = page
+            .getByRole('button', { name: /Heatmap/i })
+            .first();
+        if (await heatmapToggle.isVisible().catch(() => false)) {
+            await heatmapToggle.click();
+        }
+
+        // ── 5. The custom axis title surfaces in the matrix ───────
+        await expect(
+            page.getByText(CUSTOM_LABEL, { exact: false }).first(),
+        ).toBeVisible({ timeout: 15_000 });
+
+        // ── Cleanup — reset to default ────────────────────────────
+        await safeGoto(page, `/t/${tenantSlug}/admin/risk-matrix`, {
+            waitUntil: 'domcontentloaded',
+        });
+        await expect(page.locator('#risk-matrix-admin')).toBeVisible({
+            timeout: 30_000,
+        });
+        await page.click('#risk-matrix-restore-defaults');
+        await page.click('#risk-matrix-save-btn');
+        await expect(page.locator('#risk-matrix-save-btn')).toHaveText(
+            /Save changes/i,
+            { timeout: 15_000 },
+        );
+    });
+
+    test('non-admin (READER) cannot reach the matrix admin page', async ({ page }) => {
+        const tenantSlug = await loginAndGetTenant(page, READER_USER);
+        await safeGoto(page, `/t/${tenantSlug}/admin/risk-matrix`, {
+            waitUntil: 'domcontentloaded',
+        });
+        await page.waitForLoadState('networkidle').catch(() => {});
+        // The shared admin layout's `<RequirePermission>` short-circuits
+        // to a forbidden page. The editor itself never mounts.
+        await expect(page.locator('#risk-matrix-admin')).toHaveCount(0);
+    });
+});

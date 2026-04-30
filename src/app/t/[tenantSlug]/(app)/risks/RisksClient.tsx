@@ -34,6 +34,9 @@ import {
     RISK_FILTER_KEYS,
 } from './filter-defs';
 import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
+import { RiskMatrix } from '@/components/ui/RiskMatrix';
+import { resolveBandForScore } from '@/lib/risk-matrix/scoring';
+import type { RiskMatrixConfigShape } from '@/lib/risk-matrix/types';
 
 interface RiskListItem {
     id: string;
@@ -57,6 +60,13 @@ interface RiskListItem {
 interface RisksClientProps {
     initialRisks: RiskListItem[];
     initialFilters?: Record<string, string>;
+    /**
+     * Effective `RiskMatrixConfigShape` for this tenant (Epic 44.1).
+     * Drives the heatmap view's `<RiskMatrix>` engine + the score-
+     * column chip colour. Resolved server-side; the client never
+     * has to handle "no config".
+     */
+    matrixConfig: RiskMatrixConfigShape;
     tenantSlug: string;
     permissions: {
         canRead: boolean;
@@ -115,6 +125,7 @@ export function RisksClient(props: RisksClientProps) {
 function RisksPageInner({
     initialRisks,
     initialFilters,
+    matrixConfig,
     tenantSlug,
     permissions,
     translations: t,
@@ -192,8 +203,13 @@ function RisksPageInner({
     // All filtered rows render at once; the card scrolls.
     const riskColumnConfig = useMemo(
         () => ({
-            all: ['title', 'asset', 'threat', 'lxi', 'inherentScore', 'level', 'treatment', 'controls'],
-            defaultVisible: ['title', 'asset', 'threat', 'lxi', 'inherentScore', 'level', 'treatment', 'controls'],
+            // Epic 44.4 — added `status` and `owner` to the column
+            // set; default-visible KEEPS the pre-Epic-44 columns
+            // (asset / threat / lxi) so existing operators don't
+            // see a quietly-pruned first view. The new columns sit
+            // alongside, toggleable via the ColumnsDropdown.
+            all: ['title', 'asset', 'threat', 'lxi', 'inherentScore', 'level', 'status', 'owner', 'treatment', 'controls'],
+            defaultVisible: ['title', 'asset', 'threat', 'lxi', 'inherentScore', 'level', 'status', 'owner', 'treatment', 'controls'],
         }),
         [],
     );
@@ -213,6 +229,8 @@ function RisksPageInner({
             { id: 'lxi', label: 'L × I' },
             { id: 'inherentScore', label: 'Score' },
             { id: 'level', label: 'Level' },
+            { id: 'status', label: 'Status' },
+            { id: 'owner', label: 'Owner' },
             { id: 'treatment', label: 'Treatment' },
             { id: 'controls', label: 'Controls' },
         ],
@@ -234,16 +252,47 @@ function RisksPageInner({
     // guardrail-ignore: KPI count across the loaded page, not a refilter.
     const overdueRisks = now ? risks.filter(r => r.nextReviewAt && new Date(r.nextReviewAt) < now) : [];
 
-    const heatmap: number[][] = Array.from({ length: 5 }, (_, l) =>
-        // guardrail-ignore: bucketing the loaded page into the 5×5 heatmap.
-        Array.from({ length: 5 }, (_, i) => risks.filter(r => r.likelihood === (5 - l) && r.impact === (i + 1)).length)
-    );
+    // Epic 44.3 — collapse the loaded page into the sparse `(L, I)`
+    // shape the new `<RiskMatrix>` engine consumes. Each cell carries
+    // count + risk titles for the bubble overlay; the engine handles
+    // truncation + tooltip so the page stays presentation-free.
+    const matrixCells = useMemo(() => {
+        const lookup = new Map<
+            string,
+            { likelihood: number; impact: number; count: number; risks: { id: string; title: string }[] }
+        >();
+        for (const r of risks) {
+            const key = `${r.likelihood}-${r.impact}`;
+            // guardrail-ignore: bucketing the loaded page into the matrix cells.
+            const cell = lookup.get(key) ?? {
+                likelihood: r.likelihood,
+                impact: r.impact,
+                count: 0,
+                risks: [],
+            };
+            cell.count += 1;
+            cell.risks.push({ id: r.id, title: r.title });
+            lookup.set(key, cell);
+        }
+        return Array.from(lookup.values());
+    }, [risks]);
 
     const getRiskLevel = (score: number) => {
         if (score <= 5) return { label: t.low, class: 'badge-success' };
         if (score <= 12) return { label: t.medium, class: 'badge-warning' };
         if (score <= 18) return { label: t.high, class: 'badge-danger' };
         return { label: t.critical, class: 'badge-danger' };
+    };
+
+    // Workflow-status badge classes (Epic 44.4). The label set
+    // mirrors `RiskStatus` in the schema (OPEN / MITIGATING / ACCEPTED
+    // / CLOSED). Class mapping uses the existing `.badge-*` tokens so
+    // the visual aligns with controls / evidence / vendor pages.
+    const STATUS_CLASS: Record<string, string> = {
+        OPEN: 'badge-warning',
+        MITIGATING: 'badge-info',
+        ACCEPTED: 'badge-neutral',
+        CLOSED: 'badge-success',
     };
 
     // ── Column Definitions ──
@@ -281,9 +330,29 @@ function RisksPageInner({
         {
             accessorKey: 'inherentScore',
             header: t.score,
-            cell: ({ getValue }) => (
-                <span className="font-bold">{getValue<number>()}</span>
-            ),
+            // Epic 44.4 — score chip uses the band colour from the
+            // tenant's RiskMatrixConfig, so the colour, threshold,
+            // and label set all stay configurable. Falls back to a
+            // neutral chip if a band can't be resolved (mid-edit
+            // config preview).
+            cell: ({ getValue, row }) => {
+                const score = getValue<number>();
+                const band = resolveBandForScore(score, matrixConfig.bands);
+                return (
+                    <span
+                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-bold tabular-nums"
+                        style={{
+                            backgroundColor: `${band.color}33`, // 20% alpha
+                            color: band.color,
+                        }}
+                        title={`${band.name} (${score})`}
+                        data-band={band.name}
+                        data-testid={`risk-score-${row.original.id}`}
+                    >
+                        {score}
+                    </span>
+                );
+            },
         },
         {
             id: 'level',
@@ -292,6 +361,48 @@ function RisksPageInner({
             cell: ({ getValue }) => {
                 const level = getRiskLevel(getValue<number>());
                 return <span className={`badge ${level.class}`}>{level.label}</span>;
+            },
+        },
+        {
+            id: 'status',
+            header: 'Status',
+            accessorFn: (r) => r.status ?? 'OPEN',
+            cell: ({ row }) => {
+                const status = row.original.status ?? 'OPEN';
+                return (
+                    <span
+                        className={`badge ${STATUS_CLASS[status] ?? 'badge-neutral'}`}
+                        data-testid={`risk-status-${row.original.id}`}
+                    >
+                        {status}
+                    </span>
+                );
+            },
+        },
+        {
+            id: 'owner',
+            header: 'Owner',
+            // Owner display preference: real user (name → email) →
+            // legacy free-text `treatmentOwner` → em-dash. Keeping
+            // both signals visible avoids the empty-cell footgun
+            // when only one of the two is populated.
+            accessorFn: (r) =>
+                r.owner?.name ??
+                r.owner?.email ??
+                r.treatmentOwner ??
+                '—',
+            cell: ({ row }) => {
+                const r = row.original;
+                const display =
+                    r.owner?.name ?? r.owner?.email ?? r.treatmentOwner ?? null;
+                return (
+                    <span
+                        className="text-xs text-content-muted"
+                        data-testid={`risk-owner-${r.id}`}
+                    >
+                        {display ?? <span className="text-content-subtle">—</span>}
+                    </span>
+                );
             },
         },
         {
@@ -310,7 +421,7 @@ function RisksPageInner({
                 <span className="text-xs">{getValue<number>()}</span>
             ),
         },
-    ]), [t, getRiskLevel]);
+    ]), [t, getRiskLevel, matrixConfig]);
 
     return (
         <ListPageShell className="animate-fadeIn gap-6">
@@ -388,36 +499,22 @@ function RisksPageInner({
 
             <ListPageShell.Body>
                 {view === 'heatmap' ? (
-                    <div className="glass-card p-6">
-                        <h3 className="text-sm font-semibold text-content-default mb-4">{t.heatmapTitle}</h3>
-                        <div className="flex gap-2">
-                            <div className="flex flex-col items-center justify-between text-xs text-content-muted pr-2">
-                                {[5, 4, 3, 2, 1].map(n => <span key={n} className="h-16 flex items-center">{n}</span>)}
-                                <span className="mt-1">L↑</span>
-                            </div>
-                            <div className="flex-1">
-                                <div className="grid grid-rows-5 gap-1">
-                                    {heatmap.map((row, li) => (
-                                        <div key={li} className="grid grid-cols-5 gap-1">
-                                            {row.map((count, ii) => {
-                                                const score = (5 - li) * (ii + 1);
-                                                const bg = score <= 5 ? 'bg-emerald-900/50' : score <= 12 ? 'bg-amber-900/50' : score <= 18 ? 'bg-orange-900/50' : 'bg-red-900/50';
-                                                return (
-                                                    <div key={ii} className={`${bg} h-16 rounded-lg flex items-center justify-center text-sm font-bold transition hover:scale-105 ${count > 0 ? 'ring-1 ring-white/20' : ''}`}>
-                                                        {count > 0 ? count : ''}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="flex justify-between text-xs text-content-muted mt-2 px-3">
-                                    {[1, 2, 3, 4, 5].map(n => <span key={n}>{n}</span>)}
-                                </div>
-                                <div className="text-center text-xs text-content-muted mt-1">Impact →</div>
-                            </div>
-                        </div>
-                    </div>
+                    <RiskMatrix
+                        config={matrixConfig}
+                        cells={matrixCells}
+                        title={t.heatmapTitle}
+                        mode="bubble"
+                        onCellClick={(cell) => {
+                            // Drill into the risks that share this
+                            // (likelihood, impact) cell by setting the
+                            // score range filter on the cell's score —
+                            // single-score range collapses to the
+                            // matching cell.
+                            const score = cell.likelihood * cell.impact;
+                            filterCtx.set('score', `${score}|${score}`);
+                            setView('register');
+                        }}
+                    />
                 ) : (
                     <DataTable<RiskListItem>
                         fillBody

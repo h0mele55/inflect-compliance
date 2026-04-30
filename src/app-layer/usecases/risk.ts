@@ -30,10 +30,12 @@ export async function listRisks(ctx: RequestContext, filters: RiskFilters = {}) 
         entity: 'risk',
         operation: 'list',
         params: filters,
-        loader: () =>
-            runInTenantContext(ctx, (db) =>
+        loader: async () => {
+            const rows = await runInTenantContext(ctx, (db) =>
                 RiskRepository.list(db, ctx, filters),
-            ),
+            );
+            return attachOwnerUsers(ctx, rows);
+        },
     });
 }
 
@@ -44,11 +46,65 @@ export async function listRisksPaginated(ctx: RequestContext, params: RiskListPa
         entity: 'risk',
         operation: 'listPaginated',
         params,
-        loader: () =>
-            runInTenantContext(ctx, (db) =>
+        loader: async () => {
+            const result = await runInTenantContext(ctx, (db) =>
                 RiskRepository.listPaginated(db, ctx, params),
-            ),
+            );
+            const enriched = await attachOwnerUsers(
+                ctx,
+                result.items as RiskRowWithOwner[],
+            );
+            return { ...result, items: enriched };
+        },
     });
+}
+
+// Epic 44.4 — batch-attach `owner` ({ id, name, email }) per risk.
+// `Risk.ownerUserId` doesn't carry a Prisma `@relation` to User
+// today, so this stays a usecase-layer enrichment rather than a
+// `findMany({ include })`. Single batched lookup keeps the cost
+// bounded — 1 extra query per page of risks regardless of count.
+//
+// ## Cache-staleness caveat
+//
+// `listRisks` is wrapped by `cachedListRead`; the enriched shape is
+// what gets cached. Cache invalidation fires on Risk writes (via
+// `bumpEntityCacheVersion('risk')`), but NOT on User writes — so a
+// user renaming themselves will have their previous display name
+// linger in the risks-list cache until any other risk write bumps
+// the version. Acceptable for now; if it bites, the fix is to
+// invalidate the risk cache on user-rename in the auth layer or to
+// drop the cache on this list path entirely.
+type RiskRowWithOwner = {
+    ownerUserId: string | null;
+    owner?: { id: string; name: string | null; email: string | null } | null;
+    [k: string]: unknown;
+};
+async function attachOwnerUsers<T extends RiskRowWithOwner>(
+    ctx: RequestContext,
+    rows: T[],
+): Promise<T[]> {
+    const ids = Array.from(
+        new Set(
+            rows
+                .map((r) => r.ownerUserId)
+                .filter((v): v is string => Boolean(v)),
+        ),
+    );
+    if (ids.length === 0) {
+        return rows.map((r) => ({ ...r, owner: null }));
+    }
+    const users = await runInTenantContext(ctx, (db) =>
+        db.user.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, name: true, email: true },
+        }),
+    );
+    const byId = new Map(users.map((u) => [u.id, u]));
+    return rows.map((r) => ({
+        ...r,
+        owner: r.ownerUserId ? (byId.get(r.ownerUserId) ?? null) : null,
+    }));
 }
 
 export async function getRisk(ctx: RequestContext, id: string) {

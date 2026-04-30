@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { listRisks } from '@/app-layer/usecases/risk';
+import { getRiskMatrixConfig } from '@/app-layer/usecases/risk-matrix-config';
 import { RisksClient } from './RisksClient';
 
 export const dynamic = 'force-dynamic';
@@ -50,17 +51,21 @@ export default async function RisksPage({
         if (max && !Number.isNaN(Number(max))) apiFilters.scoreMax = Number(max);
     }
 
-    const risks = await listRisks(
-        ctx,
-        Object.keys(apiFilters).length > 0
-            ? (apiFilters as unknown as Parameters<typeof listRisks>[1])
-            : undefined,
-    );
+    const [risks, matrixConfig] = await Promise.all([
+        listRisks(
+            ctx,
+            Object.keys(apiFilters).length > 0
+                ? (apiFilters as unknown as Parameters<typeof listRisks>[1])
+                : undefined,
+        ),
+        getRiskMatrixConfig(ctx),
+    ]);
 
     return (
         <RisksClient
             initialRisks={JSON.parse(JSON.stringify(risks))}
             initialFilters={clientFilters}
+            matrixConfig={matrixConfig}
             tenantSlug={tenantSlug}
             permissions={ctx.permissions}
             translations={{

@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { getTenantCtx } from '@/app-layer/context';
 import { listAuditLogs } from '@/app-layer/usecases/auditLog';
-import { Shield, CreditCard, KeyRound, ShieldCheck, ShieldPlus, Users, CloudCog, Plug, Palette } from 'lucide-react';
+import { Shield, CreditCard, KeyRound, ShieldCheck, ShieldPlus, Users, CloudCog, Plug, Palette, Grid3x3 } from 'lucide-react';
 import Link from 'next/link';
 import { AdminClient } from './AdminClient';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
@@ -136,6 +136,14 @@ export default async function AdminPage({
                 >
                     <ShieldCheck className="w-3.5 h-3.5" />
                     Security &amp; MFA
+                </Link>
+                <Link
+                    href={tenantHref('/admin/risk-matrix')}
+                    className="btn btn-secondary"
+                    id="risk-matrix-pill-btn"
+                >
+                    <Grid3x3 className="w-3.5 h-3.5" />
+                    Risk Matrix
                 </Link>
             </div>
 
