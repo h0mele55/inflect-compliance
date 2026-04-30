@@ -8,6 +8,7 @@ import { ListPageShell } from '@/components/layout/ListPageShell';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { TableEmptyState } from '@/components/ui/table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useCursorPagination } from '@/components/ui/hooks';
 import { formatDate } from '@/lib/format-date';
 import type { CriticalRiskRow } from '@/app-layer/schemas/portfolio';
 
@@ -29,12 +30,20 @@ function ScorePill({ score }: { score: number }) {
     return <StatusBadge variant={variant}>{score}</StatusBadge>;
 }
 
-export function RisksTable({ rows, nextCursor, orgSlug }: Props) {
+export function RisksTable({ rows: initialRows, nextCursor: initialNextCursor, orgSlug }: Props) {
     const [sortBy, setSortBy] = useState<string>('inherentScore');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+    // Epic E — Load-more accumulator. See ControlsTable for design.
+    const pagination = useCursorPagination<CriticalRiskRow>({
+        initialRows,
+        initialNextCursor: initialNextCursor ?? null,
+        fetchUrl: (cursor) =>
+            `/api/org/${orgSlug ?? ''}/portfolio?view=risks&cursor=${encodeURIComponent(cursor)}`,
+    });
+
     const sorted = useMemo(() => {
-        const copy = [...rows];
+        const copy = [...pagination.rows];
         copy.sort((a, b) => {
             const dir = sortOrder === 'asc' ? 1 : -1;
             switch (sortBy) {
@@ -52,7 +61,7 @@ export function RisksTable({ rows, nextCursor, orgSlug }: Props) {
             }
         });
         return copy;
-    }, [rows, sortBy, sortOrder]);
+    }, [pagination.rows, sortBy, sortOrder]);
 
     const columns = useMemo(
         () =>
@@ -117,7 +126,8 @@ export function RisksTable({ rows, nextCursor, orgSlug }: Props) {
                         Critical Risks
                     </h1>
                     <p className="text-sm text-content-muted mt-1">
-                        {rows.length} critical risk{rows.length === 1 ? '' : 's'} (score ≥ 15, not closed) across the portfolio
+                        {pagination.rows.length} critical risk{pagination.rows.length === 1 ? '' : 's'} (score ≥ 15, not closed) across the portfolio
+                        {pagination.hasMore ? ' (more available)' : ''}
                     </p>
                 </div>
             </ListPageShell.Header>
@@ -144,16 +154,28 @@ export function RisksTable({ rows, nextCursor, orgSlug }: Props) {
                     }
                     data-testid="org-risks-table"
                 />
-                {nextCursor && orgSlug && (
-                    <div className="flex justify-center pt-3">
-                        <Link
-                            href={`/org/${orgSlug}/risks?cursor=${encodeURIComponent(nextCursor)}`}
+                {pagination.hasMore && orgSlug && (
+                    <div className="flex flex-col items-center gap-2 pt-3">
+                        <button
+                            type="button"
                             className="btn btn-secondary btn-sm"
                             data-testid="org-risks-load-more"
-                            prefetch={false}
+                            onClick={() => {
+                                void pagination.loadMore();
+                            }}
+                            disabled={pagination.loading}
                         >
-                            Load more risks
-                        </Link>
+                            {pagination.loading ? 'Loading…' : 'Load more risks'}
+                        </button>
+                        {pagination.error && (
+                            <span
+                                className="text-content-error text-sm"
+                                role="alert"
+                                data-testid="org-risks-load-error"
+                            >
+                                Failed to load more — please retry.
+                            </span>
+                        )}
                     </div>
                 )}
             </ListPageShell.Body>

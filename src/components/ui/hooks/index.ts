@@ -66,3 +66,10 @@ export {
     type CopyOptions,
     type CopyFn,
 } from "./use-copy-to-clipboard";
+
+// ─── Cursor pagination ────────────────────────────────────────────────
+export {
+    useCursorPagination,
+    type UseCursorPaginationOptions,
+    type UseCursorPaginationResult,
+} from "./use-cursor-pagination";

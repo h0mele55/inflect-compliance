@@ -8,15 +8,18 @@ import { ListPageShell } from '@/components/layout/ListPageShell';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { TableEmptyState } from '@/components/ui/table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { useCursorPagination } from '@/components/ui/hooks';
 import { formatDate } from '@/lib/format-date';
 import type { NonPerformingControlRow } from '@/app-layer/schemas/portfolio';
 
 interface Props {
     rows: NonPerformingControlRow[];
-    /** Encoded cursor for the next page, or null on the last page.
-     *  Threaded through the URL via `?cursor=`. */
+    /** Encoded cursor for the next page returned by the server's first
+     *  `listNonPerformingControls` call. Null when the first page is
+     *  also the last. */
     nextCursor?: string | null;
-    /** Org slug used to construct the "Load more" link. */
+    /** Org slug used to build the API endpoint for client-side
+     *  Load-more requests. Required when `nextCursor` is non-null. */
     orgSlug?: string;
 }
 
@@ -33,12 +36,23 @@ function StatusBadgeForControl({ status }: { status: NonPerformingControlRow['st
     return <StatusBadge variant={variant}>{status.replace(/_/g, ' ')}</StatusBadge>;
 }
 
-export function ControlsTable({ rows, nextCursor, orgSlug }: Props) {
+export function ControlsTable({ rows: initialRows, nextCursor: initialNextCursor, orgSlug }: Props) {
     const [sortBy, setSortBy] = useState<string>('tenantName');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+    // Epic E — Load-more accumulator. Server-rendered initial page +
+    // client-side fetched subsequent pages. Replaces the older
+    // `<Link href="?cursor=...">` pattern that REPLACED rather than
+    // accumulated, capping the dedicated drill-down at 50 rows.
+    const pagination = useCursorPagination<NonPerformingControlRow>({
+        initialRows,
+        initialNextCursor: initialNextCursor ?? null,
+        fetchUrl: (cursor) =>
+            `/api/org/${orgSlug ?? ''}/portfolio?view=controls&cursor=${encodeURIComponent(cursor)}`,
+    });
+
     const sorted = useMemo(() => {
-        const copy = [...rows];
+        const copy = [...pagination.rows];
         copy.sort((a, b) => {
             const dir = sortOrder === 'asc' ? 1 : -1;
             switch (sortBy) {
@@ -56,7 +70,7 @@ export function ControlsTable({ rows, nextCursor, orgSlug }: Props) {
             }
         });
         return copy;
-    }, [rows, sortBy, sortOrder]);
+    }, [pagination.rows, sortBy, sortOrder]);
 
     const columns = useMemo(
         () =>
@@ -121,7 +135,8 @@ export function ControlsTable({ rows, nextCursor, orgSlug }: Props) {
                         Non-Performing Controls
                     </h1>
                     <p className="text-sm text-content-muted mt-1">
-                        {rows.length} applicable control{rows.length === 1 ? '' : 's'} not yet implemented across the portfolio
+                        {pagination.rows.length} applicable control{pagination.rows.length === 1 ? '' : 's'} not yet implemented across the portfolio
+                        {pagination.hasMore ? ' (more available)' : ''}
                     </p>
                 </div>
             </ListPageShell.Header>
@@ -148,16 +163,28 @@ export function ControlsTable({ rows, nextCursor, orgSlug }: Props) {
                     }
                     data-testid="org-controls-table"
                 />
-                {nextCursor && orgSlug && (
-                    <div className="flex justify-center pt-3">
-                        <Link
-                            href={`/org/${orgSlug}/controls?cursor=${encodeURIComponent(nextCursor)}`}
+                {pagination.hasMore && orgSlug && (
+                    <div className="flex flex-col items-center gap-2 pt-3">
+                        <button
+                            type="button"
                             className="btn btn-secondary btn-sm"
                             data-testid="org-controls-load-more"
-                            prefetch={false}
+                            onClick={() => {
+                                void pagination.loadMore();
+                            }}
+                            disabled={pagination.loading}
                         >
-                            Load more controls
-                        </Link>
+                            {pagination.loading ? 'Loading…' : 'Load more controls'}
+                        </button>
+                        {pagination.error && (
+                            <span
+                                className="text-content-error text-sm"
+                                role="alert"
+                                data-testid="org-controls-load-error"
+                            >
+                                Failed to load more — please retry.
+                            </span>
+                        )}
                     </div>
                 )}
             </ListPageShell.Body>
