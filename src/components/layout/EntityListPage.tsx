@@ -1,0 +1,212 @@
+"use client";
+
+/**
+ * `EntityListPage` — composition shell for entity list pages.
+ *
+ * Wraps the standard `<ListPageShell>` (Epic 52) +
+ * `<FilterToolbar>` (Epic 53) + `<DataTable>` (Epic 52) arrangement
+ * every list page uses, so consumers stop hand-writing the same
+ * 30-line `<ListPageShell.Header>...<ListPageShell.Body>` block.
+ *
+ * Inspiration: CISO-Assistant's `ModelTable.svelte` shows the value
+ * of one shell across every entity list. Inflect already has the
+ * underlying primitives (DataTable + ListPageShell + FilterToolbar);
+ * what was missing was the higher-level composition that bundles
+ * them. This file is that bundle.
+ *
+ * What stays in the page:
+ *
+ *   - Column definitions (typed via `createColumns<TRow>()` so the
+ *     row shape isn't erased)
+ *   - Filter definitions (`buildXFilters` from each page's
+ *     `filter-defs.ts`)
+ *   - Data fetching, mutations, optimistic updates
+ *   - Detail / create modals + sheets (rendered as children — they
+ *     live next to the page state that drives them)
+ *   - Permission gates on header actions
+ *   - URL sync (handled by `<FilterProvider>` from the page)
+ *
+ * What the shell carries:
+ *
+ *   - The 3-slot ListPageShell layout (header + filters + body)
+ *   - Header chrome: title + count line + right-aligned actions
+ *   - FilterToolbar wiring (defs + searchId + searchPlaceholder
+ *     + the right-side actions slot for the ColumnsDropdown)
+ *   - DataTable wiring (every prop the consumer cares about
+ *     surfaces; nothing forced)
+ *   - Children passthrough so modals/sheets sit at the page-state
+ *     level, not nested in the shell's tree
+ *
+ * What this is NOT:
+ *
+ *   - A JSON-driven generic table. Columns are typed React nodes
+ *     the page builds with full TanStack power.
+ *   - A data fetcher. Pages run their queries — see
+ *     `ControlsClient` for the canonical React Query shape.
+ *   - A wrapper that hides DataTable's prop surface. Most table
+ *     props pass through directly so a feature added to DataTable
+ *     (sorting, batch actions, column visibility) is reachable
+ *     without a shell change.
+ */
+
+import { type ReactNode } from 'react';
+
+import { ListPageShell } from '@/components/layout/ListPageShell';
+import { FilterToolbar } from '@/components/filters/FilterToolbar';
+import { DataTable, type DataTableProps } from '@/components/ui/table';
+import type { FilterType } from '@/components/ui/filter';
+
+// ─── Header ────────────────────────────────────────────────────────
+
+export interface EntityListPageHeader {
+    /** Title rendered in the page header (string or ReactNode). */
+    title: ReactNode;
+    /** Optional count / subtitle line beneath the title. */
+    count?: ReactNode;
+    /** Right-side action area (create button, dashboard nav, etc.). */
+    actions?: ReactNode;
+}
+
+// ─── Filters ──────────────────────────────────────────────────────
+
+export interface EntityListPageFilters {
+    /** Filter definitions (typically resolved via `useFilters` + buildXFilters). */
+    defs: FilterType[];
+    /** Stable id for the search input (e.g. `control-search`). */
+    searchId: string;
+    /** Search placeholder copy. */
+    searchPlaceholder: string;
+    /** Optional override for the FilterSelect trigger label. */
+    triggerLabel?: ReactNode;
+    /**
+     * Right-aligned actions inside the toolbar — typically a
+     * `<ColumnsDropdown>`. Same shape as `<FilterToolbar actions>`.
+     */
+    toolbarActions?: ReactNode;
+}
+
+// ─── Public props ────────────────────────────────────────────────
+
+/**
+ * Table props mirror `<DataTable>`'s public surface (see
+ * `data-table.tsx`). `data + columns` are required; everything
+ * else is optional and threads through. Adding a new DataTable
+ * prop doesn't require a shell change — it surfaces here via the
+ * `Pick` type below.
+ */
+export type EntityListPageTable<TRow> = Pick<
+    DataTableProps<TRow>,
+    | 'data'
+    | 'columns'
+    | 'loading'
+    | 'error'
+    | 'emptyState'
+    | 'resourceName'
+    | 'sortableColumns'
+    | 'sortBy'
+    | 'sortOrder'
+    | 'onSortChange'
+    | 'onRowClick'
+    | 'getRowId'
+    | 'onRowSelectionChange'
+    | 'selectedRows'
+    | 'selectionControls'
+    | 'batchActions'
+    | 'columnVisibility'
+    | 'onColumnVisibilityChange'
+    | 'pagination'
+    | 'onPaginationChange'
+    | 'rowCount'
+    | 'className'
+    | 'scrollWrapperClassName'
+> & {
+    /** Test id forwarded to the DataTable. */
+    'data-testid'?: string;
+    /**
+     * Default true. Override to opt out of viewport-fitting (rare —
+     * the shell is built for the standard list-page layout).
+     */
+    fillBody?: boolean;
+};
+
+export interface EntityListPageProps<TRow> {
+    header: EntityListPageHeader;
+    /** Omit when the page doesn't have any filter UI. */
+    filters?: EntityListPageFilters;
+    table: EntityListPageTable<TRow>;
+    /**
+     * Children render below the body inside the same `<ListPageShell>`
+     * — typically modals / sheets that sit at the page-state level.
+     * They're a render-time concern of the page, not the shell, so
+     * they pass through verbatim.
+     */
+    children?: ReactNode;
+    /** Forwarded to the outer ListPageShell. */
+    className?: string;
+}
+
+// ─── Component ──────────────────────────────────────────────────
+
+export function EntityListPage<TRow>(props: EntityListPageProps<TRow>) {
+    const { header, filters, table, children, className } = props;
+
+    return (
+        <ListPageShell
+            className={className}
+            data-entity-list-page
+        >
+            <ListPageShell.Header>
+                <div
+                    className="flex items-center justify-between gap-4 flex-wrap"
+                    data-testid="entity-list-header"
+                >
+                    <div>
+                        <h1
+                            className="text-2xl font-bold text-content-emphasis"
+                            data-testid="entity-list-title"
+                        >
+                            {header.title}
+                        </h1>
+                        {header.count !== undefined && header.count !== null && (
+                            <p
+                                className="text-content-muted text-sm"
+                                data-testid="entity-list-count"
+                            >
+                                {header.count}
+                            </p>
+                        )}
+                    </div>
+                    {header.actions && (
+                        <div
+                            className="flex gap-2 flex-wrap"
+                            data-testid="entity-list-header-actions"
+                        >
+                            {header.actions}
+                        </div>
+                    )}
+                </div>
+            </ListPageShell.Header>
+
+            {filters && (
+                <ListPageShell.Filters>
+                    <FilterToolbar
+                        filters={filters.defs}
+                        searchId={filters.searchId}
+                        searchPlaceholder={filters.searchPlaceholder}
+                        triggerLabel={filters.triggerLabel}
+                        actions={filters.toolbarActions}
+                    />
+                </ListPageShell.Filters>
+            )}
+
+            <ListPageShell.Body>
+                <DataTable<TRow>
+                    fillBody={table.fillBody ?? true}
+                    {...table}
+                />
+            </ListPageShell.Body>
+
+            {children}
+        </ListPageShell>
+    );
+}

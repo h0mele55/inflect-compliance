@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/date-picker/date-utils';
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
+import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout';
 
 const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
     loading: () => <div className="glass-card p-6 animate-pulse h-48" aria-busy="true" />,
@@ -477,33 +478,30 @@ export default function ControlDetailPage() {
         await refetch();
     };
 
-    if (loading) return (
-        <div className="space-y-6 animate-fadeIn" aria-busy="true">
-            <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                    <div className="animate-pulse rounded bg-bg-elevated/60 h-4 w-24" />
-                    <div className="animate-pulse rounded bg-bg-elevated/60 h-7 w-64" />
-                </div>
-            </div>
-            <div className="flex gap-1 border-b border-border-default">
-                {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="animate-pulse rounded bg-bg-elevated/60 h-8 w-20 mx-1" />
-                ))}
-            </div>
-            <div className="glass-card p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-6">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} className="space-y-1">
-                            <div className="animate-pulse rounded bg-bg-elevated/60 h-3 w-16" />
-                            <div className="animate-pulse rounded bg-bg-elevated/60 h-4 w-full" />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-    if (error) return <div className="p-12 text-center text-red-400">{error}</div>;
-    if (!control) return <div className="p-12 text-center text-content-subtle">Control not found.</div>;
+    // Loading / error / empty states render through the shared
+    // EntityDetailLayout — same skeleton + same error/empty copy
+    // every detail page in Inflect uses.
+    if (loading) {
+        return (
+            <EntityDetailLayout loading title="">
+                {null}
+            </EntityDetailLayout>
+        );
+    }
+    if (error) {
+        return (
+            <EntityDetailLayout error={error} title="">
+                {null}
+            </EntityDetailLayout>
+        );
+    }
+    if (!control) {
+        return (
+            <EntityDetailLayout empty={{ message: 'Control not found.' }} title="">
+                {null}
+            </EntityDetailLayout>
+        );
+    }
 
     const doneTasks = control.controlTasks?.filter((t: ControlTaskDTO) => t.status === 'DONE').length ?? 0;
     const totalTasks = control.controlTasks?.length ?? 0;
@@ -518,93 +516,105 @@ export default function ControlDetailPage() {
         { key: 'tests', label: 'Tests' },
     ];
 
-    return (
-        <div className="space-y-6 animate-fadeIn">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <Link href={tenantHref('/controls')} className="text-content-muted text-xs hover:text-content-emphasis transition">← Controls</Link>
-                    <h1 className="text-2xl font-bold mt-1" id="control-title">{control.name}</h1>
-                    <div className="flex gap-2 mt-1 flex-wrap items-center">
-                        {control.code && (
-                            <CopyText
-                                value={control.code}
-                                label={`Copy control code ${control.code}`}
-                                successMessage="Control code copied"
-                                className="text-xs text-content-subtle"
-                            >
-                                {control.code}
-                            </CopyText>
-                        )}
-                        <span className={`badge ${STATUS_BADGE[control.status] || 'badge-neutral'}`} id="control-status">
-                            {STATUS_LABELS[control.status] || control.status}
-                        </span>
-                        <span className={`badge ${control.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'}`} id="control-applicability">
-                            {control.applicability === 'NOT_APPLICABLE' ? 'Not Applicable' : 'Applicable'}
-                        </span>
-                        {syncStatus === 'CONFLICT' && (
-                            <Tooltip
-                                title="Sync conflict"
-                                content={syncError ?? 'Local and remote state diverged — resolve before editing.'}
-                            >
-                                <span
-                                    className="badge badge-error flex items-center gap-1 animate-pulse cursor-help"
-                                    id="sync-conflict-badge"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
-                                    Sync Conflict
-                                </span>
-                            </Tooltip>
-                        )}
-                        {syncStatus === 'FAILED' && (
-                            <Tooltip
-                                title="Last sync failed"
-                                content={syncError ?? 'The integration could not reach the source system.'}
-                            >
-                                <span
-                                    className="badge badge-error flex items-center gap-1 cursor-help"
-                                    id="sync-failed-badge"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
-                                    Sync Failed
-                                </span>
-                            </Tooltip>
-                        )}
-                        {syncStatus === 'SYNCED' && (
-                            <Tooltip content={syncLastAt ? `Last synced: ${formatDateTime(syncLastAt)}` : 'Synced'}>
-                                <span className="badge badge-success flex items-center gap-1 cursor-help" id="sync-ok-badge">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-                                    Synced
-                                </span>
-                            </Tooltip>
-                        )}
-                    </div>
-                </div>
-                {permissions.canWrite && (
-                    <div className="flex gap-2">
-                        <Combobox
-                            hideSearch
-                            id="control-status-select"
-                            selected={STATUS_CB_OPTIONS.find(o => o.value === control.status) ?? null}
-                            setSelected={(opt) => { if (opt) changeStatus(opt.value); }}
-                            options={STATUS_CB_OPTIONS}
-                            disabled={changingStatus}
-                            placeholder="Status"
-                            matchTriggerWidth
-                            buttonProps={{ className: 'w-40 text-sm' }}
-                        />
-                        <button className="btn btn-secondary" onClick={() => { setAppChoice(control.applicability); setAppJustification(control.applicabilityJustification || ''); setShowApplicability(!showApplicability); }} id="toggle-applicability-btn">
-                            Applicability
-                        </button>
-                        {control.applicability !== 'NOT_APPLICABLE' && (
-                            <button className="btn btn-primary" onClick={handleMarkTestCompleted} disabled={markingTest} id="mark-test-completed-btn">
-                                {markingTest ? '...' : 'Mark Test Completed'}
-                            </button>
-                        )}
-                    </div>
-                )}
-            </div>
+    // ── Header meta (badges) ──
+    //
+    // Domain-specific metadata row. The shell renders this as its
+    // `meta` slot so layout/spacing/wrapping is consistent across
+    // detail pages while the badges themselves stay specific to
+    // controls (status, applicability, sync state).
+    const headerMeta = (
+        <>
+            {control.code && (
+                <CopyText
+                    value={control.code}
+                    label={`Copy control code ${control.code}`}
+                    successMessage="Control code copied"
+                    className="text-xs text-content-subtle"
+                >
+                    {control.code}
+                </CopyText>
+            )}
+            <span className={`badge ${STATUS_BADGE[control.status] || 'badge-neutral'}`} id="control-status">
+                {STATUS_LABELS[control.status] || control.status}
+            </span>
+            <span className={`badge ${control.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'}`} id="control-applicability">
+                {control.applicability === 'NOT_APPLICABLE' ? 'Not Applicable' : 'Applicable'}
+            </span>
+            {syncStatus === 'CONFLICT' && (
+                <Tooltip
+                    title="Sync conflict"
+                    content={syncError ?? 'Local and remote state diverged — resolve before editing.'}
+                >
+                    <span
+                        className="badge badge-error flex items-center gap-1 animate-pulse cursor-help"
+                        id="sync-conflict-badge"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                        Sync Conflict
+                    </span>
+                </Tooltip>
+            )}
+            {syncStatus === 'FAILED' && (
+                <Tooltip
+                    title="Last sync failed"
+                    content={syncError ?? 'The integration could not reach the source system.'}
+                >
+                    <span
+                        className="badge badge-error flex items-center gap-1 cursor-help"
+                        id="sync-failed-badge"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                        Sync Failed
+                    </span>
+                </Tooltip>
+            )}
+            {syncStatus === 'SYNCED' && (
+                <Tooltip content={syncLastAt ? `Last synced: ${formatDateTime(syncLastAt)}` : 'Synced'}>
+                    <span className="badge badge-success flex items-center gap-1 cursor-help" id="sync-ok-badge">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        Synced
+                    </span>
+                </Tooltip>
+            )}
+        </>
+    );
 
+    // ── Header actions (right side) ──
+    const headerActions = permissions.canWrite ? (
+        <>
+            <Combobox
+                hideSearch
+                id="control-status-select"
+                selected={STATUS_CB_OPTIONS.find(o => o.value === control.status) ?? null}
+                setSelected={(opt) => { if (opt) changeStatus(opt.value); }}
+                options={STATUS_CB_OPTIONS}
+                disabled={changingStatus}
+                placeholder="Status"
+                matchTriggerWidth
+                buttonProps={{ className: 'w-40 text-sm' }}
+            />
+            <button className="btn btn-secondary" onClick={() => { setAppChoice(control.applicability); setAppJustification(control.applicabilityJustification || ''); setShowApplicability(!showApplicability); }} id="toggle-applicability-btn">
+                Applicability
+            </button>
+            {control.applicability !== 'NOT_APPLICABLE' && (
+                <button className="btn btn-primary" onClick={handleMarkTestCompleted} disabled={markingTest} id="mark-test-completed-btn">
+                    {markingTest ? '...' : 'Mark Test Completed'}
+                </button>
+            )}
+        </>
+    ) : null;
+
+    return (
+        <EntityDetailLayout
+            id="control-detail-page"
+            back={{ href: tenantHref('/controls'), label: 'Controls' }}
+            title={<span id="control-title">{control.name}</span>}
+            meta={headerMeta}
+            actions={headerActions}
+            tabs={tabs}
+            activeTab={tab}
+            onTabChange={(next) => setTab(next as Tab)}
+        >
             {/* Applicability modal */}
             {showApplicability && permissions.canWrite && (
                 <div className="glass-card p-4 space-y-3">
@@ -628,21 +638,7 @@ export default function ControlDetailPage() {
                 </div>
             )}
 
-            {/* Tabs */}
-            <div className="flex gap-1 border-b border-border-default">
-                {tabs.map(t => (
-                    <button
-                        key={t.key}
-                        className={`px-4 py-2 text-sm font-medium transition border-b-2 ${tab === t.key ? 'border-[var(--brand-default)] text-content-emphasis' : 'border-transparent text-content-muted hover:text-content-emphasis'}`}
-                        onClick={() => setTab(t.key)}
-                        id={`tab-${t.key}`}
-                    >
-                        {t.label} {t.count !== undefined && <span className="ml-1 text-xs opacity-60">({t.count})</span>}
-                    </button>
-                ))}
-            </div>
-
-            {/* Tab content */}
+            {/* Tab content — tab bar is rendered by EntityDetailLayout */}
             {tab === 'overview' && (
                 <div className="glass-card p-6 space-y-4">
                     {/* Overview header with Edit button */}
@@ -1267,6 +1263,6 @@ export default function ControlDetailPage() {
                     <TestPlansPanel controlId={controlId} />
                 </div>
             )}
-        </div>
+        </EntityDetailLayout>
     );
 }
