@@ -1,6 +1,7 @@
 'use client';
 import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
@@ -13,6 +14,26 @@ import {
 } from '@/components/ui/date-picker/date-utils';
 import { TabSelect } from '@/components/ui/tab-select';
 import { NumberStepper } from '@/components/ui/number-stepper';
+import { sanitizeRichTextHtml } from '@/lib/security/sanitize';
+import type { RichTextContentType } from '@/components/ui/RichTextEditor';
+import { ApprovalBanner } from '@/components/ui/ApprovalBanner';
+import { VersionDiff } from '@/components/ui/VersionDiff';
+
+// Lazy-load Tiptap. The editor + ProseMirror chunks land at
+// ~200KB gzipped; deferring the import means the static parts of
+// the policy detail page (current view, versions, activity) stay
+// light unless the operator opens the Editor tab.
+const RichTextEditor = dynamic(
+    () => import('@/components/ui/RichTextEditor').then((m) => m.RichTextEditor),
+    {
+        ssr: false,
+        loading: () => (
+            <div className="rounded-lg border border-border-default bg-bg-subtle p-4 text-center text-sm text-content-muted">
+                Loading editor…
+            </div>
+        ),
+    },
+);
 
 const STATUS_BADGE: Record<string, string> = {
     DRAFT: 'badge-neutral', PUBLISHED: 'badge-success', ARCHIVED: 'badge-warning',
@@ -43,9 +64,14 @@ export default function PolicyDetailPage() {
     // Editor state
     const [contentMode, setContentMode] = useState<ContentMode>('MARKDOWN');
     const [editorContent, setEditorContent] = useState('');
+    // Epic 45.2 — when the operator toggles the rich editor's
+    // markdown ↔ WYSIWYG switch, the editor reports the new type.
+    // We persist that as `contentType` on the version so rendering
+    // can branch correctly between markdown-as-text and HTML.
+    const [editorContentType, setEditorContentType] =
+        useState<RichTextContentType>('MARKDOWN');
     const [externalUrl, setExternalUrl] = useState('');
     const [changeSummary, setChangeSummary] = useState('');
-    const [showPreview, setShowPreview] = useState(false);
     const [saving, setSaving] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -101,8 +127,18 @@ export default function PolicyDetailPage() {
         setSaving(true);
         setError('');
         try {
+            // Epic 45.2 — when the editor is in WYSIWYG mode the
+            // payload is HTML, not markdown. The backend's
+            // `sanitizePolicyContent` allowlists HTML on write, so
+            // the wire format simply needs the right `contentType`.
+            const wireContentType =
+                contentMode === 'FILE'
+                    ? 'MARKDOWN'
+                    : contentMode === 'MARKDOWN'
+                      ? editorContentType
+                      : contentMode;
             const body: Record<string, unknown> = {
-                contentType: contentMode === 'FILE' ? 'MARKDOWN' : contentMode,
+                contentType: wireContentType,
                 changeSummary: changeSummary || null,
             };
 
@@ -135,7 +171,7 @@ export default function PolicyDetailPage() {
                 const data = await res.json().catch(() => ({}));
                 throw new Error(data.error || 'Failed to create version');
             }
-            setEditorContent(''); setExternalUrl(''); setChangeSummary('');
+            setEditorContent(''); setExternalUrl(''); setChangeSummary(''); setEditorContentType('MARKDOWN');
             setSelectedFile(null); setTab('versions');
             await fetchPolicy();
         } catch (err: unknown) {
@@ -221,6 +257,26 @@ export default function PolicyDetailPage() {
                 </a>
             );
         }
+        // Epic 45.2 — HTML versions render via dangerouslySetInnerHTML
+        // with `sanitizeRichTextHtml` as defence-in-depth (the
+        // backend already sanitises on write via
+        // `sanitizePolicyContent('HTML', …)`). MARKDOWN versions
+        // keep the legacy whitespace-pre rendering — the existing
+        // policy content path stores markdown as literal text and
+        // we deliberately don't add a markdown parser here.
+        if (v.contentType === 'HTML') {
+            const safe = sanitizeRichTextHtml(v.contentText ?? '');
+            if (!safe.trim()) {
+                return <span className="text-content-subtle italic">No content</span>;
+            }
+            return (
+                <div
+                    className="prose prose-sm prose-invert max-w-none text-content-default text-sm"
+                    data-testid={`policy-version-html-${v.id}`}
+                    dangerouslySetInnerHTML={{ __html: safe }}
+                />
+            );
+        }
         return (
             <div className="prose prose-sm prose-invert max-w-none text-content-default whitespace-pre-wrap text-sm">
                 {v.contentText || <span className="text-content-subtle italic">No content</span>}
@@ -263,8 +319,46 @@ export default function PolicyDetailPage() {
         current: 'Current', versions: 'Versions', editor: 'Editor', activity: 'Activity',
     };
 
+    // Epic 45.3 — surface the active pending approval (if any) above
+    // the page chrome so reviewers see it on first paint. Approvals
+    // come back nested per-version on `policy.approvals`; we pick the
+    // most recent PENDING row + augment it with the version number
+    // the banner displays.
+    const pendingApproval = (() => {
+        const all = policy.approvals ?? [];
+        const pending = all.find((a) => a.status === 'PENDING');
+        if (!pending) return null;
+        const matchingVersion = (policy.versions ?? []).find(
+            (v) => v.id === pending.policyVersionId,
+        );
+        return {
+            id: pending.id,
+            status: 'PENDING' as const,
+            requestedBy: pending.requestedBy ?? null,
+            approvedBy: pending.approvedBy ?? null,
+            decidedAt: pending.decidedAt ?? null,
+            comment: (pending as { comment?: string | null }).comment ?? null,
+            versionNumber: matchingVersion?.versionNumber ?? null,
+        };
+    })();
+
     return (
         <div className="space-y-6 animate-fadeIn">
+            {/* Approval banner (Epic 45.3) — only mounts when an
+                approval row is PENDING. Reviewer-only actions are
+                gated by `canAdmin`; non-reviewers still see status
+                + requester so the page is informative. */}
+            {policy.status === 'IN_REVIEW' && pendingApproval && (
+                <ApprovalBanner
+                    approval={pendingApproval}
+                    canDecide={canAdmin}
+                    busy={!!actionLoading && actionLoading.startsWith('decide-')}
+                    onDecide={(approvalId, decision) =>
+                        decideApproval(approvalId, decision)
+                    }
+                />
+            )}
+
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-content-muted">
                 <Link href={tenantHref('/policies')} className="hover:text-[var(--brand-default)] transition">Policies</Link>
@@ -375,7 +469,20 @@ export default function PolicyDetailPage() {
                     </div>
                     <div className="flex gap-2 flex-shrink-0">
                         {canWrite && policy.status !== 'ARCHIVED' && (
-                            <button onClick={() => { setTab('editor'); setEditorContent(currentVersion?.contentText || ''); }}
+                            <button onClick={() => {
+                                setTab('editor');
+                                setEditorContent(currentVersion?.contentText || '');
+                                // Seed the editor's mode from the
+                                // current version's contentType so a
+                                // version saved as HTML opens in
+                                // WYSIWYG and one saved as MARKDOWN
+                                // opens in the textarea.
+                                setEditorContentType(
+                                    currentVersion?.contentType === 'HTML'
+                                        ? 'HTML'
+                                        : 'MARKDOWN',
+                                );
+                            }}
                                 className="btn btn-primary btn-sm" id="new-version-btn">New Version</button>
                         )}
                         {canAdmin && policy.status !== 'ARCHIVED' && (
@@ -430,6 +537,20 @@ export default function PolicyDetailPage() {
             {/* ── Version History ── */}
             {tab === 'versions' && (
                 <div className="space-y-3" id="version-history">
+                    {/* Version diff (Epic 45.3) — defaults to
+                        previous-vs-current so a reviewer's first
+                        impression is always meaningful. The picker
+                        in the diff card lets them pick any pair. */}
+                    {versions.length >= 2 && (
+                        <VersionDiff
+                            versions={versions.map((v) => ({
+                                id: v.id,
+                                versionNumber: v.versionNumber,
+                                contentType: v.contentType,
+                                text: v.contentText ?? '',
+                            }))}
+                        />
+                    )}
                     {versions.length === 0 ? (
                         <div className="glass-card p-8 text-center text-content-subtle">No versions yet.</div>
                     ) : versions.map((v: PolicyVersionDTO) => {
@@ -523,24 +644,18 @@ export default function PolicyDetailPage() {
                         ))}
                     </div>
 
-                    {/* Markdown editor */}
+                    {/* Markdown / WYSIWYG editor (Epic 45.2) */}
                     {contentMode === 'MARKDOWN' && (
-                        <>
-                            <div className="flex justify-end">
-                                <button onClick={() => setShowPreview(!showPreview)} className="btn btn-xs btn-ghost text-content-muted">
-                                    {showPreview ? 'Edit' : 'Preview'}
-                                </button>
-                            </div>
-                            {showPreview ? (
-                                <div className="prose prose-sm prose-invert max-w-none text-content-default whitespace-pre-wrap text-sm min-h-[300px] border border-border-default rounded-lg p-4">
-                                    {editorContent || <span className="text-content-subtle italic">Nothing to preview</span>}
-                                </div>
-                            ) : (
-                                <textarea className="input w-full min-h-[300px] font-mono text-sm" value={editorContent}
-                                    onChange={e => setEditorContent(e.target.value)}
-                                    placeholder="# Policy Content&#10;&#10;Write your policy here..." id="version-editor" />
-                            )}
-                        </>
+                        <RichTextEditor
+                            id="version-editor"
+                            value={editorContent}
+                            contentType={editorContentType}
+                            placeholder="# Policy Content&#10;&#10;Write your policy here..."
+                            onChange={(value, contentType) => {
+                                setEditorContent(value);
+                                setEditorContentType(contentType);
+                            }}
+                        />
                     )}
 
                     {/* External link input */}

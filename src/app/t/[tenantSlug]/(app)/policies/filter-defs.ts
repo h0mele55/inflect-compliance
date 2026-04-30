@@ -15,12 +15,17 @@ import {
 import type { FilterOption } from '@/components/ui/filter/types';
 import { CircleDot, Tag } from 'lucide-react';
 
+// Canonical labels for `PolicyStatus` — single source of truth for
+// the filter picker AND the row badge. Pre-Epic-45 the filter map
+// listed `RETIRED` but the schema enum is `ARCHIVED`; that drift
+// meant a "Retired" filter selection matched zero rows. Aligned to
+// the enum here so future column wiring stays canonical.
 export const POLICY_STATUS_LABELS = {
     DRAFT: 'Draft',
     IN_REVIEW: 'In Review',
     APPROVED: 'Approved',
     PUBLISHED: 'Published',
-    RETIRED: 'Retired',
+    ARCHIVED: 'Archived',
 } as const;
 
 const STATIC_DEFS = {
