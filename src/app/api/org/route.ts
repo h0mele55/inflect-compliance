@@ -26,6 +26,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { withValidatedBody } from '@/lib/validation/route';
 import { CreateOrganizationInput } from '@/app-layer/schemas/organization.schemas';
 import { provisionOrgAdminToTenants } from '@/app-layer/usecases/org-provisioning';
+import { seedDefaultOrgDashboard } from '@/app-layer/usecases/org-dashboard-presets';
 import { ConflictError } from '@/lib/errors/types';
 
 export const POST = withApiErrorHandling(
@@ -48,6 +49,14 @@ export const POST = withApiErrorHandling(
                         role: 'ORG_ADMIN',
                     },
                 });
+                // Epic 41 — seed the default dashboard preset inside
+                // the org-creation transaction so a new org is born
+                // with a useful out-of-the-box overview. Idempotent:
+                // a re-run on an org that already has widgets is a
+                // no-op, never duplicate. The freshly-created org
+                // has zero widgets so this unconditionally inserts
+                // the eight defaults.
+                await seedDefaultOrgDashboard(tx, org.id);
                 return org;
             });
             orgId = created.id;

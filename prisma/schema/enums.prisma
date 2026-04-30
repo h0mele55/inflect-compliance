@@ -76,6 +76,22 @@ enum MembershipStatus {
   REMOVED
 }
 
+/// Epic 41 — configurable org dashboard widget categories.
+///
+/// Drives the React component dispatched on the org overview page.
+/// Adding a new value requires:
+///   1. CREATE TYPE / ALTER TYPE migration
+///   2. A Zod variant in `src/app-layer/schemas/org-dashboard-widget.schemas.ts`
+///   3. A renderer registered in the frontend dispatcher (out of
+///      scope for the backend foundation prompt)
+enum OrgDashboardWidgetType {
+  KPI            // Stat-card tile — single metric with optional delta
+  DONUT          // Donut breakdown — RAG distribution and similar
+  TREND          // Time-series sparkline / area chart
+  TENANT_LIST    // Per-tenant coverage list with drill-down
+  DRILLDOWN_CTAS // Drill-down navigation cards (controls / risks / evidence)
+}
+
 enum ClauseStatus {
   NOT_STARTED
   IN_PROGRESS

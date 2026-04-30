@@ -106,6 +106,18 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
         // and redeemOrgInvite specifically operates pre-membership
         // (the redeemer is not yet a member, mirroring tenant-invites).
         'org-invites.ts',
+        // Epic 41 — configurable dashboard widget CRUD. OrgDashboardWidget
+        // is org-scoped, NOT tenant-scoped (not in TENANT_SCOPED_MODELS).
+        // Same access shape as org-members.ts / org-invites.ts: global
+        // prisma + getOrgCtx for isolation. Read gated by canViewPortfolio,
+        // write gated by canConfigureDashboard (ORG_ADMIN only).
+        'org-dashboard-widgets.ts',
+        // Epic E.3 — request-scoped portfolio data helper. Memoises
+        // tenants + snapshots reads via the AsyncLocalStorage
+        // RequestContext + WeakMap. The repository methods it calls
+        // are themselves org-scoped (not tenant-scoped), so the
+        // helper proxies them at the global prisma layer.
+        'portfolio-data.ts',
         // Epic O-3 — portfolio aggregation uses `runInGlobalContext` for
         // ComplianceSnapshot reads (org-wide aggregates, no business data)
         // and switches to per-tenant `withTenantDb(tid, ...)` for drill-

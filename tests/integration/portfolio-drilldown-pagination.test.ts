@@ -52,6 +52,7 @@ describeFn('Portfolio drill-down — cursor pagination (DB-backed)', () => {
                 canExportReports: true,
                 canManageTenants: true,
                 canManageMembers: true,
+            canConfigureDashboard: true,
             },
         };
     }

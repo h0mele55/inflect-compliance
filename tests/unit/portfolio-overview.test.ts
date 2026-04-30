@@ -54,6 +54,7 @@ function ctxFor(): OrgContext {
             canExportReports: true,
             canManageTenants: true,
             canManageMembers: true,
+            canConfigureDashboard: true,
         },
     };
 }

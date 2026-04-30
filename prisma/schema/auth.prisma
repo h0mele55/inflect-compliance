@@ -182,6 +182,7 @@ model Organization {
   invites                      OrgInvite[]
   provisionedTenantMemberships TenantMembership[] @relation("OrgProvisionedTenantMemberships")
   auditLogs                    OrgAuditLog[]
+  dashboardWidgets             OrgDashboardWidget[]
 }
 
 // Per-user, per-org role assignment.
@@ -250,6 +251,58 @@ model OrgInvite {
 
   @@unique([organizationId, email])
   @@index([token])
+  @@index([organizationId])
+}
+
+// Epic 41 — Configurable Dashboard Widget Engine.
+//
+// Persists the widget composition of the org-level dashboard at
+// `/org/[orgSlug]`. Each row is one widget rendered on the portfolio
+// overview: a KPI tile, RAG donut, risk-trend chart, tenant-coverage
+// list, or drill-down CTA group. The frontend renders strictly from
+// these rows — the backend enforces shape via Zod at the API layer.
+//
+// Org-scoped (NOT tenant-scoped). Same shape as OrgInvite /
+// OrgMembership / OrgAuditLog: `organizationId` is the foreign key,
+// the global postgres role serves the queries, isolation is enforced
+// by `getOrgCtx` resolving the user's OrgMembership before the
+// usecase runs. Not in TENANT_SCOPED_MODELS.
+//
+// Position + size + config are stored as JSON. The DB enforces
+// nothing about their internal shape — that's deliberate so a new
+// widget type doesn't require a migration. The Zod schemas in
+// `src/app-layer/schemas/org-dashboard-widget.schemas.ts` lock the
+// shape per (type, chartType) and the API layer rejects payloads
+// that don't fit.
+model OrgDashboardWidget {
+  id             String                 @id @default(cuid())
+  organizationId String
+  type           OrgDashboardWidgetType
+  /// Sub-variant within a `type` (e.g. for KPI: 'coverage' /
+  /// 'critical-risks' / 'overdue-evidence' / 'tenants'). Free-form
+  /// at the schema layer; the Zod map narrows valid values per type.
+  chartType      String
+  /// Optional human-readable title. When null the frontend uses
+  /// the widget's default title for the (type, chartType) pair.
+  title          String?
+  /// Per-(type, chartType) config. Locked by Zod at the API
+  /// boundary; storing as JSON keeps the model open to new widget
+  /// types without migrations.
+  config         Json
+  /// Grid position { x: int, y: int } — top-left in the
+  /// react-grid-layout coordinate system.
+  position       Json
+  /// Grid size { w: int, h: int } — width and height in grid cells.
+  size           Json
+  /// True (default) renders the widget; false hides it without
+  /// deleting the row, preserving position so re-enabling is
+  /// non-destructive.
+  enabled        Boolean                @default(true)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@index([organizationId])
 }
 
