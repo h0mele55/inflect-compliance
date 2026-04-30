@@ -1,27 +1,42 @@
 'use client';
 
 /**
- * Epic 54 — Upload Evidence modal.
+ * Epic 43.1 — Evidence upload modal (multi-file dropzone).
  *
- * Replaces the inline `#upload-form` that previously lived in
- * EvidenceClient with a modal-first flow built on the shared `<Modal>` +
- * `<FileUpload>` primitives.
+ * Builds on the Epic 54 modal shape but swaps the single-file
+ * `<FileUpload>` primitive for the new generic `<FileDropzone>` from
+ * `@/components/ui/FileDropzone`. The dropzone supports drag-and-drop,
+ * click-to-browse, multi-file selection, and a per-file progress bar
+ * driven by `XMLHttpRequest.upload.onprogress` (fetch can't surface
+ * upload progress on any mainstream browser today).
  *
  * Business contract is preserved byte-for-byte:
- *   - `POST /api/t/:slug/evidence/uploads` with `FormData` containing
- *     `file`, `title?`, `controlId?`, `retentionUntil?` (ISO).
+ *   - `POST /api/t/:slug/evidence/uploads` with `FormData` carrying
+ *     `file`, `title?`, `controlId?`. Each queued file is uploaded
+ *     individually; the same metadata fields apply to every file in
+ *     the batch.
  *   - Optimistic pending row inserted into
- *     `queryKeys.evidence.list(tenantSlug)` while the upload is in-flight;
- *     replaced on success, rolled back on error.
- *   - Follow-up `POST /evidence/:id/retention` when a retention date is
- *     supplied, mirroring the legacy two-call sequence.
+ *     `queryKeys.evidence.list(tenantSlug)` while each upload is in
+ *     flight, replaced on success / rolled back on error.
+ *   - Follow-up `POST /evidence/:id/retention` when a retention date
+ *     is supplied (per uploaded evidence record).
  *   - React-Query `queryKeys.evidence.all(tenantSlug)` invalidated on
- *     settle so filters, counts, and the expiring/archived tabs refresh.
+ *     settle so filters, counts, and the expiring/archived tabs
+ *     refresh.
  *
- * Form IDs (`upload-form`, `file-input`, `upload-title-input`,
- * `control-search-input`, `control-select`, `retention-date-input`,
- * `submit-upload-btn`, `upload-error`) are preserved so the pre-migration
- * E2E suite continues to pass untouched.
+ * E2E selectors preserved:
+ *   - `#upload-form`, `#upload-evidence-cancel-btn`, `#submit-upload-btn`,
+ *     `#file-input`, `#upload-title-input`, `#control-select`,
+ *     `#retention-date-input`, `#upload-error`. The dropzone forwards
+ *     `inputId="file-input"` so `setInputFiles('#file-input', …)`
+ *     keeps working unchanged.
+ *
+ * The modal is intentionally submit-driven: drops queue files in the
+ * dropzone, the operator fills metadata, clicks "Upload", and the
+ * dropzone's imperative `startAll()` runs each upload sequentially.
+ * Auto-start UX (drop → upload immediately) is left to a future
+ * lighter-weight surface (e.g. a list-page bulk-upload tray); the
+ * modal preserves the form-shaped flow operators are used to.
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -29,15 +44,18 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type Dispatch,
     type SetStateAction,
 } from 'react';
 import { Modal } from '@/components/ui/modal';
-import { FileUpload } from '@/components/ui/file-upload';
+import {
+    FileDropzone,
+    type FileDropzoneHandle,
+} from '@/components/ui/FileDropzone';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
-import { FormError } from '@/components/ui/form-error';
 import { InfoTooltip } from '@/components/ui/tooltip';
 import { DatePicker } from '@/components/ui/date-picker/date-picker';
 import {
@@ -47,13 +65,20 @@ import {
 } from '@/components/ui/date-picker/date-utils';
 import { queryKeys } from '@/lib/queryKeys';
 import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
+import {
+    uploadWithProgress,
+    UploadHttpError,
+} from '@/lib/upload/upload-with-progress';
 
 // ─── Constraints ────────────────────────────────────────────────────
-// 25 MB — generous enough for a signed PDF or a scanned policy pack,
-// still small enough to surface oversized uploads client-side before we
-// burn bandwidth on a 4xx round-trip. Server-side still enforces the
-// canonical limit.
+// 25 MB per file — generous enough for a signed PDF or scanned policy
+// pack, still small enough to surface oversized uploads client-side
+// before we burn bandwidth on a 4xx round-trip. Server-side still
+// enforces the canonical limit.
 const MAX_FILE_SIZE_MB = 25;
+
+const EVIDENCE_ACCEPT =
+    '.pdf,.jpg,.jpeg,.png,.gif,.webp,.csv,.txt,.doc,.docx,.xlsx,.xls,.json,.zip';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -72,13 +97,6 @@ export interface UploadEvidenceModalProps {
     controls: ControlOption[];
 }
 
-function formatBytes(bytes: number | null | undefined): string {
-    if (!bytes) return '—';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1048576).toFixed(1)} MB`;
-}
-
 // ─── Component ──────────────────────────────────────────────────────
 
 export function UploadEvidenceModal({
@@ -90,21 +108,24 @@ export function UploadEvidenceModal({
 }: UploadEvidenceModalProps) {
     const close = useCallback(() => setOpen(false), [setOpen]);
     const queryClient = useQueryClient();
+    const dropzoneRef = useRef<FileDropzoneHandle>(null);
 
-    const [file, setFile] = useState<File | null>(null);
     const [title, setTitle] = useState('');
     const [controlId, setControlId] = useState('');
     const [retentionUntil, setRetentionUntil] = useState('');
     const [error, setError] = useState('');
+    const [queuedCount, setQueuedCount] = useState(0);
+    const [uploadingAll, setUploadingAll] = useState(false);
 
     // Reset on every open so a previous cancel doesn't leak state.
     useEffect(() => {
         if (!open) return;
-        setFile(null);
         setTitle('');
         setControlId('');
         setRetentionUntil('');
         setError('');
+        setQueuedCount(0);
+        setUploadingAll(false);
     }, [open]);
 
     // Project controls into ComboboxOption shape. The annexId + code +
@@ -121,48 +142,47 @@ export function UploadEvidenceModal({
         [controls],
     );
 
+    const telemetry = useFormTelemetry('UploadEvidenceModal');
+
+    // Single-file mutation is preserved as a thin wrapper so React
+    // Query handles the optimistic-row + invalidation flow per file.
+    // The actual HTTP work is `uploadWithProgress` so the dropzone's
+    // progress bar updates from real network events.
     const mutation = useMutation({
-        mutationFn: async ({
-            file,
-            title,
-            controlId,
-            retentionUntil,
-        }: {
+        mutationFn: async (vars: {
             file: File;
-            title: string;
+            applyTitle: boolean;
             controlId: string;
             retentionUntil: string;
+            onProgress: (percent: number | null) => void;
+            signal: AbortSignal;
         }) => {
+            const { file, applyTitle, onProgress, signal } = vars;
             const formData = new FormData();
             formData.append('file', file);
-            if (title) formData.append('title', title);
-            if (controlId) formData.append('controlId', controlId);
-            if (retentionUntil)
-                formData.append(
-                    'retentionUntil',
-                    new Date(retentionUntil).toISOString(),
-                );
+            // Apply the title input only when uploading a single file
+            // (multi-file uploads just take the filename — different
+            // titles would all land on the same string otherwise).
+            if (applyTitle && title) formData.append('title', title);
+            if (vars.controlId) formData.append('controlId', vars.controlId);
 
-            const res = await fetch(apiUrl('/evidence/uploads'), {
-                method: 'POST',
-                body: formData,
-            });
+            const uploaded = await uploadWithProgress<{ id?: string }>(
+                apiUrl('/evidence/uploads'),
+                formData,
+                {
+                    onProgress: (p) => onProgress(p.percent),
+                    signal,
+                },
+            );
 
-            if (!res.ok) {
-                const err = await res
-                    .json()
-                    .catch(() => ({ error: 'Upload failed' }));
-                throw new Error(err.error || err.message || 'Upload failed');
-            }
-
-            const uploaded = await res.json();
-
-            if (retentionUntil && uploaded?.id) {
+            if (vars.retentionUntil && uploaded?.id) {
                 await fetch(apiUrl(`/evidence/${uploaded.id}/retention`), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        retentionUntil: new Date(retentionUntil).toISOString(),
+                        retentionUntil: new Date(
+                            vars.retentionUntil,
+                        ).toISOString(),
                         retentionPolicy: 'FIXED_DATE',
                     }),
                 });
@@ -170,11 +190,11 @@ export function UploadEvidenceModal({
 
             return uploaded;
         },
-        // Optimistic pending row — keeps the list responsive while we
-        // wait on S3. Identical shape to the legacy inline upload so
-        // every column renderer (status badge, retention pill, etc.)
-        // works without special-casing.
-        onMutate: async ({ file, title }) => {
+        // Optimistic pending row — keeps the list responsive while the
+        // upload is in flight. Identical shape to the legacy single-
+        // file flow so every column renderer (status badge, retention
+        // pill, file-type icon) works without special-casing.
+        onMutate: async (vars) => {
             await queryClient.cancelQueries({
                 queryKey: queryKeys.evidence.all(tenantSlug),
             });
@@ -186,8 +206,11 @@ export function UploadEvidenceModal({
                 queryClient.setQueryData<unknown[]>(listKey, [
                     {
                         id: tempId,
-                        title: title || file.name,
-                        fileName: file.name,
+                        title: vars.applyTitle && title
+                            ? title
+                            : vars.file.name,
+                        fileName: vars.file.name,
+                        fileMimeType: vars.file.type || null,
                         type: 'FILE',
                         status: 'PENDING_UPLOAD',
                         owner: null,
@@ -202,7 +225,6 @@ export function UploadEvidenceModal({
                     ...previousList,
                 ]);
             }
-
             return { previousList, listKey, tempId };
         },
         onError: (err, _vars, context) => {
@@ -210,13 +232,24 @@ export function UploadEvidenceModal({
                 queryClient.setQueryData(context.listKey, context.previousList);
             }
             telemetry.trackError(err);
-            setError(err instanceof Error ? err.message : 'Upload failed');
+            const msg =
+                err instanceof UploadHttpError
+                    ? (() => {
+                          const body = err.parsedBody as
+                              | { error?: string; message?: string }
+                              | null;
+                          return body?.error || body?.message || err.message;
+                      })()
+                    : err instanceof Error
+                      ? err.message
+                      : 'Upload failed';
+            setError(msg);
         },
         onSuccess: (data, _vars, context) => {
             if (context?.previousList) {
-                const currentList = queryClient.getQueryData<
-                    { id: string }[]
-                >(context.listKey);
+                const currentList = queryClient.getQueryData<{ id: string }[]>(
+                    context.listKey,
+                );
                 if (currentList) {
                     queryClient.setQueryData(
                         context.listKey,
@@ -227,7 +260,6 @@ export function UploadEvidenceModal({
             telemetry.trackSuccess({
                 evidenceId: (data as { id?: string })?.id,
             });
-            close();
         },
         onSettled: () => {
             queryClient.invalidateQueries({
@@ -236,22 +268,79 @@ export function UploadEvidenceModal({
         },
     });
 
-    const telemetry = useFormTelemetry('UploadEvidenceModal');
+    // Dropzone's `onUpload` — invoked once per file at submit time.
+    // The mutation owns optimistic-row + cache invalidation; this
+    // handler only bridges the dropzone's progress callback into the
+    // mutation's variables.
+    const handleDropzoneUpload = useCallback(
+        async (
+            file: File,
+            ctx: { onProgress: (p: number | null) => void; signal: AbortSignal },
+        ) => {
+            const total = dropzoneRef.current?.getEntries().length ?? 1;
+            const applyTitle = total === 1;
+            return mutation.mutateAsync({
+                file,
+                applyTitle,
+                controlId,
+                retentionUntil,
+                onProgress: ctx.onProgress,
+                signal: ctx.signal,
+            });
+        },
+        [mutation, controlId, retentionUntil],
+    );
 
-    const canSubmit = !!file && !mutation.isPending;
+    const onPick = useCallback((files: File[]) => {
+        setError('');
+        // Add to existing count so multi-pick across drops accumulates.
+        setQueuedCount((prev) => prev + files.length);
+    }, []);
+
+    const onAllSettled = useCallback(() => {
+        setUploadingAll(false);
+        const entries = dropzoneRef.current?.getEntries() ?? [];
+        const allOk =
+            entries.length > 0 && entries.every((e) => e.status === 'success');
+        if (allOk) {
+            // Drop the modal once every queued file landed cleanly.
+            close();
+        }
+    }, [close]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!file || mutation.isPending) return;
+        if (uploadingAll) return;
+        const entries = dropzoneRef.current?.getEntries() ?? [];
+        const queued = entries.filter((x) => x.status === 'queued');
+        if (queued.length === 0) {
+            setError('A file is required to upload evidence.');
+            return;
+        }
         setError('');
         telemetry.trackSubmit({
+            count: queued.length,
             hasTitle: title.trim().length > 0,
             hasControlLink: Boolean(controlId),
             hasRetention: Boolean(retentionUntil),
-            sizeBytes: file.size,
         });
-        mutation.mutate({ file, title, controlId, retentionUntil });
+        setUploadingAll(true);
+        dropzoneRef.current?.startAll().catch(() => {
+            // Errors land in `mutation.onError` per file — the
+            // imperative chain only signals "all done" via
+            // `onAllSettled`, so no extra surface needed here.
+        });
     };
+
+    const cancel = () => {
+        if (uploadingAll) {
+            dropzoneRef.current?.cancelAll();
+            setUploadingAll(false);
+        }
+        close();
+    };
+
+    const submitDisabled = queuedCount === 0 || uploadingAll;
 
     return (
         <Modal
@@ -259,12 +348,12 @@ export function UploadEvidenceModal({
             setShowModal={setOpen}
             size="lg"
             title="Upload evidence"
-            description="Attach a signed PDF, screenshot, export, or archive to your register."
-            preventDefaultClose={mutation.isPending}
+            description="Drag and drop one or more files — PDF, Office, CSV, image, JSON, or ZIP. Each file becomes its own evidence record."
+            preventDefaultClose={uploadingAll}
         >
             <Modal.Header
                 title="Upload evidence"
-                description="Drag and drop a file or click to browse."
+                description="Drag and drop one or more files (or click to browse). Files share the metadata you set below."
             />
             <Modal.Form id="upload-form" onSubmit={handleSubmit}>
                 <Modal.Body>
@@ -279,59 +368,33 @@ export function UploadEvidenceModal({
                         </div>
                     )}
 
-                    <fieldset
-                        className="space-y-4"
-                        disabled={mutation.isPending}
-                    >
-                        {/* Dropzone */}
+                    <fieldset className="space-y-4" disabled={uploadingAll}>
+                        {/* Multi-file dropzone */}
                         <div>
                             <label
                                 className="mb-1 block text-sm text-content-default"
                                 htmlFor="file-input"
                             >
-                                File <span className="text-content-error">*</span>
+                                Files{' '}
+                                <span className="text-content-error">*</span>
                             </label>
-                            <FileUpload
-                                id="file-input"
-                                accept="evidence"
-                                variant="document"
+                            <FileDropzone
+                                ref={dropzoneRef}
+                                inputId="file-input"
+                                accept={EVIDENCE_ACCEPT}
+                                multiple
+                                autoStart={false}
                                 maxFileSizeMB={MAX_FILE_SIZE_MB}
-                                loading={mutation.isPending}
-                                accessibilityLabel="Drop evidence file"
-                                content={
-                                    file ? (
-                                        <p className="text-content-emphasis">
-                                            {file.name}{' '}
-                                            <span className="text-content-muted">
-                                                ({formatBytes(file.size)})
-                                            </span>
-                                        </p>
-                                    ) : (
-                                        <>
-                                            <p className="text-content-emphasis">
-                                                Drag and drop or click to upload
-                                            </p>
-                                            <p className="mt-0.5 text-xs text-content-muted">
-                                                PDF, Office, CSV, image, JSON, or ZIP — up to{' '}
-                                                {MAX_FILE_SIZE_MB} MB
-                                            </p>
-                                        </>
-                                    )
-                                }
-                                onChange={({ file }) => {
-                                    setFile(file);
-                                    setError('');
-                                }}
+                                disabled={uploadingAll}
+                                onPick={onPick}
+                                onUpload={handleDropzoneUpload}
+                                onAllSettled={onAllSettled}
+                                hint={`PDF, Office, CSV, image, JSON, or ZIP — up to ${MAX_FILE_SIZE_MB} MB per file`}
                             />
-                            {!file && error && (
-                                <FormError>
-                                    A file is required to upload evidence.
-                                </FormError>
-                            )}
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            {/* Title (optional) */}
+                            {/* Title (single-file only — see UX note below) */}
                             <div>
                                 <label
                                     className="mb-1 block text-sm text-content-default"
@@ -343,22 +406,29 @@ export function UploadEvidenceModal({
                                     id="upload-title-input"
                                     type="text"
                                     className="input w-full"
-                                    placeholder="Defaults to filename"
+                                    placeholder={
+                                        queuedCount > 1
+                                            ? 'Each file uses its own filename'
+                                            : 'Defaults to filename'
+                                    }
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     autoComplete="off"
+                                    disabled={queuedCount > 1}
                                 />
+                                {queuedCount > 1 && (
+                                    <p className="mt-1 text-xs text-content-muted">
+                                        Per-file titles default to the filename
+                                        when uploading multiple files.
+                                    </p>
+                                )}
                             </div>
 
                             {/* Retention date.
-                              Epic 58 — migrated from the native date
-                              input to the shared DatePicker.
-                              `retentionUntil` stays a YMD string
-                              externally (same serialisation the
-                              retention API expects); the picker
-                              bridges to `DateValue` at the prop edge.
-                              `disabledDays` mirrors the previous
-                              `min=today` constraint. */}
+                              Epic 58 — uses the shared DatePicker; the
+                              YMD-string state is the wire format the
+                              retention API consumes. `disabledDays`
+                              mirrors the previous `min=today` constraint. */}
                             <div>
                                 <div className="mb-1 flex items-center gap-1.5">
                                     <label
@@ -389,7 +459,8 @@ export function UploadEvidenceModal({
                                     aria-label="Retain until"
                                 />
                                 <p className="mt-1 text-xs text-content-muted">
-                                    Optional — when this evidence expires.
+                                    Optional — applies to every file in the
+                                    batch.
                                 </p>
                             </div>
                         </div>
@@ -432,20 +503,21 @@ export function UploadEvidenceModal({
                         type="button"
                         className="btn btn-secondary btn-sm"
                         id="upload-evidence-cancel-btn"
-                        onClick={() => {
-                            if (!mutation.isPending) close();
-                        }}
-                        disabled={mutation.isPending}
+                        onClick={cancel}
                     >
-                        Cancel
+                        {uploadingAll ? 'Stop' : 'Cancel'}
                     </button>
                     <button
                         type="submit"
                         className="btn btn-primary btn-sm"
                         id="submit-upload-btn"
-                        disabled={!canSubmit}
+                        disabled={submitDisabled}
                     >
-                        {mutation.isPending ? 'Uploading…' : 'Upload'}
+                        {uploadingAll
+                            ? 'Uploading…'
+                            : queuedCount > 1
+                              ? `Upload ${queuedCount} files`
+                              : 'Upload'}
                     </button>
                 </Modal.Actions>
             </Modal.Form>
