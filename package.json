@@ -16,6 +16,7 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset --force && tsx prisma/seed.ts",
     "db:bootstrap-owners": "tsx scripts/bootstrap-tenant-owners.ts",
+    "framework:import": "tsx scripts/framework-import.ts",
     "test": "jest",
     "test:e2e": "playwright test",
     "test:a11y": "playwright test tests/e2e/a11y.spec.ts",
