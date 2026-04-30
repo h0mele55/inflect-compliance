@@ -386,7 +386,7 @@ async function enqueueDigest(
 
     try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const record = await (prisma as any).notificationOutbox.create({
+        const record = await prisma.notificationOutbox.create({
             data: {
                 tenantId,
                 type: category,

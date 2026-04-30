@@ -65,7 +65,7 @@ export async function getSoA(ctx: RequestContext, options: SoAOptions = {}): Pro
     // 1. Load framework + requirements
     const fw = await runInTenantContext(ctx, (db) =>
         db.framework.findFirst({ where: { key: frameworkKey } })
-    ) as any;
+    );
     if (!fw) throw notFound(`Framework "${frameworkKey}" not found`);
 
     const requirements = await runInTenantContext(ctx, (db) =>
@@ -73,11 +73,11 @@ export async function getSoA(ctx: RequestContext, options: SoAOptions = {}): Pro
             where: { frameworkId: fw.id, deprecatedAt: null },
             orderBy: { sortOrder: 'asc' },
         })
-    ) as any[];
+    );
 
     if (requirements.length === 0) throw notFound('No requirements found for this framework');
 
-    const reqIds = requirements.map((r: any) => r.id);
+    const reqIds = requirements.map((r) => r.id);
 
     // 2. Load all ControlRequirementLinks for this tenant + framework
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -107,7 +107,7 @@ export async function getSoA(ctx: RequestContext, options: SoAOptions = {}): Pro
 
     // Filter out deleted controls
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const activeLinks = links.filter((l: any) => !l.control.deletedAt);
+    const activeLinks = links.filter((l) => !l.control.deletedAt);
 
     // Group links by requirement ID
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,7 +153,7 @@ export async function getSoA(ctx: RequestContext, options: SoAOptions = {}): Pro
 
         // Build mapped controls list
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mappedControls: SoAMappedControlDTO[] = reqLinks.map((l: any) => ({
+        const mappedControls: SoAMappedControlDTO[] = reqLinks.map((l) => ({
             controlId: l.control.id,
             code: l.control.code,
             title: l.control.name,
@@ -244,7 +244,7 @@ export async function getSoA(ctx: RequestContext, options: SoAOptions = {}): Pro
             where: { id: ctx.tenantId },
             select: { slug: true },
         })
-    ) as any;
+    );
 
     return {
         tenantId: ctx.tenantId,

@@ -50,7 +50,7 @@ export class PrismaLocalStore implements GitHubLocalStore {
             switch (entityType) {
                 case 'control': {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    await (db as any).control.update({
+                    await db.control.update({
                         where: { id: entityId },
                         data: updatableFields,
                     });
@@ -89,7 +89,7 @@ export class PrismaLocalStore implements GitHubLocalStore {
             switch (entityType) {
                 case 'control': {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const control = await (db as any).control.findUnique({
+                    const control = await db.control.findUnique({
                         where: { id: entityId },
                         select: {
                             id: true,

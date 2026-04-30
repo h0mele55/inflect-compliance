@@ -44,7 +44,7 @@ export const GET = withApiErrorHandling(async (
     // Fetch the control's automationKey to derive the provider
     const control = await runInTenantContext(ctx, async (db) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return (db as any).control.findFirst({
+        return db.control.findFirst({
             where: { id: params.controlId, tenantId: ctx.tenantId, deletedAt: null },
             select: { id: true, automationKey: true },
         });

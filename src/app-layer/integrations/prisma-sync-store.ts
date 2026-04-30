@@ -59,7 +59,7 @@ export class PrismaSyncMappingStore implements SyncMappingStore {
     ): Promise<SyncMapping | null> {
         return withTenantDb(tenantId, async (db: PrismaTx) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const row = await (db as any).integrationSyncMapping.findUnique({
+            const row = await db.integrationSyncMapping.findUnique({
                 where: {
                     tenantId_provider_localEntityType_localEntityId: {
                         tenantId,
@@ -84,7 +84,7 @@ export class PrismaSyncMappingStore implements SyncMappingStore {
     ): Promise<SyncMapping | null> {
         return withTenantDb(tenantId, async (db: PrismaTx) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const row = await (db as any).integrationSyncMapping.findUnique({
+            const row = await db.integrationSyncMapping.findUnique({
                 where: {
                     tenantId_provider_remoteEntityType_remoteEntityId: {
                         tenantId,
@@ -114,7 +114,7 @@ export class PrismaSyncMappingStore implements SyncMappingStore {
             if (defaults?.errorMessage !== undefined) createPayload.errorMessage = defaults.errorMessage;
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const row = await (db as any).integrationSyncMapping.upsert({
+            const row = await db.integrationSyncMapping.upsert({
                 where: {
                     tenantId_provider_localEntityType_localEntityId: {
                         tenantId: key.tenantId,
@@ -178,7 +178,7 @@ export class PrismaSyncMappingStore implements SyncMappingStore {
         if (tenantId) {
             return withTenantDb(tenantId, async (db: PrismaTx) => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const row = await (db as any).integrationSyncMapping.update({
+                const row = await db.integrationSyncMapping.update({
                     where: { id },
                     data: payload,
                 });
@@ -190,7 +190,7 @@ export class PrismaSyncMappingStore implements SyncMappingStore {
         // This is safe because the mapping was already found within a tenant context
         const { prisma } = await import('@/lib/prisma');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const row = await (prisma as any).integrationSyncMapping.update({
+        const row = await prisma.integrationSyncMapping.update({
             where: { id },
             data: payload,
         });

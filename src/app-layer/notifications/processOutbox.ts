@@ -35,7 +35,7 @@ export async function processOutbox(
 
     // Fetch PENDING rows where sendAfter <= now and attempts < maxAttempts
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pending = await (prisma as any).notificationOutbox.findMany({
+    const pending = await prisma.notificationOutbox.findMany({
         where: {
             status: 'PENDING',
             sendAfter: { lte: now },
@@ -76,7 +76,7 @@ export async function processOutbox(
             });
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (prisma as any).notificationOutbox.update({
+            await prisma.notificationOutbox.update({
                 where: { id: row.id },
                 data: {
                     status: 'SENT',
@@ -92,7 +92,7 @@ export async function processOutbox(
             const newStatus = newAttempts >= maxAttempts ? 'FAILED' : 'PENDING';
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (prisma as any).notificationOutbox.update({
+            await prisma.notificationOutbox.update({
                 where: { id: row.id },
                 data: {
                     status: newStatus,

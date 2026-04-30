@@ -25,6 +25,12 @@
       }
     },
     {
+      "files": ["src/lib/security/**/*", "src/middleware.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "error"
+      }
+    },
+    {
       "files": ["src/app/**/*(Client).tsx"],
       "rules": {
         "no-restricted-imports": ["warn", {

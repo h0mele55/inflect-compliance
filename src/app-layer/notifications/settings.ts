@@ -31,7 +31,7 @@ export async function getTenantNotificationSettings(
     tenantId: string,
 ): Promise<TenantNotificationSettingsData> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const row = await (db as any).tenantNotificationSettings.findUnique({
+    const row = await db.tenantNotificationSettings.findUnique({
         where: { tenantId },
     });
     if (!row) return { ...DEFAULTS };
@@ -52,7 +52,7 @@ export async function updateTenantNotificationSettings(
     data: Partial<TenantNotificationSettingsData>,
 ): Promise<TenantNotificationSettingsData> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const row = await (db as any).tenantNotificationSettings.upsert({
+    const row = await db.tenantNotificationSettings.upsert({
         where: { tenantId: ctx.tenantId },
         create: {
             tenantId: ctx.tenantId,
@@ -78,7 +78,7 @@ export async function isNotificationsEnabled(
     tenantId: string,
 ): Promise<boolean> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const row = await (db as any).tenantNotificationSettings.findUnique({
+    const row = await db.tenantNotificationSettings.findUnique({
         where: { tenantId },
         select: { enabled: true },
     });
@@ -106,7 +106,7 @@ export async function getOutboxStats(
 
     async function countByWindow(since: Date) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rows = await (db as any).notificationOutbox.groupBy({
+        const rows = await db.notificationOutbox.groupBy({
             by: ['status'],
             where: { tenantId, createdAt: { gte: since } },
             _count: true,

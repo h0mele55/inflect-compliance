@@ -207,22 +207,22 @@ export function parseLegacyReport(
     clientIp: string,
     userAgent: string,
 ): CspViolation | null {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const report = (body as any)['csp-report'];
+    const report = body['csp-report'];
     if (!report || typeof report !== 'object') return null;
+    const r = report as Record<string, unknown>;
 
     return {
         id: crypto.randomUUID(),
-        documentUri: sanitizeUri(report['document-uri']),
-        violatedDirective: sanitizeString(report['violated-directive']),
-        blockedUri: sanitizeUri(report['blocked-uri']),
-        originalPolicy: sanitizeString(report['original-policy'], 500),
-        sourceFile: sanitizeUri(report['source-file']),
-        lineNumber: toSafeInt(report['line-number']),
-        columnNumber: toSafeInt(report['column-number']),
+        documentUri: sanitizeUri(r['document-uri']),
+        violatedDirective: sanitizeString(r['violated-directive']),
+        blockedUri: sanitizeUri(r['blocked-uri']),
+        originalPolicy: sanitizeString(r['original-policy'], 500),
+        sourceFile: sanitizeUri(r['source-file']),
+        lineNumber: toSafeInt(r['line-number']),
+        columnNumber: toSafeInt(r['column-number']),
         userAgent,
         clientIp,
-        disposition: report['disposition'] === 'report' ? 'report' : 'enforce',
+        disposition: r['disposition'] === 'report' ? 'report' : 'enforce',
         createdAt: new Date().toISOString(),
     };
 }
@@ -244,11 +244,10 @@ export function parseModernReports(
 
     for (const entry of body) {
         if (!entry || typeof entry !== 'object') continue;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const e = entry as any;
-        if (e.type !== 'csp-violation' || !e.body) continue;
+        const e = entry as Record<string, unknown>;
+        if (e.type !== 'csp-violation' || !e.body || typeof e.body !== 'object') continue;
 
-        const b = e.body;
+        const b = e.body as Record<string, unknown>;
         results.push({
             id: crypto.randomUUID(),
             documentUri: sanitizeUri(b.documentURL || b.documentUri),

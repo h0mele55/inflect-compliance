@@ -35,7 +35,7 @@ export async function linkEvidenceWithHash(
     assertCanLinkTestEvidence(ctx);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return runInTenantContext(ctx, async (db: any) => {
+    return runInTenantContext(ctx, async (db) => {
         const run = await db.controlTestRun.findFirst({
             where: { id: runId, tenantId: ctx.tenantId },
         });
@@ -92,7 +92,7 @@ export async function verifyRunEvidence(ctx: RequestContext, runId: string) {
     assertCanReadTests(ctx);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return runInTenantContext(ctx, async (db: any) => {
+    return runInTenantContext(ctx, async (db) => {
         const run = await db.controlTestRun.findFirst({
             where: { id: runId, tenantId: ctx.tenantId },
             include: {
@@ -180,7 +180,7 @@ export async function snapshotTestRun(ctx: RequestContext, runId: string, packId
     assertCanManageAuditPacks(ctx);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return runInTenantContext(ctx, async (db: any) => {
+    return runInTenantContext(ctx, async (db) => {
         // Verify pack exists and is not frozen
         const pack = await db.auditPack.findFirst({
             where: { id: packId, tenantId: ctx.tenantId },
@@ -305,7 +305,7 @@ export async function exportTestEvidenceBundle(ctx: RequestContext, options: Exp
     assertCanReadTests(ctx);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return runInTenantContext(ctx, async (db: any) => {
+    return runInTenantContext(ctx, async (db) => {
         const where: Record<string, unknown> = { tenantId: ctx.tenantId };
         if (options.controlId) where.controlId = options.controlId;
         if (options.periodDays) {
@@ -330,10 +330,10 @@ export async function exportTestEvidenceBundle(ctx: RequestContext, options: Exp
             orderBy: { createdAt: 'desc' },
             take: 500,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        }) as any[];
+        });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rows = runs.map((run: any) => ({
+        const rows = runs.map((run) => ({
             runId: run.id,
             controlCode: run.control?.code || '',
             controlName: run.control?.name || '',
@@ -349,9 +349,9 @@ export async function exportTestEvidenceBundle(ctx: RequestContext, options: Exp
             evidenceCount: run.evidence?.length || 0,
             evidenceHashes: run.evidence
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                ?.filter((e: any) => e.sha256Hash)
+                ?.filter((e) => e.sha256Hash)
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                .map((e: any) => `${e.fileId}:${e.sha256Hash}`)
+                .map((e) => `${e.fileId}:${e.sha256Hash}`)
                 .join('; ') || '',
         }));
 

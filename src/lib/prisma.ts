@@ -210,8 +210,8 @@ if (env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 // ── Register middlewares (Node.js runtime only) ──
 // Edge Runtime (Next.js middleware) imports this module via auth.ts → PrismaAdapter.
 // $use is NOT supported in Edge Runtime, so we guard with a typeof check.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-if (typeof (globalThis as any).EdgeRuntime === 'undefined' && !globalForPrisma.prismaAuditMiddlewareRegistered) {
+// `EdgeRuntime` is declared globally in src/types/globals.d.ts.
+if (typeof EdgeRuntime === 'undefined' && !globalForPrisma.prismaAuditMiddlewareRegistered) {
     // Middleware execution order (Prisma processes in reverse registration order for writes):
     //   1. PII encryption — populates *Encrypted/*Hash columns on write, decrypts on read
     //   2. Soft-delete — transforms delete → update before audit sees it

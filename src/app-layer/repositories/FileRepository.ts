@@ -17,7 +17,7 @@ export class FileRepository {
             domain?: string;
         },
     ) {
-        return (db as any).fileRecord.create({            // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.create({
             data: {
                 tenantId: ctx.tenantId,
                 pathKey: data.pathKey,
@@ -35,34 +35,34 @@ export class FileRepository {
     }
 
     static async markStored(db: PrismaTx, _ctx: RequestContext, id: string) {
-        return (db as any).fileRecord.update({            // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.update({
             where: { id },
             data: { status: 'STORED', storedAt: new Date(), scanStatus: 'PENDING' },
         });
     }
 
     static async markFailed(db: PrismaTx, _ctx: RequestContext, id: string) {
-        return (db as any).fileRecord.update({            // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.update({
             where: { id },
             data: { status: 'FAILED' },
         });
     }
 
     static async markDeleted(db: PrismaTx, _ctx: RequestContext, id: string) {
-        return (db as any).fileRecord.update({            // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.update({
             where: { id },
             data: { status: 'DELETED' },
         });
     }
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {
-        return (db as any).fileRecord.findFirst({         // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.findFirst({
             where: { id, tenantId: ctx.tenantId },
         });
     }
 
     static async getByIdForTenant(db: PrismaTx, tenantId: string, id: string) {
-        return (db as any).fileRecord.findFirst({         // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.findFirst({
             where: { id, tenantId },
         });
     }
@@ -70,7 +70,7 @@ export class FileRepository {
     static async listByTenant(db: PrismaTx, ctx: RequestContext, options?: { status?: string }) {
         const where: Record<string, unknown> = { tenantId: ctx.tenantId };
         if (options?.status) where.status = options.status;
-        return (db as any).fileRecord.findMany({          // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.findMany({
             where,
             orderBy: { createdAt: 'desc' },
         });
@@ -80,7 +80,7 @@ export class FileRepository {
      * Find a STORED FileRecord with the same SHA-256 hash for a tenant (dedup).
      */
     static async findBySha256(db: PrismaTx, tenantId: string, sha256: string) {
-        return (db as any).fileRecord.findFirst({         // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.findFirst({
             where: { tenantId, sha256, status: 'STORED' },
         });
     }
@@ -89,7 +89,7 @@ export class FileRepository {
      * Find old PENDING FileRecords for cleanup.
      */
     static async findPendingOlderThan(db: PrismaTx, tenantId: string, olderThan: Date) {
-        return (db as any).fileRecord.findMany({          // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.findMany({
             where: {
                 tenantId,
                 status: 'PENDING',
@@ -106,7 +106,7 @@ export class FileRepository {
         scanStatus: 'PENDING' | 'CLEAN' | 'INFECTED' | 'SKIPPED',
         scanDetails?: string,
     ) {
-        return (db as any).fileRecord.update({            // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.update({
             where: { id },
             data: {
                 scanStatus,
@@ -127,7 +127,7 @@ export class FileRepository {
     static async findPendingScan(db: PrismaTx, tenantId?: string) {
         const where: Record<string, unknown> = { scanStatus: 'PENDING', status: 'STORED' };
         if (tenantId) where.tenantId = tenantId;
-        return (db as any).fileRecord.findMany({          // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.findMany({
             where,
             orderBy: { createdAt: 'asc' },
             take: 100,
@@ -135,7 +135,7 @@ export class FileRepository {
     }
 
     static async getByPathKey(db: PrismaTx, pathKey: string) {
-        return (db as any).fileRecord.findFirst({         // eslint-disable-line @typescript-eslint/no-explicit-any
+        return db.fileRecord.findFirst({
             where: { pathKey },
         });
     }
@@ -153,7 +153,7 @@ export class FileRepository {
         if (evidence) return true;
 
         // Check via FileRecord (new: pathKey or originalName match)
-        const fileRecord = await (db as any).fileRecord.findFirst({    // eslint-disable-line @typescript-eslint/no-explicit-any
+        const fileRecord = await db.fileRecord.findFirst({
             where: {
                 tenantId: ctx.tenantId,
                 OR: [

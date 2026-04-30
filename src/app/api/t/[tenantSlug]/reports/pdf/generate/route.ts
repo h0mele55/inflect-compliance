@@ -115,7 +115,7 @@ export const POST = withApiErrorHandling(async (req: NextRequest, { params }: { 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const fileRecord = await runInTenantContext(ctx, (db) =>
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (db as any).fileRecord.create({
+            db.fileRecord.create({
                 data: {
                     tenantId: ctx.tenantId,
                     pathKey,

@@ -76,7 +76,7 @@ export async function enqueueEmail(
     const dedupeKey = buildDedupeKey(tenantId, type, toEmail, entityId);
 
     try {
-        const record = await (db as any).notificationOutbox.create({  // eslint-disable-line @typescript-eslint/no-explicit-any
+        const record = await db.notificationOutbox.create({
             data: {
                 tenantId,
                 type,
