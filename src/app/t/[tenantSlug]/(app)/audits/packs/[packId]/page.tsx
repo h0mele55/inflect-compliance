@@ -8,6 +8,8 @@ import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 import { RequirePermission } from '@/components/require-permission';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import { CopyButton } from '@/components/ui/copy-button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Package } from 'lucide-react';
 
 const ENTITY_ICON: Record<string, AppIconName> = {
     CONTROL: 'controls', POLICY: 'policies', EVIDENCE: 'evidence', FILE: 'overview', ISSUE: 'warning',
@@ -161,8 +163,12 @@ export default function PackDetailPage() {
 
             {/* Items grouped by type */}
             {Object.keys(grouped).length === 0 ? (
-                <div className="glass-card p-12 text-center text-content-muted">
-                    <p>No items in this pack yet.</p>
+                <div className="glass-card">
+                    <EmptyState
+                        icon={Package}
+                        title="No items in this pack yet"
+                        description="Add evidence, controls, or risks to this audit pack from the source pages."
+                    />
                 </div>
             ) : (
                 Object.entries(grouped).map(([type, items]) => (

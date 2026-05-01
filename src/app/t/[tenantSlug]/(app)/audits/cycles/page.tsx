@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
+import { ClipboardCheck } from 'lucide-react';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { EmptyState } from '@/components/ui/empty-state';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
 import { FieldGroup } from '@/components/ui/field-group';
@@ -193,11 +195,16 @@ export default function AuditCyclesPage() {
             )}
 
             {cycles.length === 0 && !showForm ? (
-                <div className="glass-card p-12 text-center">
-                    <div className="mb-4"><AppIcon name="overview" size={48} className="text-content-muted" /></div>
-                    <h3 className="text-lg font-semibold mb-2">No audit cycles yet</h3>
-                    <p className="text-content-muted text-sm mb-4">Create your first audit cycle for ISO 27001 or NIS2</p>
-                    <button onClick={() => setShowForm(true)} className="btn btn-primary">+ New Audit Cycle</button>
+                <div className="glass-card">
+                    <EmptyState
+                        icon={ClipboardCheck}
+                        title="No audit cycles yet"
+                        description="Create your first audit cycle for ISO 27001 or NIS2."
+                        primaryAction={{
+                            label: '+ New Audit Cycle',
+                            onClick: () => setShowForm(true),
+                        }}
+                    />
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

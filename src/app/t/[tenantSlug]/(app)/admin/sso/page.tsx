@@ -5,6 +5,7 @@ import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { Shield, CheckCircle, XCircle, AlertTriangle, ExternalLink, Trash2, Save, Eye, EyeOff } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/tooltip';
 import { ToggleGroup } from '@/components/ui/toggle-group';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface SsoProvider {
     id: string;
@@ -28,6 +29,7 @@ export default function SsoAdminPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // ── Form state ──
     const [formName, setFormName] = useState('');
@@ -192,9 +194,13 @@ export default function SsoAdminPage() {
     }
 
     // ── Delete handler ──
-    async function handleDelete() {
+    function handleDelete() {
         if (!existingProvider) return;
-        if (!confirm('Delete this SSO configuration? Users will need to use local login.')) return;
+        setShowDeleteConfirm(true);
+    }
+
+    async function performDelete() {
+        if (!existingProvider) return;
         setError(null);
         try {
             const res = await fetch(apiUrl('/sso'), {
@@ -530,6 +536,15 @@ export default function SsoAdminPage() {
                     <li>• Email domains help auto-discover SSO on the login page</li>
                 </ul>
             </div>
+            <ConfirmDialog
+                showModal={showDeleteConfirm}
+                setShowModal={setShowDeleteConfirm}
+                tone="danger"
+                title="Delete SSO configuration?"
+                description="Users will need to use local login until SSO is reconfigured. This cannot be undone."
+                confirmLabel="Delete configuration"
+                onConfirm={performDelete}
+            />
         </div>
     );
 }

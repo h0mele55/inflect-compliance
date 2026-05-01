@@ -610,7 +610,11 @@ export default function ControlDetailPage() {
     return (
         <EntityDetailLayout
             id="control-detail-page"
-            back={{ href: tenantHref('/controls'), label: 'Controls' }}
+            breadcrumbs={[
+                { label: 'Dashboard', href: tenantHref('/') },
+                { label: 'Controls', href: tenantHref('/controls') },
+                { label: control.name },
+            ]}
             title={<span id="control-title">{control.name}</span>}
             meta={headerMeta}
             actions={headerActions}

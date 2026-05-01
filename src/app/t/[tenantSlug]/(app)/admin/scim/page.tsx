@@ -7,6 +7,7 @@ import { CloudCog, Plus, Trash2, Copy, Check, AlertTriangle, Clock, ExternalLink
 import { toast } from 'sonner';
 import { useCopyToClipboard } from '@/components/ui/hooks';
 import { CopyButton } from '@/components/ui/copy-button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface ScimToken {
     id: string;
@@ -32,6 +33,7 @@ export default function ScimAdminPage() {
     const [showForm, setShowForm] = useState(false);
     const { copy, copied } = useCopyToClipboard({ timeout: 2500 });
     const [error, setError] = useState<string | null>(null);
+    const [tokenIdToRevoke, setTokenIdToRevoke] = useState<string | null>(null);
 
     const fetchTokens = useCallback(async () => {
         try {
@@ -74,8 +76,9 @@ export default function ScimAdminPage() {
         }
     };
 
-    const revokeToken = async (tokenId: string) => {
-        if (!confirm('Revoke this SCIM token? Any IdP using it will lose access.')) return;
+    const revokeToken = (tokenId: string) => setTokenIdToRevoke(tokenId);
+
+    const performRevoke = async (tokenId: string) => {
         try {
             await fetch(apiUrl('/admin/scim'), {
                 method: 'DELETE',
@@ -303,6 +306,24 @@ export default function ScimAdminPage() {
                     Admin role cannot be assigned via SCIM — it must be set manually.
                 </div>
             </div>
+            <ConfirmDialog
+                showModal={tokenIdToRevoke !== null}
+                setShowModal={(open) => {
+                    if (typeof open === 'function') {
+                        const next = open(tokenIdToRevoke !== null);
+                        if (!next) setTokenIdToRevoke(null);
+                    } else if (!open) {
+                        setTokenIdToRevoke(null);
+                    }
+                }}
+                tone="danger"
+                title="Revoke SCIM token?"
+                description="Any IdP using this token will lose access immediately. This cannot be undone."
+                confirmLabel="Revoke token"
+                onConfirm={async () => {
+                    if (tokenIdToRevoke) await performRevoke(tokenIdToRevoke);
+                }}
+            />
         </div>
     );
 }

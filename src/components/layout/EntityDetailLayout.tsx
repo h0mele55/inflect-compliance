@@ -38,6 +38,10 @@ import Link from 'next/link';
 import { type ReactNode } from 'react';
 
 import { cn } from '@dub/utils';
+import {
+    Breadcrumbs,
+    type BreadcrumbItem,
+} from '@/components/ui/breadcrumbs';
 
 // ─── Tab descriptor ───────────────────────────────────────────────
 
@@ -55,6 +59,14 @@ export interface EntityDetailTab<TKey extends string = string> {
 // ─── Public props ────────────────────────────────────────────────
 
 export interface EntityDetailLayoutProps<TKey extends string = string> {
+    /**
+     * Breadcrumb trail rendered ABOVE the title. When supplied, prefer
+     * this over `back` — breadcrumbs convey ancestor depth that a single
+     * back link can't. The two are not mutually exclusive: passing both
+     * shows breadcrumbs above + the back link below them, but the
+     * canonical pattern is to use one or the other.
+     */
+    breadcrumbs?: ReadonlyArray<BreadcrumbItem>;
     /** Back-navigation link rendered above the title. Optional. */
     back?: {
         href: string;
@@ -124,6 +136,7 @@ export interface EntityDetailLayoutProps<TKey extends string = string> {
 // ─── Component ──────────────────────────────────────────────────
 
 export function EntityDetailLayout<TKey extends string = string>({
+    breadcrumbs,
     back,
     title,
     meta,
@@ -172,6 +185,13 @@ export function EntityDetailLayout<TKey extends string = string>({
             {/* Header */}
             <header className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-0">
+                    {breadcrumbs && breadcrumbs.length > 0 && (
+                        <Breadcrumbs
+                            items={breadcrumbs}
+                            className="mb-1"
+                            data-testid="entity-detail-breadcrumbs"
+                        />
+                    )}
                     {back && (
                         <Link
                             href={back.href}

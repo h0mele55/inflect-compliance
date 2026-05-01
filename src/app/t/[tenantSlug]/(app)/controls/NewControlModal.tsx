@@ -3,41 +3,52 @@
 /**
  * Epic 54 — Create Control modal.
  *
- * Modal-based version of the legacy `/controls/new` full-page form. Mounts
- * inside the Controls list so users don't lose their table state, filters,
- * or scroll position when opening "New Control".
+ * Modal-based version of the legacy `/controls/new` full-page form.
+ * Mounts inside the Controls list so users don't lose their table
+ * state, filters, or scroll position when opening "New Control".
  *
- * Business behaviour is unchanged:
- *   - POST /api/t/:slug/controls with the same payload.
- *   - Optional NOT_APPLICABLE applicability update on the created control.
- *   - On success, invalidate the Controls React-Query cache and navigate to
- *     the new control's detail page (preserves the existing downstream E2E
- *     state that chains through controlDetailPath).
- *   - Form IDs (#control-name-input, #control-code-input, …,
- *     #create-control-btn) are preserved so existing E2E suites pass
- *     untouched against the modal.
+ * Form pattern (Epic 64-FORM):
+ *   - `useForm` + `zodResolver` for state + validation
+ *   - `<FormField>` wraps each control (Label + error + a11y wiring)
+ *   - `register(...)` for plain inputs / textareas
+ *   - `<Controller>` for the Combobox primitives (they own their own
+ *     value/onChange contract)
+ *
+ * This is the canonical example of how to build a non-trivial form on
+ * the shared form foundation. Mirror this shape when migrating
+ * `NewRiskModal`, `NewTaskPage`, etc.
+ *
+ * Business behaviour is unchanged from the previous useState shape:
+ *   - POST /api/t/:slug/controls with the same payload
+ *   - Optional NOT_APPLICABLE applicability update on the created control
+ *   - On success, invalidate the React-Query cache and route to the
+ *     new control's detail page
+ *   - Form IDs (#control-name-input, …, #create-control-btn) are
+ *     preserved so existing E2E suites pass untouched.
  */
 
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import {
     useCallback,
     useEffect,
-    useRef,
-    useState,
     type Dispatch,
     type SetStateAction,
 } from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import { z } from 'zod';
 import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
-import { FormError } from '@/components/ui/form-error';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { InfoTooltip } from '@/components/ui/tooltip';
 import { queryKeys } from '@/lib/queryKeys';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
+
+// ─── Options ─────────────────────────────────────────────────────────
 
 const FREQUENCY_OPTIONS: ComboboxOption[] = [
     { value: 'AD_HOC', label: 'Ad Hoc' },
@@ -61,84 +72,110 @@ const CATEGORY_OPTIONS: ComboboxOption[] = [
     { value: 'Other', label: 'Other' },
 ];
 
+// ─── Schema ──────────────────────────────────────────────────────────
+//
+// Zod schema is the source of truth for the form contract. Server-side
+// validation lives in `src/app-layer/schemas/control.schemas.ts`; the
+// client form intentionally enforces a SUBSET (name required + the
+// not-applicable-needs-justification rule). Cross-field validation runs
+// in `superRefine` so the error is attached to the right field.
+
+const formSchema = z
+    .object({
+        code: z.string().max(64).optional(),
+        name: z.string().min(1, 'Name is required'),
+        description: z.string().optional(),
+        category: z.string().optional(),
+        frequency: z.string().optional(),
+        applicability: z.enum(['APPLICABLE', 'NOT_APPLICABLE']),
+        justification: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+        if (
+            data.applicability === 'NOT_APPLICABLE' &&
+            !data.justification?.trim()
+        ) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['justification'],
+                message: 'Justification is required for non-applicable controls.',
+            });
+        }
+    });
+
+type FormValues = z.infer<typeof formSchema>;
+
+const DEFAULT_VALUES: FormValues = {
+    code: '',
+    name: '',
+    description: '',
+    category: '',
+    frequency: '',
+    applicability: 'APPLICABLE',
+    justification: '',
+};
+
+// ─── Component ───────────────────────────────────────────────────────
+
 export interface NewControlModalProps {
     open: boolean;
     setOpen: Dispatch<SetStateAction<boolean>>;
     /**
-     * Tenant slug for the react-query invalidation. The mutation uses the
-     * tenant-scoped apiUrl helper already, so this is only used for cache
-     * keys.
+     * Tenant slug for react-query invalidation. The mutation already
+     * uses tenant-scoped apiUrl helpers; this is only used for keys.
      */
     tenantSlug: string;
 }
 
 export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalProps) {
-    // Normalise the setState-compatible setter into a simple close helper
-    // so the form handlers don't need to branch on function-vs-value.
     const close = useCallback(() => setOpen(false), [setOpen]);
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
     const router = useRouter();
     const queryClient = useQueryClient();
-
-    const [form, setForm] = useState({
-        code: '',
-        name: '',
-        description: '',
-        category: '',
-        frequency: '',
-    });
-    const [applicability, setApplicability] = useState<'APPLICABLE' | 'NOT_APPLICABLE'>(
-        'APPLICABLE',
-    );
-    const [justification, setJustification] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
-
-    const nameInputRef = useRef<HTMLInputElement>(null);
-
-    // Reset the form + focus the name input each time the modal opens.
-    useEffect(() => {
-        if (!open) return;
-        setForm({ code: '', name: '', description: '', category: '', frequency: '' });
-        setApplicability('APPLICABLE');
-        setJustification('');
-        setError('');
-        setSaving(false);
-        // Give Radix's focus manager a beat before we override — matches
-        // the preventDefault on onOpenAutoFocus in <Modal>.
-        const t = setTimeout(() => nameInputRef.current?.focus(), 60);
-        return () => clearTimeout(t);
-    }, [open]);
-
-    const update = (field: keyof typeof form, value: string) =>
-        setForm((prev) => ({ ...prev, [field]: value }));
-
-    const canSubmit = form.name.trim().length > 0 && !saving &&
-        (applicability === 'APPLICABLE' || justification.trim().length > 0);
-
     const telemetry = useFormTelemetry('NewControlModal');
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!canSubmit) return;
-        setSaving(true);
-        setError('');
+    const {
+        register,
+        handleSubmit,
+        control,
+        watch,
+        reset,
+        setError: setFormError,
+        setFocus,
+        formState: { errors, isSubmitting },
+    } = useForm<FormValues>({
+        resolver: zodResolver(formSchema),
+        defaultValues: DEFAULT_VALUES,
+        mode: 'onTouched',
+    });
+
+    const applicability = watch('applicability');
+
+    // Reset form + focus the name input each time the modal opens.
+    useEffect(() => {
+        if (!open) return;
+        reset(DEFAULT_VALUES);
+        // Give Radix's focus manager a beat before we override.
+        const t = setTimeout(() => setFocus('name'), 60);
+        return () => clearTimeout(t);
+    }, [open, reset, setFocus]);
+
+    const onSubmit = async (values: FormValues) => {
         telemetry.trackSubmit({
-            applicability,
-            hasCategory: Boolean(form.category),
-            hasFrequency: Boolean(form.frequency),
+            applicability: values.applicability,
+            hasCategory: Boolean(values.category),
+            hasFrequency: Boolean(values.frequency),
         });
         try {
             const body = {
-                name: form.name.trim(),
-                code: form.code.trim() || undefined,
-                description: form.description.trim() || undefined,
-                category: form.category || undefined,
-                frequency: form.frequency || undefined,
+                name: values.name.trim(),
+                code: values.code?.trim() || undefined,
+                description: values.description?.trim() || undefined,
+                category: values.category || undefined,
+                frequency: values.frequency || undefined,
                 isCustom: true,
             };
-
             const res = await fetch(apiUrl('/controls'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -152,36 +189,44 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                         : data.message || 'Failed to create control';
                 throw new Error(msg);
             }
-            const control = await res.json();
+            const created = await res.json();
 
-            if (applicability === 'NOT_APPLICABLE' && justification.trim()) {
-                await fetch(apiUrl(`/controls/${control.id}/applicability`), {
+            if (
+                values.applicability === 'NOT_APPLICABLE' &&
+                values.justification?.trim()
+            ) {
+                await fetch(apiUrl(`/controls/${created.id}/applicability`), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         applicability: 'NOT_APPLICABLE',
-                        justification,
+                        justification: values.justification,
                     }),
                 });
             }
 
-            // Refresh the list in the background so when the user returns
-            // the new control is already there.
             queryClient.invalidateQueries({
                 queryKey: queryKeys.controls.all(tenantSlug),
             });
 
-            telemetry.trackSuccess({ controlId: control.id });
+            telemetry.trackSuccess({ controlId: created.id });
             close();
-            // Preserve the legacy post-create UX: deep-link to the new
-            // control so users can start editing immediately.
-            router.push(tenantHref(`/controls/${control.id}`));
+            router.push(tenantHref(`/controls/${created.id}`));
         } catch (err) {
             telemetry.trackError(err);
-            setError(err instanceof Error ? err.message : 'Failed to create control');
-            setSaving(false);
+            // Surface API errors via RHF's root-error slot so the same
+            // banner pattern works for client + server failures.
+            setFormError('root.api', {
+                type: 'api',
+                message:
+                    err instanceof Error
+                        ? err.message
+                        : 'Failed to create control',
+            });
         }
     };
+
+    const apiError = errors.root?.api?.message;
 
     return (
         <Modal
@@ -190,88 +235,118 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
             size="lg"
             title="New control"
             description="Create a custom control for your register."
-            preventDefaultClose={saving}
+            preventDefaultClose={isSubmitting}
         >
             <Modal.Header
                 title="New Control"
                 description="Create a custom control for your register."
             />
-            <Modal.Form onSubmit={handleSubmit}>
+            <Modal.Form onSubmit={handleSubmit(onSubmit)}>
                 <Modal.Body>
-                    {error && (
+                    {apiError && (
                         <div
                             className="mb-4 rounded-lg border border-border-error bg-bg-error px-3 py-2 text-sm text-content-error"
                             id="new-control-error"
                             role="alert"
                         >
-                            {error}
+                            {apiError}
                         </div>
                     )}
 
                     <div className="space-y-4">
-                        <FormField label="Code">
+                        <FormField label="Code" error={errors.code?.message}>
                             <Input
                                 id="control-code-input"
                                 type="text"
                                 placeholder="e.g. CTRL-001"
-                                value={form.code}
-                                onChange={(e) => update('code', e.target.value)}
                                 autoComplete="off"
+                                {...register('code')}
                             />
                         </FormField>
-                        <FormField label="Name" required>
+                        <FormField
+                            label="Name"
+                            required
+                            error={errors.name?.message}
+                        >
                             <Input
                                 id="control-name-input"
-                                ref={nameInputRef}
                                 type="text"
                                 placeholder="e.g. Password Policy Enforcement"
-                                value={form.name}
-                                onChange={(e) => update('name', e.target.value)}
-                                required
                                 autoComplete="off"
+                                {...register('name')}
                             />
                         </FormField>
-                        <FormField label="Description">
+                        <FormField
+                            label="Description"
+                            error={errors.description?.message}
+                        >
                             <Textarea
                                 id="control-description-input"
                                 rows={3}
                                 placeholder="Brief description of this control"
-                                value={form.description}
-                                onChange={(e) => update('description', e.target.value)}
+                                {...register('description')}
                             />
                         </FormField>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <FormField label="Category">
-                                <Combobox
-                                    id="control-category-input"
+                            <FormField
+                                label="Category"
+                                error={errors.category?.message}
+                            >
+                                <Controller
+                                    control={control}
                                     name="category"
-                                    options={CATEGORY_OPTIONS}
-                                    selected={CATEGORY_OPTIONS.find(o => o.value === form.category) ?? null}
-                                    setSelected={(o) => update('category', o?.value ?? '')}
-                                    placeholder="Select category…"
-                                    searchPlaceholder="Search categories…"
-                                    matchTriggerWidth
-                                    forceDropdown
-                                    buttonProps={{ className: 'w-full' }}
-                                    caret
+                                    render={({ field }) => (
+                                        <Combobox
+                                            id="control-category-input"
+                                            name="category"
+                                            options={CATEGORY_OPTIONS}
+                                            selected={
+                                                CATEGORY_OPTIONS.find(
+                                                    (o) => o.value === field.value,
+                                                ) ?? null
+                                            }
+                                            setSelected={(o) =>
+                                                field.onChange(o?.value ?? '')
+                                            }
+                                            placeholder="Select category…"
+                                            searchPlaceholder="Search categories…"
+                                            matchTriggerWidth
+                                            forceDropdown
+                                            buttonProps={{ className: 'w-full' }}
+                                            caret
+                                        />
+                                    )}
                                 />
                             </FormField>
                             <FormField
                                 label="Frequency"
                                 hint="How often the control is expected to be reviewed or re-tested (monthly, quarterly, annually). Drives the next-review date on the control dashboard."
+                                error={errors.frequency?.message}
                             >
-                                <Combobox
-                                    id="control-frequency-input"
+                                <Controller
+                                    control={control}
                                     name="frequency"
-                                    options={FREQUENCY_OPTIONS}
-                                    selected={FREQUENCY_OPTIONS.find(o => o.value === form.frequency) ?? null}
-                                    setSelected={(o) => update('frequency', o?.value ?? '')}
-                                    placeholder="Select frequency…"
-                                    hideSearch
-                                    matchTriggerWidth
-                                    forceDropdown
-                                    buttonProps={{ className: 'w-full' }}
-                                    caret
+                                    render={({ field }) => (
+                                        <Combobox
+                                            id="control-frequency-input"
+                                            name="frequency"
+                                            options={FREQUENCY_OPTIONS}
+                                            selected={
+                                                FREQUENCY_OPTIONS.find(
+                                                    (o) => o.value === field.value,
+                                                ) ?? null
+                                            }
+                                            setSelected={(o) =>
+                                                field.onChange(o?.value ?? '')
+                                            }
+                                            placeholder="Select frequency…"
+                                            hideSearch
+                                            matchTriggerWidth
+                                            forceDropdown
+                                            buttonProps={{ className: 'w-full' }}
+                                            caret
+                                        />
+                                    )}
                                 />
                             </FormField>
                         </div>
@@ -293,41 +368,34 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                                 <label className="flex items-center gap-2 text-sm text-content-default">
                                     <input
                                         type="radio"
-                                        name="applicability"
                                         value="APPLICABLE"
-                                        checked={applicability === 'APPLICABLE'}
-                                        onChange={() => setApplicability('APPLICABLE')}
+                                        {...register('applicability')}
                                     />
                                     Applicable
                                 </label>
                                 <label className="flex items-center gap-2 text-sm text-content-default">
                                     <input
                                         type="radio"
-                                        name="applicability"
                                         value="NOT_APPLICABLE"
-                                        checked={applicability === 'NOT_APPLICABLE'}
-                                        onChange={() => setApplicability('NOT_APPLICABLE')}
+                                        {...register('applicability')}
                                     />
                                     Not Applicable
                                 </label>
                             </div>
                             {applicability === 'NOT_APPLICABLE' && (
-                                <>
+                                <FormField
+                                    label=""
+                                    error={errors.justification?.message}
+                                    className="mt-2"
+                                >
                                     <Textarea
                                         id="control-justification-input"
-                                        className="mt-2"
                                         rows={2}
                                         placeholder="Justification is required..."
-                                        value={justification}
-                                        onChange={(e) => setJustification(e.target.value)}
-                                        required
                                         aria-label="Justification for non-applicable control"
-                                        invalid={!justification.trim()}
+                                        {...register('justification')}
                                     />
-                                    <FormError visible={!justification.trim()}>
-                                        Justification is required for non-applicable controls.
-                                    </FormError>
-                                </>
+                                </FormField>
                             )}
                         </div>
                     </div>
@@ -338,9 +406,9 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                         className="btn btn-secondary btn-sm"
                         id="new-control-cancel-btn"
                         onClick={() => {
-                            if (!saving) close();
+                            if (!isSubmitting) close();
                         }}
-                        disabled={saving}
+                        disabled={isSubmitting}
                     >
                         Cancel
                     </button>
@@ -348,9 +416,9 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                         type="submit"
                         className="btn btn-primary btn-sm"
                         id="create-control-btn"
-                        disabled={!canSubmit}
+                        disabled={isSubmitting}
                     >
-                        {saving ? 'Creating…' : 'Create Control'}
+                        {isSubmitting ? 'Creating…' : 'Create Control'}
                     </button>
                 </Modal.Actions>
             </Modal.Form>

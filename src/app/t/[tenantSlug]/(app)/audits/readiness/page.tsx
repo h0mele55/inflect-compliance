@@ -34,6 +34,7 @@ import {
 import { getTenantCtx } from '@/app-layer/context';
 import { getReadinessOverview } from '@/app-layer/usecases/audit-readiness';
 import type { ReadinessResult } from '@/app-layer/usecases/audit-readiness-scoring';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,17 +116,16 @@ export default async function ReadinessOverviewPage({
             </div>
 
             {cycles.length === 0 ? (
-                <div className="glass-card p-12 text-center">
-                    <div className="text-4xl mb-4">
-                        <BarChart3 className="w-10 h-10 text-content-muted mx-auto" />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-2">No audit cycles yet</h3>
-                    <p className="text-content-muted text-sm mb-4">
-                        Create an audit cycle to see readiness scores
-                    </p>
-                    <Link href={`/t/${tenantSlug}/audits/cycles`} className="btn btn-primary">
-                        + New Audit Cycle
-                    </Link>
+                <div className="glass-card">
+                    <EmptyState
+                        icon={BarChart3}
+                        title="No audit cycles yet"
+                        description="Create an audit cycle to see readiness scores."
+                        primaryAction={{
+                            label: "+ New Audit Cycle",
+                            href: `/t/${tenantSlug}/audits/cycles`,
+                        }}
+                    />
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
