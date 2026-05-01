@@ -50,7 +50,7 @@
  * full list either way.
  */
 
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeftRight } from 'lucide-react';
 
 import {
@@ -226,7 +226,14 @@ export function RiskMatrix({
                 </div>
 
                 <div className="flex-1">
-                    {/* Grid — header column (24px) + N data columns; data rows + footer row (20px). */}
+                    {/* Grid — header column (24px) + N data columns;
+                        data rows + footer row (20px). Each `[role=row]`
+                        wrapper uses `display: contents` so the CSS Grid
+                        layout still treats the row's children as direct
+                        grid items, while ARIA gets the
+                        `grid → row → {rowheader,gridcell,columnheader}`
+                        hierarchy axe-AA's `aria-required-children`
+                        rule expects. */}
                     <div
                         role="grid"
                         aria-label={`${yAxisLabel} by ${xAxisLabel} matrix`}
@@ -238,7 +245,11 @@ export function RiskMatrix({
                         }}
                     >
                         {rows.map((rowVal, yIdx) => (
-                            <Fragment key={`row-${rowVal}`}>
+                            <div
+                                key={`row-${rowVal}`}
+                                role="row"
+                                style={{ display: 'contents' }}
+                            >
                                 {/* Row label (numeric). */}
                                 <div
                                     role="rowheader"
@@ -277,22 +288,24 @@ export function RiskMatrix({
                                         />
                                     );
                                 })}
-                            </Fragment>
-                        ))}
-
-                        {/* X-axis numeric labels (footer row) */}
-                        <div /> {/* spacer for the row-label column */}
-                        {cols.map((colVal) => (
-                            <div
-                                key={`col-${colVal}`}
-                                role="columnheader"
-                                className="flex items-center justify-center text-[10px] tabular-nums text-content-subtle"
-                                title={xLabels[colVal - 1] ?? String(colVal)}
-                                data-testid={`risk-matrix-col-label-${colVal}`}
-                            >
-                                {colVal}
                             </div>
                         ))}
+
+                        {/* X-axis numeric labels (footer row). */}
+                        <div role="row" style={{ display: 'contents' }}>
+                            <div /> {/* spacer for the row-label column */}
+                            {cols.map((colVal) => (
+                                <div
+                                    key={`col-${colVal}`}
+                                    role="columnheader"
+                                    className="flex items-center justify-center text-[10px] tabular-nums text-content-subtle"
+                                    title={xLabels[colVal - 1] ?? String(colVal)}
+                                    data-testid={`risk-matrix-col-label-${colVal}`}
+                                >
+                                    {colVal}
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="mt-1 text-center">

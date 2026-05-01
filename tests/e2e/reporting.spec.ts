@@ -30,18 +30,23 @@ test.describe('Reporting & Audit Narrative', () => {
 
     // ─── A) Frameworks Page ───────────────────────────────────────────
 
-    test('A — frameworks page loads with framework cards', async ({ page }) => {
+    test('A — frameworks page loads with framework rows', async ({ page }) => {
+        // Epic 46.4 migrated this page from a card grid to a
+        // ListPageShell + DataTable. The smoke test still covers
+        // the same intent (page renders, frameworks visible) but
+        // against the new selectors:
+        //   - heading id stays the same (`#frameworks-heading`)
+        //   - rows are now table rows linked via the per-framework
+        //     "View" link `[id^="view-framework-"]`
         tenantSlug = await loginAndGetTenant(page);
 
-        // VERIFY-ON-EXIT: check heading rendered, not just HTTP status
         await gotoAndVerify(page, `/t/${tenantSlug}/frameworks`, '#frameworks-heading');
 
         await expect(page.locator('#frameworks-heading')).toContainText('Compliance Frameworks');
 
-        // Wait for cards to hydrate
         await page.waitForLoadState('networkidle');
-        const cardCount = await page.locator('[id^="fw-card-"]').count();
-        expect(cardCount).toBeGreaterThanOrEqual(1);
+        const rowCount = await page.locator('[id^="view-framework-"]').count();
+        expect(rowCount).toBeGreaterThanOrEqual(1);
     });
 
     // ─── B) Coverage Report ──────────────────────────────────────────

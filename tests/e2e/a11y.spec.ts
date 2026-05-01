@@ -88,6 +88,25 @@ const SEVERITY_GATE: Array<NonNullable<AxeViolation['impact']>> = [
  * impact, then asserts no `serious` or `critical` issues remain.
  */
 async function runA11yScan(page: Page, surfaceLabel: string) {
+    // ThemeProvider mounts after hydration: SSR seeds `data-theme="dark"`,
+    // then a useEffect flips to whichever palette `prefers-color-scheme`
+    // resolves to (Playwright's default is `light`). If axe runs during
+    // that transition window, it samples a mix of dark-theme and
+    // light-theme tokens against the in-flight cream backgrounds and
+    // produces phantom contrast failures (e.g. `#737372` foregrounds
+    // that match neither documented palette). Wait until the theme
+    // attribute matches the emulated colorScheme so the scan runs on a
+    // settled DOM.
+    await page.waitForFunction(
+        () => {
+            const want = matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+            return document.documentElement.getAttribute('data-theme') === want;
+        },
+        undefined,
+        { timeout: 10_000 },
+    );
     const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         // See the docblock for why these are disabled.
