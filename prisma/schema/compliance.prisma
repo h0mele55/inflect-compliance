@@ -858,8 +858,33 @@ model FrameworkRequirement {
   requirementMappingsFrom RequirementMapping[]             @relation("ReqMappingSource")
   requirementMappingsTo   RequirementMapping[]             @relation("ReqMappingTarget")
   framework               Framework                        @relation(fields: [frameworkId], references: [id])
+  tenantOrders            FrameworkRequirementOrder[]
 
   @@unique([frameworkId, code])
+}
+
+// Epic 46.4 — per-tenant ordering overlay for the framework
+// builder. Frameworks themselves are global rows shared across
+// every tenant; this table lets a tenant reorder requirements (and
+// implicitly sections) without ever mutating the global
+// `FrameworkRequirement.sortOrder`. The tree usecase merges these
+// values BEFORE grouping, so a tenant override always wins.
+//
+// RLS: canonical Class-A shape (direct tenantId column). Migration
+// `20260501104500_framework_requirement_order_overlay` applies the
+// `tenant_isolation` + `superuser_bypass` policies.
+model FrameworkRequirementOrder {
+  id            String               @id @default(cuid())
+  tenantId      String
+  requirementId String
+  sortOrder     Int
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  requirement   FrameworkRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, requirementId])
+  @@index([tenantId])
 }
 
 model FrameworkPack {

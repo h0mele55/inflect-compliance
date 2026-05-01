@@ -13,6 +13,9 @@ export {
     listFrameworkPacks,
 } from './catalog';
 
+// Hierarchical tree view (Epic 46)
+export { getFrameworkTree, reorderFrameworkRequirements } from './tree';
+
 // Install operations (pack, template, bulk)
 export {
     previewPackInstall,

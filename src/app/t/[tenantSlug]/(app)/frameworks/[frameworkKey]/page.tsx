@@ -5,8 +5,11 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { RequirePermission } from '@/components/require-permission';
 import { ProgressBar } from '@/components/ui/progress-bar';
+import { FrameworkExplorer } from '@/components/frameworks/FrameworkExplorer';
+import { FrameworkBuilder } from '@/components/ui/FrameworkBuilder';
+import type { FrameworkTreePayload } from '@/lib/framework-tree/types';
 
-type Tab = 'requirements' | 'packs' | 'coverage';
+type Tab = 'requirements' | 'packs' | 'coverage' | 'builder';
 
 export default function FrameworkDetailPage() {
     const params = useParams();
@@ -17,62 +20,68 @@ export default function FrameworkDetailPage() {
 
     const [activeTab, setActiveTab] = useState<Tab>('requirements');
     const [framework, setFramework] = useState<any>(null);
-    const [requirements, setRequirements] = useState<any[]>([]);
+    const [tree, setTree] = useState<FrameworkTreePayload | null>(null);
     const [packs, setPacks] = useState<any[]>([]);
     const [coverage, setCoverage] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
-    const [expandedReq, setExpandedReq] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        // Epic 46 — fetch the new `/tree` endpoint instead of the
+        // flat `?action=requirements` payload. The tree endpoint
+        // already includes the `framework` descriptor, so the
+        // separate `getFramework` call only stays around to keep the
+        // header rendering identical (it carries no data the tree
+        // doesn't, but `<FrameworkExplorer>` shouldn't be the source
+        // of truth for the page title).
         (async () => {
+            setError(null);
             try {
-                const [fwRes, reqRes, packRes, covRes] = await Promise.all([
+                const [fwRes, treeRes, packRes, covRes] = await Promise.all([
                     fetch(apiUrl(`/frameworks/${frameworkKey}`)),
-                    fetch(apiUrl(`/frameworks/${frameworkKey}?action=requirements`)),
+                    fetch(apiUrl(`/frameworks/${frameworkKey}/tree`)),
                     fetch(apiUrl(`/frameworks/${frameworkKey}?action=packs`)),
                     fetch(apiUrl(`/frameworks/${frameworkKey}?action=coverage`)),
                 ]);
                 if (fwRes.ok) setFramework(await fwRes.json());
-                if (reqRes.ok) setRequirements(await reqRes.json());
+                if (treeRes.ok) setTree((await treeRes.json()) as FrameworkTreePayload);
+                else if (treeRes.status === 404) setError('Framework not found');
                 if (packRes.ok) setPacks(await packRes.json());
                 if (covRes.ok) setCoverage(await covRes.json());
-            } catch { /* ignore */ }
+            } catch {
+                setError('Failed to load framework');
+            }
             setLoading(false);
         })();
     }, [apiUrl, frameworkKey]);
 
-    if (loading) return <div className="p-8 animate-pulse text-content-muted">Loading framework...</div>;
-    if (!framework) return <div className="p-8 text-red-400">Framework not found</div>;
-
-    // Group requirements by section
-    const groupedReqs = requirements.reduce((acc: Record<string, any[]>, r: any) => {
-        const section = r.section || r.category || 'Other';
-        (acc[section] = acc[section] || []).push(r);
-        return acc;
-    }, {});
-
-    // Coverage lookup
-    const mappedReqCodes = new Set((coverage?.controlMappings || []).map((m: any) => m.requirementCode));
-    const controlsByReq: Record<string, any[]> = {};
-    for (const m of (coverage?.controlMappings || [])) {
-        (controlsByReq[m.requirementCode] = controlsByReq[m.requirementCode] || []).push(m);
-    }
-
-    // Filter
-    const filteredGroups = Object.entries(groupedReqs).reduce((acc: Record<string, any[]>, [section, reqs]) => {
-        const filtered = (reqs as any[]).filter((r: any) =>
-            !search || r.code.toLowerCase().includes(search.toLowerCase()) || r.title.toLowerCase().includes(search.toLowerCase())
-        );
-        if (filtered.length > 0) acc[section] = filtered;
-        return acc;
-    }, {});
+    if (loading) return <div className="p-8 animate-pulse text-content-muted" id="framework-detail-loading">Loading framework...</div>;
+    if (error || !framework) return <div className="p-8 text-red-400" id="framework-detail-error">{error ?? 'Framework not found'}</div>;
 
     const tabs: { key: Tab; label: string; count?: number }[] = [
-        { key: 'requirements', label: 'Requirements', count: requirements.length },
+        { key: 'requirements', label: 'Requirements', count: tree?.totals.requirements },
         { key: 'packs', label: 'Packs', count: packs.length },
         { key: 'coverage', label: 'Coverage' },
+        // Epic 46.4 — builder MVP. Permission-gated below by
+        // wrapping the panel in <RequirePermission>; the tab itself
+        // stays visible so non-admins see it exists.
+        { key: 'builder', label: 'Builder' },
     ];
+
+    async function handleReorderSave(body: { sections: { sectionId: string; requirementIds: string[] }[] }) {
+        const res = await fetch(apiUrl(`/frameworks/${frameworkKey}/reorder`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const j = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(j.error ?? `Reorder failed (${res.status})`);
+        }
+        // Refetch the tree so the explorer reflects the new order.
+        const fresh = await fetch(apiUrl(`/frameworks/${frameworkKey}/tree`));
+        if (fresh.ok) setTree((await fresh.json()) as FrameworkTreePayload);
+    }
 
     return (
         <div className="space-y-6">
@@ -117,67 +126,16 @@ export default function FrameworkDetailPage() {
                 ))}
             </div>
 
-            {/* Requirements Tab */}
+            {/* Requirements Tab — Epic 46 tree explorer */}
             {activeTab === 'requirements' && (
-                <div className="space-y-4" id="requirements-panel">
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="text"
-                            placeholder="Search requirements..."
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            className="input w-full sm:w-72"
-                            id="requirements-search"
-                        />
-                        <span className="text-xs text-content-subtle">
-                            {Object.values(filteredGroups).flat().length} showing
-                        </span>
-                    </div>
-
-                    {Object.entries(filteredGroups).map(([section, reqs]) => (
-                        <div key={section} className="glass-card">
-                            <h3 className="text-sm font-semibold text-[var(--brand-muted)] mb-3">{section}</h3>
-                            <div className="space-y-1">
-                                {(reqs as any[]).map((r: any) => {
-                                    const isMapped = mappedReqCodes.has(r.code);
-                                    const controls = controlsByReq[r.code] || [];
-                                    const isExpanded = expandedReq === r.id;
-
-                                    return (
-                                        <div key={r.id}>
-                                            <button
-                                                onClick={() => setExpandedReq(isExpanded ? null : r.id)}
-                                                className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-bg-elevated/30 transition-colors text-left"
-                                            >
-                                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isMapped ? 'bg-emerald-500' : 'bg-border-emphasis'}`} />
-                                                <code className="text-xs text-content-subtle font-mono w-16 sm:w-28 flex-shrink-0 truncate">{r.code}</code>
-                                                <span className="text-sm text-content-default flex-1">{r.title}</span>
-                                                {isMapped ? (
-                                                    <span className="badge badge-success text-xs">Mapped ({controls.length})</span>
-                                                ) : (
-                                                    <span className="badge text-xs" style={{ background: 'rgba(100,116,139,0.3)', color: '#94a3b8' }}>Unmapped</span>
-                                                )}
-                                            </button>
-                                            {isExpanded && controls.length > 0 && (
-                                                <div className="ml-4 sm:ml-12 mt-1 mb-2 p-3 rounded-lg bg-bg-default/50 border border-border-default/30">
-                                                    <p className="text-xs text-content-subtle mb-2">Mapped Controls:</p>
-                                                    {controls.map((ctrl: any, i: number) => (
-                                                        <div key={i} className="flex items-center gap-2 text-sm py-1">
-                                                            <code className="text-xs text-[var(--brand-default)] font-mono">{ctrl.controlCode}</code>
-                                                            <span className="text-content-default">{ctrl.controlName}</span>
-                                                            <span className={`badge text-xs ${ctrl.controlStatus === 'IMPLEMENTED' ? 'badge-success' : ctrl.controlStatus === 'IN_PROGRESS' ? 'badge-warning' : 'badge-primary'}`}>
-                                                                {ctrl.controlStatus}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                <div id="requirements-panel">
+                    {tree ? (
+                        <FrameworkExplorer tree={tree} coverage={coverage ?? null} />
+                    ) : (
+                        <div className="glass-card text-center py-10 text-content-subtle">
+                            Loading tree...
                         </div>
-                    ))}
+                    )}
                 </div>
             )}
 
@@ -300,6 +258,29 @@ export default function FrameworkDetailPage() {
                             Full Coverage Report →
                         </Link>
                     </div>
+                </div>
+            )}
+
+            {/* Builder Tab — Epic 46.4 MVP */}
+            {activeTab === 'builder' && (
+                <div id="builder-panel">
+                    {tree ? (
+                        <RequirePermission
+                            resource="frameworks"
+                            action="install"
+                            fallback={
+                                <div className="glass-card text-center py-10 text-content-subtle">
+                                    Reordering is restricted to OWNER / ADMIN roles.
+                                </div>
+                            }
+                        >
+                            <FrameworkBuilder tree={tree} onSave={handleReorderSave} />
+                        </RequirePermission>
+                    ) : (
+                        <div className="glass-card text-center py-10 text-content-subtle">
+                            Loading tree...
+                        </div>
+                    )}
                 </div>
             )}
         </div>
