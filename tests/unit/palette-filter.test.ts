@@ -1,0 +1,134 @@
+/**
+ * Pure tests for the command-palette filter-chip helpers.
+ *
+ * The render side (chip row + active-state styling) is locked
+ * by the structural ratchet in `search-palette-migration.test.ts`;
+ * here we cover the algebra: empty-set passthrough, multi-select
+ * intersection, count derivation, immutability.
+ */
+
+import {
+    countHitsByKind,
+    filterHitsByKind,
+    toggleKind,
+} from '@/lib/palette/filter';
+import type { SearchHit, SearchHitType } from '@/lib/search/types';
+
+function hit(id: string, type: SearchHitType): SearchHit {
+    return {
+        id,
+        type,
+        title: `${id}-title`,
+        subtitle: null,
+        badge: null,
+        href: `/x/${id}`,
+        score: 0,
+        iconKey: 'shield-check',
+        category: 'X',
+    };
+}
+
+const getKind = (h: SearchHit) => h.type;
+
+// ─── filterHitsByKind ─────────────────────────────────────────────────
+
+describe('filterHitsByKind', () => {
+    it('passes everything through when active set is empty (no chips selected = all kinds)', () => {
+        const hits = [hit('c1', 'control'), hit('r1', 'risk')];
+        expect(filterHitsByKind(hits, new Set(), getKind)).toEqual(hits);
+    });
+
+    it('keeps only hits whose kind is in the active set', () => {
+        const hits = [
+            hit('c1', 'control'),
+            hit('r1', 'risk'),
+            hit('p1', 'policy'),
+        ];
+        const out = filterHitsByKind(
+            hits,
+            new Set<SearchHitType>(['control', 'policy']),
+            getKind,
+        );
+        expect(out.map((h) => h.id).sort()).toEqual(['c1', 'p1']);
+    });
+
+    it('returns a new array — never mutates input', () => {
+        const hits = [hit('c1', 'control'), hit('r1', 'risk')];
+        const before = JSON.stringify(hits);
+        filterHitsByKind(hits, new Set<SearchHitType>(['control']), getKind);
+        expect(JSON.stringify(hits)).toBe(before);
+    });
+
+    it('returns an empty array when no hit matches the active set', () => {
+        const hits = [hit('c1', 'control')];
+        const out = filterHitsByKind(
+            hits,
+            new Set<SearchHitType>(['risk']),
+            getKind,
+        );
+        expect(out).toEqual([]);
+    });
+});
+
+// ─── toggleKind ───────────────────────────────────────────────────────
+
+describe('toggleKind', () => {
+    it('adds a kind that is not in the active set', () => {
+        const out = toggleKind(new Set<SearchHitType>(['control']), 'risk');
+        expect([...out].sort()).toEqual(['control', 'risk']);
+    });
+
+    it('removes a kind that IS in the active set', () => {
+        const out = toggleKind(
+            new Set<SearchHitType>(['control', 'risk']),
+            'risk',
+        );
+        expect([...out]).toEqual(['control']);
+    });
+
+    it('returns a new Set — never mutates input', () => {
+        const input = new Set<SearchHitType>(['control']);
+        const before = [...input];
+        toggleKind(input, 'risk');
+        expect([...input]).toEqual(before);
+    });
+});
+
+// ─── countHitsByKind ──────────────────────────────────────────────────
+
+describe('countHitsByKind', () => {
+    it('zero-fills every kind so callers do not have to defensive-check', () => {
+        const out = countHitsByKind([], getKind);
+        expect(out).toEqual({
+            control: 0,
+            risk: 0,
+            policy: 0,
+            framework: 0,
+            evidence: 0,
+        });
+    });
+
+    it('counts each hit under its kind', () => {
+        const hits = [
+            hit('c1', 'control'),
+            hit('c2', 'control'),
+            hit('r1', 'risk'),
+            hit('p1', 'policy'),
+        ];
+        const out = countHitsByKind(hits, getKind);
+        expect(out.control).toBe(2);
+        expect(out.risk).toBe(1);
+        expect(out.policy).toBe(1);
+        expect(out.evidence).toBe(0);
+        expect(out.framework).toBe(0);
+    });
+
+    it('counts the FULL list — independent of any filter that may be applied later', () => {
+        const hits = [hit('c1', 'control'), hit('r1', 'risk')];
+        // Even if we then filter to 'control', the count for risk
+        // stays at 1 — the chip should still display "Risk (1)" so
+        // the user can toggle it back on.
+        const out = countHitsByKind(hits, getKind);
+        expect(out.risk).toBe(1);
+    });
+});
