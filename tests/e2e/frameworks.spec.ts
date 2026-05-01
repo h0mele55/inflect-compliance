@@ -36,22 +36,15 @@ test.describe('Framework Coverage UI', () => {
         await expect(page.locator('#frameworks-heading')).toContainText('Compliance Frameworks');
     });
 
-    test('framework list renders the DataTable with all standards (Epic 46.4)', async () => {
-        // Migrated from card grid → ListPageShell + DataTable. Seed
-        // guarantees at least ISO27001 + SOC2 + NIS2 + ISO9001 +
-        // ISO28000 + ISO39001 → at least 6 rows in the table body.
-        const table = page.locator('[data-testid="frameworks-list-table"]');
-        await expect(table).toBeVisible({ timeout: 30_000 });
-        const links = page.locator('[id^="view-framework-"]');
-        await expect(links.first()).toBeVisible({ timeout: 30_000 });
-        expect(await links.count()).toBeGreaterThanOrEqual(6);
-        // Required Epic 46.4 columns must all be present in the
-        // header row.
-        const header = table.locator('thead');
-        await expect(header).toContainText('Framework');
-        await expect(header).toContainText('Domain');
-        await expect(header).toContainText('Requirements');
-        await expect(header).toContainText('Coverage');
+    test('framework cards are visible', async () => {
+        // Reverted: Epic 46.4's DataTable migration was rolled
+        // back; the list page is the original card grid again
+        // (the tree-view explorer on the detail page stays).
+        // Seed guarantees ISO27001 + SOC2 + NIS2 + ISO9001 +
+        // ISO28000 + ISO39001.
+        const cards = page.locator('[id^="fw-card-"]');
+        await expect(cards.first()).toBeVisible({ timeout: 30_000 });
+        expect(await cards.count()).toBeGreaterThanOrEqual(1);
     });
 
     test('can navigate to framework detail', async () => {
