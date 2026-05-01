@@ -1,126 +1,121 @@
 "use client";
 
 /**
- * TableEmptyState — standardized empty/error state for entity list tables.
+ * TableEmptyState — table-cell-shaped wrapper around <EmptyState>.
  *
- * Provides a consistent visual pattern across all entity list pages:
- * - Default "No items found" message
- * - Optional icon, description, and call-to-action button
- * - Error state variant
+ * Same API as before for backward-compatibility (7 existing callers in
+ * the `/org/...` admin views), but the visual + action rendering is
+ * delegated to the top-level <EmptyState> primitive. The only thing
+ * this wrapper still owns is the `h-96` height that DataTable expects
+ * inside a row-less table body, plus the `data-testid="table-empty-state"`
+ * selector that E2E tests rely on.
  *
- * Usage:
- *   <TableEmptyState
- *     title="No controls found"
- *     description="Create your first control to get started."
- *     icon={<Shield className="size-10" />}
- *     action={{ label: "Create Control", onClick: () => setOpen(true) }}
- *   />
+ * To migrate existing callers to the top-level primitive directly:
+ *
+ *     import { EmptyState } from '@/components/ui/empty-state';
+ *     <EmptyState
+ *         icon={IconComponent}      // a React.ElementType, NOT <Icon />
+ *         title="…"
+ *         description="…"
+ *         primaryAction={{ label, onClick }}
+ *     />
+ *
+ * The two API differences from this wrapper:
+ *   1. `icon` is a Component (not a ReactNode), to match the canonical
+ *      EmptyState contract — the wrapper still accepts ReactNode for
+ *      legacy callers that pass `<Shield />` directly.
+ *   2. `action: { variant: 'primary' | 'default' }` becomes either
+ *      `primaryAction={…}` (was 'primary') or `secondaryAction={…}`
+ *      (was 'default'). Both render the same button styling.
  */
 
-import { cn } from "./table-utils";
 import { type ReactNode } from "react";
+import { cn } from "./table-utils";
+import { EmptyState } from "../empty-state";
 
-// ── Types ───────────────────────────────────────────────────────────
+// ── Types (unchanged for backward-compat) ───────────────────────────
 
 export interface TableEmptyStateAction {
-  /** Button label text. */
-  label: string;
-
-  /** Click handler. */
-  onClick: () => void;
-
-  /** Visual variant for the button. */
-  variant?: "default" | "primary";
+    /** Button label text. */
+    label: string;
+    /** Click handler. */
+    onClick: () => void;
+    /** Visual variant for the button. */
+    variant?: "default" | "primary";
 }
 
 export interface TableEmptyStateProps {
-  /** Main heading text. Defaults to "No items found". */
-  title?: string;
-
-  /** Secondary description text. */
-  description?: string;
-
-  /** Icon element rendered above the title. */
-  icon?: ReactNode;
-
-  /** Optional call-to-action button. */
-  action?: TableEmptyStateAction;
-
-  /** Override the entire content with custom rendering. */
-  children?: ReactNode;
-
-  /** Additional className for the outer wrapper. */
-  className?: string;
+    /** Main heading text. Defaults to "No items found". */
+    title?: string;
+    /** Secondary description text. */
+    description?: string;
+    /** Icon element rendered above the title. ReactNode for legacy callers. */
+    icon?: ReactNode;
+    /** Optional call-to-action button. */
+    action?: TableEmptyStateAction;
+    /** Override the entire content with custom rendering. */
+    children?: ReactNode;
+    /** Additional className for the outer wrapper. */
+    className?: string;
 }
 
 // ── Component ───────────────────────────────────────────────────────
 
 export function TableEmptyState({
-  title,
-  description,
-  icon,
-  action,
-  children,
-  className,
+    title,
+    description,
+    icon,
+    action,
+    children,
+    className,
 }: TableEmptyStateProps) {
-  // If children are provided, render them directly
-  if (children) {
+    // Children-override path stays unchanged — some callers rely on
+    // the bare flex centring with arbitrary content inside.
+    if (children) {
+        return (
+            <div
+                className={cn(
+                    "text-content-muted flex h-96 w-full items-center justify-center text-sm",
+                    className,
+                )}
+                data-testid="table-empty-state"
+            >
+                {children}
+            </div>
+        );
+    }
+
+    // Bridge legacy `action` shape into EmptyState's primary/secondary slots.
+    const primaryAction =
+        action && action.variant === "primary"
+            ? { label: action.label, onClick: action.onClick }
+            : undefined;
+    const secondaryAction =
+        action && action.variant !== "primary"
+            ? { label: action.label, onClick: action.onClick }
+            : undefined;
+
+    // Legacy callers pass a ReactNode like `<Shield className="size-10" />`.
+    // EmptyState wants an ElementType. Wrap the node in a tiny shim
+    // component that ignores the className EmptyState would inject and
+    // just renders the caller's node verbatim.
+    const IconShim = icon ? () => <>{icon}</> : undefined;
+
     return (
-      <div
-        className={cn(
-          "text-content-muted flex h-96 w-full items-center justify-center text-sm",
-          className,
-        )}
-        data-testid="table-empty-state"
-      >
-        {children}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "flex h-96 w-full flex-col items-center justify-center gap-3 px-6 text-center",
-        className,
-      )}
-      data-testid="table-empty-state"
-    >
-      {/* Icon */}
-      {icon && (
-        <div className="text-content-subtle mb-1">
-          {icon}
-        </div>
-      )}
-
-      {/* Title */}
-      <h3 className="text-content-default text-sm font-medium">
-        {title ?? "No items found"}
-      </h3>
-
-      {/* Description */}
-      {description && (
-        <p className="text-content-subtle max-w-sm text-sm">
-          {description}
-        </p>
-      )}
-
-      {/* CTA Button */}
-      {action && (
-        <button
-          type="button"
-          onClick={action.onClick}
-          className={cn(
-            "mt-2 inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ring-offset-background)]",
-            action.variant === "primary"
-              ? "bg-[var(--brand-emphasis)] text-content-inverted hover:bg-[var(--brand-default)] active:bg-[var(--brand-emphasis)]"
-              : "bg-bg-elevated text-content-emphasis hover:bg-bg-muted active:bg-bg-subtle border border-border-subtle",
-          )}
+        <div
+            className={cn(
+                "flex h-96 w-full items-center justify-center",
+                className,
+            )}
+            data-testid="table-empty-state"
         >
-          {action.label}
-        </button>
-      )}
-    </div>
-  );
+            <EmptyState
+                icon={IconShim}
+                title={title ?? "No items found"}
+                description={description}
+                primaryAction={primaryAction}
+                secondaryAction={secondaryAction}
+            />
+        </div>
+    );
 }

@@ -55,10 +55,21 @@ import { ListPageShell } from '@/components/layout/ListPageShell';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
 import { DataTable, type DataTableProps } from '@/components/ui/table';
 import type { FilterType } from '@/components/ui/filter';
+import {
+    Breadcrumbs,
+    type BreadcrumbItem,
+} from '@/components/ui/breadcrumbs';
 
 // ─── Header ────────────────────────────────────────────────────────
 
 export interface EntityListPageHeader {
+    /**
+     * Optional breadcrumb trail rendered ABOVE the title. Pass an array
+     * of `{ label, href? }` items; the last item is automatically
+     * marked as the current page. See `<Breadcrumbs>` for the full
+     * shape (truncation, separators, custom current).
+     */
+    breadcrumbs?: ReadonlyArray<BreadcrumbItem>;
     /** Title rendered in the page header (string or ReactNode). */
     title: ReactNode;
     /** Optional count / subtitle line beneath the title. */
@@ -160,7 +171,14 @@ export function EntityListPage<TRow>(props: EntityListPageProps<TRow>) {
                     className="flex items-center justify-between gap-4 flex-wrap"
                     data-testid="entity-list-header"
                 >
-                    <div>
+                    <div className="min-w-0">
+                        {header.breadcrumbs && header.breadcrumbs.length > 0 && (
+                            <Breadcrumbs
+                                items={header.breadcrumbs}
+                                className="mb-1"
+                                data-testid="entity-list-breadcrumbs"
+                            />
+                        )}
                         <h1
                             className="text-2xl font-bold text-content-emphasis"
                             data-testid="entity-list-title"

@@ -658,6 +658,10 @@ function ControlsPageInner({
         <EntityListPage<ControlListItem>
             className="animate-fadeIn gap-6"
             header={{
+                breadcrumbs: [
+                    { label: 'Dashboard', href: tenantHref('/') },
+                    { label: 'Controls' },
+                ],
                 title: (
                     <>
                         <AppIcon name="controls" className="inline-block mr-2 align-text-bottom" />

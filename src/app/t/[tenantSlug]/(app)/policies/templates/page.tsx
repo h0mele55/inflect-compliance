@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import Link from 'next/link';
 import { Combobox } from '@/components/ui/combobox';
+import { EmptyState } from '@/components/ui/empty-state';
+import { FileText, SearchX } from 'lucide-react';
 
 export default function TemplatesPage() {
     const apiUrl = useTenantApiUrl();
@@ -94,8 +96,22 @@ export default function TemplatesPage() {
             {loading ? (
                 <div className="p-12 text-center text-content-subtle animate-pulse">Loading templates...</div>
             ) : filtered.length === 0 ? (
-                <div className="glass-card p-12 text-center text-content-subtle">
-                    {templates.length === 0 ? 'No templates available yet.' : 'No templates match your filters.'}
+                <div className="glass-card">
+                    {templates.length === 0 ? (
+                        <EmptyState
+                            icon={FileText}
+                            variant="no-records"
+                            title="No templates available yet"
+                            description="Policy templates will appear here once your tenant or admin loads them."
+                        />
+                    ) : (
+                        <EmptyState
+                            icon={SearchX}
+                            variant="no-results"
+                            title="No templates match your filters"
+                            description="Try clearing the category filter or broadening your search."
+                        />
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="template-grid">

@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useTenantApiUrl } from '@/lib/tenant-context-provider';
+import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { VALID_SCOPES } from '@/lib/auth/api-key-auth';
 import {
     KeyRound, Plus, Trash2, XCircle, CheckCircle, Copy, Check,
     Clock, AlertTriangle, Eye, EyeOff,
 } from 'lucide-react';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InfoTooltip, Tooltip } from '@/components/ui/tooltip';
 import { useCopyToClipboard } from '@/components/ui/hooks';
 import { DataTable, createColumns } from '@/components/ui/table';
@@ -214,6 +216,7 @@ export function KeyDisplay({ plaintext }: { plaintext: string }) {
 
 export default function ApiKeysPage() {
     const apiUrl = useTenantApiUrl();
+    const tenantHref = useTenantHref();
 
     const [keys, setKeys] = useState<ApiKeyRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -227,6 +230,9 @@ export default function ApiKeysPage() {
     const [createExpiry, setCreateExpiry] = useState('');
     const [creating, setCreating] = useState(false);
     const [createdKey, setCreatedKey] = useState<CreatedKeyResponse | null>(null);
+    // Pending revocation — drives the ConfirmDialog. Replaces the
+    // previous window.confirm() call.
+    const [keyToRevoke, setKeyToRevoke] = useState<ApiKeyRecord | null>(null);
 
     // ─── Data Fetching ───
     const fetchKeys = useCallback(async () => {
@@ -288,9 +294,13 @@ export default function ApiKeysPage() {
     }
 
     // ─── Revoke ───
-    async function handleRevoke(key: ApiKeyRecord) {
-        if (!confirm(`Revoke API key "${key.name}" (${key.keyPrefix}...)?\n\nThis cannot be undone. Any integrations using this key will immediately lose access.`)) return;
+    // The button in each row sets `keyToRevoke`; the actual delete
+    // happens in the ConfirmDialog's `onConfirm` below.
+    function handleRevoke(key: ApiKeyRecord) {
+        setKeyToRevoke(key);
+    }
 
+    async function performRevoke(key: ApiKeyRecord) {
         setError(null);
         setSuccess(null);
         try {
@@ -298,12 +308,13 @@ export default function ApiKeysPage() {
             if (!res.ok) {
                 const err = await res.json().catch(() => ({ error: 'Revoke failed' }));
                 setError(err.error?.message || err.error || 'Revoke failed');
-                return;
+                throw new Error(err.error?.message || err.error || 'Revoke failed');
             }
             setSuccess(`API key "${key.name}" revoked successfully.`);
             await fetchKeys();
         } catch (err) {
             setError((err as Error).message);
+            throw err;
         }
     }
 
@@ -463,6 +474,14 @@ export default function ApiKeysPage() {
             {/* Header */}
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
+                    <Breadcrumbs
+                        items={[
+                            { label: 'Dashboard', href: tenantHref('/') },
+                            { label: 'Admin', href: tenantHref('/admin') },
+                            { label: 'API keys' },
+                        ]}
+                        className="mb-1"
+                    />
                     <h1 className="text-2xl font-bold flex items-center gap-2">
                         <KeyRound className="w-6 h-6 text-[var(--brand-default)]" />
                         API Keys
@@ -594,6 +613,33 @@ export default function ApiKeysPage() {
                     />
                 </div>
             )}
+
+            <ConfirmDialog
+                showModal={keyToRevoke !== null}
+                setShowModal={(open) => {
+                    if (typeof open === 'function') {
+                        const next = open(keyToRevoke !== null);
+                        if (!next) setKeyToRevoke(null);
+                    } else if (!open) {
+                        setKeyToRevoke(null);
+                    }
+                }}
+                tone="danger"
+                title={
+                    keyToRevoke
+                        ? `Revoke API key "${keyToRevoke.name}"?`
+                        : 'Revoke API key?'
+                }
+                description={
+                    keyToRevoke
+                        ? `Key prefix ${keyToRevoke.keyPrefix}… will stop working immediately. Any integration using it will lose access. This cannot be undone.`
+                        : undefined
+                }
+                confirmLabel="Revoke key"
+                onConfirm={async () => {
+                    if (keyToRevoke) await performRevoke(keyToRevoke);
+                }}
+            />
         </div>
     );
 }

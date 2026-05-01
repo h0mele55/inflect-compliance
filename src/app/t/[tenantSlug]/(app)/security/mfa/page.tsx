@@ -6,6 +6,7 @@ import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { ShieldCheck, QrCode, Copy, CheckCircle, XCircle, Trash2, AlertTriangle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCopyToClipboard } from '@/components/ui/hooks';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface MfaStatus {
     isEnrolled: boolean;
@@ -34,6 +35,7 @@ export default function UserMfaPage() {
     const [success, setSuccess] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
     const { copy, copied } = useCopyToClipboard({ timeout: 2500 });
 
     const fetchStatus = useCallback(async () => {
@@ -100,8 +102,9 @@ export default function UserMfaPage() {
         }
     };
 
-    const removeMfa = async () => {
-        if (!confirm('Are you sure you want to remove MFA? Your account will be less secure.')) return;
+    const removeMfa = () => setShowRemoveConfirm(true);
+
+    const performRemoveMfa = async () => {
         setSubmitting(true);
         setError(null);
         try {
@@ -314,6 +317,15 @@ export default function UserMfaPage() {
                     </button>
                 </div>
             )}
+            <ConfirmDialog
+                showModal={showRemoveConfirm}
+                setShowModal={setShowRemoveConfirm}
+                tone="danger"
+                title="Remove multi-factor authentication?"
+                description="Your account will be less secure. You can re-enroll at any time."
+                confirmLabel="Remove MFA"
+                onConfirm={performRemoveMfa}
+            />
         </div>
     );
 }
