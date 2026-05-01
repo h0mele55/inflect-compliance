@@ -102,7 +102,7 @@ export function TraceabilityGraphTable({
                 {visibleEdges.length} of {graph.edges.length} relationships
                 {highlight.hasQuery && (
                     <span className="ml-2 text-[var(--brand-default)]">
-                        · filtered by "{searchQuery.trim()}"
+                        · filtered by &ldquo;{searchQuery.trim()}&rdquo;
                     </span>
                 )}
             </div>
@@ -124,7 +124,7 @@ export function TraceabilityGraphTable({
                                     className="text-center text-content-subtle italic py-6"
                                     data-graph-table-no-match="true"
                                 >
-                                    No relationships match "{searchQuery.trim()}"
+                                    No relationships match &ldquo;{searchQuery.trim()}&rdquo;
                                 </td>
                             </tr>
                         ) : (

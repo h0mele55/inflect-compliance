@@ -410,7 +410,7 @@ export function GraphExplorer({
                     className="absolute inset-x-0 top-2 mx-auto w-fit px-3 py-1.5 rounded-md bg-bg-elevated/95 border border-border-default text-xs text-content-muted shadow-md"
                     role="status"
                 >
-                    No matches for "{searchQuery.trim()}"
+                    No matches for &ldquo;{searchQuery.trim()}&rdquo;
                 </div>
             )}
         </div>

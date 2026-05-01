@@ -178,6 +178,7 @@ export function buildTraceabilityGraph(input: BuildInput): TraceabilityGraph {
         risk: 0,
         asset: 0,
         requirement: 0,
+        policy: 0,
     };
     for (const n of kept) counts[n.kind] += 1;
     for (const kind of Object.keys(counts) as TraceabilityNodeKind[]) {
