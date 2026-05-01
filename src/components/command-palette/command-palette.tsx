@@ -55,6 +55,21 @@ import {
     type EntityKind,
     type EntitySearchResult,
 } from './use-entity-search';
+import { useLocalStorage } from '@/components/ui/hooks';
+import {
+    MAX_RECENTS,
+    addRecent,
+    loadRecents,
+    recentsStorageKey,
+    serializeRecents,
+    type RecentItem,
+} from '@/lib/palette/recents';
+import {
+    countHitsByKind,
+    filterHitsByKind,
+    toggleKind,
+} from '@/lib/palette/filter';
+import { SEARCH_TYPE_DEFAULTS, type SearchHitType } from '@/lib/search/types';
 import {
     filterPaletteCommands,
     usePaletteCommands,
@@ -167,8 +182,50 @@ export function CommandPalette() {
         query,
         tenantSlug,
     );
-    const grouped = groupByKind(results);
-    const hasEntityResults = results.length > 0;
+    // ── Entity-type filter chips ──────────────────────────────────────
+    // Ephemeral — not persisted across palette opens. Each fresh
+    // open starts with no chips active (= all kinds visible).
+    const [activeKinds, setActiveKinds] = useState<Set<SearchHitType>>(
+        () => new Set(),
+    );
+    const handleToggleChip = useCallback((kind: SearchHitType) => {
+        setActiveKinds((prev) => toggleKind(prev, kind));
+    }, []);
+    // EntitySearchResult exposes `.kind` (legacy adapter shape);
+    // the helpers are generic over a kind extractor.
+    const getKind = (r: EntitySearchResult): SearchHitType => r.kind;
+    const filteredResults = useMemo(
+        () => filterHitsByKind(results, activeKinds, getKind),
+        [results, activeKinds],
+    );
+    const perKindCounts = useMemo(
+        () => countHitsByKind(results, getKind),
+        [results],
+    );
+    const grouped = groupByKind(filteredResults);
+    const hasEntityResults = filteredResults.length > 0;
+
+    // ── Recents (per-tenant, bounded, dedupe-on-touch) ────────────────
+    // Storage key keyed on tenantSlug; useLocalStorage handles the
+    // SSR-safe one-tick hydration. `useEntitySearch` already returns
+    // `null` results when tenantSlug is null, so the recents UI just
+    // hides itself in that case.
+    const recentsKey = recentsStorageKey(tenantSlug ?? '__no-tenant__');
+    const [recentsBlob, setRecentsBlob] = useLocalStorage(recentsKey, {
+        version: 1,
+        items: [] as RecentItem[],
+    });
+    const recents: RecentItem[] = useMemo(
+        () => loadRecents(recentsBlob),
+        [recentsBlob],
+    );
+    const showRecents = query.trim().length === 0 && tenantSlug !== null && recents.length > 0;
+    const recordVisit = useCallback(
+        (item: Omit<RecentItem, 'lastVisitedAt'>) => {
+            setRecentsBlob(serializeRecents(addRecent(recents, item)));
+        },
+        [recents, setRecentsBlob],
+    );
 
     // Navigation + action commands. When the user has started typing,
     // we fold the shortcut group away so the narrower, intent-driven
@@ -224,6 +281,21 @@ export function CommandPalette() {
         router.push(href);
     };
 
+    /**
+     * Selection variant for ENTITY rows (search hits + recents).
+     * Records the visit so it surfaces in the recents group on
+     * subsequent opens. Static nav targets call `handleSelect`
+     * directly — they don't pollute recents (the static commands
+     * are already permanently visible).
+     */
+    const handleEntitySelect = (
+        href: string,
+        item: Omit<RecentItem, 'lastVisitedAt'>,
+    ) => {
+        recordVisit(item);
+        handleSelect(href);
+    };
+
     const handleAction = (perform: () => void) => {
         close();
         setQuery('');
@@ -232,11 +304,14 @@ export function CommandPalette() {
         queueMicrotask(() => perform());
     };
 
-    // Reset the query when the palette closes so the next open starts
-    // clean. Covers the backdrop-click and Escape paths that don't go
-    // through `handleSelect`.
+    // Reset the query AND the chip filter when the palette closes so
+    // the next open starts clean. Covers the backdrop-click and
+    // Escape paths that don't go through `handleSelect`.
     useEffect(() => {
-        if (!isOpen) setQuery('');
+        if (!isOpen) {
+            setQuery('');
+            setActiveKinds(new Set());
+        }
     }, [isOpen]);
 
     return (
@@ -327,6 +402,51 @@ export function CommandPalette() {
                             </kbd>
                         </div>
 
+                        {/* Filter chips — only visible when search is
+                            active (non-empty query). Hides chip row on
+                            the empty-state surface so static commands
+                            + recents read clean.
+
+                            Each chip toggles `activeKinds` (multi-
+                            select). Empty active set means "all kinds
+                            visible" — no separate "All" chip needed.
+                            Counts are derived from the FULL pre-filter
+                            result list so a user can see what they'd
+                            unhide by toggling a chip back on. */}
+                        {query.trim().length > 0 && (
+                            <div
+                                className="flex flex-wrap items-center gap-1.5 border-b border-border-subtle px-4 py-2"
+                                role="group"
+                                aria-label="Filter results by entity type"
+                                data-testid="palette-filter-chips"
+                            >
+                                {(Object.keys(SEARCH_TYPE_DEFAULTS) as SearchHitType[]).map((kind) => {
+                                    const count = perKindCounts[kind];
+                                    const active = activeKinds.has(kind);
+                                    return (
+                                        <button
+                                            key={kind}
+                                            type="button"
+                                            onClick={() => handleToggleChip(kind)}
+                                            aria-pressed={active}
+                                            data-chip-kind={kind}
+                                            data-chip-active={active ? 'true' : 'false'}
+                                            className={cn(
+                                                'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] border transition-colors',
+                                                active
+                                                    ? 'border-[var(--brand-default)] bg-[var(--brand-subtle)] text-[var(--brand-default)]'
+                                                    : 'border-border-subtle text-content-muted hover:text-content-emphasis hover:bg-bg-muted',
+                                                count === 0 && !active && 'opacity-60',
+                                            )}
+                                        >
+                                            <span className="capitalize">{SEARCH_TYPE_DEFAULTS[kind].category}</span>
+                                            <span className="text-[10px] tabular-nums opacity-80">{count}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
                         <Command.List
                             className={cn(
                                 'max-h-[min(60vh,420px)] overflow-y-auto',
@@ -343,8 +463,23 @@ export function CommandPalette() {
                                     ? 'Searching…'
                                     : searchDisabled
                                       ? 'Entity search is available after sign-in.'
-                                      : 'No results found.'}
+                                      : activeKinds.size > 0 && results.length > 0
+                                        ? 'No matches in the selected categories. Toggle chips to widen.'
+                                        : 'No results found.'}
                             </Command.Empty>
+
+                            {/* Recents — visible only when the user
+                                hasn't started typing AND has visited
+                                at least one entity in this tenant
+                                before. Clicking a recent re-records
+                                it (move-to-top), so frequent targets
+                                stay near the top organically. */}
+                            {showRecents && (
+                                <RecentsGroup
+                                    items={recents}
+                                    onSelect={handleEntitySelect}
+                                />
+                            )}
 
                             {navCommands.length > 0 && (
                                 <CommandGroup
@@ -379,7 +514,25 @@ export function CommandPalette() {
                                             heading={meta.heading}
                                             Icon={meta.icon}
                                             items={items}
-                                            onSelect={handleSelect}
+                                            onSelect={(href) => {
+                                                // Find the source row so we can
+                                                // record the recent. Items in this
+                                                // group are guaranteed to share
+                                                // the same kind; first match by
+                                                // href is canonical.
+                                                const row = items.find((i) => i.href === href);
+                                                if (row) {
+                                                    handleEntitySelect(href, {
+                                                        type: row.kind,
+                                                        id: row.id,
+                                                        title: row.primary,
+                                                        href: row.href,
+                                                        iconKey: SEARCH_TYPE_DEFAULTS[row.kind].iconKey,
+                                                    });
+                                                } else {
+                                                    handleSelect(href);
+                                                }
+                                            }}
                                         />
                                     );
                                 })}
@@ -584,6 +737,64 @@ function ShortcutGroup({
                                 {renderShortcut(k)}
                             </span>
                         ))}
+                    </span>
+                </Command.Item>
+            ))}
+        </Command.Group>
+    );
+}
+
+// ─── Recents group ────────────────────────────────────────────────────
+
+function RecentsGroup({
+    items,
+    onSelect,
+}: {
+    items: ReadonlyArray<RecentItem>;
+    onSelect: (
+        href: string,
+        item: Omit<RecentItem, 'lastVisitedAt'>,
+    ) => void;
+}) {
+    return (
+        <Command.Group
+            heading="Recent"
+            className={cn(
+                '[&_[cmdk-group-heading]]:px-2',
+                '[&_[cmdk-group-heading]]:py-1.5',
+                '[&_[cmdk-group-heading]]:text-xs',
+                '[&_[cmdk-group-heading]]:font-medium',
+                '[&_[cmdk-group-heading]]:uppercase',
+                '[&_[cmdk-group-heading]]:tracking-wider',
+                '[&_[cmdk-group-heading]]:text-content-subtle',
+            )}
+            data-testid="palette-recents-group"
+        >
+            {items.slice(0, MAX_RECENTS).map((item) => (
+                <Command.Item
+                    key={`${item.type}:${item.id}`}
+                    value={`${item.title} ${item.type}`}
+                    onSelect={() =>
+                        onSelect(item.href, {
+                            type: item.type,
+                            id: item.id,
+                            title: item.title,
+                            href: item.href,
+                            iconKey: item.iconKey,
+                        })
+                    }
+                    data-testid="palette-recent-item"
+                    data-recent-type={item.type}
+                    className={cn(
+                        'flex cursor-pointer items-center justify-between gap-3',
+                        'rounded-md px-2 py-2 text-sm',
+                        'text-content-default',
+                        'data-[selected=true]:bg-bg-muted data-[selected=true]:text-content-emphasis',
+                    )}
+                >
+                    <span className="truncate">{item.title}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-content-subtle">
+                        {SEARCH_TYPE_DEFAULTS[item.type].category}
                     </span>
                 </Command.Item>
             ))}
