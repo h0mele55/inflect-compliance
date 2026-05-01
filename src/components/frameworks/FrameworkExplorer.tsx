@@ -189,17 +189,10 @@ export function FrameworkExplorer({
         [controlsByCode],
     );
 
-    // ── Empty state for the tree side. ────────────────────────────────
-    if (tree.nodes.length === 0) {
-        return (
-            <div className="glass-card text-center py-10 text-content-subtle" id="framework-explorer-empty">
-                This framework has no requirements yet.
-            </div>
-        );
-    }
-
     // Ref to the tree's scroll container so the minimap can both
     // observe scroll position AND trigger scrollIntoView jumps.
+    // Declared BEFORE the empty-state early return so the hook
+    // call order stays stable across renders (rules-of-hooks).
     const treeScrollRef = useRef<HTMLDivElement | null>(null);
 
     // Minimap → tree handler: ensure the section is expanded so the
@@ -223,6 +216,15 @@ export function FrameworkExplorer({
         },
         [trimmed],
     );
+
+    // ── Empty state for the tree side. ────────────────────────────────
+    if (tree.nodes.length === 0) {
+        return (
+            <div className="glass-card text-center py-10 text-content-subtle" id="framework-explorer-empty">
+                This framework has no requirements yet.
+            </div>
+        );
+    }
 
     return (
         <div
