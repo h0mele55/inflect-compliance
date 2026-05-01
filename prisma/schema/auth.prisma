@@ -97,6 +97,7 @@ model Tenant {
   controlContributors       ControlContributor[]
   controlEvidenceLinks      ControlEvidenceLink[]
   controlRequirementLinks   ControlRequirementLink[]
+  frameworkRequirementOrders FrameworkRequirementOrder[]
   controlTasks              ControlTask[]
   controlTestEvidenceLinks  ControlTestEvidenceLink[]
   controlTestPlans          ControlTestPlan[]
