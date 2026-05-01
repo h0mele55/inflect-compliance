@@ -291,8 +291,25 @@ export function TreeView<T extends TreeViewNode>(props: TreeViewProps<T>) {
                     const isLoading = loadingIds.has(node.id);
 
                     if (renderItem) {
+                        // Wrapper carries `data-tree-row-id` (NOT
+                        // `data-tree-node-id`). The inner item set
+                        // — typically `<TreeViewItem>` — is what
+                        // owns `data-tree-node-id`. Two attributes
+                        // for two different jobs:
+                        //   - `data-tree-row-id` lets the TreeView
+                        //     anchor virtualisation / measurement
+                        //     hooks at the row level without
+                        //     colliding with the inner item.
+                        //   - `data-tree-node-id` on the inner item
+                        //     remains the canonical selector for
+                        //     IntersectionObserver, focus mgmt, and
+                        //     E2E selectors.
+                        // Pre-fix the wrapper carried both, which
+                        // produced strict-mode locator violations
+                        // on Playwright queries that hit BOTH the
+                        // wrapper and the inner item.
                         return (
-                            <div key={node.id} data-tree-node-id={node.id}>
+                            <div key={node.id} data-tree-row-id={node.id}>
                                 {renderItem(node, {
                                     depth: row.depth,
                                     expanded: isExpanded,
