@@ -88,11 +88,16 @@ describe('Import hygiene — no legacy table imports in migrated pages', () => {
 describe('Structural compliance — migrated pages use DataTable', () => {
     it.each(MIGRATED_PAGES)('%s uses <DataTable>, not raw <table>', (rel) => {
         const src = readClientFile(rel);
+        // `EntityListPage` is the composition shell that internally
+        // mounts `<DataTable>` (see `src/components/layout/EntityListPage.tsx`).
+        // A page that uses the shell satisfies this guardrail without
+        // importing DataTable directly. Either signal counts.
         const hasDataTable = src.includes('DataTable');
+        const hasEntityListPage = src.includes('EntityListPage');
         const hasRawTable = /<table[\s>]/.test(src);
 
-        // Must use DataTable
-        expect(hasDataTable).toBe(true);
+        // Must use DataTable directly OR via the EntityListPage shell.
+        expect(hasDataTable || hasEntityListPage).toBe(true);
         // Should NOT have raw <table> (unless also using DataTable)
         if (hasRawTable) {
             // Transitional: allow raw <table> only if DataTable is also present

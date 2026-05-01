@@ -169,6 +169,8 @@ describe('ControlsClient — Sheet entry points', () => {
     it('row-click navigation to the full detail page is preserved', () => {
         // Regression guard — the Sheet is an *additional* entry point; the
         // list row still navigates for users who want the tabbed detail.
-        expect(CLIENT_SRC).toMatch(/onRowClick=\{\(row\)\s*=>\s*router\.push\(tenantHref\(`\/controls\/\$\{row\.original\.id\}`\)\)\}/);
+        // Page now passes onRowClick through EntityListPage's `table={{...}}`
+        // config object (object-property syntax), not as a JSX prop.
+        expect(CLIENT_SRC).toMatch(/onRowClick:\s*\(row\)\s*=>\s*router\.push\(tenantHref\(`\/controls\/\$\{row\.original\.id\}`\)\)/);
     });
 });

@@ -278,26 +278,27 @@ export class WorkItemRepository {
             openTaskCount: r._count,
         }));
 
-        // Top linked entities (ASSET / RISK) with most open tasks
-        const topLinkedRaw = await db.taskLink.findMany({
+        // Top linked entities (ASSET / RISK) with most open tasks.
+        // Pushdown: groupBy + take 5 instead of loading every TaskLink
+        // and aggregating in JS. The (`tenantId`, `entityType`,
+        // `entityId`) composite index already on TaskLink covers this.
+        const topLinkedRaw = await db.taskLink.groupBy({
+            by: ['entityType', 'entityId'],
             where: {
                 tenantId,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 entityType: { in: ['ASSET', 'RISK'] as any[] },
                 task: { status: openFilter },
             },
-            select: { entityType: true, entityId: true },
+            _count: true,
+            orderBy: { _count: { entityId: 'desc' } },
+            take: 5,
         });
-        const entityCounts = new Map<string, { entityType: string; entityId: string; count: number }>();
-        for (const l of topLinkedRaw) {
-            const key = `${l.entityType}:${l.entityId}`;
-            const existing = entityCounts.get(key);
-            if (existing) existing.count++;
-            else entityCounts.set(key, { entityType: l.entityType, entityId: l.entityId, count: 1 });
-        }
-        const topLinkedEntities = Array.from(entityCounts.values())
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5);
+        const topLinkedEntities = topLinkedRaw.map((r) => ({
+            entityType: r.entityType as string,
+            entityId: r.entityId,
+            count: r._count,
+        }));
 
         return {
             total,

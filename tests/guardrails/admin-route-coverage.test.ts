@@ -50,6 +50,9 @@ const ADMIN_ONLY_ROUTES = [
     'admin/invites/route.ts',
     'admin/invites/[inviteId]/route.ts',
 
+    // Epic 44 — risk matrix configuration
+    'admin/risk-matrix-config/route.ts',
+
     // Billing routes (admin-only)
     'billing/checkout/route.ts',
     'billing/portal/route.ts',

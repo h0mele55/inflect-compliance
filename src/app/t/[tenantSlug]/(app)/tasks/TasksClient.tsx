@@ -158,7 +158,7 @@ function TasksPageInner({
             return res.json();
         },
         initialData: filtersMatchInitial ? initialTasks : undefined,
-        initialDataUpdatedAt: 0,
+        initialDataUpdatedAt: filtersMatchInitial ? Date.now() : 0,
         // Prevent aggressive refetch during user interaction (SWR after 30s)
         staleTime: 30_000,
     });

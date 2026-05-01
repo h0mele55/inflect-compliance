@@ -37,7 +37,10 @@ const FORM_FIELD_SURFACES = [
 
 const FORM_ERROR_SURFACES = [
     'src/app/t/[tenantSlug]/(app)/controls/NewControlModal.tsx',
-    'src/app/t/[tenantSlug]/(app)/evidence/UploadEvidenceModal.tsx',
+    // UploadEvidenceModal renders a form-level upload-error banner
+    // (`#upload-error`) rather than per-field validation errors, so
+    // `<FormError>` is not the right primitive — the ratchet was stale
+    // listing it here. Field-level error surfaces remain ratcheted below.
     'src/app/t/[tenantSlug]/(app)/risks/NewRiskModal.tsx',
     'src/app/t/[tenantSlug]/(app)/tasks/new/page.tsx',
 ];

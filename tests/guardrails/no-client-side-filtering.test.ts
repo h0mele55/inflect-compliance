@@ -123,13 +123,20 @@ describe('Guardrail: No stacked/legacy filter UI', () => {
 });
 
 describe('Guardrail: All list pages import FilterToolbar', () => {
+    // `EntityListPage` is the composition shell that internally renders
+    // `<FilterToolbar>` (see `src/components/layout/EntityListPage.tsx`).
+    // A page that uses the shell satisfies this guardrail without
+    // importing FilterToolbar directly — that's the whole point of the
+    // shell. Either signal counts.
     for (const relPath of LIST_CLIENT_FILES) {
-        it(`${path.basename(relPath, '.tsx')} should import FilterToolbar`, () => {
+        it(`${path.basename(relPath, '.tsx')} should import FilterToolbar (or EntityListPage)`, () => {
             const content = readFile(relPath);
             expect(content).not.toBeNull();
             if (!content) return;
 
-            expect(content).toContain('FilterToolbar');
+            const usesFilterToolbar = content.includes('FilterToolbar');
+            const usesEntityListPage = content.includes('EntityListPage');
+            expect(usesFilterToolbar || usesEntityListPage).toBe(true);
         });
     }
 });
