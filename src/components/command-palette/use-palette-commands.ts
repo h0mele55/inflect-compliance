@@ -37,6 +37,7 @@ import {
     LayoutDashboard,
     LogOut,
     Moon,
+    Network,
     Paperclip,
     Settings,
     ShieldCheck,
@@ -125,6 +126,13 @@ export function usePaletteCommands(tenantSlug: string | null): PaletteCommand[] 
                 label: 'Go to Frameworks',
                 icon: Layers,
                 href: href('/frameworks'),
+            },
+            {
+                id: 'nav:traceability',
+                group: 'Navigation',
+                label: 'Go to Traceability',
+                icon: Network,
+                href: href('/traceability'),
             },
             {
                 id: 'nav:vendors',
