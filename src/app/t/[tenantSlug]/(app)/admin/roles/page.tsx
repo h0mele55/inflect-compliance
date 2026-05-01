@@ -1,6 +1,27 @@
 'use client';
+/**
+ * Custom Roles admin — Epic 48 DataTable migration.
+ *
+ * Replaces the hand-rolled `<table className="data-table">`
+ * with the shared <DataTable> + <ListPageShell> primitives.
+ *
+ * The previous markup expanded a row inline when editing a role
+ * (the row's `<td colSpan={6}>` swapped to a <RoleForm>).
+ * That doesn't fit the row-per-record model DataTable assumes,
+ * so the edit form now renders ABOVE the table — same place +
+ * shape as the existing create form. The selected row is hidden
+ * from the table while editing so the user has one obvious focus
+ * surface, not two competing ones.
+ *
+ * Stable IDs preserved: roles-table-card, roles-table,
+ * create-role-form, edit-role-form (new), create-role-btn,
+ * role-name-input, role-base-select, role-description-input,
+ * toggle-permissions-btn, role-submit-btn, edit-role-${id},
+ * delete-role-${id}, perm-${resource}-${action},
+ * preset-${role}, roles-error, roles-success.
+ */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { getPermissionsForRole, type PermissionSet } from '@/lib/permissions';
 import {
@@ -10,6 +31,8 @@ import {
 import type { Role } from '@prisma/client';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
+import { DataTable, createColumns } from '@/components/ui/table';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 
 // ─── Types ───
 
@@ -88,7 +111,6 @@ function PermissionGrid({
         onChange(updated);
     };
 
-    // Collect all unique actions across all resources for column headers
     const allActions = Array.from(
         new Set(Object.values(PERMISSION_SCHEMA).flat())
     );
@@ -174,7 +196,6 @@ function RoleForm({
     );
     const [showGrid, setShowGrid] = useState(!!initial);
 
-    // Load preset when baseRole changes (only in create mode)
     const handleBaseRoleChange = (role: Role) => {
         setBaseRole(role);
         if (!initial) {
@@ -306,7 +327,6 @@ export default function CustomRolesPage() {
             const res = await fetch(apiUrl('/admin/roles'));
             if (res.ok) {
                 const data = await res.json();
-                // Only show active roles
                 setRoles(data.filter((r: CustomRole) => r.isActive));
             }
         } catch {
@@ -318,7 +338,7 @@ export default function CustomRolesPage() {
 
     useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
-    // ─── Create ───
+    // ─── Handlers ───
     async function handleCreate(data: { name: string; description: string; baseRole: Role; permissionsJson: PermissionSet }) {
         setError(null);
         setSuccess(null);
@@ -344,7 +364,6 @@ export default function CustomRolesPage() {
         }
     }
 
-    // ─── Update ───
     async function handleUpdate(roleId: string, data: { name: string; description: string; baseRole: Role; permissionsJson: PermissionSet }) {
         setError(null);
         setSuccess(null);
@@ -370,7 +389,6 @@ export default function CustomRolesPage() {
         }
     }
 
-    // ─── Delete ───
     async function handleDelete(role: CustomRole) {
         const memberWarning = role._count.memberships > 0
             ? `\n\n${role._count.memberships} member(s) will lose this custom role and fall back to their base role.`
@@ -407,6 +425,109 @@ export default function CustomRolesPage() {
         return `${granted}/${total}`;
     }
 
+    // ─── DataTable columns ───
+    const editingRole = useMemo(
+        () => (editingId ? roles.find((r) => r.id === editingId) ?? null : null),
+        [editingId, roles],
+    );
+    // Hide the row currently being edited from the table — the
+    // edit form above renders the full record, so showing it twice
+    // would be visual noise.
+    const visibleRoles = useMemo(
+        () => (editingId ? roles.filter((r) => r.id !== editingId) : roles),
+        [roles, editingId],
+    );
+
+    const roleColumns = useMemo(
+        () => createColumns<CustomRole>([
+            {
+                id: 'name',
+                header: 'Name',
+                accessorKey: 'name',
+                cell: ({ row }) => (
+                    <span className="text-sm font-medium text-content-emphasis">{row.original.name}</span>
+                ),
+            },
+            {
+                id: 'baseRole',
+                header: 'Base Role',
+                accessorKey: 'baseRole',
+                cell: ({ row }) => (
+                    <span className={`badge ${ROLE_COLORS[row.original.baseRole] || 'badge-neutral'}`}>
+                        {row.original.baseRole}
+                    </span>
+                ),
+            },
+            {
+                id: 'description',
+                header: 'Description',
+                accessorKey: 'description',
+                cell: ({ row }) => (
+                    <span className="text-xs text-content-muted truncate block max-w-xs">
+                        {row.original.description || '—'}
+                    </span>
+                ),
+            },
+            {
+                id: 'members',
+                header: 'Members',
+                accessorFn: (r) => r._count.memberships,
+                cell: ({ row }) => (
+                    <span className="flex items-center gap-1 text-xs text-content-default">
+                        <Users className="w-3 h-3" />
+                        {row.original._count.memberships}
+                    </span>
+                ),
+            },
+            {
+                id: 'permissions',
+                header: 'Permissions',
+                accessorFn: (r) => countGranted(r.permissionsJson),
+                cell: ({ row }) => (
+                    <span className="text-xs text-content-muted font-mono">
+                        {countGranted(row.original.permissionsJson)}
+                    </span>
+                ),
+            },
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }) => {
+                    const role = row.original;
+                    return (
+                        <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
+                            <Tooltip content="Edit role">
+                                <button
+                                    onClick={() => {
+                                        setShowCreate(false);
+                                        setEditingId(role.id);
+                                    }}
+                                    className="btn btn-secondary text-xs py-1 px-2"
+                                    aria-label="Edit role"
+                                    id={`edit-role-${role.id}`}
+                                >
+                                    <Pencil className="w-3 h-3" />
+                                </button>
+                            </Tooltip>
+                            <Tooltip content="Delete role">
+                                <button
+                                    onClick={() => handleDelete(role)}
+                                    className="btn btn-secondary text-xs py-1 px-2 text-red-400 hover:bg-red-500/10"
+                                    aria-label="Delete role"
+                                    id={`delete-role-${role.id}`}
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
+                            </Tooltip>
+                        </div>
+                    );
+                },
+            },
+        ]),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [],
+    );
+
     // ─── Loading ───
     if (loading) {
         return (
@@ -425,153 +546,97 @@ export default function CustomRolesPage() {
     }
 
     return (
-        <div className="space-y-6 animate-fadeIn">
-            {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold flex items-center gap-2">
-                        <Shield className="w-6 h-6 text-[var(--brand-default)]" />
-                        Custom Roles
-                    </h1>
-                    <p className="text-sm text-content-muted mt-1">
-                        {roles.length} custom role{roles.length !== 1 ? 's' : ''} defined.
-                        Members assigned a custom role use its permissions instead of the built-in role defaults.
-                    </p>
+        <ListPageShell>
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold flex items-center gap-2">
+                            <Shield className="w-6 h-6 text-[var(--brand-default)]" />
+                            Custom Roles
+                        </h1>
+                        <p className="text-sm text-content-muted mt-1">
+                            {roles.length} custom role{roles.length !== 1 ? 's' : ''} defined.
+                            Members assigned a custom role use its permissions instead of the built-in role defaults.
+                        </p>
+                    </div>
+                    {!showCreate && !editingId && (
+                        <button
+                            onClick={() => setShowCreate(true)}
+                            className="btn btn-primary"
+                            id="create-role-btn"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            Create Custom Role
+                        </button>
+                    )}
                 </div>
-                {!showCreate && !editingId && (
-                    <button
-                        onClick={() => setShowCreate(true)}
-                        className="btn btn-primary"
-                        id="create-role-btn"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        Create Custom Role
-                    </button>
+            </ListPageShell.Header>
+
+            <ListPageShell.Filters className="space-y-4">
+                {/* Messages */}
+                {error && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2" id="roles-error">
+                        <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                        <span className="text-sm text-red-400">{error}</span>
+                        <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300">
+                            <XCircle className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                 )}
-            </div>
+                {success && (
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center gap-2" id="roles-success">
+                        <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                        <span className="text-sm text-emerald-400">{success}</span>
+                        <button onClick={() => setSuccess(null)} className="ml-auto text-emerald-400 hover:text-emerald-300">
+                            <XCircle className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                )}
 
-            {/* Messages */}
-            {error && (
-                <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-2" id="roles-error">
-                    <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                    <span className="text-sm text-red-400">{error}</span>
-                    <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300">
-                        <XCircle className="w-3.5 h-3.5" />
-                    </button>
-                </div>
-            )}
-            {success && (
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center gap-2" id="roles-success">
-                    <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <span className="text-sm text-emerald-400">{success}</span>
-                    <button onClick={() => setSuccess(null)} className="ml-auto text-emerald-400 hover:text-emerald-300">
-                        <XCircle className="w-3.5 h-3.5" />
-                    </button>
-                </div>
-            )}
+                {/* Create Form */}
+                {showCreate && (
+                    <div className="glass-card p-6 border border-[var(--brand-default)]/30" id="create-role-form">
+                        <h3 className="text-sm font-semibold text-content-emphasis mb-4">Create Custom Role</h3>
+                        <RoleForm
+                            onSubmit={handleCreate}
+                            onCancel={() => setShowCreate(false)}
+                            submitting={submitting}
+                            submitLabel="Create Role"
+                        />
+                    </div>
+                )}
 
-            {/* Create Form */}
-            {showCreate && (
-                <div className="glass-card p-6 border border-[var(--brand-default)]/30" id="create-role-form">
-                    <h3 className="text-sm font-semibold text-content-emphasis mb-4">Create Custom Role</h3>
-                    <RoleForm
-                        onSubmit={handleCreate}
-                        onCancel={() => setShowCreate(false)}
-                        submitting={submitting}
-                        submitLabel="Create Role"
+                {/* Edit Form (Epic 48 migration — moved from inline-row expansion to
+                    above-table panel; matches the create-form pattern) */}
+                {editingRole && (
+                    <div className="glass-card p-6 border border-[var(--brand-default)]/30" id="edit-role-form">
+                        <h3 className="text-sm font-semibold text-content-emphasis mb-4">
+                            Edit: {editingRole.name}
+                        </h3>
+                        <RoleForm
+                            initial={editingRole}
+                            onSubmit={(data) => handleUpdate(editingRole.id, data)}
+                            onCancel={() => setEditingId(null)}
+                            submitting={submitting}
+                            submitLabel="Save Changes"
+                        />
+                    </div>
+                )}
+            </ListPageShell.Filters>
+
+            <ListPageShell.Body>
+                <div className="glass-card overflow-hidden" id="roles-table-card">
+                    <DataTable
+                        fillBody
+                        data={visibleRoles}
+                        columns={roleColumns}
+                        getRowId={(r) => r.id}
+                        emptyState='No custom roles defined yet. Click "Create Custom Role" to get started.'
+                        resourceName={(p) => (p ? 'custom roles' : 'custom role')}
+                        data-testid="roles-table"
                     />
                 </div>
-            )}
-
-            {/* Roles Table */}
-            <div className="glass-card overflow-hidden" id="roles-table-card">
-                <table className="data-table" id="roles-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Base Role</th>
-                            <th>Description</th>
-                            <th>Members</th>
-                            <th>Permissions</th>
-                            <th className="text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {roles.map((role) => (
-                            editingId === role.id ? (
-                                <tr key={role.id}>
-                                    <td colSpan={6} className="p-4">
-                                        <h3 className="text-sm font-semibold text-content-emphasis mb-4">
-                                            Edit: {role.name}
-                                        </h3>
-                                        <RoleForm
-                                            initial={role}
-                                            onSubmit={(data) => handleUpdate(role.id, data)}
-                                            onCancel={() => setEditingId(null)}
-                                            submitting={submitting}
-                                            submitLabel="Save Changes"
-                                        />
-                                    </td>
-                                </tr>
-                            ) : (
-                                <tr key={role.id} data-role-id={role.id}>
-                                    <td className="text-sm font-medium text-content-emphasis">{role.name}</td>
-                                    <td>
-                                        <span className={`badge ${ROLE_COLORS[role.baseRole] || 'badge-neutral'}`}>
-                                            {role.baseRole}
-                                        </span>
-                                    </td>
-                                    <td className="text-xs text-content-muted max-w-xs truncate">
-                                        {role.description || '—'}
-                                    </td>
-                                    <td>
-                                        <span className="flex items-center gap-1 text-xs text-content-default">
-                                            <Users className="w-3 h-3" />
-                                            {role._count.memberships}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span className="text-xs text-content-muted font-mono">
-                                            {countGranted(role.permissionsJson)}
-                                        </span>
-                                    </td>
-                                    <td className="text-right">
-                                        <div className="flex gap-1 justify-end">
-                                            <Tooltip content="Edit role">
-                                                <button
-                                                    onClick={() => setEditingId(role.id)}
-                                                    className="btn btn-secondary text-xs py-1 px-2"
-                                                    aria-label="Edit role"
-                                                    id={`edit-role-${role.id}`}
-                                                >
-                                                    <Pencil className="w-3 h-3" />
-                                                </button>
-                                            </Tooltip>
-                                            <Tooltip content="Delete role">
-                                                <button
-                                                    onClick={() => handleDelete(role)}
-                                                    className="btn btn-secondary text-xs py-1 px-2 text-red-400 hover:bg-red-500/10"
-                                                    aria-label="Delete role"
-                                                    id={`delete-role-${role.id}`}
-                                                >
-                                                    <Trash2 className="w-3 h-3" />
-                                                </button>
-                                            </Tooltip>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )
-                        ))}
-                        {roles.length === 0 && !showCreate && (
-                            <tr>
-                                <td colSpan={6} className="text-center text-content-subtle py-8">
-                                    No custom roles defined yet. Click &quot;Create Custom Role&quot; to get started.
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }

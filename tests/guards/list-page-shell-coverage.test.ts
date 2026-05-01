@@ -61,6 +61,13 @@ const EXEMPTIONS: Record<string, string> = {
     'admin/api-keys/page.tsx':
         'multi-table page (active + revoked stacked)',
 
+    // Same shape as api-keys: members + pending-invites tables
+    // stacked. Viewport-clamping a stacked-table layout would
+    // force the bottom table to scroll while the top stays
+    // static — unhelpful UX.
+    'admin/members/page.tsx':
+        'multi-table page (members + pending invites stacked)',
+
     // Tabbed admin settings page. The "stats" tab shows a fixed
     // 3-row table that doesn't need internal scroll; the "settings"
     // tab is a form. Neither benefits from viewport-clamping.
@@ -90,7 +97,12 @@ const EXEMPTIONS: Record<string, string> = {
         'import wizard flow',
 };
 
-const SHELL_IMPORT_RE = /['"]@\/components\/layout\/ListPageShell['"]/;
+// Accept either the raw `ListPageShell` primitive or the `EntityListPage`
+// composition (which wraps `ListPageShell` internally — see
+// `src/components/layout/EntityListPage.tsx`). Both satisfy the
+// viewport-clamped scroll contract this ratchet exists to enforce.
+const SHELL_IMPORT_RE =
+    /['"]@\/components\/layout\/(ListPageShell|EntityListPage)['"]/;
 const DATATABLE_IMPORT_RE = /from\s+['"]@\/components\/ui\/table[^'"]*['"]/;
 
 function walk(dir: string, results: string[] = []): string[] {
@@ -173,10 +185,13 @@ describe('list-page-shell coverage ratchet', () => {
         const migrated = findings.filter(
             (f) => f.importsDataTable && f.importsListPageShell,
         );
-        // Snapshot at Phase 2 landing — 12 list pages migrated. The
-        // floor stops a future PR from quietly removing the shell
-        // from one of them without bumping this number in the same
-        // diff (which forces a code review conversation).
-        expect(migrated.length).toBeGreaterThanOrEqual(12);
+        // Snapshot after Epic 48 admin/roles migration — 13 list
+        // pages migrated (the regex now also recognises
+        // `EntityListPage`, the unified shell that wraps
+        // `ListPageShell` internally). The floor stops a future PR
+        // from quietly removing the shell from one of them without
+        // bumping this number in the same diff (which forces a code
+        // review conversation).
+        expect(migrated.length).toBeGreaterThanOrEqual(13);
     });
 });

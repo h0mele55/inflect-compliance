@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { useTenantContext, useTenantHref, usePermissions } from '@/lib/tenant-context-provider';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { useKeyboardShortcut } from '@/lib/hooks/use-keyboard-shortcut';
+import { StartTourButton } from '@/components/ui/OnboardingTour';
 import {
     X,
     LayoutDashboard,
@@ -193,6 +194,15 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
                         <p className="text-xs text-content-muted">{tenant.role}</p>
                     </div>
                     <ThemeToggle id="theme-toggle-desktop" />
+                </div>
+                {/* Driver.js product tour — manual restart entry.
+                    Renders only when the OnboardingTourProvider is
+                    mounted (i.e. inside the authenticated tenant
+                    shell). The auto-trigger handles first-login;
+                    this button is for the "I want to see it again"
+                    case. */}
+                <div className="mb-1">
+                    <StartTourButton />
                 </div>
                 <button
                     onClick={onLogout}
