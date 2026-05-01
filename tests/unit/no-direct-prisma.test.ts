@@ -125,6 +125,15 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
         // single-tenant RequestContext shape — the WITH_TENANT_DB_ALLOWLIST
         // entry below covers that side.
         'portfolio.ts',
+        // Epic 47 — global search reads cross-tenant `Framework` rows
+        // (frameworks are not tenant-scoped: they're shared catalogue
+        // data). The tenant-scoped portion of the search runs through
+        // `runInTenantContext` already; the framework lookup uses the
+        // global prisma client because Framework has no `tenantId`
+        // column to filter on. Authorization gate: the route's
+        // `getTenantCtx` already enforces tenant membership; framework
+        // metadata leaks no business data.
+        'search.ts',
     ];
 
     const usecases = readFilesInDir(path.join(SRC_ROOT, 'app-layer/usecases'));

@@ -73,8 +73,10 @@ describe('ControlsClient — EntityListPage adoption', () => {
 
     it('preserves all four header actions gated by appPermissions.controls.create', () => {
         // Regression guard — the refactor must not silently drop the
-        // permission gate or any of the four buttons.
-        expect(source).toMatch(/appPermissions\.controls\.create\s*\?/);
+        // permission gate or any of the four buttons. Accept both
+        // ternary (`? :`) and short-circuit (`&&`) gating styles —
+        // both correctly hide the actions when the permission is false.
+        expect(source).toMatch(/appPermissions\.controls\.create\s*[?&]/);
         expect(source).toContain('controls-dashboard-btn');
         expect(source).toContain('frameworks-btn');
         expect(source).toContain('install-templates-btn');

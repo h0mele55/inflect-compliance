@@ -168,7 +168,15 @@ describe('Epic 58 — existing API contracts preserved', () => {
         expect(src).toMatch(/id=["']retention-date-input["']/);
         // Post-migration the modal still converts the stored YMD
         // string to an ISO timestamp for the /retention endpoint.
-        expect(src).toMatch(/new Date\(retentionUntil\)\.toISOString\(\)/);
+        // After the mutation refactor (vars-destructured handler), the
+        // retention value lives on the mutation `vars` object, not
+        // the bare closure variable — match either shape so the test
+        // asserts the conversion contract regardless of plumbing.
+        // Allow optional trailing comma (Prettier formats multiline
+        // function calls with trailing commas).
+        expect(src).toMatch(
+            /new Date\(\s*(vars\.)?retentionUntil\s*,?\s*\)\.toISOString\(\)/,
+        );
     });
 
     it('Inline retention edit still posts { retentionUntil: ISO | null, retentionPolicy }', () => {

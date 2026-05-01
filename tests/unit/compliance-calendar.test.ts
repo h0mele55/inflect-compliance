@@ -62,45 +62,53 @@ beforeEach(() => {
         mockVendorCount,
     ].forEach((m) => m.mockReset().mockResolvedValue(0));
 
-    jest.mock('@/lib/prisma', () => ({
-        __esModule: true,
-        prisma: {
-            evidence: {
-                findMany: (...a: unknown[]) => mockEvidenceFindMany(...a),
-                count: (...a: unknown[]) => mockEvidenceCount(...a),
-            },
-            policy: {
-                findMany: (...a: unknown[]) => mockPolicyFindMany(...a),
-                count: (...a: unknown[]) => mockPolicyCount(...a),
-            },
-            vendor: {
-                findMany: (...a: unknown[]) => mockVendorFindMany(...a),
-                count: (...a: unknown[]) => mockVendorCount(...a),
-            },
-            vendorDocument: {
-                findMany: (...a: unknown[]) => mockVendorDocFindMany(...a),
-            },
-            auditCycle: {
-                findMany: (...a: unknown[]) => mockAuditCycleFindMany(...a),
-            },
-            control: {
-                findMany: (...a: unknown[]) => mockControlFindMany(...a),
-                count: (...a: unknown[]) => mockControlCount(...a),
-            },
-            controlTestPlan: {
-                findMany: (...a: unknown[]) => mockTestPlanFindMany(...a),
-            },
-            task: {
-                findMany: (...a: unknown[]) => mockTaskFindMany(...a),
-                count: (...a: unknown[]) => mockTaskCount(...a),
-            },
-            risk: {
-                findMany: (...a: unknown[]) => mockRiskFindMany(...a),
-            },
-            finding: {
-                findMany: (...a: unknown[]) => mockFindingFindMany(...a),
-            },
+    // Calendar usecase reads via `runInTenantContext(ctx, db => ...)`
+    // (passes through RLS-bound `app_user`). Mock the helper to invoke
+    // the callback with our spy db immediately — equivalent to the
+    // single-pass, no-actual-tx test path.
+    const mockDb = {
+        evidence: {
+            findMany: (...a: unknown[]) => mockEvidenceFindMany(...a),
+            count: (...a: unknown[]) => mockEvidenceCount(...a),
         },
+        policy: {
+            findMany: (...a: unknown[]) => mockPolicyFindMany(...a),
+            count: (...a: unknown[]) => mockPolicyCount(...a),
+        },
+        vendor: {
+            findMany: (...a: unknown[]) => mockVendorFindMany(...a),
+            count: (...a: unknown[]) => mockVendorCount(...a),
+        },
+        vendorDocument: {
+            findMany: (...a: unknown[]) => mockVendorDocFindMany(...a),
+        },
+        auditCycle: {
+            findMany: (...a: unknown[]) => mockAuditCycleFindMany(...a),
+        },
+        control: {
+            findMany: (...a: unknown[]) => mockControlFindMany(...a),
+            count: (...a: unknown[]) => mockControlCount(...a),
+        },
+        controlTestPlan: {
+            findMany: (...a: unknown[]) => mockTestPlanFindMany(...a),
+        },
+        task: {
+            findMany: (...a: unknown[]) => mockTaskFindMany(...a),
+            count: (...a: unknown[]) => mockTaskCount(...a),
+        },
+        risk: {
+            findMany: (...a: unknown[]) => mockRiskFindMany(...a),
+        },
+        finding: {
+            findMany: (...a: unknown[]) => mockFindingFindMany(...a),
+        },
+    };
+    jest.mock('@/lib/db-context', () => ({
+        __esModule: true,
+        runInTenantContext: jest.fn(
+            async (_ctx: unknown, fn: (db: unknown) => Promise<unknown>) =>
+                fn(mockDb),
+        ),
     }));
 });
 

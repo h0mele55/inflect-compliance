@@ -26,8 +26,10 @@
  * to the source (one place to look when a new entity is added).
  */
 
-import { prisma } from '@/lib/prisma';
+import { runInTenantContext } from '@/lib/db-context';
+import type { PrismaTx } from '@/lib/db-context';
 import { assertCanRead } from '../policies/common';
+import { TERMINAL_WORK_ITEM_STATUSES } from '../domain/work-item-status';
 import type { RequestContext } from '../types';
 import {
     type CalendarEvent,
@@ -67,8 +69,11 @@ export async function getComplianceCalendarEvents(
     const limit = input.perSourceLimit ?? 500;
     const range = { from: input.from, to: input.to };
 
-    // Fan-out to every source in parallel. Each source returns a flat
-    // CalendarEvent[] and is responsible for its own status mapping.
+    // Fan-out to every source in parallel inside one tenant-bound
+    // transaction. `runInTenantContext` binds the per-tx `app_user`
+    // role + sets `app.tenant_id` so every read goes through the
+    // RLS policies — that's belt-and-braces with the explicit
+    // `tenantId: ctx.tenantId` filter inside each loader.
     const [
         evidenceEvents,
         policyEvents,
@@ -80,18 +85,20 @@ export async function getComplianceCalendarEvents(
         taskEvents,
         riskEvents,
         findingEvents,
-    ] = await Promise.all([
-        loadEvidenceEvents(ctx, range, now, limit),
-        loadPolicyEvents(ctx, range, now, limit),
-        loadVendorEvents(ctx, range, now, limit),
-        loadVendorDocumentEvents(ctx, range, now, limit),
-        loadAuditCycleEvents(ctx, range, now, limit),
-        loadControlEvents(ctx, range, now, limit),
-        loadTestPlanEvents(ctx, range, now, limit),
-        loadTaskEvents(ctx, range, now, limit),
-        loadRiskEvents(ctx, range, now, limit),
-        loadFindingEvents(ctx, range, now, limit),
-    ]);
+    ] = await runInTenantContext(ctx, (db) =>
+        Promise.all([
+            loadEvidenceEvents(db, ctx, range, now, limit),
+            loadPolicyEvents(db, ctx, range, now, limit),
+            loadVendorEvents(db, ctx, range, now, limit),
+            loadVendorDocumentEvents(db, ctx, range, now, limit),
+            loadAuditCycleEvents(db, ctx, range, now, limit),
+            loadControlEvents(db, ctx, range, now, limit),
+            loadTestPlanEvents(db, ctx, range, now, limit),
+            loadTaskEvents(db, ctx, range, now, limit),
+            loadRiskEvents(db, ctx, range, now, limit),
+            loadFindingEvents(db, ctx, range, now, limit),
+        ]),
+    );
 
     let all: CalendarEvent[] = [
         ...evidenceEvents,
@@ -182,12 +189,13 @@ function countSummaries(events: CalendarEvent[]) {
 // ─── Per-source loaders ──────────────────────────────────────────────
 
 async function loadEvidenceEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
     limit: number,
 ): Promise<CalendarEvent[]> {
-    const rows = await prisma.evidence.findMany({
+    const rows = await db.evidence.findMany({
         where: {
             tenantId: ctx.tenantId,
             nextReviewDate: { not: null, gte: range.from, lte: range.to },
@@ -222,12 +230,13 @@ async function loadEvidenceEvents(
 }
 
 async function loadPolicyEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
     limit: number,
 ): Promise<CalendarEvent[]> {
-    const rows = await prisma.policy.findMany({
+    const rows = await db.policy.findMany({
         where: {
             tenantId: ctx.tenantId,
             nextReviewAt: { not: null, gte: range.from, lte: range.to },
@@ -260,12 +269,13 @@ async function loadPolicyEvents(
 }
 
 async function loadVendorEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
     limit: number,
 ): Promise<CalendarEvent[]> {
-    const rows = await prisma.vendor.findMany({
+    const rows = await db.vendor.findMany({
         where: {
             tenantId: ctx.tenantId,
             OR: [
@@ -337,12 +347,13 @@ async function loadVendorEvents(
 }
 
 async function loadVendorDocumentEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
     limit: number,
 ): Promise<CalendarEvent[]> {
-    const rows = await prisma.vendorDocument.findMany({
+    const rows = await db.vendorDocument.findMany({
         where: {
             tenantId: ctx.tenantId,
             validTo: { not: null, gte: range.from, lte: range.to },
@@ -375,6 +386,7 @@ async function loadVendorDocumentEvents(
 }
 
 async function loadAuditCycleEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
@@ -383,7 +395,7 @@ async function loadAuditCycleEvents(
     // AuditCycle is the only duration source today: emits an event with
     // `start` (periodStartAt) and `end` (periodEndAt). Either bound
     // intersecting the queried range surfaces the cycle.
-    const rows = await prisma.auditCycle.findMany({
+    const rows = await db.auditCycle.findMany({
         where: {
             tenantId: ctx.tenantId,
             deletedAt: null,
@@ -434,12 +446,13 @@ async function loadAuditCycleEvents(
 }
 
 async function loadControlEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
     limit: number,
 ): Promise<CalendarEvent[]> {
-    const rows = await prisma.control.findMany({
+    const rows = await db.control.findMany({
         where: {
             tenantId: ctx.tenantId,
             deletedAt: null,
@@ -476,12 +489,13 @@ async function loadControlEvents(
 }
 
 async function loadTestPlanEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
     limit: number,
 ): Promise<CalendarEvent[]> {
-    const rows = await prisma.controlTestPlan.findMany({
+    const rows = await db.controlTestPlan.findMany({
         where: {
             tenantId: ctx.tenantId,
             status: 'ACTIVE',
@@ -519,12 +533,13 @@ async function loadTestPlanEvents(
 }
 
 async function loadTaskEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
     limit: number,
 ): Promise<CalendarEvent[]> {
-    const rows = await prisma.task.findMany({
+    const rows = await db.task.findMany({
         where: {
             tenantId: ctx.tenantId,
             dueAt: { not: null, gte: range.from, lte: range.to },
@@ -562,12 +577,13 @@ async function loadTaskEvents(
 }
 
 async function loadRiskEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
     limit: number,
 ): Promise<CalendarEvent[]> {
-    const rows = await prisma.risk.findMany({
+    const rows = await db.risk.findMany({
         where: {
             tenantId: ctx.tenantId,
             OR: [
@@ -626,12 +642,13 @@ async function loadRiskEvents(
 }
 
 async function loadFindingEvents(
+    db: PrismaTx,
     ctx: RequestContext,
     range: DateRange,
     now: Date,
     limit: number,
 ): Promise<CalendarEvent[]> {
-    const rows = await prisma.finding.findMany({
+    const rows = await db.finding.findMany({
         where: {
             tenantId: ctx.tenantId,
             dueDate: { not: null, gte: range.from, lte: range.to },
@@ -688,54 +705,60 @@ export async function getUpcomingDeadlineCount(
 
     // Count, don't fetch — we only need a number for the badge. The
     // `take: MAX_BADGE_COUNT + 1` pattern lets us know if the real
-    // number exceeds the cap without doing a full COUNT.
-    const [tasks, controls, evidence, policies, vendors] = await Promise.all([
-        prisma.task.count({
-            where: {
-                tenantId: ctx.tenantId,
-                dueAt: { not: null, lte: horizon },
-                status: { notIn: ['RESOLVED', 'CLOSED', 'CANCELED'] },
-            },
-            take: MAX_BADGE_COUNT + 1,
-        }),
-        prisma.control.count({
-            where: {
-                tenantId: ctx.tenantId,
-                deletedAt: null,
-                applicability: 'APPLICABLE',
-                nextDueAt: { not: null, lte: horizon },
-                status: { notIn: ['IMPLEMENTED', 'NOT_APPLICABLE'] },
-            },
-            take: MAX_BADGE_COUNT + 1,
-        }),
-        prisma.evidence.count({
-            where: {
-                tenantId: ctx.tenantId,
-                nextReviewDate: { not: null, lte: horizon },
-                status: { not: 'APPROVED' },
-            },
-            take: MAX_BADGE_COUNT + 1,
-        }),
-        prisma.policy.count({
-            where: {
-                tenantId: ctx.tenantId,
-                nextReviewAt: { not: null, lte: horizon },
-                status: { not: 'ARCHIVED' },
-            },
-            take: MAX_BADGE_COUNT + 1,
-        }),
-        prisma.vendor.count({
-            where: {
-                tenantId: ctx.tenantId,
-                status: { not: 'OFFBOARDED' },
-                OR: [
-                    { nextReviewAt: { not: null, lte: horizon } },
-                    { contractRenewalAt: { not: null, lte: horizon } },
-                ],
-            },
-            take: MAX_BADGE_COUNT + 1,
-        }),
-    ]);
+    // number exceeds the cap without doing a full COUNT. Wrapped in
+    // `runInTenantContext` so the read goes through RLS-bound `app_user`.
+    const [tasks, controls, evidence, policies, vendors] =
+        await runInTenantContext(ctx, (db) =>
+            Promise.all([
+                db.task.count({
+                    where: {
+                        tenantId: ctx.tenantId,
+                        dueAt: { not: null, lte: horizon },
+                        status: {
+                            notIn: TERMINAL_WORK_ITEM_STATUSES as unknown as string[],
+                        },
+                    },
+                    take: MAX_BADGE_COUNT + 1,
+                }),
+                db.control.count({
+                    where: {
+                        tenantId: ctx.tenantId,
+                        deletedAt: null,
+                        applicability: 'APPLICABLE',
+                        nextDueAt: { not: null, lte: horizon },
+                        status: { notIn: ['IMPLEMENTED', 'NOT_APPLICABLE'] },
+                    },
+                    take: MAX_BADGE_COUNT + 1,
+                }),
+                db.evidence.count({
+                    where: {
+                        tenantId: ctx.tenantId,
+                        nextReviewDate: { not: null, lte: horizon },
+                        status: { not: 'APPROVED' },
+                    },
+                    take: MAX_BADGE_COUNT + 1,
+                }),
+                db.policy.count({
+                    where: {
+                        tenantId: ctx.tenantId,
+                        nextReviewAt: { not: null, lte: horizon },
+                        status: { not: 'ARCHIVED' },
+                    },
+                    take: MAX_BADGE_COUNT + 1,
+                }),
+                db.vendor.count({
+                    where: {
+                        tenantId: ctx.tenantId,
+                        status: { not: 'OFFBOARDED' },
+                        OR: [
+                            { nextReviewAt: { not: null, lte: horizon } },
+                            { contractRenewalAt: { not: null, lte: horizon } },
+                        ],
+                    },
+                    take: MAX_BADGE_COUNT + 1,
+                }),
+            ]),
+        );
 
     return Math.min(
         MAX_BADGE_COUNT + 1,

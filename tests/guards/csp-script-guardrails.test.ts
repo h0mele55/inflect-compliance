@@ -18,6 +18,13 @@ const SRC_DIR = path.resolve(__dirname, '../../src');
 // Dub-ported files with known CSP patterns that are safe in context
 const CSP_ALLOWLIST = new Set([
     'components/ui/form.tsx', // Dub-ported — dangerouslySetInnerHTML for pre-sanitized helpText
+    // Epic 45.2 — policy detail renders the published HTML body. The
+    // body is sanitised twice (server-side on write via
+    // `sanitizePolicyContent('HTML', …)` AND client-side on render via
+    // `sanitizeRichTextHtml(...)` — defence in depth). Both calls
+    // funnel through the same DOMPurify allowlist; widening the
+    // allowlist requires a security review.
+    'app/t/[tenantSlug]/(app)/policies/[policyId]/page.tsx',
 ]);
 
 // ── Helpers ──────────────────────────────────────────────────────────
