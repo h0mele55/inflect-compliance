@@ -1,0 +1,237 @@
+/**
+ * Epic 49 — render tests for the calendar UI surfaces.
+ *
+ * Covers:
+ *   - CalendarHeatmap — bucketing, click-through, sparse data
+ *   - CalendarMonth — event dots, multi-event days, +N more, today ring
+ *   - GanttTimeline — duration bars, today marker, empty state
+ */
+
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import * as React from 'react';
+
+jest.mock('next/navigation', () => ({
+    useRouter: () => ({
+        push: jest.fn(),
+        replace: jest.fn(),
+        back: jest.fn(),
+        forward: jest.fn(),
+        refresh: jest.fn(),
+        prefetch: jest.fn(),
+    }),
+    usePathname: () => '/t/acme/calendar',
+    useSearchParams: () => new URLSearchParams(),
+    useParams: () => ({ tenantSlug: 'acme' }),
+}));
+
+import { CalendarHeatmap } from '@/components/ui/CalendarHeatmap';
+import { CalendarMonth } from '@/components/ui/CalendarMonth';
+import { GanttTimeline } from '@/components/ui/GanttTimeline';
+import type { CalendarEvent } from '@/app-layer/schemas/calendar.schemas';
+
+function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+    return {
+        id: 'TASK:t-1:task-due',
+        type: 'task-due',
+        category: 'task',
+        title: 'Task due',
+        date: '2026-06-15T00:00:00.000Z',
+        status: 'scheduled',
+        entityType: 'TASK',
+        entityId: 't-1',
+        href: '/t/acme/tasks/t-1',
+        ...overrides,
+    };
+}
+
+// ─── CalendarHeatmap ─────────────────────────────────────────────────
+
+describe('<CalendarHeatmap />', () => {
+    const FROM = new Date('2026-01-01T00:00:00Z');
+    const TO = new Date('2026-03-31T00:00:00Z');
+
+    it('renders a cell for every day in the range with intensity buckets', () => {
+        const events = [
+            makeEvent({ id: '1', date: '2026-02-15T00:00:00.000Z' }),
+            makeEvent({ id: '2', date: '2026-02-15T12:00:00.000Z' }),
+            makeEvent({ id: '3', date: '2026-02-15T18:00:00.000Z' }),
+            makeEvent({ id: '4', date: '2026-03-01T00:00:00.000Z' }),
+        ];
+        const { container } = render(
+            <CalendarHeatmap from={FROM} to={TO} events={events} />,
+        );
+        // 4 events distributed across 2 days. The day with 3 events
+        // should bucket at intensity 4 (max-density).
+        const cell0215 = container.querySelector(
+            'button[data-ymd="2026-02-15"]',
+        ) as HTMLElement;
+        expect(cell0215).toBeInTheDocument();
+        expect(cell0215.dataset.count).toBe('3');
+        expect(cell0215.dataset.intensity).toBe('4');
+        const cell0301 = container.querySelector(
+            'button[data-ymd="2026-03-01"]',
+        ) as HTMLElement;
+        expect(cell0301.dataset.count).toBe('1');
+    });
+
+    it('handles a fully sparse range without errors (zero events)', () => {
+        const { container } = render(
+            <CalendarHeatmap from={FROM} to={TO} events={[]} />,
+        );
+        expect(
+            container.querySelector('[data-testid="calendar-heatmap"]'),
+        ).toBeInTheDocument();
+        // Every cell should have intensity 0.
+        const cells = container.querySelectorAll('button[data-ymd]');
+        expect(cells.length).toBeGreaterThan(80); // ~90 days
+        cells.forEach((c) => {
+            expect((c as HTMLElement).dataset.intensity).toBe('0');
+        });
+    });
+
+    it('fires onSelectDate with YYYY-MM-DD when a cell is clicked', async () => {
+        const user = userEvent.setup();
+        const onSelectDate = jest.fn();
+        render(
+            <CalendarHeatmap
+                from={FROM}
+                to={TO}
+                events={[makeEvent({ date: '2026-02-15T00:00:00.000Z' })]}
+                onSelectDate={onSelectDate}
+            />,
+        );
+        const cell = document.querySelector(
+            'button[data-ymd="2026-02-15"]',
+        ) as HTMLElement;
+        await user.click(cell);
+        expect(onSelectDate).toHaveBeenCalledWith('2026-02-15');
+    });
+});
+
+// ─── CalendarMonth ───────────────────────────────────────────────────
+
+describe('<CalendarMonth />', () => {
+    const MONTH = new Date('2026-06-15T00:00:00Z');
+    const TODAY = new Date('2026-06-15T00:00:00Z');
+
+    it('renders 7 weekday headers + a 6×7 day grid (or 5×7 when month fits)', () => {
+        render(<CalendarMonth month={MONTH} events={[]} today={TODAY} />);
+        expect(screen.getByText('Sun')).toBeInTheDocument();
+        expect(screen.getByText('Sat')).toBeInTheDocument();
+        const grid = screen.getByTestId('calendar-month');
+        // June 2026 has 30 days. Total cells = padStart + 30 + padEnd.
+        const cells = grid.querySelectorAll('[data-ymd]');
+        expect(cells.length % 7).toBe(0);
+    });
+
+    it('renders one event dot per event and respects maxDotsPerDay overflow', () => {
+        const events: CalendarEvent[] = Array.from({ length: 5 }).map((_, i) =>
+            makeEvent({
+                id: `t-${i}`,
+                date: '2026-06-15T00:00:00.000Z',
+                title: `Event ${i}`,
+            }),
+        );
+        const { container } = render(
+            <CalendarMonth
+                month={MONTH}
+                events={events}
+                today={TODAY}
+                maxDotsPerDay={3}
+            />,
+        );
+        const cell = container.querySelector('[data-ymd="2026-06-15"]')!;
+        const eventLinks = cell.querySelectorAll('[data-event-id]');
+        expect(eventLinks).toHaveLength(3);
+        expect(cell.textContent).toMatch(/\+2 more/);
+    });
+
+    it('marks today with the data-today attribute', () => {
+        const { container } = render(
+            <CalendarMonth month={MONTH} events={[]} today={TODAY} />,
+        );
+        const todayCell = container.querySelector('[data-today="true"]');
+        expect(todayCell).toBeInTheDocument();
+        expect(todayCell?.getAttribute('data-ymd')).toBe('2026-06-15');
+    });
+
+    it('fires onSelectDate when a day-number button is clicked', async () => {
+        const user = userEvent.setup();
+        const onSelectDate = jest.fn();
+        render(
+            <CalendarMonth
+                month={MONTH}
+                events={[]}
+                today={TODAY}
+                onSelectDate={onSelectDate}
+            />,
+        );
+        // Click day 15 button. The label includes "<ymd>: 0 events".
+        const dayBtn = screen.getByRole('button', {
+            name: /2026-06-15: 0 events/i,
+        });
+        await user.click(dayBtn);
+        expect(onSelectDate).toHaveBeenCalledWith('2026-06-15');
+    });
+});
+
+// ─── GanttTimeline ───────────────────────────────────────────────────
+
+describe('<GanttTimeline />', () => {
+    const FROM = new Date('2026-01-01T00:00:00Z');
+    const TO = new Date('2026-12-31T00:00:00Z');
+    const TODAY = new Date('2026-06-15T00:00:00Z');
+
+    it('renders a bar per duration event', () => {
+        const events = [
+            makeEvent({
+                id: 'AUDIT_CYCLE:c-1:audit-cycle',
+                category: 'audit',
+                title: 'Q3 SOC2',
+                date: '2026-06-01T00:00:00.000Z',
+                end: '2026-08-31T00:00:00.000Z',
+                entityType: 'AUDIT_CYCLE',
+                entityId: 'c-1',
+                href: '/t/acme/audits/cycles/c-1',
+            }),
+        ];
+        render(
+            <GanttTimeline
+                from={FROM}
+                to={TO}
+                events={events}
+                today={TODAY}
+            />,
+        );
+        const bar = screen.getByRole('listitem');
+        expect(bar).toBeInTheDocument();
+        expect(bar.textContent).toContain('Q3 SOC2');
+    });
+
+    it('renders the today marker when today falls inside the range', () => {
+        render(
+            <GanttTimeline
+                from={FROM}
+                to={TO}
+                events={[
+                    makeEvent({
+                        id: 'AUDIT_CYCLE:c-1:audit-cycle',
+                        category: 'audit',
+                        title: 'A',
+                        date: '2026-06-01T00:00:00.000Z',
+                        end: '2026-08-31T00:00:00.000Z',
+                    }),
+                ]}
+                today={TODAY}
+            />,
+        );
+        expect(screen.getByTestId('gantt-today-marker')).toBeInTheDocument();
+    });
+
+    it('renders the empty state when no events are in range', () => {
+        render(<GanttTimeline from={FROM} to={TO} events={[]} today={TODAY} />);
+        const root = screen.getByTestId('gantt-timeline');
+        expect(root.textContent).toMatch(/no timeline events/i);
+    });
+});

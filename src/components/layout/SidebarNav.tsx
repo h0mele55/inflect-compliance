@@ -24,8 +24,10 @@ import {
     Settings,
     LogOut,
     Bell,
+    Calendar as CalendarIcon,
     type LucideIcon,
 } from 'lucide-react';
+import { useCalendarBadge } from './use-calendar-badge';
 
 // ─── Types ───
 
@@ -49,6 +51,9 @@ export function useNavSections(): NavSectionDef[] {
     const t = useTranslations('nav');
     const tenantHref = useTenantHref();
     const perms = usePermissions();
+    const tenant = useTenantContext();
+    // Live badge — fetched lazily; undefined when count is 0 or load fails.
+    const calendarBadge = useCalendarBadge(tenant.tenantSlug);
 
     return [
         {
@@ -61,6 +66,12 @@ export function useNavSections(): NavSectionDef[] {
                 { href: tenantHref('/policies'), label: t('policies'), icon: FileText },
                 { href: tenantHref('/tasks'), label: t('tasks'), icon: ClipboardList },
                 { href: tenantHref('/tests'), label: 'Test', icon: FlaskConical },
+                {
+                    href: tenantHref('/calendar'),
+                    label: 'Calendar',
+                    icon: CalendarIcon,
+                    badge: calendarBadge,
+                },
             ],
         },
         {

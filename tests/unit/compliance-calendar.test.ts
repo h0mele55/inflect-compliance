@@ -1,0 +1,404 @@
+/**
+ * Epic 49 — `getComplianceCalendarEvents` usecase tests.
+ *
+ * Verifies the unified-aggregation behaviour:
+ *
+ *   1. Each source contributes events with the right shape (category,
+ *      type, entityType, href).
+ *   2. Mixed sources merge into one chronologically-sorted stream.
+ *   3. Status classification is correct (scheduled/due_soon/overdue/done).
+ *   4. Duration events (audit-cycle) carry both `date` and `end`.
+ *   5. The type / category filters narrow the output.
+ *   6. Tenant filter is applied to every Prisma call (regression guard).
+ *   7. The empty-range case returns zero events without throwing.
+ *   8. The badge count helper short-circuits at 99+.
+ */
+
+export {};
+
+const TENANT_ID = 'tenant-1';
+const TENANT_SLUG = 'acme';
+const OWNER = 'user-owner';
+
+// ─── Mocks ────────────────────────────────────────────────────────────
+
+const mockEvidenceFindMany = jest.fn();
+const mockPolicyFindMany = jest.fn();
+const mockVendorFindMany = jest.fn();
+const mockVendorDocFindMany = jest.fn();
+const mockAuditCycleFindMany = jest.fn();
+const mockControlFindMany = jest.fn();
+const mockTestPlanFindMany = jest.fn();
+const mockTaskFindMany = jest.fn();
+const mockRiskFindMany = jest.fn();
+const mockFindingFindMany = jest.fn();
+
+const mockTaskCount = jest.fn().mockResolvedValue(0);
+const mockControlCount = jest.fn().mockResolvedValue(0);
+const mockEvidenceCount = jest.fn().mockResolvedValue(0);
+const mockPolicyCount = jest.fn().mockResolvedValue(0);
+const mockVendorCount = jest.fn().mockResolvedValue(0);
+
+beforeEach(() => {
+    jest.resetModules();
+    jest.clearAllMocks();
+    [
+        mockEvidenceFindMany,
+        mockPolicyFindMany,
+        mockVendorFindMany,
+        mockVendorDocFindMany,
+        mockAuditCycleFindMany,
+        mockControlFindMany,
+        mockTestPlanFindMany,
+        mockTaskFindMany,
+        mockRiskFindMany,
+        mockFindingFindMany,
+    ].forEach((m) => m.mockReset().mockResolvedValue([]));
+    [
+        mockTaskCount,
+        mockControlCount,
+        mockEvidenceCount,
+        mockPolicyCount,
+        mockVendorCount,
+    ].forEach((m) => m.mockReset().mockResolvedValue(0));
+
+    jest.mock('@/lib/prisma', () => ({
+        __esModule: true,
+        prisma: {
+            evidence: {
+                findMany: (...a: unknown[]) => mockEvidenceFindMany(...a),
+                count: (...a: unknown[]) => mockEvidenceCount(...a),
+            },
+            policy: {
+                findMany: (...a: unknown[]) => mockPolicyFindMany(...a),
+                count: (...a: unknown[]) => mockPolicyCount(...a),
+            },
+            vendor: {
+                findMany: (...a: unknown[]) => mockVendorFindMany(...a),
+                count: (...a: unknown[]) => mockVendorCount(...a),
+            },
+            vendorDocument: {
+                findMany: (...a: unknown[]) => mockVendorDocFindMany(...a),
+            },
+            auditCycle: {
+                findMany: (...a: unknown[]) => mockAuditCycleFindMany(...a),
+            },
+            control: {
+                findMany: (...a: unknown[]) => mockControlFindMany(...a),
+                count: (...a: unknown[]) => mockControlCount(...a),
+            },
+            controlTestPlan: {
+                findMany: (...a: unknown[]) => mockTestPlanFindMany(...a),
+            },
+            task: {
+                findMany: (...a: unknown[]) => mockTaskFindMany(...a),
+                count: (...a: unknown[]) => mockTaskCount(...a),
+            },
+            risk: {
+                findMany: (...a: unknown[]) => mockRiskFindMany(...a),
+            },
+            finding: {
+                findMany: (...a: unknown[]) => mockFindingFindMany(...a),
+            },
+        },
+    }));
+});
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+function makeCtx() {
+    return {
+        requestId: 'req-1',
+        userId: 'user-1',
+        tenantId: TENANT_ID,
+        tenantSlug: TENANT_SLUG,
+        role: 'EDITOR',
+        permissions: {
+            canRead: true,
+            canWrite: true,
+            canAdmin: false,
+            canAudit: false,
+            canExport: false,
+        },
+        appPermissions: {} as unknown,
+    };
+}
+
+const NOW = new Date('2026-06-01T00:00:00Z');
+const FROM = new Date('2026-05-01T00:00:00Z');
+const TO = new Date('2026-08-01T00:00:00Z');
+
+// ─── Test cases ──────────────────────────────────────────────────────
+
+describe('getComplianceCalendarEvents — aggregation', () => {
+    it('returns an empty stream when every source is empty', async () => {
+        const { getComplianceCalendarEvents } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        const result = await getComplianceCalendarEvents(makeCtx() as never, {
+            from: FROM,
+            to: TO,
+            now: NOW,
+        });
+        expect(result.events).toEqual([]);
+        expect(result.counts.total).toBe(0);
+    });
+
+    it('always filters every Prisma query by tenantId (defense-in-depth)', async () => {
+        const { getComplianceCalendarEvents } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        await getComplianceCalendarEvents(makeCtx() as never, {
+            from: FROM,
+            to: TO,
+            now: NOW,
+        });
+        for (const m of [
+            mockEvidenceFindMany,
+            mockPolicyFindMany,
+            mockVendorFindMany,
+            mockVendorDocFindMany,
+            mockAuditCycleFindMany,
+            mockControlFindMany,
+            mockTestPlanFindMany,
+            mockTaskFindMany,
+            mockRiskFindMany,
+            mockFindingFindMany,
+        ]) {
+            expect(m).toHaveBeenCalled();
+            const call = m.mock.calls[0][0] as { where: { tenantId: string } };
+            expect(call.where.tenantId).toBe(TENANT_ID);
+        }
+    });
+
+    it('normalises mixed-source events into one stream sorted by date', async () => {
+        mockEvidenceFindMany.mockResolvedValue([
+            {
+                id: 'ev-1',
+                title: 'SOC2 Evidence',
+                nextReviewDate: new Date('2026-06-15T00:00:00Z'),
+                status: 'SUBMITTED',
+                ownerUserId: OWNER,
+            },
+        ]);
+        mockPolicyFindMany.mockResolvedValue([
+            {
+                id: 'pol-1',
+                title: 'Acceptable Use',
+                nextReviewAt: new Date('2026-05-20T00:00:00Z'),
+                status: 'PUBLISHED',
+            },
+        ]);
+        mockTaskFindMany.mockResolvedValue([
+            {
+                id: 'task-1',
+                title: 'Review access logs',
+                dueAt: new Date('2026-07-01T00:00:00Z'),
+                status: 'OPEN',
+                assigneeUserId: OWNER,
+            },
+        ]);
+
+        const { getComplianceCalendarEvents } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        const result = await getComplianceCalendarEvents(makeCtx() as never, {
+            from: FROM,
+            to: TO,
+            now: NOW,
+        });
+
+        expect(result.events).toHaveLength(3);
+        expect(result.events.map((e) => e.type)).toEqual([
+            'policy-review',
+            'evidence-review',
+            'task-due',
+        ]);
+        expect(result.counts.total).toBe(3);
+        expect(result.counts.byCategory.policy).toBe(1);
+        expect(result.counts.byCategory.evidence).toBe(1);
+        expect(result.counts.byCategory.task).toBe(1);
+    });
+
+    it('classifies status correctly: overdue vs due_soon vs scheduled', async () => {
+        mockTaskFindMany.mockResolvedValue([
+            {
+                id: 't-overdue',
+                title: 'past',
+                dueAt: new Date('2026-05-15T00:00:00Z'), // pre-now
+                status: 'OPEN',
+                assigneeUserId: null,
+            },
+            {
+                id: 't-soon',
+                title: 'in 5 days',
+                dueAt: new Date('2026-06-06T00:00:00Z'), // +5d
+                status: 'OPEN',
+                assigneeUserId: null,
+            },
+            {
+                id: 't-far',
+                title: 'in 40 days',
+                dueAt: new Date('2026-07-15T00:00:00Z'),
+                status: 'OPEN',
+                assigneeUserId: null,
+            },
+            {
+                id: 't-done',
+                title: 'closed',
+                dueAt: new Date('2026-06-15T00:00:00Z'),
+                status: 'CLOSED',
+                assigneeUserId: null,
+            },
+        ]);
+        const { getComplianceCalendarEvents } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        const result = await getComplianceCalendarEvents(makeCtx() as never, {
+            from: FROM,
+            to: TO,
+            now: NOW,
+        });
+        const byId = Object.fromEntries(
+            result.events.map((e) => [e.entityId, e.status]),
+        );
+        expect(byId['t-overdue']).toBe('overdue');
+        expect(byId['t-soon']).toBe('due_soon');
+        expect(byId['t-far']).toBe('scheduled');
+        expect(byId['t-done']).toBe('done');
+    });
+
+    it('emits audit cycles with both `date` and `end` (duration shape)', async () => {
+        mockAuditCycleFindMany.mockResolvedValue([
+            {
+                id: 'cyc-1',
+                name: 'Q3 SOC2',
+                frameworkKey: 'SOC2',
+                periodStartAt: new Date('2026-06-01T00:00:00Z'),
+                periodEndAt: new Date('2026-08-31T00:00:00Z'),
+                status: 'IN_PROGRESS',
+            },
+        ]);
+        const { getComplianceCalendarEvents } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        const result = await getComplianceCalendarEvents(makeCtx() as never, {
+            from: FROM,
+            to: TO,
+            now: NOW,
+        });
+        expect(result.events).toHaveLength(1);
+        const ev = result.events[0];
+        expect(ev.type).toBe('audit-cycle');
+        expect(ev.category).toBe('audit');
+        expect(ev.date).toBe('2026-06-01T00:00:00.000Z');
+        expect(ev.end).toBe('2026-08-31T00:00:00.000Z');
+        expect(ev.href).toBe('/t/acme/audits/cycles/cyc-1');
+    });
+
+    it('vendor returns BOTH a review event AND a renewal event when both dates fall in range', async () => {
+        mockVendorFindMany.mockResolvedValue([
+            {
+                id: 'v-1',
+                name: 'AWS',
+                nextReviewAt: new Date('2026-06-10T00:00:00Z'),
+                contractRenewalAt: new Date('2026-07-15T00:00:00Z'),
+                status: 'ACTIVE',
+                ownerUserId: OWNER,
+            },
+        ]);
+        const { getComplianceCalendarEvents } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        const result = await getComplianceCalendarEvents(makeCtx() as never, {
+            from: FROM,
+            to: TO,
+            now: NOW,
+        });
+        expect(result.events.map((e) => e.type)).toEqual([
+            'vendor-review',
+            'vendor-renewal',
+        ]);
+    });
+
+    it('applies the `types` filter to narrow results post-aggregation', async () => {
+        mockEvidenceFindMany.mockResolvedValue([
+            {
+                id: 'ev-1',
+                title: 'X',
+                nextReviewDate: new Date('2026-06-15T00:00:00Z'),
+                status: 'SUBMITTED',
+                ownerUserId: null,
+            },
+        ]);
+        mockTaskFindMany.mockResolvedValue([
+            {
+                id: 't-1',
+                title: 'Y',
+                dueAt: new Date('2026-06-15T00:00:00Z'),
+                status: 'OPEN',
+                assigneeUserId: null,
+            },
+        ]);
+
+        const { getComplianceCalendarEvents } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        const result = await getComplianceCalendarEvents(makeCtx() as never, {
+            from: FROM,
+            to: TO,
+            now: NOW,
+            types: ['task-due'],
+        });
+        expect(result.events).toHaveLength(1);
+        expect(result.events[0].type).toBe('task-due');
+    });
+
+    it('embeds tenantSlug into the href so client navigation works without slug plumbing', async () => {
+        mockTaskFindMany.mockResolvedValue([
+            {
+                id: 't-1',
+                title: 'a',
+                dueAt: new Date('2026-06-15T00:00:00Z'),
+                status: 'OPEN',
+                assigneeUserId: null,
+            },
+        ]);
+        const { getComplianceCalendarEvents } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        const result = await getComplianceCalendarEvents(makeCtx() as never, {
+            from: FROM,
+            to: TO,
+            now: NOW,
+        });
+        expect(result.events[0].href).toBe('/t/acme/tasks/t-1');
+    });
+});
+
+describe('getUpcomingDeadlineCount — sidebar badge', () => {
+    it('sums per-source counts and caps at 99+', async () => {
+        mockTaskCount.mockResolvedValue(50);
+        mockControlCount.mockResolvedValue(40);
+        mockEvidenceCount.mockResolvedValue(20);
+        mockPolicyCount.mockResolvedValue(0);
+        mockVendorCount.mockResolvedValue(0);
+        const { getUpcomingDeadlineCount } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        const count = await getUpcomingDeadlineCount(makeCtx() as never);
+        // 50 + 40 + 20 = 110 → capped at 100 (MAX_BADGE_COUNT + 1).
+        expect(count).toBe(100);
+    });
+
+    it('returns the real total when below the cap', async () => {
+        mockTaskCount.mockResolvedValue(3);
+        mockControlCount.mockResolvedValue(2);
+        mockEvidenceCount.mockResolvedValue(1);
+        const { getUpcomingDeadlineCount } = await import(
+            '@/app-layer/usecases/compliance-calendar'
+        );
+        const count = await getUpcomingDeadlineCount(makeCtx() as never);
+        expect(count).toBe(6);
+    });
+});

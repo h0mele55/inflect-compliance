@@ -105,12 +105,32 @@ export async function runNotificationDispatch(
                     itemCount: items.length,
                 });
             } else {
-                const { runDeadlineMonitor } = await import('./deadline-monitor');
-                const monitor = await runDeadlineMonitor({
-                    tenantId: payload.tenantId,
-                    windows: payload.windows,
-                });
-                items = monitor.items;
+                // The base deadline-monitor covers
+                // Control/Policy/Task/Risk/TestPlan. Epic 49 adds the
+                // calendar-deadlines monitor for AuditCycle /
+                // VendorDocument / Finding — three sources that
+                // weren't previously scanned. Run them in parallel and
+                // merge into the same DEADLINE_DIGEST stream so the
+                // existing per-day per-recipient dedupe still applies
+                // (one digest per day, not one-per-source).
+                const [
+                    { runDeadlineMonitor },
+                    { runCalendarDeadlineMonitor },
+                ] = await Promise.all([
+                    import('./deadline-monitor'),
+                    import('./calendar-deadlines'),
+                ]);
+                const [base, calendar] = await Promise.all([
+                    runDeadlineMonitor({
+                        tenantId: payload.tenantId,
+                        windows: payload.windows,
+                    }),
+                    runCalendarDeadlineMonitor({
+                        tenantId: payload.tenantId,
+                        windows: payload.windows,
+                    }),
+                ]);
+                items = [...base.items, ...calendar.items];
                 scanSource.deadlines = 'scanned';
             }
 

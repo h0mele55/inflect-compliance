@@ -70,4 +70,11 @@ export const queryKeys = {
         list: (tenantSlug: string) =>
             ['members', tenantSlug, 'list'] as const,
     },
+    calendar: {
+        all: (tenantSlug: string) => ['calendar', tenantSlug] as const,
+        range: (tenantSlug: string, from: string, to: string) =>
+            ['calendar', tenantSlug, 'range', from, to] as const,
+        upcomingCount: (tenantSlug: string) =>
+            ['calendar', tenantSlug, 'upcoming-count'] as const,
+    },
 } as const;

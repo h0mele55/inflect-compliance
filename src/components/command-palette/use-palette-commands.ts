@@ -31,6 +31,7 @@
 
 import {
     Activity,
+    Calendar as CalendarIcon,
     ClipboardList,
     FileText,
     Layers,
@@ -118,6 +119,13 @@ export function usePaletteCommands(tenantSlug: string | null): PaletteCommand[] 
                 label: 'Go to Tasks',
                 icon: ClipboardList,
                 href: href('/tasks'),
+            },
+            {
+                id: 'nav:calendar',
+                group: 'Navigation',
+                label: 'Go to Calendar',
+                icon: CalendarIcon,
+                href: href('/calendar'),
             },
             {
                 id: 'nav:frameworks',
