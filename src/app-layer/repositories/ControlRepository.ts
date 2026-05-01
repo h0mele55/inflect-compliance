@@ -29,7 +29,7 @@ export class ControlRepository {
                 orderBy: [{ code: 'asc' }, { annexId: 'asc' }],
                 include: {
                     owner: { select: { id: true, name: true, email: true } },
-                    _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
+                    _count: { select: { controlTasks: true, evidenceLinks: true } },
                 },
             });
         });
@@ -52,7 +52,7 @@ export class ControlRepository {
                 take: limit + 1,
                 include: {
                     owner: { select: { id: true, name: true, email: true } },
-                    _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
+                    _count: { select: { controlTasks: true, evidenceLinks: true } },
                 },
             });
 
@@ -87,6 +87,15 @@ export class ControlRepository {
 
     static async getById(db: PrismaTx, ctx: RequestContext, id: string) {
         return traceRepository('control.getById', ctx, async () => {
+            // `risks`, `policyLinks`, and `_count` are deliberately
+            // omitted — they were eager-loaded historically but no
+            // caller ever reads them off the detail payload (the page
+            // computes badge counts from `.length` on the kept arrays;
+            // TraceabilityPanel/TestPlansPanel run their own fetches).
+            // The bigger tab-lazy refactor (drop controlTasks /
+            // evidenceLinks / evidence / frameworkMappings arrays in
+            // favour of per-tab fetches) is bounded follow-up; safe
+            // trim landed here cuts the unused subqueries today.
             return db.control.findFirst({
                 where: {
                     id,
@@ -100,10 +109,7 @@ export class ControlRepository {
                     controlTasks: { orderBy: { createdAt: 'desc' }, include: { assignee: { select: { id: true, name: true, email: true } } } },
                     evidenceLinks: { orderBy: { createdAt: 'desc' }, include: { createdBy: { select: { id: true, name: true } } } },
                     evidence: { where: { tenantId: ctx.tenantId }, orderBy: { createdAt: 'desc' } },
-                    risks: { include: { risk: { select: { id: true, title: true, inherentScore: true } } } },
-                    policyLinks: { include: { policy: { select: { id: true, title: true, status: true } } } },
                     frameworkMappings: { include: { fromRequirement: { include: { framework: { select: { name: true } } } } } },
-                    _count: { select: { evidence: true, risks: true, assets: true, controlTasks: true, evidenceLinks: true, contributors: true } },
                 },
             });
         });

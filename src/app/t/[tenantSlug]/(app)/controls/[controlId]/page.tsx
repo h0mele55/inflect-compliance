@@ -23,7 +23,6 @@ import {
     toYMD,
 } from '@/components/ui/date-picker/date-utils';
 import dynamic from 'next/dynamic';
-import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout';
 
 const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
@@ -31,6 +30,10 @@ const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel')
     ssr: false,
 });
 const TestPlansPanel = dynamic(() => import('@/components/TestPlansPanel'), {
+    loading: () => <div className="glass-card p-6 animate-pulse h-48" aria-busy="true" />,
+    ssr: false,
+});
+const LinkedTasksPanel = dynamic(() => import('@/components/LinkedTasksPanel'), {
     loading: () => <div className="glass-card p-6 animate-pulse h-48" aria-busy="true" />,
     ssr: false,
 });

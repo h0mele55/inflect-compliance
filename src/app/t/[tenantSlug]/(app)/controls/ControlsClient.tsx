@@ -235,7 +235,8 @@ function ControlsPageInner({
             return res.json();
         },
         initialData: filtersMatchInitial ? initialControls : undefined,
-        initialDataUpdatedAt: 0,
+        initialDataUpdatedAt: filtersMatchInitial ? Date.now() : 0,
+        staleTime: 30_000,
     });
 
     const controls = controlsQuery.data ?? [];
