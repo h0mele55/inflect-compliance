@@ -23,6 +23,7 @@ import {
     Settings,
     LogOut,
     Bell,
+    Network,
     type LucideIcon,
 } from 'lucide-react';
 
@@ -58,6 +59,7 @@ export function useNavSections(): NavSectionDef[] {
                 { href: tenantHref('/controls'), label: t('controls'), icon: ShieldCheck },
                 { href: tenantHref('/evidence'), label: t('evidence'), icon: Paperclip },
                 { href: tenantHref('/policies'), label: t('policies'), icon: FileText },
+                { href: tenantHref('/traceability'), label: 'Traceability', icon: Network },
                 { href: tenantHref('/tasks'), label: t('tasks'), icon: ClipboardList },
                 { href: tenantHref('/tests'), label: 'Test', icon: FlaskConical },
             ],

@@ -189,10 +189,11 @@ test.describe('Framework Coverage UI', () => {
     test('Epic 46.3 — compliance status indicators paint on tree rows', async () => {
         await page.locator('#tab-requirements').click();
         await expect(page.locator('#framework-explorer')).toBeVisible({ timeout: 30_000 });
-        await page.locator('#framework-explorer-toggle-expand').click();
-        // Status indicators carry a `data-status="<value>"` attr. At
-        // least one should be present somewhere in the tree, with a
-        // value from the documented enum.
+        // Section rows render their aggregated status dot whether
+        // expanded OR collapsed — no need to flip the tree state.
+        // Earlier tests in this serial suite may leave expand-all
+        // already in 'all' state (which disables the toggle button),
+        // so we don't attempt to click it.
         const indicators = page.locator(
             '#framework-explorer-tree-scroll [data-status]',
         );
