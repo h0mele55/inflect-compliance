@@ -1,177 +1,155 @@
 /**
- * Epic 47.2 — structural ratchet for the new tenant-wide
- * traceability page + the GraphExplorer's a11y / search wiring.
+ * Sankey-only page composition + traceability-page removal ratchet.
  *
- * The interactive features (search dimming, kind filter, view
- * toggle, table view) need DOM rendering to test end-to-end. The
- * E2E spec covers behaviour; this ratchet locks the COMPOSITION
- * so a future "simplify" PR can't quietly strip these surfaces.
+ * The standalone /traceability page (graph + table + sankey
+ * toggle) was rolled back. The Sankey is the surviving surface,
+ * reachable from a pill button on the Controls list and rendered
+ * at /controls/sankey.
+ *
+ * This file locks:
+ *   - the /traceability route is gone
+ *   - SidebarNav + cmdk palette have no Traceability nav target
+ *   - the Sankey page mounts <SankeyChart> with the typed graph
+ *   - the controls pill links to /controls/sankey
+ *   - the GraphExplorer (still exported by the codebase, used
+ *     by callers that want a generic React Flow wrapper later)
+ *     keeps its public surface
+ *   - the category-defaults palette stays accessible (downstream
+ *     surfaces still consume it for legend rendering)
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 
-const PAGE = path.resolve(
+const SANKEY_PAGE = path.resolve(
     __dirname,
-    '../../src/app/t/[tenantSlug]/(app)/traceability/page.tsx',
+    '../../src/app/t/[tenantSlug]/(app)/controls/sankey/page.tsx',
 );
-const CLIENT = path.resolve(
+const SANKEY_CLIENT = path.resolve(
     __dirname,
-    '../../src/app/t/[tenantSlug]/(app)/traceability/TraceabilityClient.tsx',
+    '../../src/app/t/[tenantSlug]/(app)/controls/sankey/ControlsSankeyClient.tsx',
 );
-const EXPLORER = path.resolve(
+const CONTROLS_CLIENT = path.resolve(
     __dirname,
-    '../../src/components/ui/GraphExplorer.tsx',
-);
-const TABLE = path.resolve(
-    __dirname,
-    '../../src/components/traceability/TraceabilityGraphTable.tsx',
+    '../../src/app/t/[tenantSlug]/(app)/controls/ControlsClient.tsx',
 );
 const SIDEBAR = path.resolve(
     __dirname,
     '../../src/components/layout/SidebarNav.tsx',
 );
+const PALETTE_COMMANDS = path.resolve(
+    __dirname,
+    '../../src/components/command-palette/use-palette-commands.ts',
+);
 const TYPES = path.resolve(
     __dirname,
     '../../src/lib/traceability-graph/types.ts',
+);
+const GRAPH_EXPLORER = path.resolve(
+    __dirname,
+    '../../src/components/ui/GraphExplorer.tsx',
+);
+const DEPRECATED_TRACEABILITY_DIR = path.resolve(
+    __dirname,
+    '../../src/app/t/[tenantSlug]/(app)/traceability',
 );
 
 function read(p: string): string {
     return fs.readFileSync(p, 'utf-8');
 }
 
-describe('Traceability page — composition (Epic 47.2)', () => {
-    const page = read(PAGE);
-    const client = read(CLIENT);
+describe('Traceability page removal', () => {
+    it('the standalone /traceability page directory is gone', () => {
+        expect(fs.existsSync(DEPRECATED_TRACEABILITY_DIR)).toBe(false);
+    });
 
-    it('server page delegates to TraceabilityClient', () => {
-        expect(page).toMatch(/<TraceabilityClient\b/);
+    it('SidebarNav has no Traceability nav entry', () => {
+        const src = read(SIDEBAR);
+        expect(src).not.toMatch(/\/traceability\b/);
+        expect(src).not.toMatch(/'Traceability'/);
+    });
+
+    it('Command palette has no Traceability nav target', () => {
+        const src = read(PALETTE_COMMANDS);
+        expect(src).not.toMatch(/Go to Traceability/);
+        expect(src).not.toMatch(/'nav:traceability'/);
+    });
+});
+
+describe('Sankey page — composition', () => {
+    const page = read(SANKEY_PAGE);
+    const client = read(SANKEY_CLIENT);
+
+    it('server page delegates to ControlsSankeyClient', () => {
+        expect(page).toMatch(/<ControlsSankeyClient\b/);
         expect(page).toMatch(/getTraceabilityGraph\(/);
     });
 
-    it('client carries graph + table + sankey view toggle (Epic 47.3)', () => {
-        expect(client).toMatch(/<ToggleGroup\b/);
-        expect(client).toMatch(/value:\s*'graph'/);
-        expect(client).toMatch(/value:\s*'table'/);
-        expect(client).toMatch(/value:\s*'sankey'/);
-    });
-
-    it('mounts ALL THREE views (state preserved across toggle)', () => {
-        // Every view child is always mounted; the inactive ones
-        // are hidden via className. This is the load-bearing rule
-        // behind "filter state survives toggle" — extending it to
-        // sankey means a sankey↔table switch is also a single
-        // attribute flip with zero re-render cost.
-        expect(client).toMatch(/<GraphExplorer\b/);
-        expect(client).toMatch(/<TraceabilityGraphTable\b/);
+    it('client mounts <SankeyChart> with the typed graph', () => {
+        expect(client).toMatch(/from\s*'@\/components\/ui\/SankeyChart'/);
         expect(client).toMatch(/<SankeyChart\b/);
-        expect(client).toMatch(/data-view="graph"/);
-        expect(client).toMatch(/data-view="table"/);
-        expect(client).toMatch(/data-view="sankey"/);
+        expect(client).toMatch(/TraceabilityGraph\b/);
     });
 
-    it('owns the search query at the page level (so every view shares it)', () => {
-        expect(client).toMatch(/useState\(''\)/); // searchQuery
-        expect(client).toMatch(/searchQuery=\{searchQuery\}/);
-        // All three views receive the same prop now.
-        const matches = client.match(/searchQuery=\{searchQuery\}/g) ?? [];
-        expect(matches.length).toBeGreaterThanOrEqual(3);
+    it('does NOT mount GraphExplorer or TraceabilityGraphTable (Sankey-only by design)', () => {
+        // The other two views were the deprecated /traceability
+        // page's siblings. Re-introducing either here turns this
+        // surface back into a multi-view page, which we just
+        // rolled back.
+        expect(client).not.toMatch(/<GraphExplorer\b/);
+        expect(client).not.toMatch(/TraceabilityGraphTable/);
     });
 
-    it('owns the kind-filter Set so it survives toggling too', () => {
-        expect(client).toMatch(/activeKinds/);
-        expect(client).toMatch(/data-kind-toggle/);
-    });
-
-    it('GraphExplorer is dynamically imported with ssr=false (bundle gating)', () => {
-        // React Flow chunk is ~150KB. Pages that don't need it
-        // shouldn't pay the bandwidth.
-        expect(client).toMatch(/dynamic\(/);
-        expect(client).toMatch(/ssr:\s*false/);
+    it('keeps the back-to-controls link affordance', () => {
+        expect(client).toMatch(/controls-sankey-back/);
+        expect(client).toMatch(/\/controls['"`]/);
     });
 });
 
-describe('GraphExplorer — search + accessibility wiring', () => {
-    const src = read(EXPLORER);
+describe('Controls list — Sankey pill', () => {
+    const src = read(CONTROLS_CLIENT);
 
-    it('accepts a controlled `searchQuery` prop', () => {
-        expect(src).toMatch(/searchQuery\?:\s*string/);
+    it('renders the Sankey pill linking to /controls/sankey', () => {
+        expect(src).toMatch(/controls-sankey-btn/);
+        expect(src).toMatch(/\/controls\/sankey/);
     });
 
-    it('uses computeSearchHighlight (not an inline reducer)', () => {
-        expect(src).toMatch(/computeSearchHighlight\b/);
-    });
-
-    it('renders a no-match overlay when query yields zero hits', () => {
-        expect(src).toMatch(/data-graph-no-match/);
-    });
-
-    it('renders per-kind icon (non-color cue)', () => {
-        // The icon is the second cue alongside palette colour.
-        expect(src).toMatch(/ShieldCheck|AlertTriangle|Box|FileText|ScrollText/);
-        expect(src).toMatch(/ICON_MAP\b/);
-    });
-
-    it('renders per-kind border pattern (third cue)', () => {
-        expect(src).toMatch(/PATTERN_MAP\b/);
-        expect(src).toMatch(/border-dashed|border-double/);
-    });
-
-    it('exposes data-highlight-tier on each node for E2E dimming assertions', () => {
-        expect(src).toMatch(/data-highlight-tier/);
+    it('mounts the pill OUTSIDE the create-permission gate (read-only surface for everyone)', () => {
+        // The pill must be reachable for READER / AUDITOR / EDITOR
+        // alike — it's a glance-and-leave informational view.
+        // Locating the pill inside the `appPermissions.controls.create`
+        // ternary would silently hide it from non-admins.
+        const pillIdx = src.indexOf('controls-sankey-btn');
+        const gateIdx = src.indexOf('appPermissions.controls.create');
+        expect(pillIdx).toBeGreaterThan(0);
+        expect(gateIdx).toBeGreaterThan(0);
+        expect(pillIdx).toBeLessThan(gateIdx);
     });
 });
 
-describe('Category contract — Epic 47.2 colours + accessibility', () => {
+describe('GraphExplorer — public surface preserved', () => {
+    const src = read(GRAPH_EXPLORER);
+
+    it('still exports GraphExplorer for future callers', () => {
+        expect(src).toMatch(/export function GraphExplorer\b/);
+    });
+
+    it('preserves the typed graph contract import', () => {
+        expect(src).toMatch(/TraceabilityGraph\b/);
+    });
+});
+
+describe('Category contract — Epic 47 palette retained', () => {
     const types = read(TYPES);
 
-    it('color union matches the prompt palette + Slate fallback', () => {
-        // Required: sky (controls), rose (risks), emerald (requirements),
-        // violet (policies). Plus amber + slate as extras.
-        const required = ['sky', 'rose', 'emerald', 'violet', 'amber', 'slate'];
-        for (const c of required) {
+    it('keeps the canonical color union (downstream surfaces — Sankey, future legends — still consume it)', () => {
+        for (const c of ['sky', 'rose', 'emerald', 'violet', 'amber', 'slate']) {
             expect(types).toMatch(new RegExp(`'${c}'`));
         }
     });
 
-    it('every kind exports iconKey + pattern (non-color cues)', () => {
+    it('keeps iconKey + pattern as accessibility cues', () => {
         expect(types).toMatch(/iconKey/);
         expect(types).toMatch(/pattern/);
-    });
-
-    it('control uses sky (blue), risk uses rose (red), policy uses violet (purple)', () => {
-        // The defaults table is the authoritative source — lock the
-        // prompt's required mapping.
-        const control = types.match(/control:\s*\{[^}]*color:\s*'(\w+)'/)?.[1];
-        const risk = types.match(/risk:\s*\{[^}]*color:\s*'(\w+)'/)?.[1];
-        const policy = types.match(/policy:\s*\{[^}]*color:\s*'(\w+)'/)?.[1];
-        expect(control).toBe('sky');
-        expect(risk).toBe('rose');
-        expect(policy).toBe('violet');
-    });
-});
-
-describe('Sidebar — traceability entry', () => {
-    const src = read(SIDEBAR);
-
-    it('mounts the Traceability link in the primary nav', () => {
-        expect(src).toMatch(/\/traceability/);
-        expect(src).toMatch(/'Traceability'/);
-    });
-});
-
-describe('TraceabilityGraphTable — basic shape', () => {
-    const src = read(TABLE);
-
-    it('exposes test hooks (data-graph-table) for E2E', () => {
-        expect(src).toMatch(/data-graph-table/);
-    });
-
-    it('shows a "no relationships match" empty cell when search filters everything out', () => {
-        expect(src).toMatch(/data-graph-table-no-match/);
-    });
-
-    it('uses the same computeSearchHighlight helper as the explorer', () => {
-        expect(src).toMatch(/computeSearchHighlight\b/);
     });
 });

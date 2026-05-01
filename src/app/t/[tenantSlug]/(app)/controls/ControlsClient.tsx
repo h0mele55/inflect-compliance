@@ -666,27 +666,38 @@ function ControlsPageInner({
                     </>
                 ),
                 count: `${controls.length} controls in register`,
-                actions: appPermissions.controls.create ? (
+                actions: (
                     <>
-                        <Link href={tenantHref('/controls/dashboard')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="controls-dashboard-btn">
-                            <AppIcon name="dashboard" size={14} /> Dashboard
+                        {/* Sankey is read-only and informational — keep it
+                            outside the create-permission gate so READERs
+                            can still glance at the asset → risk → control
+                            flow. */}
+                        <Link href={tenantHref('/controls/sankey')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="controls-sankey-btn">
+                            <AppIcon name="share" size={14} /> Sankey
                         </Link>
-                        <Link href={tenantHref('/frameworks')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="frameworks-btn">
-                            <AppIcon name="frameworks" size={14} /> Frameworks
-                        </Link>
-                        <Link href={tenantHref('/controls/templates')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="install-templates-btn">
-                            <AppIcon name="templates" size={14} /> Install from Templates
-                        </Link>
-                        <button
-                            type="button"
-                            className={buttonVariants({ variant: 'primary', size: 'sm' })}
-                            id="new-control-btn"
-                            onClick={() => setIsCreateOpen(true)}
-                        >
-                            + New Control
-                        </button>
+                        {appPermissions.controls.create && (
+                            <>
+                                <Link href={tenantHref('/controls/dashboard')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="controls-dashboard-btn">
+                                    <AppIcon name="dashboard" size={14} /> Dashboard
+                                </Link>
+                                <Link href={tenantHref('/frameworks')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="frameworks-btn">
+                                    <AppIcon name="frameworks" size={14} /> Frameworks
+                                </Link>
+                                <Link href={tenantHref('/controls/templates')} className={buttonVariants({ variant: 'secondary', size: 'sm' })} id="install-templates-btn">
+                                    <AppIcon name="templates" size={14} /> Install from Templates
+                                </Link>
+                                <button
+                                    type="button"
+                                    className={buttonVariants({ variant: 'primary', size: 'sm' })}
+                                    id="new-control-btn"
+                                    onClick={() => setIsCreateOpen(true)}
+                                >
+                                    + New Control
+                                </button>
+                            </>
+                        )}
                     </>
-                ) : null,
+                ),
             }}
             filters={{
                 defs: liveFilterDefs,
