@@ -20,4 +20,23 @@ declare global {
     var EdgeRuntime: string | undefined;
 }
 
+/**
+ * Side-effect CSS imports from third-party packages (e.g.
+ * `driver.js/dist/driver.css`, `@xyflow/react/dist/style.css`).
+ * Next.js + webpack handle the actual import at build time;
+ * TypeScript only needs to know the module shape exists. Without
+ * these declarations, `await import('driver.js/dist/driver.css')`
+ * fails type-checking with TS2307.
+ *
+ * The wildcard form alone doesn't apply to deep subpath imports
+ * from node_modules — explicit per-package declarations cover
+ * the cases we hit.
+ */
+declare module '*.css' {
+    const content: { [className: string]: string };
+    export default content;
+}
+declare module 'driver.js/dist/driver.css';
+declare module '@xyflow/react/dist/style.css';
+
 export {};

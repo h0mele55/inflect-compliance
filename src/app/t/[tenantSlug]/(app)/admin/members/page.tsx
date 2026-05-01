@@ -1,20 +1,33 @@
 'use client';
-import { formatDate } from '@/lib/format-date';
+/**
+ * Members & Roles admin — Epic 48 DataTable migration.
+ *
+ * Two stacked DataTables (members + pending invites) replacing
+ * the previous hand-rolled `<table className="data-table">`
+ * markup. Same data, same handlers, same stable IDs — the only
+ * thing that changes is the rendering layer.
+ *
+ * The page stays in the ListPageShell-coverage exemption list
+ * for the same reason `admin/api-keys/page.tsx` is exempt:
+ * multi-table layout (members + invites stacked) doesn't fit
+ * the viewport-clamp pattern that ListPageShell exists for.
+ */
 
-import { useState, useEffect, useCallback } from 'react';
+import { formatDate } from '@/lib/format-date';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import {
     Users, UserPlus, ChevronDown, Shield, XCircle, CheckCircle,
     Search, MoreVertical, UserMinus, Mail, Monitor,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { statusBadgeVariants } from '@/components/ui/status-badge';
+import { StatusBadge, statusBadgeVariants } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton, SkeletonButton } from '@/components/ui/skeleton';
 import { Modal } from '@/components/ui/modal';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
+import { DataTable, createColumns } from '@/components/ui/table';
 import { cn } from '@dub/utils';
 
 // ─── Types ───
@@ -140,7 +153,7 @@ export default function MembersAdminPage() {
 
     useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
-    // ─── Invite handler ───
+    // ─── Handlers (unchanged from pre-migration) ───
     async function handleInvite() {
         if (!inviteEmail.trim()) return;
         setError(null);
@@ -178,21 +191,18 @@ export default function MembersAdminPage() {
         }
     }
 
-    // ─── Role change handler ───
     async function handleRoleChange(membershipId: string) {
         setError(null);
         setSuccess(null);
         setChangingRole(true);
 
         try {
-            // Build patch payload
             const member = members.find(m => m.id === membershipId);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const payload: Record<string, any> = {};
             if (pendingRole && pendingRole !== member?.role) {
                 payload.role = pendingRole;
             }
-            // Always include customRoleId to handle assign/unassign
             if (pendingCustomRoleId !== (member?.customRoleId ?? null)) {
                 payload.customRoleId = pendingCustomRoleId;
             }
@@ -224,7 +234,6 @@ export default function MembersAdminPage() {
         }
     }
 
-    // ─── Deactivate handler ───
     async function handleDeactivate(membershipId: string, email: string) {
         if (!confirm(`Deactivate ${email}? They will lose access to this tenant.`)) return;
         setError(null);
@@ -250,7 +259,6 @@ export default function MembersAdminPage() {
         }
     }
 
-    // ─── Sessions modal handlers (Epic C.3) ───
     const openSessionsModal = useCallback(async (member: Member) => {
         setSessionsModalUser(member);
         setSessionsLoading(true);
@@ -294,8 +302,6 @@ export default function MembersAdminPage() {
             }
             setMemberSessions((sessions) => sessions.filter((s) => s.sessionId !== sessionId));
             setSuccess('Session revoked');
-            // Refresh members list so the activeSessionCount badge
-            // reflects the new total without a page reload.
             void fetchMembers();
         } catch (err) {
             setError((err as Error).message);
@@ -305,16 +311,287 @@ export default function MembersAdminPage() {
     }, [apiUrl, fetchMembers, sessionsModalUser]);
 
     // ─── Filter ───
-    const filteredMembers = members.filter((m) => {
-        if (!search) return true;
-        const q = search.toLowerCase();
-        return (
-            m.user.name?.toLowerCase().includes(q) ||
-            m.user.email.toLowerCase().includes(q) ||
-            m.role.toLowerCase().includes(q) ||
-            m.status.toLowerCase().includes(q)
-        );
-    });
+    const filteredMembers = useMemo(
+        () => members.filter((m) => {
+            if (!search) return true;
+            const q = search.toLowerCase();
+            return (
+                m.user.name?.toLowerCase().includes(q) ||
+                m.user.email.toLowerCase().includes(q) ||
+                m.role.toLowerCase().includes(q) ||
+                m.status.toLowerCase().includes(q)
+            );
+        }),
+        [members, search],
+    );
+
+    // ─── Members DataTable columns ───
+    const memberColumns = useMemo(
+        () => createColumns<Member>([
+            {
+                id: 'member',
+                header: 'Member',
+                accessorFn: (m) => m.user.name ?? m.user.email,
+                cell: ({ row }) => {
+                    const m = row.original;
+                    return (
+                        <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-[var(--brand-subtle)] text-[var(--brand-default)] flex items-center justify-center text-xs font-semibold">
+                                {(m.user.name || m.user.email).charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-sm font-medium text-content-emphasis">{m.user.name || '—'}</span>
+                        </div>
+                    );
+                },
+            },
+            {
+                id: 'email',
+                header: 'Email',
+                accessorFn: (m) => m.user.email,
+                cell: ({ row }) => (
+                    <span className="text-xs text-content-muted">{row.original.user.email}</span>
+                ),
+            },
+            {
+                id: 'role',
+                header: 'Role',
+                accessorKey: 'role',
+                cell: ({ row }) => {
+                    const m = row.original;
+                    if (editingRoleId === m.id) {
+                        return (
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1">
+                                    <Combobox
+                                        hideSearch
+                                        id={`role-select-${m.id}`}
+                                        selected={ROLE_CB_OPTIONS.find(o => o.value === pendingRole) ?? null}
+                                        setSelected={(opt) => setPendingRole(opt?.value ?? pendingRole)}
+                                        options={ROLE_CB_OPTIONS}
+                                        matchTriggerWidth
+                                        buttonProps={{ className: 'text-xs py-1 px-2 w-full sm:w-28' }}
+                                    />
+                                    <Button
+                                        variant="primary"
+                                        size="xs"
+                                        onClick={() => handleRoleChange(m.id)}
+                                        disabled={changingRole}
+                                        loading={changingRole}
+                                        id={`role-save-${m.id}`}
+                                    >
+                                        Save
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        size="xs"
+                                        onClick={() => setEditingRoleId(null)}
+                                        icon={<XCircle className="w-3 h-3" />}
+                                    />
+                                </div>
+                                {customRoles.length > 0 && (
+                                    <Combobox
+                                        hideSearch
+                                        id={`custom-role-select-${m.id}`}
+                                        selected={customRoles.map(cr => ({ value: cr.id, label: cr.name })).find(o => o.value === (pendingCustomRoleId ?? '')) ?? null}
+                                        setSelected={(opt) => setPendingCustomRoleId(opt?.value || null)}
+                                        options={customRoles.map(cr => ({ value: cr.id, label: cr.name }))}
+                                        placeholder="No custom role (use base role)"
+                                        matchTriggerWidth
+                                        buttonProps={{ className: 'text-xs py-1 px-2 w-full sm:w-48' }}
+                                    />
+                                )}
+                            </div>
+                        );
+                    }
+                    return (
+                        <div className="flex items-center gap-1 flex-wrap">
+                            <Tooltip
+                                content="Click to change role"
+                                disabled={m.status !== 'ACTIVE'}
+                            >
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        statusBadgeVariants({ variant: ROLE_VARIANT[m.role] || 'neutral' }),
+                                        'cursor-pointer hover:opacity-80 transition',
+                                    )}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (m.status === 'ACTIVE') {
+                                            setEditingRoleId(m.id);
+                                            setPendingRole(m.role);
+                                            setPendingCustomRoleId(m.customRoleId);
+                                        }
+                                    }}
+                                    id={`role-badge-${m.id}`}
+                                >
+                                    {m.role}
+                                    {m.status === 'ACTIVE' && <ChevronDown className="w-3 h-3 ml-0.5" />}
+                                </button>
+                            </Tooltip>
+                            {m.customRole && (
+                                <Tooltip
+                                    title="Custom role"
+                                    content={m.customRole.name}
+                                >
+                                    <span className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30 cursor-help">
+                                        {m.customRole.name}
+                                    </span>
+                                </Tooltip>
+                            )}
+                        </div>
+                    );
+                },
+            },
+            {
+                id: 'status',
+                header: 'Status',
+                accessorKey: 'status',
+                cell: ({ row }) => (
+                    <StatusBadge variant={STATUS_VARIANT[row.original.status] || 'neutral'} icon={null} size="sm">
+                        {row.original.status}
+                    </StatusBadge>
+                ),
+            },
+            {
+                id: 'sessions',
+                header: 'Sessions',
+                accessorFn: (m) => m.activeSessionCount ?? 0,
+                cell: ({ row }) => {
+                    const m = row.original;
+                    const count = m.activeSessionCount ?? 0;
+                    return (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                void openSessionsModal(m);
+                            }}
+                            className={cn(
+                                'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium border transition-colors',
+                                count > 0
+                                    ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
+                                    : 'bg-bg-muted text-content-subtle border-border-subtle hover:bg-bg-elevated',
+                            )}
+                            id={`sessions-count-${m.id}`}
+                            aria-label={`View ${count} active sessions for ${m.user.email}`}
+                        >
+                            <Monitor className="w-3 h-3" />
+                            {count}
+                        </button>
+                    );
+                },
+            },
+            {
+                id: 'joined',
+                header: 'Joined',
+                accessorKey: 'createdAt',
+                cell: ({ row }) => (
+                    <span className="text-xs text-content-subtle">{formatDate(row.original.createdAt)}</span>
+                ),
+            },
+            {
+                id: 'actions',
+                header: '',
+                cell: ({ row }) => {
+                    const m = row.original;
+                    if (m.status !== 'ACTIVE') return null;
+                    return (
+                        <div className="relative inline-block text-right" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                                variant="secondary"
+                                size="xs"
+                                onClick={() => setOpenMenuId(openMenuId === m.id ? null : m.id)}
+                                icon={<MoreVertical className="w-3.5 h-3.5" />}
+                                id={`member-menu-${m.id}`}
+                            />
+                            {openMenuId === m.id && (
+                                <div className="absolute right-0 top-full mt-1 bg-bg-default border border-border-default rounded-lg shadow-lg z-20 min-w-[160px]">
+                                    <button
+                                        onClick={() => {
+                                            setEditingRoleId(m.id);
+                                            setPendingRole(m.role);
+                                            setOpenMenuId(null);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-xs text-content-emphasis hover:bg-bg-muted flex items-center gap-2"
+                                        id={`action-change-role-${m.id}`}
+                                    >
+                                        <Shield className="w-3 h-3" />
+                                        Change Role
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setOpenMenuId(null);
+                                            void openSessionsModal(m);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-xs text-content-emphasis hover:bg-bg-muted flex items-center gap-2"
+                                        id={`action-view-sessions-${m.id}`}
+                                    >
+                                        <Monitor className="w-3 h-3" />
+                                        View Sessions
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeactivate(m.id, m.user.email)}
+                                        className="w-full text-left px-3 py-2 text-xs text-content-error hover:bg-bg-error flex items-center gap-2"
+                                        id={`action-deactivate-${m.id}`}
+                                    >
+                                        <UserMinus className="w-3 h-3" />
+                                        Deactivate
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    );
+                },
+            },
+        ]),
+        // Re-derive columns when any state used inline by the cells
+        // changes — otherwise the inline edit row's combobox would
+        // render with a stale selection.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [editingRoleId, pendingRole, pendingCustomRoleId, changingRole, customRoles, openMenuId],
+    );
+
+    // ─── Invites DataTable columns ───
+    const inviteColumns = useMemo(
+        () => createColumns<Invite>([
+            {
+                id: 'email',
+                header: 'Email',
+                accessorKey: 'email',
+                cell: ({ row }) => (
+                    <span className="text-sm text-content-emphasis">{row.original.email}</span>
+                ),
+            },
+            {
+                id: 'role',
+                header: 'Role',
+                accessorKey: 'role',
+                cell: ({ row }) => (
+                    <StatusBadge variant={ROLE_VARIANT[row.original.role] || 'neutral'} icon={null}>
+                        {row.original.role}
+                    </StatusBadge>
+                ),
+            },
+            {
+                id: 'invitedBy',
+                header: 'Invited By',
+                accessorFn: (i) => i.invitedBy?.name ?? '—',
+                cell: ({ row }) => (
+                    <span className="text-xs text-content-muted">{row.original.invitedBy?.name || '—'}</span>
+                ),
+            },
+            {
+                id: 'expires',
+                header: 'Expires',
+                accessorKey: 'expiresAt',
+                cell: ({ row }) => (
+                    <span className="text-xs text-content-subtle">{formatDate(row.original.expiresAt)}</span>
+                ),
+            },
+        ]),
+        [],
+    );
 
     // ─── Loading state ───
     if (loading) {
@@ -441,240 +718,49 @@ export default function MembersAdminPage() {
                 />
             </div>
 
-            {/* Members table */}
+            {/* Members DataTable (Epic 48 migration) */}
             <div className="glass-card overflow-hidden" id="members-table-card">
-                <table className="data-table" id="members-table">
-                    <thead>
-                        <tr>
-                            <th>Member</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th>Status</th>
-                            <th>Sessions</th>
-                            <th>Joined</th>
-                            <th className="text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredMembers.map((m) => (
-                            <tr key={m.id} data-member-id={m.id}>
-                                <td className="text-sm font-medium text-content-emphasis">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-full bg-[var(--brand-subtle)] text-[var(--brand-default)] flex items-center justify-center text-xs font-semibold">
-                                            {(m.user.name || m.user.email).charAt(0).toUpperCase()}
-                                        </div>
-                                        {m.user.name || '—'}
-                                    </div>
-                                </td>
-                                <td className="text-xs text-content-muted">{m.user.email}</td>
-                                <td>
-                                    {editingRoleId === m.id ? (
-                                        <div className="space-y-1">
-                                            <div className="flex items-center gap-1">
-                                                <Combobox
-                                                    hideSearch
-                                                    id={`role-select-${m.id}`}
-                                                    selected={ROLE_CB_OPTIONS.find(o => o.value === pendingRole) ?? null}
-                                                    setSelected={(opt) => setPendingRole(opt?.value ?? pendingRole)}
-                                                    options={ROLE_CB_OPTIONS}
-                                                    matchTriggerWidth
-                                                    buttonProps={{ className: 'text-xs py-1 px-2 w-full sm:w-28' }}
-                                                />
-                                                <Button
-                                                    variant="primary"
-                                                    size="xs"
-                                                    onClick={() => handleRoleChange(m.id)}
-                                                    disabled={changingRole}
-                                                    loading={changingRole}
-                                                    id={`role-save-${m.id}`}
-                                                >
-                                                    Save
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    size="xs"
-                                                    onClick={() => setEditingRoleId(null)}
-                                                    icon={<XCircle className="w-3 h-3" />}
-                                                />
-                                            </div>
-                                            {customRoles.length > 0 && (
-                                                <Combobox
-                                                    hideSearch
-                                                    id={`custom-role-select-${m.id}`}
-                                                    selected={customRoles.map(cr => ({ value: cr.id, label: cr.name })).find(o => o.value === (pendingCustomRoleId ?? '')) ?? null}
-                                                    setSelected={(opt) => setPendingCustomRoleId(opt?.value || null)}
-                                                    options={customRoles.map(cr => ({ value: cr.id, label: cr.name }))}
-                                                    placeholder="No custom role (use base role)"
-                                                    matchTriggerWidth
-                                                    buttonProps={{ className: 'text-xs py-1 px-2 w-full sm:w-48' }}
-                                                />
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-1 flex-wrap">
-                                            <Tooltip
-                                                content="Click to change role"
-                                                disabled={m.status !== 'ACTIVE'}
-                                            >
-                                                <button
-                                                    className={cn(
-                                                        statusBadgeVariants({ variant: ROLE_VARIANT[m.role] || 'neutral' }),
-                                                        'cursor-pointer hover:opacity-80 transition',
-                                                    )}
-                                                    onClick={() => {
-                                                        if (m.status === 'ACTIVE') {
-                                                            setEditingRoleId(m.id);
-                                                            setPendingRole(m.role);
-                                                            setPendingCustomRoleId(m.customRoleId);
-                                                        }
-                                                    }}
-                                                    id={`role-badge-${m.id}`}
-                                                >
-                                                    {m.role}
-                                                    {m.status === 'ACTIVE' && <ChevronDown className="w-3 h-3 ml-0.5" />}
-                                                </button>
-                                            </Tooltip>
-                                            {m.customRole && (
-                                                <Tooltip
-                                                    title="Custom role"
-                                                    content={m.customRole.name}
-                                                >
-                                                    <span className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30 cursor-help">
-                                                        {m.customRole.name}
-                                                    </span>
-                                                </Tooltip>
-                                            )}
-                                        </div>
-                                    )}
-                                </td>
-                                <td>
-                                    <StatusBadge variant={STATUS_VARIANT[m.status] || 'neutral'} icon={null} size="sm">
-                                        {m.status}
-                                    </StatusBadge>
-                                </td>
-                                <td>
-                                    <button
-                                        type="button"
-                                        onClick={() => openSessionsModal(m)}
-                                        className={cn(
-                                            'inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium border transition-colors',
-                                            (m.activeSessionCount ?? 0) > 0
-                                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
-                                                : 'bg-bg-muted text-content-subtle border-border-subtle hover:bg-bg-elevated',
-                                        )}
-                                        id={`sessions-count-${m.id}`}
-                                        aria-label={`View ${m.activeSessionCount ?? 0} active sessions for ${m.user.email}`}
-                                    >
-                                        <Monitor className="w-3 h-3" />
-                                        {m.activeSessionCount ?? 0}
-                                    </button>
-                                </td>
-                                <td className="text-xs text-content-subtle">
-                                    {formatDate(m.createdAt)}
-                                </td>
-                                <td className="text-right relative">
-                                    {m.status === 'ACTIVE' && (
-                                        <div className="relative inline-block">
-                                            <Button
-                                                variant="secondary"
-                                                size="xs"
-                                                onClick={() => setOpenMenuId(openMenuId === m.id ? null : m.id)}
-                                                icon={<MoreVertical className="w-3.5 h-3.5" />}
-                                                id={`member-menu-${m.id}`}
-                                            />
-                                            {openMenuId === m.id && (
-                                                <div className="absolute right-0 top-full mt-1 bg-bg-default border border-border-default rounded-lg shadow-lg z-20 min-w-[160px]">
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingRoleId(m.id);
-                                                            setPendingRole(m.role);
-                                                            setOpenMenuId(null);
-                                                        }}
-                                                        className="w-full text-left px-3 py-2 text-xs text-content-emphasis hover:bg-bg-muted flex items-center gap-2"
-                                                        id={`action-change-role-${m.id}`}
-                                                    >
-                                                        <Shield className="w-3 h-3" />
-                                                        Change Role
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            setOpenMenuId(null);
-                                                            void openSessionsModal(m);
-                                                        }}
-                                                        className="w-full text-left px-3 py-2 text-xs text-content-emphasis hover:bg-bg-muted flex items-center gap-2"
-                                                        id={`action-view-sessions-${m.id}`}
-                                                    >
-                                                        <Monitor className="w-3 h-3" />
-                                                        View Sessions
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDeactivate(m.id, m.user.email)}
-                                                        className="w-full text-left px-3 py-2 text-xs text-content-error hover:bg-bg-error flex items-center gap-2"
-                                                        id={`action-deactivate-${m.id}`}
-                                                    >
-                                                        <UserMinus className="w-3 h-3" />
-                                                        Deactivate
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </td>
-                            </tr>
-                        ))}
-                        {filteredMembers.length === 0 && (
-                            <tr>
-                                <td colSpan={7}>
-                                    <EmptyState
-                                        icon={search ? Search : Users}
-                                        title={search ? 'No members match your search' : 'No members found'}
-                                        description={search ? 'Try adjusting your search term.' : undefined}
-                                    />
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                {filteredMembers.length === 0 && search ? (
+                    <EmptyState
+                        icon={Search}
+                        title="No members match your search"
+                        description="Try adjusting your search term."
+                    />
+                ) : filteredMembers.length === 0 ? (
+                    <EmptyState
+                        icon={Users}
+                        title="No members found"
+                    />
+                ) : (
+                    <DataTable
+                        data={filteredMembers}
+                        columns={memberColumns}
+                        getRowId={(m) => m.id}
+                        emptyState="No members."
+                        resourceName={(p) => (p ? 'members' : 'member')}
+                        data-testid="members-table"
+                    />
+                )}
             </div>
 
-            {/* Pending Invites */}
+            {/* Pending Invites DataTable */}
             {invites.length > 0 && (
                 <div>
                     <h2 className="text-lg font-semibold text-content-emphasis mb-3">Pending Invitations</h2>
                     <div className="glass-card overflow-hidden" id="invites-table-card">
-                        <table className="data-table" id="invites-table">
-                            <thead>
-                                <tr>
-                                    <th>Email</th>
-                                    <th>Role</th>
-                                    <th>Invited By</th>
-                                    <th>Expires</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {invites.map((inv) => (
-                                    <tr key={inv.id}>
-                                        <td className="text-sm text-content-emphasis">{inv.email}</td>
-                                        <td>
-                                            <StatusBadge variant={ROLE_VARIANT[inv.role] || 'neutral'} icon={null}>
-                                                {inv.role}
-                                            </StatusBadge>
-                                        </td>
-                                        <td className="text-xs text-content-muted">
-                                            {inv.invitedBy?.name || '—'}
-                                        </td>
-                                        <td className="text-xs text-content-subtle">
-                                            {formatDate(inv.expiresAt)}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <DataTable
+                            data={invites}
+                            columns={inviteColumns}
+                            getRowId={(i) => i.id}
+                            emptyState="No pending invitations."
+                            resourceName={(p) => (p ? 'invites' : 'invite')}
+                            data-testid="invites-table"
+                        />
                     </div>
                 </div>
             )}
 
-            {/* Click-away handler for menu */}
+            {/* Click-away handler for action menu */}
             {openMenuId && (
                 <div
                     className="fixed inset-0 z-10"

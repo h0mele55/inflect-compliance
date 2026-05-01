@@ -38,7 +38,7 @@ export default async function AppLayout({
             user={{ name: session.user.name }}
             appName={tc('appName')}
         >
-            <ClientProviders>
+            <ClientProviders userId={session.user.id ?? null}>
                 {children}
             </ClientProviders>
         </AppShell>
