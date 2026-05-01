@@ -1,13 +1,18 @@
 /**
- * Epic 46.4 — structural ratchet for the framework list-page
- * DataTable migration AND the builder-tab wiring on the detail
- * page.
+ * Framework list page — UX choice ratchet.
  *
- * The migration replaced a hand-rolled card grid with the shared
- * `<ListPageShell>` + `<DataTable>` pattern. A future "simplify"
- * PR could quietly revert this; the regression would be silent
- * (the page still renders SOMETHING, just no longer in the
- * standard list architecture). This guardrail catches that.
+ * Epic 46.4 originally migrated this page to ListPageShell +
+ * DataTable. That migration was rolled back (the card grid reads
+ * better at-a-glance for a small catalog and gives every
+ * framework a colour band). The tree-view explorer on the
+ * DETAIL page stays — it's the better experience inside a
+ * framework, just not for the framework picker.
+ *
+ * This file now locks the OPPOSITE invariant: the list page
+ * must keep the card grid (no DataTable migration without an
+ * explicit re-decision). The builder-tab assertions on the
+ * detail page stay — those are independent of the list-page
+ * decision.
  */
 
 import * as fs from 'fs';
@@ -30,49 +35,32 @@ function read(p: string): string {
     return fs.readFileSync(p, 'utf-8');
 }
 
-describe('framework list — DataTable migration', () => {
+describe('framework list — card grid (revert ratchet)', () => {
     const page = read(LIST_PAGE);
-    const client = read(LIST_CLIENT);
 
-    it('server page delegates to FrameworksClient', () => {
-        expect(page).toMatch(/from\s*'\.\/FrameworksClient'/);
-        expect(page).toMatch(/<FrameworksClient\b/);
+    it('renders the card grid (NOT a DataTable)', () => {
+        // The card grid signal: per-card `id="fw-card-<key>"`.
+        // Anyone re-introducing a DataTable migration would
+        // remove these in favour of `<DataTable data={…} />`.
+        expect(page).toMatch(/fw-card-/);
+        expect(page).not.toMatch(/<DataTable\b/);
     });
 
-    it('FrameworksClient mounts <DataTable> from the shared table primitive', () => {
-        expect(client).toMatch(
-            /from\s*'@\/components\/ui\/table'/,
-        );
-        expect(client).toMatch(/<DataTable\b/);
-        expect(client).toMatch(/createColumns\b/);
+    it('does not delegate to a FrameworksClient island', () => {
+        // The DataTable migration created
+        // `frameworks/FrameworksClient.tsx` and made the page a
+        // thin server-component shell. Reverting that means the
+        // page is the canonical card-grid server component
+        // again, with no client island.
+        expect(page).not.toMatch(/<FrameworksClient\b/);
+        expect(fs.existsSync(LIST_CLIENT)).toBe(false);
     });
 
-    it('FrameworksClient wraps in <ListPageShell> (Epic 52 architecture)', () => {
-        expect(client).toMatch(
-            /from\s*'@\/components\/layout\/ListPageShell'/,
-        );
-        expect(client).toMatch(/<ListPageShell\b/);
-    });
-
-    it('list carries the required Epic 46.4 columns: Domain, Requirements, Coverage', () => {
-        expect(client).toMatch(/header:\s*'Domain'/);
-        expect(client).toMatch(/header:\s*'Requirements'/);
-        expect(client).toMatch(/header:\s*'Coverage'/);
-    });
-
-    it('preserves the original framework-detail link affordance', () => {
-        // The card grid had `view-framework-<key>` as the primary
-        // CTA — keeping that id stable means existing E2E selectors
-        // and analytics keep working.
-        expect(client).toMatch(/view-framework-/);
-    });
-
-    it('does not retain the legacy card-grid markup', () => {
-        // The legacy block built `[id^="fw-card-"]` cards. Their
-        // disappearance is the canonical signal the migration
-        // landed.
-        expect(page).not.toMatch(/fw-card-/);
-        expect(client).not.toMatch(/fw-card-/);
+    it('keeps the per-card "View Details" link as the entry to the tree explorer', () => {
+        // The detail page still hosts the Epic 46 tree explorer;
+        // every card MUST give the user a one-click path into it.
+        expect(page).toMatch(/view-framework-/);
+        expect(page).toMatch(/\/frameworks\/\$\{?fw\.key\}?/);
     });
 });
 
@@ -87,9 +75,6 @@ describe('framework detail — builder tab wiring (Epic 46.4)', () => {
     });
 
     it('mounts the builder behind a permission gate', () => {
-        // The reorder action mutates per-tenant state — must be
-        // gated. The page uses `<RequirePermission resource="frameworks" action="install">`,
-        // matching the OWNER/ADMIN bar inside the usecase.
         expect(src).toMatch(/<RequirePermission[^>]*resource="frameworks"[^>]*action="install"/);
     });
 
