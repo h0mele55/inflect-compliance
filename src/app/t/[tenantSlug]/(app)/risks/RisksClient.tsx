@@ -338,17 +338,34 @@ function RisksPageInner({
             cell: ({ getValue, row }) => {
                 const score = getValue<number>();
                 const band = resolveBandForScore(score, matrixConfig.bands);
+                // axe AA — `color-contrast`: the previous chip used
+                // `band.color` for both the tinted background AND the
+                // text, so the contrast ratio collapsed to ~2:1 (well
+                // below WCAG AA's 4.5:1 for small text). Splitting the
+                // visual roles fixes it without losing the band cue:
+                //   - background: tinted `band.color` (kept as the
+                //     band-recognition cue),
+                //   - dot: solid `band.color` (a second, higher-
+                //     saturation cue that reads even when the tint is
+                //     subtle),
+                //   - text: `text-content-emphasis` (the app's
+                //     designed-for-contrast neutral, ~16:1 against
+                //     either palette).
                 return (
                     <span
-                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-bold tabular-nums"
+                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-bold tabular-nums text-content-emphasis"
                         style={{
                             backgroundColor: `${band.color}33`, // 20% alpha
-                            color: band.color,
                         }}
                         title={`${band.name} (${score})`}
                         data-band={band.name}
                         data-testid={`risk-score-${row.original.id}`}
                     >
+                        <span
+                            aria-hidden="true"
+                            className="inline-block w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: band.color }}
+                        />
                         {score}
                     </span>
                 );

@@ -605,8 +605,20 @@ export function Table<T>({
           )}
           <div
             ref={scrollWrapperRef}
+            // axe AA — `scrollable-region-focusable`: scrollable
+            // regions (containers with `overflow: auto/scroll` and
+            // content that exceeds the viewport) MUST be reachable
+            // by keyboard. `tabIndex=0` makes the wrapper part of
+            // the tab order so a keyboard-only user can focus it
+            // and use ↑↓ / PgUp/PgDn to scroll. The complementary
+            // `role="region"` + `aria-label` give assistive tech a
+            // meaningful announce-name for the table viewport.
+            tabIndex={0}
+            role="region"
+            aria-label="Table contents (scrollable)"
             className={cn(
               "relative min-h-[400px] overflow-x-auto rounded-[inherit]",
+              "focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--brand-default)]/40",
               // Scroll-snap so rows align cleanly with the sticky
               // header instead of stopping mid-row. `snap-proximity`
               // only snaps when you stop near a snap point, so free
