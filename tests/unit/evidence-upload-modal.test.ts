@@ -3,7 +3,7 @@
  *
  * Node-env jest can't render .tsx. These source-contract tests assert
  * the Evidence create/upload flows have been lifted onto the shared
- * `<Modal>` + `<FileUpload>` primitives while preserving:
+ * `<Modal>` + `<FileDropzone>` primitives while preserving:
  *
  *   1. UploadEvidenceModal — drag-and-drop dropzone, FormData POST to
  *      /evidence/uploads, conditional retention POST, optimistic
@@ -12,8 +12,10 @@
  *      invalidation, preserved `text-evidence-form` id.
  *   3. EvidenceClient — old inline forms removed; triggers now open
  *      modals; modals mounted with tenant-scoped helpers.
- *   4. FileUpload primitive — exposes `evidence` accept preset and
- *      `document` variant for tokenised modal surfaces.
+ *   4. FileDropzone primitive — generic dropzone that replaces the
+ *      legacy `<FileUpload>` (the rename happened mid-Epic-54; the
+ *      old `file-upload.tsx` is still on disk for legacy callers but
+ *      the evidence modal flow uses `FileDropzone` now).
  */
 
 import * as fs from 'fs';
@@ -33,7 +35,9 @@ const TEXT_MODAL_SRC = read(
 const CLIENT_SRC = read(
     'src/app/t/[tenantSlug]/(app)/evidence/EvidenceClient.tsx',
 );
-const FILE_UPLOAD_SRC = read('src/components/ui/file-upload.tsx');
+// FileDropzone is the canonical primitive; file-upload.tsx still
+// exists for legacy callers but the evidence flow has migrated.
+const FILE_DROPZONE_SRC = read('src/components/ui/FileDropzone.tsx');
 
 // ─── 1. UploadEvidenceModal — composition ──────────────────────
 
@@ -49,11 +53,15 @@ describe('UploadEvidenceModal — shared Modal composition', () => {
         expect(UPLOAD_MODAL_SRC).not.toMatch(/fixed inset-0 bg-black/);
     });
 
-    it('uses the shared <FileUpload> primitive (reuse, not rebuild)', () => {
+    it('uses the shared <FileDropzone> primitive (reuse, not rebuild)', () => {
+        // The original Epic 54 plan called for `<FileUpload>` but the
+        // implementation migrated mid-epic to a more generic
+        // `<FileDropzone>` that supports drag-and-drop, queued
+        // uploads, per-file progress, and submit-driven uploads.
         expect(UPLOAD_MODAL_SRC).toMatch(
-            /from ['"]@\/components\/ui\/file-upload['"]/,
+            /from ['"]@\/components\/ui\/FileDropzone['"]/,
         );
-        expect(UPLOAD_MODAL_SRC).toMatch(/<FileUpload\b/);
+        expect(UPLOAD_MODAL_SRC).toMatch(/<FileDropzone\b/);
     });
 
     it('renders Modal.Form + Modal.Body + Modal.Actions', () => {
@@ -67,23 +75,32 @@ describe('UploadEvidenceModal — shared Modal composition', () => {
     });
 
     it('guards close-during-upload via preventDefaultClose', () => {
+        // Accept either the legacy `mutation.isPending` shape or the
+        // FileDropzone-era `uploadingAll` ref-tracked flag (the
+        // dropzone owns the queue, so the modal tracks "any upload
+        // in flight" via its imperative handle, not via the React
+        // Query mutation alone).
         expect(UPLOAD_MODAL_SRC).toMatch(
-            /preventDefaultClose=\{mutation\.isPending\}/,
+            /preventDefaultClose=\{(mutation\.isPending|uploadingAll)\}/,
         );
     });
 
-    it('drives the dropzone as document variant with the evidence preset', () => {
-        expect(UPLOAD_MODAL_SRC).toMatch(/variant=["']document["']/);
-        expect(UPLOAD_MODAL_SRC).toMatch(/accept=["']evidence["']/);
-    });
+    // NOTE: the original `accept="evidence"` preset + `variant="document"`
+    // props were specific to the legacy `<FileUpload>`. FileDropzone
+    // takes a raw `accept` string and has no variant axis. The size-cap
+    // contract that survives is asserted in the UX-invariants section
+    // below ("enforces a generous but finite client-side max size").
 });
 
 // ─── 2. UploadEvidenceModal — preserved E2E IDs ───────────────
 
 describe('UploadEvidenceModal — preserved E2E IDs', () => {
-    const REQUIRED_IDS = [
+    // `file-input` is now forwarded via FileDropzone's `inputId` prop
+    // (the dropzone hides its own <input type="file"> and lets the
+    // caller pin its DOM id for setInputFiles selectors). Every
+    // other id is a direct `id=` attribute on a regular element.
+    const REQUIRED_PLAIN_IDS = [
         'upload-form',
-        'file-input',
         'upload-title-input',
         // Epic 55 Prompt 4: `control-search-input` was removed when the
         // paired input + native <select> was migrated to a searchable
@@ -95,8 +112,16 @@ describe('UploadEvidenceModal — preserved E2E IDs', () => {
         'upload-error',
     ];
 
-    it.each(REQUIRED_IDS)('preserves id="%s"', (id) => {
+    it.each(REQUIRED_PLAIN_IDS)('preserves id="%s"', (id) => {
         expect(UPLOAD_MODAL_SRC).toMatch(new RegExp(`id=["']${id}["']`));
+    });
+
+    it('preserves the file-input selector via FileDropzone.inputId', () => {
+        // E2E uses `setInputFiles('#file-input', …)`. FileDropzone
+        // forwards `inputId` to its hidden <input>, so this still
+        // works post-migration without an `id="file-input"` literal
+        // on a separate element.
+        expect(UPLOAD_MODAL_SRC).toMatch(/inputId=["']file-input["']/);
     });
 });
 
@@ -109,7 +134,11 @@ describe('UploadEvidenceModal — business contract preserved', () => {
         );
         expect(UPLOAD_MODAL_SRC).toMatch(/method:\s*['"]POST['"]/);
         expect(UPLOAD_MODAL_SRC).toMatch(/new FormData\(\)/);
-        for (const field of ['file', 'title', 'controlId', 'retentionUntil']) {
+        // After the FileDropzone migration, retention is sent via a
+        // separate POST (see `fires the follow-up retention POST` test
+        // below) — NOT in the upload's FormData. The upload payload
+        // still carries file + title + controlId.
+        for (const field of ['file', 'title', 'controlId']) {
             // Allow for whitespace/newlines between the paren and the
             // field name — prettier may wrap long appends.
             expect(UPLOAD_MODAL_SRC).toMatch(
@@ -119,8 +148,12 @@ describe('UploadEvidenceModal — business contract preserved', () => {
     });
 
     it('fires the follow-up retention POST only when a date is supplied', () => {
+        // Mutation handler captures vars-destructured args, so the
+        // closure variable is `vars.retentionUntil`, not the bare
+        // `retentionUntil`. Either shape is acceptable for the
+        // "conditional retention POST" contract.
         expect(UPLOAD_MODAL_SRC).toMatch(
-            /if \(retentionUntil && uploaded\?\.id\)/,
+            /if \(\s*(vars\.)?retentionUntil\s*&&\s*uploaded\?\.id\s*\)/,
         );
         expect(UPLOAD_MODAL_SRC).toMatch(
             /apiUrl\(`\/evidence\/\$\{uploaded\.id\}\/retention`\)/,
@@ -149,9 +182,14 @@ describe('UploadEvidenceModal — business contract preserved', () => {
         );
     });
 
-    it('closes the modal on upload success', () => {
+    it('closes the modal once every queued file uploaded successfully', () => {
+        // FileDropzone-era shape — closing happens in `onAllSettled`
+        // (when the entire queue of N files has reached terminal
+        // states), gated on `every(e => e.status === 'success')`.
+        // The legacy single-file `onSuccess: ... close()` pattern
+        // also matches if the modal hasn't migrated yet.
         expect(UPLOAD_MODAL_SRC).toMatch(
-            /onSuccess:[\s\S]{0,800}close\(\)/,
+            /(onAllSettled[\s\S]{0,400}allOk[\s\S]{0,200}close\(\)|onSuccess:[\s\S]{0,800}close\(\))/,
         );
     });
 });
@@ -159,15 +197,21 @@ describe('UploadEvidenceModal — business contract preserved', () => {
 // ─── 4. UploadEvidenceModal — UX invariants ───────────────────
 
 describe('UploadEvidenceModal — UX invariants', () => {
-    it('disables submit while no file is selected or while pending', () => {
+    it('disables submit while no file is queued or while uploading', () => {
+        // FileDropzone-era shape — the dropzone owns the file queue,
+        // so the modal tracks `queuedCount` + `uploadingAll` instead
+        // of the legacy `!!file && !mutation.isPending`.
         expect(UPLOAD_MODAL_SRC).toMatch(
-            /canSubmit\s*=\s*!!file\s*&&\s*!mutation\.isPending/,
+            /(submitDisabled\s*=\s*queuedCount\s*===\s*0\s*\|\|\s*uploadingAll|canSubmit\s*=\s*!!file\s*&&\s*!mutation\.isPending)/,
         );
     });
 
     it('fieldset disables every field during an in-flight upload', () => {
+        // Accept either the legacy mutation.isPending or the dropzone-
+        // era uploadingAll flag — both stop interactive controls
+        // mid-upload.
         expect(UPLOAD_MODAL_SRC).toMatch(
-            /<fieldset[\s\S]*?disabled=\{mutation\.isPending\}/,
+            /<fieldset[\s\S]*?disabled=\{(mutation\.isPending|uploadingAll)\}/,
         );
     });
 
@@ -286,39 +330,34 @@ describe('EvidenceClient — modal entry points', () => {
     });
 });
 
-// ─── 7. FileUpload primitive extension ────────────────────────
+// ─── 7. FileDropzone primitive contract ───────────────────────
+//
+// The legacy `<FileUpload>` "evidence preset" + "document variant"
+// tests were removed when the modal migrated to `<FileDropzone>`.
+// FileDropzone takes a raw `accept` string + has no preset/variant
+// axes. The contracts that survive — what the UPLOAD MODAL actually
+// depends on — are pinned here against the new primitive.
 
-describe('FileUpload — evidence preset + document variant', () => {
-    it('exposes an "evidence" accept preset', () => {
-        expect(FILE_UPLOAD_SRC).toMatch(/\|\s*["']evidence["']/);
-        expect(FILE_UPLOAD_SRC).toMatch(/evidence:\s*\{/);
+describe('FileDropzone — primitives the modal relies on', () => {
+    it('forwards `inputId` to a hidden <input type="file">', () => {
+        // E2E selectors use `setInputFiles('#file-input', …)`. The
+        // dropzone must propagate the caller's id to its hidden input.
+        expect(FILE_DROPZONE_SRC).toMatch(/inputId\s*\?:/);
+        expect(FILE_DROPZONE_SRC).toMatch(/type=["']file["']/);
     });
 
-    it('covers pdf, office, image, json, and zip MIME types for evidence', () => {
-        // Documents are spread in from the base set; additional types
-        // must include the image + json + zip additions for evidence.
-        expect(FILE_UPLOAD_SRC).toMatch(/evidenceTypes\s*=\s*\[/);
-        for (const mime of [
-            'image/jpeg',
-            'image/png',
-            'image/webp',
-            'application/json',
-            'application/zip',
-        ]) {
-            expect(FILE_UPLOAD_SRC).toContain(mime);
-        }
-    });
-
-    it('exposes a "document" variant that drops the 1200/630 aspect ratio', () => {
-        expect(FILE_UPLOAD_SRC).toMatch(/document:\s*[\s\S]{0,300}min-h-\[10rem\]/);
-        expect(FILE_UPLOAD_SRC).toMatch(
-            /document:\s*[\s\S]{0,300}border-dashed/,
+    it('exposes an imperative handle for submit-driven uploads', () => {
+        // The modal queues files on drop and triggers uploads on form
+        // submit via `dropzoneRef.current.startAll()`. Without the
+        // handle, the modal can't bridge React Query mutations into
+        // the dropzone's per-file lifecycle.
+        expect(FILE_DROPZONE_SRC).toMatch(
+            /export interface FileDropzoneHandle/,
         );
+        expect(FILE_DROPZONE_SRC).toMatch(/startAll\b/);
     });
 
-    it('paints the document variant on semantic tokens (dark-theme safe)', () => {
-        expect(FILE_UPLOAD_SRC).toMatch(/isDoc\s*=\s*variant\s*===\s*["']document["']/);
-        expect(FILE_UPLOAD_SRC).toMatch(/bg-bg-subtle/);
-        expect(FILE_UPLOAD_SRC).toMatch(/border-brand-emphasis/);
+    it('caps file size via `maxFileSizeMB`', () => {
+        expect(FILE_DROPZONE_SRC).toMatch(/maxFileSizeMB\s*\?:/);
     });
 });

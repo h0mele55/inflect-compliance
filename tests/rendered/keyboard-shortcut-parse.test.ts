@@ -5,7 +5,15 @@
  * shortcut-grammar regressions are caught without spinning up React.
  *
  * Runs under the jsdom Jest project because `KeyboardEvent` needs DOM.
+ *
+ * Per-test timeout bump: under the full-suite parallel run, jsdom
+ * boot-up + KeyboardEvent construction can push individual tests past
+ * Jest's 5s default. Isolated runs land in ~1.5s/test; full-suite
+ * pressure with bcrypt + chart-renderer suites running in parallel
+ * pushes some tests past 30s. 90s gives headroom without masking
+ * real regressions.
  */
+jest.setTimeout(90_000);
 
 import {
     __setIsMacForTests,

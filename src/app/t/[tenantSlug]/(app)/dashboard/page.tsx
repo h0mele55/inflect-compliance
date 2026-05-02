@@ -27,7 +27,6 @@ import { RiskMatrix } from '@/components/ui/RiskMatrix';
 import ExpiryCalendar from '@/components/ui/ExpiryCalendar';
 import RecentActivityCard from './RecentActivityCard';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { cn } from '@dub/utils';
 
@@ -421,13 +420,30 @@ async function TrendSection({ ctx }: { ctx: Parameters<typeof getComplianceTrend
     }
 
     if (trends.daysAvailable < 2) {
+        // Inline empty state — this is a server component, and
+        // <EmptyState>'s `icon` prop takes a Component reference
+        // (`React.ElementType`). Passing a function/forwardRef from a
+        // server component to a client component is a Next.js 15
+        // violation ("Functions cannot be passed directly to Client
+        // Components"). EmptyState is the right primitive for
+        // client-page empty states; this server-rendered page renders
+        // the icon JSX inline so the SSR boundary only sees serialised
+        // React nodes.
         return (
-            <div className="glass-card" id="trend-section">
-                <EmptyState
-                    icon={TrendingUp}
-                    title="Compliance Trends"
-                    description="Trend charts will appear here after the daily compliance snapshot runs. Snapshots are generated automatically at 05:00 UTC."
-                />
+            <div
+                className="glass-card flex flex-col items-center justify-center gap-y-4 py-12 px-6"
+                id="trend-section"
+            >
+                <div className="flex size-14 items-center justify-center rounded-xl border border-border-subtle bg-bg-muted">
+                    <TrendingUp className="size-6 text-content-muted" aria-hidden="true" />
+                </div>
+                <p className="text-center text-base font-medium text-content-emphasis">
+                    Compliance Trends
+                </p>
+                <p className="max-w-sm text-balance text-center text-sm text-content-muted">
+                    Trend charts will appear here after the daily compliance snapshot runs.
+                    Snapshots are generated automatically at 05:00 UTC.
+                </p>
             </div>
         );
     }

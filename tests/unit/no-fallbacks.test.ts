@@ -82,6 +82,15 @@ describe('Static Analysis: No process.env fallbacks', () => {
             // variable to satisfy schema validation, contradicting
             // the operating model documented in docs/billing.md.
             if (file.endsWith('billing/entitlements.ts')) continue;
+            // ClientProviders gates the Driver.js onboarding-tour
+            // auto-trigger via NEXT_PUBLIC_TEST_MODE. NEXT_PUBLIC_*
+            // env vars MUST be read via `process.env.NEXT_PUBLIC_*`
+            // for Next.js's build-time inlining to fire — env.ts
+            // validates at runtime and would break the inlining.
+            // The fallback to `process.env.NODE_ENV` covers test
+            // environments that don't set NEXT_PUBLIC_TEST_MODE
+            // explicitly (e.g. jsdom + jest).
+            if (file.endsWith('layout/ClientProviders.tsx')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 

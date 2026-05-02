@@ -27,8 +27,25 @@ export default async function RecentActivityCard({
 
     return (
         <div className="glass-card p-5">
-            <h3 className="text-sm font-semibold text-content-default mb-3">{label}</h3>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
+            <h3
+                id="recent-activity-heading"
+                className="text-sm font-semibold text-content-default mb-3"
+            >
+                {label}
+            </h3>
+            {/*
+              tabIndex=0 + role=region + aria-labelledby satisfies axe's
+              `scrollable-region-focusable` rule (WCAG 2.1.1 Keyboard).
+              Without these, keyboard-only users cannot scroll the
+              activity list — the rule is "serious" because the
+              content is hidden behind the overflow.
+            */}
+            <div
+                className="space-y-2 max-h-40 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] rounded"
+                tabIndex={0}
+                role="region"
+                aria-labelledby="recent-activity-heading"
+            >
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {recentActivity.map((log: any) => (
                     <div key={log.id} className="flex flex-col sm:flex-row items-start gap-1 sm:gap-2 text-xs">

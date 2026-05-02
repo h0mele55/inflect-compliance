@@ -26,8 +26,21 @@ describe('Dashboard page token migration', () => {
         expect(src).toContain("from '@/components/ui/status-badge'");
     });
 
-    it('imports EmptyState', () => {
-        expect(src).toContain("from '@/components/ui/empty-state'");
+    it('uses an EmptyState pattern (component or inline) for the trends empty case', () => {
+        // The dashboard is a server component; passing a Component
+        // reference (`React.ElementType`) to the `<EmptyState>` client
+        // component triggers the Next.js 15 "Functions cannot be
+        // passed directly to Client Components" violation. The
+        // dashboard's "no trends yet" branch was therefore inlined
+        // (server-rendered icon JSX). Either shape satisfies the
+        // empty-state contract — what matters is that the surface
+        // exists and uses semantic tokens.
+        const usesEmptyStateImport = src.includes(
+            "from '@/components/ui/empty-state'",
+        );
+        const usesInlineEmptyState =
+            /id=["']trend-section["'][\s\S]{0,800}text-content-emphasis/.test(src);
+        expect(usesEmptyStateImport || usesInlineEmptyState).toBe(true);
     });
 
     it('uses semantic text tokens', () => {

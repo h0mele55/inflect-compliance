@@ -33,6 +33,11 @@ export default async function AppLayout({
     // Resolve translations server-side — passed as plain string to AppShell
     const tc = await getTranslations('common');
 
+    // ClientProviders sits inside AppShell so the page tree (children)
+    // gets QueryClient + OnboardingTour context. AppShell's own
+    // SidebarNav must NOT depend on either provider — the
+    // calendar-badge hook (Epic 49) uses a plain fetch + useState
+    // instead of useQuery for that reason.
     return (
         <AppShell
             user={{ name: session.user.name }}
