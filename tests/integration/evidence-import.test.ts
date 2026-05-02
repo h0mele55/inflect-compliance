@@ -11,6 +11,16 @@
  * separate structural assertion.
  */
 
+// Force the local storage provider BEFORE any storage module imports.
+// `STORAGE_PROVIDER` defaults to "s3" in env.ts; CI doesn't set
+// STORAGE_PROVIDER (or S3_BUCKET) — without this guard the storage
+// layer initialises in s3 mode and `getStorageProvider()` throws
+// `S3_BUCKET environment variable is required when STORAGE_PROVIDER=s3`.
+// Local devs typically have STORAGE_PROVIDER=local in their `.env`
+// so the test passes there; CI has no `.env`. Setting it inside the
+// test file works in both environments.
+process.env.STORAGE_PROVIDER = 'local';
+
 // Load .env.test FIRST so REDIS_URL points at the test redis
 // container before any module that lazily reads
 // `process.env.REDIS_URL` (the evidence usecase's cache layer)
