@@ -46,7 +46,7 @@ test.describe('Issue Management', () => {
         await page.click('#create-task-btn');
 
         await page.waitForURL('**/tasks/**', { timeout: 30000 });
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#task-title', { timeout: 30000 });
         await expect(page.locator('#task-title')).toContainText(`E2E Issue ${uniqueId}`, { timeout: 15000 });
         await expect(page.locator('#task-severity')).toContainText('HIGH', { timeout: 5000 });
@@ -110,7 +110,7 @@ test.describe('Issue Management', () => {
             if (visible) {
                 await option.click();
                 await page.click('#assign-task-btn');
-                await page.waitForLoadState('networkidle');
+                await page.waitForLoadState('networkidle').catch(() => {});
                 await page.reload();
                 await page.waitForSelector('#task-assignee', { timeout: 10000 });
             }
@@ -126,7 +126,7 @@ test.describe('Issue Management', () => {
 
         // Go to links tab
         await page.click('#tab-links');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Add a link — the task-detail picker uses raw enum values
         // (CONTROL/RISK/ASSET/…) as the visible labels.
@@ -135,7 +135,7 @@ test.describe('Issue Management', () => {
         await selectComboboxOption(page, 'link-entity-type', 'CONTROL');
         await page.fill('#link-entity-id', 'test-control-id');
         await page.click('#submit-link-btn');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Verify link appears
         await expect(page.locator('#links-list')).toContainText('CONTROL', { timeout: 5000 });
@@ -147,17 +147,17 @@ test.describe('Issue Management', () => {
         await gotoAndVerify(page, `/t/${tenantSlug}/tasks`, 'h1');
 
         await page.click(`text=E2E Issue ${uniqueId}`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#task-title', { timeout: 30000 });
 
         // Go to comments tab
         await page.click('#tab-comments');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Add a comment
         await page.fill('#comment-body', `E2E comment ${uniqueId}`);
         await page.click('#submit-comment-btn');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Verify comment appears
         await expect(page.locator('#comments-list')).toContainText(`E2E comment ${uniqueId}`, { timeout: 15000 });

@@ -33,7 +33,7 @@ test.describe('Onboarding Wizard', () => {
     test('admin starts onboarding and sees the wizard', async ({ page }) => {
         const slug = await signInAs(page, tenant);
         await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // The onboarding page uses dynamic import (ssr: false) + API fetch.
         // Wait for either the welcome screen OR the wizard OR completed state to render.
@@ -61,7 +61,7 @@ test.describe('Onboarding Wizard', () => {
         const startBtn = page.locator('button:has-text("Start Setup")');
         if (await startBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await startBtn.click();
-            await page.waitForLoadState('networkidle');
+            await page.waitForLoadState('networkidle').catch(() => {});
         }
 
         // Fill company name
@@ -74,7 +74,7 @@ test.describe('Onboarding Wizard', () => {
         const continueBtn = page.locator('button:has-text("Continue")');
         if (await continueBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
             await continueBtn.click();
-            await page.waitForLoadState('networkidle');
+            await page.waitForLoadState('networkidle').catch(() => {});
         }
     });
 
@@ -83,7 +83,7 @@ test.describe('Onboarding Wizard', () => {
         await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
 
         // Should NOT show the welcome screen — should show the wizard with progress
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         const wizardEl = page.locator('[data-testid="onboarding-wizard"]');
         const hasWizard = await wizardEl.isVisible({ timeout: 5000 }).catch(() => false);
 
@@ -106,7 +106,7 @@ test.describe('Onboarding Wizard', () => {
         const slug = await loginAsAdmin(page, { email: 'viewer@acme.com', password: 'password123' });
 
         await gotoAndVerify(page, `/t/${slug}/onboarding`, 'main');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         const pageContent = await page.textContent('body');
         const blocked = pageContent?.includes('Access Restricted') || pageContent?.includes('administrator');

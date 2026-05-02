@@ -147,7 +147,7 @@ test.describe('Control Toggle Pills', () => {
 
         await page.goto(`/t/${tenantSlug}/controls`);
         await page.waitForSelector('#controls-table', { timeout: 15000 });
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Reader sees a static <span>; the interactive `<select>` is
         // gated by `appPermissions.controls.edit`.

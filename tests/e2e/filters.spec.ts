@@ -27,7 +27,7 @@ test.describe('FilterToolbar — Tasks', () => {
     test('search input writes q param to the URL on Enter', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/tasks`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         const search = page.locator('#task-search');
         await expect(search).toBeVisible({ timeout: 15000 });
@@ -41,7 +41,7 @@ test.describe('FilterToolbar — Tasks', () => {
     test('picking a type filter pushes it into the URL', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/tasks`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         await page.getByRole('button', { name: /^filter$/i }).first().click();
         await expect(page.getByRole('listbox').first()).toBeVisible({ timeout: 10000 });
@@ -62,7 +62,7 @@ test.describe('FilterToolbar — Tasks', () => {
     test('picking a severity filter pushes it into the URL', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/tasks`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         await page.getByRole('button', { name: /^filter$/i }).first().click();
         await expect(page.getByRole('listbox').first()).toBeVisible({ timeout: 10000 });
@@ -89,7 +89,7 @@ test.describe('FilterToolbar — Vendors', () => {
     test('search input writes q param to the URL on Enter', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/vendors`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         const search = page.locator('#vendor-search');
         await expect(search).toBeVisible({ timeout: 15000 });
@@ -103,7 +103,7 @@ test.describe('FilterToolbar — Vendors', () => {
     test('picking a criticality filter pushes it into the URL', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/vendors`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         await page.getByRole('button', { name: /^filter$/i }).first().click();
         await expect(page.getByRole('listbox').first()).toBeVisible({ timeout: 10000 });
@@ -124,7 +124,7 @@ test.describe('FilterToolbar — URL persistence', () => {
     test('filters survive a page refresh', async ({ page }) => {
         const tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls?status=IMPLEMENTED&q=policy`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Search input rehydrates with the q param value.
         const search = page.locator('#control-search');
@@ -133,7 +133,7 @@ test.describe('FilterToolbar — URL persistence', () => {
 
         // Reload — URL params come back verbatim.
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         expect(page.url()).toContain('status=IMPLEMENTED');
         expect(page.url()).toContain('q=policy');

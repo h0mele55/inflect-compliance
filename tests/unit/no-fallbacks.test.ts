@@ -91,6 +91,13 @@ describe('Static Analysis: No process.env fallbacks', () => {
             // environments that don't set NEXT_PUBLIC_TEST_MODE
             // explicitly (e.g. jsdom + jest).
             if (file.endsWith('layout/ClientProviders.tsx')) continue;
+            // use-calendar-badge gates the sidebar polling fetch via
+            // NEXT_PUBLIC_TEST_MODE for the same build-time-inlining
+            // reason. Two SidebarContent mounts × N test page loads
+            // produced enough in-flight requests to keep
+            // `waitForLoadState('networkidle')` from settling on slow
+            // CI runners — see the docblock in use-calendar-badge.ts.
+            if (file.endsWith('use-calendar-badge.ts')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 

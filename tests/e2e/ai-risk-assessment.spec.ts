@@ -93,7 +93,7 @@ test.describe('AI-Assisted Risk Assessment', () => {
         // Navigate to risk register
         await page.click('#view-risks-btn');
         await page.waitForURL('**/risks', { timeout: 30000 });
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Verify the risk is in the register. Serial-mode E2E runs
         // accumulate dozens of risks; the AI-applied row often lands on

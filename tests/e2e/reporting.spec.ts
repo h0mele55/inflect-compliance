@@ -39,7 +39,7 @@ test.describe('Reporting & Audit Narrative', () => {
         await expect(page.locator('#frameworks-heading')).toContainText('Compliance Frameworks');
 
         // Wait for cards to hydrate
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         const cardCount = await page.locator('[id^="fw-card-"]').count();
         expect(cardCount).toBeGreaterThanOrEqual(1);
     });

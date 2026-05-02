@@ -52,11 +52,11 @@ test.describe('Vendor Management', () => {
         // Extract vendor URL from the first link
         const vendorUrl = await page.locator('[id^="vendor-link-"]').first().getAttribute('href');
         await page.locator('[id^="vendor-link-"]').first().click();
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await expect(page.locator('#vendor-detail-name')).toBeVisible({ timeout: 60000 });
 
         await page.click('#tab-documents');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         await expect(page.locator('#add-doc-btn')).toBeVisible({ timeout: 20000 });
         await page.click('#add-doc-btn');
@@ -77,10 +77,10 @@ test.describe('Vendor Management', () => {
         if (!docVisible) {
             // Reload to force re-fetch
             await page.reload();
-            await page.waitForLoadState('networkidle');
+            await page.waitForLoadState('networkidle').catch(() => {});
             await expect(page.locator('#vendor-detail-name')).toBeVisible({ timeout: 60000 });
             await page.click('#tab-documents');
-            await page.waitForLoadState('networkidle');
+            await page.waitForLoadState('networkidle').catch(() => {});
         }
         await expect(page.locator(`text=SOC2 Report 2025 ${uid}`)).toBeVisible({ timeout: 20000 });
     });

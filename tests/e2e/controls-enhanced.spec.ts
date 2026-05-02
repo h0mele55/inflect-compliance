@@ -59,7 +59,7 @@ test.describe('Controls Enhanced', () => {
     test('activity tab shows events', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('h1', { timeout: 15000 });
 
         // Click any control
@@ -70,7 +70,7 @@ test.describe('Controls Enhanced', () => {
 
             // Click activity tab and wait for data to load
             await page.click('#tab-activity');
-            await page.waitForLoadState('networkidle');
+            await page.waitForLoadState('networkidle').catch(() => {});
 
             // Wait for either the activity feed or the empty state to appear
             await Promise.race([
@@ -88,13 +88,13 @@ test.describe('Controls Enhanced', () => {
     test('automation section is visible on detail page', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('h1', { timeout: 15000 });
 
         const firstControl = page.locator('#controls-table tbody tr a').first();
         if (await firstControl.isVisible()) {
             await firstControl.click();
-            await page.waitForLoadState('networkidle');
+            await page.waitForLoadState('networkidle').catch(() => {});
             await page.waitForSelector('#control-title', { timeout: 30000 });
 
             // Should see automation section in overview

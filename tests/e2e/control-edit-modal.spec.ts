@@ -20,7 +20,7 @@ test.describe('Control Edit Modal', () => {
         
         // Wait for page transition and hydration — control detail page is large (995 LOC)
         // and requires JIT compilation on first access in dev mode
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#control-title', { timeout: 30000 });
 
         // Edit button should be visible
@@ -38,7 +38,7 @@ test.describe('Control Edit Modal', () => {
         await firstLink.click();
         
         // Wait for page transition and hydration
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#control-title', { timeout: 30000 });
 
         // Record original title
@@ -87,7 +87,7 @@ test.describe('Control Edit Modal', () => {
         await firstLink.waitFor({ state: 'visible', timeout: 15000 });
         await firstLink.click();
         
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#control-title', { timeout: 30000 });
 
         const originalTitle = (await page.locator('#control-title').textContent())!.trim();

@@ -165,7 +165,7 @@ test.describe('Audit Readiness', () => {
     test('create NIS2 cycle', async () => {
         await page.goto(`/t/${tenantSlug}/audits/cycles`);
         // Wait for Network to settle instead of hardcoded 2000ms
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Wait explicitly for the button to appear in DOM, meaning the data fetch completed
         await page.waitForSelector('#create-cycle-btn', { timeout: 15000 });

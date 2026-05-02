@@ -23,7 +23,7 @@ test.describe('Controls — Epic 53 filter system', () => {
     test('search input writes q param to the URL on Enter', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         const search = page.locator('#control-search');
         await expect(search).toBeVisible({ timeout: 15000 });
@@ -43,7 +43,7 @@ test.describe('Controls — Epic 53 filter system', () => {
     test('clearing the search returns to the unfiltered list', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls?q=zzz`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         const search = page.locator('#control-search');
         await expect(search).toHaveValue('zzz');
@@ -58,7 +58,7 @@ test.describe('Controls — Epic 53 filter system', () => {
     test('FilterSelect trigger opens the command palette', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // The shared FilterSelect renders a button labelled "Filter". Click the
         // first matching button to open the picker.
@@ -75,7 +75,7 @@ test.describe('Controls — Epic 53 filter system', () => {
     test('picking a status filter pushes it into the URL', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await safeGoto(page, `/t/${tenantSlug}/controls`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         await page.getByRole('button', { name: /filter/i }).first().click();
         await expect(page.getByRole('listbox').first()).toBeVisible({ timeout: 10000 });
