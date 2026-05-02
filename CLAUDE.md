@@ -614,6 +614,38 @@ duplicating the limits table).
 - `SKIP_ENV_VALIDATION=1` is set in `jest.setup.js` to prevent env loader crash in unit tests.
 - Coverage thresholds: 60% global (branches, functions, lines, statements); checked on `npm run test:coverage`.
 
+## Failing tests
+
+A failing test on a branch is a failing test, full stop. "Pre-existing on
+main" is a diagnosis, not a license to bypass it. The rule:
+
+- **Run the affected test suites before claiming a task is done.** Don't
+  rely on "my changes only touch X" — Jest projects, structural ratchets,
+  and import graphs catch surprising regressions.
+
+- **When a test fails, find the root cause first.** Check whether your
+  change broke it; if not, check whether it's failing on `main` too. The
+  goal is to know what the failure means, not to assign blame.
+
+- **Pre-existing failures must be fixed, not bypassed.** If a suite is
+  red on `main`, that's a bug — open a focused fix PR, link it from the
+  current PR, and either (a) include the fix in the current PR if it's
+  small and on-scope, or (b) explicitly call out the blocker in the PR
+  description. Never silently admin-merge through a red test.
+
+- **Never use `gh pr merge --admin` to push past failing CI** without
+  the user's explicit authorisation for that specific PR. Required
+  checks exist for a reason; the cost of pausing is low, the cost of
+  shipping a regression to main is high.
+
+- **Apply the same standard to dependency PRs.** A dependabot bump that
+  breaks a test on `main` still needs the underlying breakage fixed,
+  even though the bump itself is mechanical.
+
+The exception: if the user has explicitly said "merge despite the
+failures, I know what they are" for a specific PR, that authorisation
+stands for that PR only — not as a precedent.
+
 ## Key Conventions
 
 - **Zod schemas** for all API input validation live in `src/app-layer/schemas/` (backend) and `src/lib/schemas/` (shared).
