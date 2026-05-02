@@ -124,6 +124,11 @@ run('npx next build', '4/6  Build Next.js (production)', {
     NODE_ENV: 'production',
     NEXT_IGNORE_INCORRECT_LOCKFILE: '1',
     NEXT_TEST_MODE: '1',
+    // NEXT_PUBLIC_* values get inlined into the client bundle at
+    // build time. Used by `<ClientProviders>` to suppress the
+    // Driver.js onboarding-tour auto-trigger so the tour overlay
+    // doesn't cover every authenticated page in E2E sessions.
+    NEXT_PUBLIC_TEST_MODE: '1',
 });
 
 // ── 5. Install Playwright browsers ──

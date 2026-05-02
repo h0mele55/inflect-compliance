@@ -47,7 +47,12 @@ const APP_ROOT = path.resolve(__dirname, '../../src/app');
 //   - controls/[controlId]/page.tsx        syncError truncation fallback
 //   - reports/soa/SoAClient.tsx            justification truncation fallback
 //   - risks/dashboard/page.tsx             heatmap matrix cell (density)
-const BASELINE_HTML_TITLE_ATTRS = 3;
+//   - risks/RisksClient.tsx:360            heatmap matrix cell (density) —
+//       same pattern as dashboard, fourth cell-density tooltip in the
+//       app. Density cells render dozens-to-hundreds per page; a real
+//       Tooltip portal per cell would be measurably costly. The native
+//       `title=` is the right tradeoff at this scale.
+const BASELINE_HTML_TITLE_ATTRS = 4;
 
 function walk(dir: string, out: string[]): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

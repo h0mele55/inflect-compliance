@@ -80,28 +80,47 @@ describe('Epic 55 — FormField adoption ratchet', () => {
 
 describe('Epic 55 — FormError adoption ratchet', () => {
     it.each(FORM_ERROR_SURFACES)(
-        '%s imports + uses <FormError>',
+        '%s surfaces field-level errors via <FormError> OR <FormField error=…>',
         (rel) => {
             const full = path.join(REPO_ROOT, rel);
             expect(fs.existsSync(full)).toBe(true);
             const src = fs.readFileSync(full, 'utf-8');
 
-            expect(src).toMatch(
-                /from\s+['"]@\/components\/ui\/form-error['"]/,
-            );
-            expect(src).toMatch(/<FormError\b/);
+            // Two equally-valid surfaces:
+            //   (a) Direct `<FormError>` import + JSX usage — the original
+            //       Epic 55 pattern, used when the form owns its error
+            //       state explicitly (e.g., conditional banners outside
+            //       the FormField row).
+            //   (b) `<FormField error={...}>` from `@/components/ui/form-field`
+            //       — the canonical Epic 64-FORM pattern with
+            //       react-hook-form. FormField renders FormError
+            //       internally when the `error` prop is set.
+            //
+            // The original ratchet only matched (a), which broke when
+            // NewControlModal migrated to RHF + FormField. Both patterns
+            // produce the same end-user error rendering; the rule should
+            // accept either.
+            const usesDirectFormError =
+                /from\s+['"]@\/components\/ui\/form-error['"]/.test(src) &&
+                /<FormError\b/.test(src);
+            const usesFormFieldError =
+                /from\s+['"]@\/components\/ui\/form-field['"]/.test(src) &&
+                /<FormField[\s\S]*?\berror=/.test(src);
+            expect(usesDirectFormError || usesFormFieldError).toBe(true);
         },
     );
 
     it(
-        `at least ${MIN_FORM_ERROR} surfaces carry <FormError> (count can only grow)`,
+        `at least ${MIN_FORM_ERROR} surfaces carry field-level error rendering (count can only grow)`,
         () => {
             const instrumented = FORM_ERROR_SURFACES.filter((rel) => {
                 const full = path.join(REPO_ROOT, rel);
                 if (!fs.existsSync(full)) return false;
-                return fs
-                    .readFileSync(full, 'utf-8')
-                    .includes('<FormError');
+                const src = fs.readFileSync(full, 'utf-8');
+                return (
+                    src.includes('<FormError') ||
+                    /<FormField[\s\S]*?\berror=/.test(src)
+                );
             });
             expect(instrumented.length).toBeGreaterThanOrEqual(MIN_FORM_ERROR);
         },

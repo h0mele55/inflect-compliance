@@ -47,6 +47,10 @@ beforeEach(() => {
             controlTestPlan: { findMany: jest.fn().mockResolvedValue([]) },
             evidence: { findMany: jest.fn().mockResolvedValue([]) },
             vendor: { findMany: jest.fn().mockResolvedValue([]) },
+            // Epic 49 calendar-deadlines monitor sources.
+            auditCycle: { findMany: jest.fn().mockResolvedValue([]) },
+            vendorDocument: { findMany: jest.fn().mockResolvedValue([]) },
+            finding: { findMany: jest.fn().mockResolvedValue([]) },
             user: { findMany: jest.fn().mockResolvedValue([]) },
             tenantMembership: { findMany: jest.fn().mockResolvedValue([]) },
             tenant: { findUnique: jest.fn().mockResolvedValue({ slug: 'test' }) },
@@ -61,6 +65,10 @@ beforeEach(() => {
             controlTestPlan: { findMany: jest.fn().mockResolvedValue([]) },
             evidence: { findMany: jest.fn().mockResolvedValue([]) },
             vendor: { findMany: jest.fn().mockResolvedValue([]) },
+            // Epic 49 calendar-deadlines monitor sources.
+            auditCycle: { findMany: jest.fn().mockResolvedValue([]) },
+            vendorDocument: { findMany: jest.fn().mockResolvedValue([]) },
+            finding: { findMany: jest.fn().mockResolvedValue([]) },
             user: { findMany: jest.fn().mockResolvedValue([]) },
             tenantMembership: { findMany: jest.fn().mockResolvedValue([]) },
             tenant: { findUnique: jest.fn().mockResolvedValue({ slug: 'test' }) },

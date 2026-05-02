@@ -218,13 +218,31 @@ describe('Executor Registry — structural tenant-scope guards', () => {
     });
 
     test('every non-exempt executor references tenantId', () => {
-        const registerPattern = /executorRegistry\.register\('([^']+)',\s*async\s*\(([^)]*)\)\s*=>\s*\{([\s\S]*?)\}\);/g;
+        // Walk each `executorRegistry.register('<name>', async (payload, ctx) => {`
+        // opener, then count braces to find the matching close — the
+        // previous regex `\}\);` was non-greedy and stopped at the
+        // FIRST inner `});`, which for executors with nested closures
+        // (e.g. `evidence-import` passing a progress callback to
+        // `runEvidenceImport`) cut off the body before reaching the
+        // outer `tenantId: r.tenantId` payload.
+        const openerRe =
+            /executorRegistry\.register\('([^']+)',\s*async\s*\([^)]*\)\s*=>\s*\{/g;
         const violations: string[] = [];
 
-        let match;
-        while ((match = registerPattern.exec(registrySource)) !== null) {
-            const jobName = match[1];
-            const body = match[3];
+        let opener: RegExpExecArray | null;
+        while ((opener = openerRe.exec(registrySource)) !== null) {
+            const jobName = opener[1];
+            // Start brace-counting at the opener's `{` (last char of match)
+            const start = opener.index + opener[0].length;
+            let depth = 1;
+            let i = start;
+            while (i < registrySource.length && depth > 0) {
+                const ch = registrySource[i];
+                if (ch === '{') depth++;
+                else if (ch === '}') depth--;
+                i++;
+            }
+            const body = registrySource.slice(start, i - 1);
 
             if (EXEMPT_JOBS.includes(jobName)) continue;
             if (!body.includes('tenantId')) {

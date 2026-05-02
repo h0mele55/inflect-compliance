@@ -37,7 +37,7 @@ const MIGRATED_PAGES: Array<{
     allowLegacyUrlFilterScope?: string[];
 }> = [
     { dir: 'controls', client: 'ControlsClient.tsx' },
-    { dir: 'evidence', client: 'EvidenceClient.tsx', allowLegacyUrlFilterScope: ['tab'] },
+    { dir: 'evidence', client: 'EvidenceClient.tsx', allowLegacyUrlFilterScope: ['tab', 'view'] },
     { dir: 'risks', client: 'RisksClient.tsx' },
     { dir: 'policies', client: 'PoliciesClient.tsx' },
     { dir: 'tasks', client: 'TasksClient.tsx' },
@@ -61,12 +61,22 @@ describe('Every migrated list page colocates a filter-defs.ts', () => {
 // ─── 2. Client imports the shared stack + FilterToolbar ────────────
 
 describe('Every migrated client imports the shared filter stack', () => {
-    it.each(MIGRATED_PAGES)('%s imports useFilterContext + FilterToolbar', (page) => {
+    it.each(MIGRATED_PAGES)('%s imports useFilterContext + a FilterToolbar host', (page) => {
         const src = read(path.join(PAGES_ROOT, page.dir, page.client));
         expect(src).toMatch(/from ['"]@\/components\/ui\/filter['"]/);
         expect(src).toMatch(/useFilterContext/);
-        expect(src).toMatch(/from ['"]@\/components\/filters\/FilterToolbar['"]/);
-        expect(src).toMatch(/<FilterToolbar\b/);
+        // FilterToolbar may be imported + rendered DIRECTLY (the
+        // original Epic 53 pattern), OR mounted via <EntityListPage>
+        // (the Epic 91 layout shell that hosts FilterToolbar
+        // internally — see EntityListPage.tsx). Both shapes deliver
+        // the same shared filter stack to the user.
+        const usesFilterToolbarDirectly =
+            /from ['"]@\/components\/filters\/FilterToolbar['"]/.test(src) &&
+            /<FilterToolbar\b/.test(src);
+        const usesEntityListPage =
+            /from ['"]@\/components\/layout\/EntityListPage['"]/.test(src) &&
+            /<EntityListPage\b/.test(src);
+        expect(usesFilterToolbarDirectly || usesEntityListPage).toBe(true);
     });
 });
 

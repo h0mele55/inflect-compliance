@@ -48,6 +48,12 @@ const spies = {
     controlTestPlan: jest.fn().mockResolvedValue([]),
     evidence:        jest.fn().mockResolvedValue([]),
     vendor:          jest.fn().mockResolvedValue([]),
+    // Epic 49 — calendar-deadlines monitor adds three entity sources
+    // that the original deadline-monitor doesn't cover. They merge
+    // into DEADLINE_DIGEST inside notification-dispatch.
+    auditCycle:      jest.fn().mockResolvedValue([]),
+    vendorDocument:  jest.fn().mockResolvedValue([]),
+    finding:         jest.fn().mockResolvedValue([]),
     // Notification infra — NOT source entities
     user:            jest.fn().mockResolvedValue([]),
     membership:      jest.fn().mockResolvedValue([]),
@@ -68,6 +74,9 @@ beforeEach(() => {
     spies.controlTestPlan.mockResolvedValue([]);
     spies.evidence.mockResolvedValue([]);
     spies.vendor.mockResolvedValue([]);
+    spies.auditCycle.mockResolvedValue([]);
+    spies.vendorDocument.mockResolvedValue([]);
+    spies.finding.mockResolvedValue([]);
     spies.user.mockResolvedValue([]);
     spies.membership.mockResolvedValue([]);
     spies.tenant.mockResolvedValue({ slug: 'test' });
@@ -86,6 +95,10 @@ beforeEach(() => {
         controlTestPlan:  { findMany: (...a: unknown[]) => spies.controlTestPlan(...a) },
         evidence:         { findMany: (...a: unknown[]) => spies.evidence(...a) },
         vendor:           { findMany: (...a: unknown[]) => spies.vendor(...a) },
+        // Epic 49 calendar-deadlines monitor sources.
+        auditCycle:       { findMany: (...a: unknown[]) => spies.auditCycle(...a) },
+        vendorDocument:   { findMany: (...a: unknown[]) => spies.vendorDocument(...a) },
+        finding:          { findMany: (...a: unknown[]) => spies.finding(...a) },
         user:             { findMany: (...a: unknown[]) => spies.user(...a) },
         tenantMembership: { findMany: (...a: unknown[]) => spies.membership(...a) },
         tenant:           { findUnique: (...a: unknown[]) => spies.tenant(...a) },
@@ -114,6 +127,9 @@ describe('REGRESSION: query budget per notification-dispatch run', () => {
      *   - controlTestPlan: 1 (deadline-monitor)
      *   - evidence:        2 (evidence-expiry-monitor: retentionUntil + expired)
      *   - vendor:          4 (vendor-renewal: overdue reviews, due reviews, overdue renewals, due renewals)
+     *   - auditCycle:      1 (Epic 49 calendar-deadlines monitor — periodEndAt scan)
+     *   - vendorDocument:  1 (Epic 49 calendar-deadlines monitor — validTo scan)
+     *   - finding:         1 (Epic 49 calendar-deadlines monitor — dueDate scan)
      *
      * If any of these double, someone reintroduced a second scan path.
      */
@@ -125,6 +141,9 @@ describe('REGRESSION: query budget per notification-dispatch run', () => {
         controlTestPlan: { spy: 'controlTestPlan', maxCalls: 1, source: 'deadline-monitor' },
         evidence:        { spy: 'evidence',        maxCalls: 2, source: 'evidence-expiry-monitor' },
         vendor:          { spy: 'vendor',          maxCalls: 4, source: 'vendor-renewal-check' },
+        auditCycle:      { spy: 'auditCycle',      maxCalls: 1, source: 'calendar-deadlines' },
+        vendorDocument:  { spy: 'vendorDocument',  maxCalls: 1, source: 'calendar-deadlines' },
+        finding:         { spy: 'finding',         maxCalls: 1, source: 'calendar-deadlines' },
     };
 
     test('full dispatch run stays within query budget for ALL entity tables', async () => {
@@ -156,6 +175,9 @@ describe('REGRESSION: query budget per notification-dispatch run', () => {
         controlTestPlan: { spy: 'controlTestPlan' as const, maxCalls: 1 },
         evidence:        { spy: 'evidence' as const,        maxCalls: 2 },
         vendor:          { spy: 'vendor' as const,          maxCalls: 4 },
+        auditCycle:      { spy: 'auditCycle' as const,      maxCalls: 1 },
+        vendorDocument:  { spy: 'vendorDocument' as const,  maxCalls: 1 },
+        finding:         { spy: 'finding' as const,         maxCalls: 1 },
     }))(
         '%s: at most %j queries per dispatch',
         async (table, { spy, maxCalls }) => {

@@ -12,7 +12,12 @@
  *   - needsRehash correctly flags weaker hashes for silent migration
  *   - validatePasswordPolicy enforces length floor + ceiling with the
  *     documented reason codes
+ *
+ * Per-test timeout bump: bcrypt is CPU-heavy; under the full-suite
+ * parallel run a single hash can push past Jest's 5s default.
+ * 60s gives headroom without masking real regressions.
  */
+jest.setTimeout(60_000);
 
 import {
     BCRYPT_COST,

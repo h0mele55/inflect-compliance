@@ -44,9 +44,26 @@ export function ClientProviders({
      *  inert in that case. */
     userId?: string | null;
 }) {
+    // Suppress the Driver.js auto-trigger in E2E test runs. Without
+    // this, every freshly-seeded test user counts as a first-login
+    // candidate (no completion record in localStorage) and the tour
+    // overlay covers the page mid-test, blocking Playwright's
+    // selector-visibility checks. The manual "Take the tour" button
+    // in the sidebar still works regardless.
+    //
+    // `NEXT_PUBLIC_TEST_MODE` is set by `scripts/e2e-local.mjs` and the
+    // playwright.config.ts webServer command. Reading via `process.env`
+    // is safe here: Next.js inlines `NEXT_PUBLIC_*` at build time, so
+    // the value the client sees is the value the server was built with.
+    const autoTrigger =
+        process.env.NEXT_PUBLIC_TEST_MODE !== '1' &&
+        process.env.NODE_ENV !== 'test';
     return (
         <QueryClientProvider client={getQueryClient()}>
-            <OnboardingTourProvider userId={userId ?? null}>
+            <OnboardingTourProvider
+                userId={userId ?? null}
+                autoTriggerOnFirstLogin={autoTrigger}
+            >
                 {children}
             </OnboardingTourProvider>
         </QueryClientProvider>

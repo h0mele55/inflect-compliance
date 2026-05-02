@@ -17,7 +17,13 @@
  *
  * prisma is mocked; bcryptjs runs for real so we're also end-to-end
  * exercising the hash module.
+ *
+ * Per-test timeout bump: bcrypt is CPU-heavy; under the full-suite
+ * parallel run a single hash + verify can push past Jest's 5s default.
+ * Isolated runs land in <1s/test; full-suite pressure pushes some tests
+ * to 10-30s. 60s gives headroom without masking real regressions.
  */
+jest.setTimeout(60_000);
 
 import bcrypt from 'bcryptjs';
 

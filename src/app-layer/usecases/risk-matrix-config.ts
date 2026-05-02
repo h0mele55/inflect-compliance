@@ -30,7 +30,6 @@ import { runInTenantContext } from '@/lib/db/rls-middleware';
 import { assertCanRead } from '@/app-layer/policies/common';
 import { forbidden, badRequest } from '@/lib/errors/types';
 import { logEvent } from '@/app-layer/events/audit';
-import { prisma } from '@/lib/prisma';
 import {
     DEFAULT_RISK_MATRIX_CONFIG,
 } from '@/lib/risk-matrix/defaults';
@@ -140,46 +139,44 @@ export async function updateRiskMatrixConfig(
         // cast through one place keeps the rest of the usecase honest.
         const labelsJson = merged.levelLabels as unknown as Prisma.InputJsonValue;
         const bandsJson = merged.bands as unknown as Prisma.InputJsonValue;
-        if (existing) {
-            return db.riskMatrixConfig.update({
-                where: { tenantId: ctx.tenantId },
-                data: {
-                    likelihoodLevels: merged.likelihoodLevels,
-                    impactLevels: merged.impactLevels,
-                    axisLikelihoodLabel: merged.axisLikelihoodLabel,
-                    axisImpactLabel: merged.axisImpactLabel,
-                    levelLabels: labelsJson,
-                    bands: bandsJson,
-                },
-            });
-        }
-        return db.riskMatrixConfig.create({
-            data: {
-                tenantId: ctx.tenantId,
+        const row = existing
+            ? await db.riskMatrixConfig.update({
+                  where: { tenantId: ctx.tenantId },
+                  data: {
+                      likelihoodLevels: merged.likelihoodLevels,
+                      impactLevels: merged.impactLevels,
+                      axisLikelihoodLabel: merged.axisLikelihoodLabel,
+                      axisImpactLabel: merged.axisImpactLabel,
+                      levelLabels: labelsJson,
+                      bands: bandsJson,
+                  },
+              })
+            : await db.riskMatrixConfig.create({
+                  data: {
+                      tenantId: ctx.tenantId,
+                      likelihoodLevels: merged.likelihoodLevels,
+                      impactLevels: merged.impactLevels,
+                      axisLikelihoodLabel: merged.axisLikelihoodLabel,
+                      axisImpactLabel: merged.axisImpactLabel,
+                      levelLabels: labelsJson,
+                      bands: bandsJson,
+                  },
+              });
+        // Audit row in the same transaction as the upsert. logEvent
+        // failure must not bounce the write — swallow inside the catch.
+        await logEvent(db, ctx, {
+            action: 'risk_matrix_config.updated',
+            entityType: 'TENANT',
+            entityId: ctx.tenantId,
+            details: 'Risk matrix configuration updated.',
+            detailsJson: {
                 likelihoodLevels: merged.likelihoodLevels,
                 impactLevels: merged.impactLevels,
-                axisLikelihoodLabel: merged.axisLikelihoodLabel,
-                axisImpactLabel: merged.axisImpactLabel,
-                levelLabels: labelsJson,
-                bands: bandsJson,
+                bandCount: merged.bands.length,
+                customLevelLabels: !!merged.levelLabels,
             },
-        });
-    });
-
-    await logEvent(prisma, ctx, {
-        action: 'risk_matrix_config.updated',
-        entityType: 'TENANT',
-        entityId: ctx.tenantId,
-        details: 'Risk matrix configuration updated.',
-        detailsJson: {
-            likelihoodLevels: merged.likelihoodLevels,
-            impactLevels: merged.impactLevels,
-            bandCount: merged.bands.length,
-            customLevelLabels: !!merged.levelLabels,
-        },
-    }).catch(() => {
-        // Audit failure must not bounce the write — the DB row is
-        // already persisted and the admin has confirmed.
+        }).catch(() => undefined);
+        return row;
     });
 
     return rowToShape(saved);

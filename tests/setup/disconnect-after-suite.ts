@@ -45,6 +45,26 @@ afterAll(async () => {
             /* best effort */
         }
     }
+    // Close the shared Redis client. Without this, tests that touch
+    // `cachedListRead` / `bumpEntityCacheVersion` (anything in
+    // `@/lib/cache/list-cache`) leak the ioredis connection. The
+    // worker stays alive past the suite's last test and is force-
+    // killed at the 5-second test timeout — which manifests as
+    // "Exceeded timeout of 5000 ms" on every test in the file even
+    // though the assertions ran in milliseconds. Reach for the
+    // module via require so pure-mock tests that never imported it
+    // skip the lookup.
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const redisMod = require('@/lib/redis') as {
+            disconnectRedis?: () => Promise<void>;
+        };
+        if (typeof redisMod.disconnectRedis === 'function') {
+            await redisMod.disconnectRedis();
+        }
+    } catch {
+        /* module never loaded — nothing to drain */
+    }
     // Epic C.4 audit-stream — cancel any pending 5s flush timer.
     // `streamAuditEvent` schedules `setTimeout(..., 5_000).unref()` on
     // first event. If it fires after Jest tears down, the flush does

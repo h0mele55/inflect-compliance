@@ -190,7 +190,12 @@ describe('Epic 52 adoption — migrated pages wire column visibility', () => {
     it.each(MIGRATED)('%s renders ColumnsDropdown inside the FilterToolbar actions slot', (page) => {
         const src = read(`src/app/t/[tenantSlug]/(app)/${page.dir}/${page.client}`);
         expect(src).toMatch(/ColumnsDropdown/);
-        expect(src).toMatch(/actions=\{/);
+        // Two equivalent shapes:
+        //   (a) Direct FilterToolbar usage: `<FilterToolbar actions={...}>`
+        //   (b) EntityListPage shell: `filters={{ ..., toolbarActions: ... }}`
+        //       — EntityListPage forwards `toolbarActions` into
+        //       FilterToolbar's `actions` prop internally.
+        expect(src).toMatch(/(actions=\{|toolbarActions:)/);
     });
 });
 

@@ -34,7 +34,6 @@ import {
 import { getTenantCtx } from '@/app-layer/context';
 import { getReadinessOverview } from '@/app-layer/usecases/audit-readiness';
 import type { ReadinessResult } from '@/app-layer/usecases/audit-readiness-scoring';
-import { EmptyState } from '@/components/ui/empty-state';
 
 export const dynamic = 'force-dynamic';
 
@@ -116,16 +115,32 @@ export default async function ReadinessOverviewPage({
             </div>
 
             {cycles.length === 0 ? (
-                <div className="glass-card">
-                    <EmptyState
-                        icon={BarChart3}
-                        title="No audit cycles yet"
-                        description="Create an audit cycle to see readiness scores."
-                        primaryAction={{
-                            label: "+ New Audit Cycle",
-                            href: `/t/${tenantSlug}/audits/cycles`,
-                        }}
-                    />
+                // Inline empty state — this is a server component, and
+                // <EmptyState>'s `icon` prop takes a Component
+                // reference (`React.ElementType`). Passing a function
+                // (Component) from a server component to a client
+                // component is a Next.js 15 violation
+                // ("Functions cannot be passed directly to Client
+                // Components"). EmptyState is the right primitive
+                // for client-page empty states; this server-rendered
+                // page renders the icon JSX inline so the SSR
+                // boundary only sees serialised React nodes.
+                <div className="glass-card p-12 text-center">
+                    <div className="mb-4">
+                        <BarChart3 className="size-10 text-content-muted mx-auto" aria-hidden="true" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2 text-content-emphasis">
+                        No audit cycles yet
+                    </h3>
+                    <p className="text-content-muted text-sm mb-4">
+                        Create an audit cycle to see readiness scores.
+                    </p>
+                    <Link
+                        href={`/t/${tenantSlug}/audits/cycles`}
+                        className="btn btn-primary"
+                    >
+                        + New Audit Cycle
+                    </Link>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

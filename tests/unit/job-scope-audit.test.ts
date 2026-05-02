@@ -28,15 +28,31 @@ describe('Executor Registry — tenantId propagation audit', () => {
      * payload type has tenantId, the executor references payload.tenantId.
      */
     test('no executor silently ignores payload.tenantId', () => {
-        // Find all register(...) blocks
-        const registerPattern = /executorRegistry\.register\('([^']+)',\s*async\s*\(([^)]*)\)\s*=>\s*\{([\s\S]*?)\}\);/g;
+        // Walk register(...) blocks via brace-counting — a non-greedy
+        // regex stops at the first inner `});` and misses outer body
+        // content for executors with nested closures (e.g.
+        // evidence-import passing an async progress callback to
+        // runEvidenceImport). The tenantId reference may appear AFTER
+        // the inner closure (in the result/payload), so we need the
+        // full body, not just the prefix up to the first `});`.
+        const openerRe =
+            /executorRegistry\.register\('([^']+)',\s*async\s*\(([^)]*)\)\s*=>\s*\{/g;
         const violations: string[] = [];
 
-        let match;
-        while ((match = registerPattern.exec(registrySource)) !== null) {
-            const jobName = match[1];
-            const paramName = match[2].trim();
-            const body = match[3];
+        let opener: RegExpExecArray | null;
+        while ((opener = openerRe.exec(registrySource)) !== null) {
+            const jobName = opener[1];
+            const paramName = opener[2].trim();
+            const start = opener.index + opener[0].length;
+            let depth = 1;
+            let i = start;
+            while (i < registrySource.length && depth > 0) {
+                const ch = registrySource[i];
+                if (ch === '{') depth++;
+                else if (ch === '}') depth--;
+                i++;
+            }
+            const body = registrySource.slice(start, i - 1);
 
             // Skip jobs that don't need tenantId (health-check, sync-pull)
             if (['health-check', 'sync-pull'].includes(jobName)) continue;

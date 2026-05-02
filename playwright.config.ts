@@ -59,7 +59,12 @@ export default defineConfig({
         // retries comment above for why local stopped using `next dev`.
         // PORT must be set explicitly because `next start -p` doesn't
         // propagate to the env that `auth-config.ts` reads at startup.
-        command: `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 AUTH_URL=http://localhost:${port} NEXTAUTH_URL=http://localhost:${port} PORT=${port} npx next start -p ${port}`,
+        // NEXT_PUBLIC_TEST_MODE=1 is mainly inlined at build time, but
+        // keeping it on `next start` too is a belt-and-braces guard in
+        // case some part of the runtime re-reads it. Suppresses the
+        // Driver.js onboarding-tour auto-trigger so the tour overlay
+        // doesn't cover every authenticated page in E2E sessions.
+        command: `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 NEXT_PUBLIC_TEST_MODE=1 AUTH_URL=http://localhost:${port} NEXTAUTH_URL=http://localhost:${port} PORT=${port} npx next start -p ${port}`,
         port,
         reuseExistingServer: !isCI,
         timeout: 120_000,

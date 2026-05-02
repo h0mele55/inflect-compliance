@@ -55,8 +55,14 @@ describe('NewControlModal — shared Modal composition', () => {
         expect(MODAL_SRC).toMatch(/description=["']Create a custom control for your register\.["']/);
     });
 
-    it('guards close-during-save via preventDefaultClose={saving}', () => {
-        expect(MODAL_SRC).toMatch(/preventDefaultClose=\{saving\}/);
+    it('guards close-during-save via preventDefaultClose tied to RHF isSubmitting', () => {
+        // After Epic 64-FORM (RHF + zodResolver migration), the save-in-progress
+        // signal comes from RHF's `formState.isSubmitting` instead of a hand-rolled
+        // `saving` useState. Either name is acceptable as long as the prop is
+        // wired to the live submit-pending flag.
+        expect(MODAL_SRC).toMatch(
+            /preventDefaultClose=\{(saving|isSubmitting)\}/,
+        );
     });
 });
 
@@ -89,15 +95,26 @@ describe('NewControlModal — business behaviour preserved', () => {
         expect(MODAL_SRC).toMatch(/apiUrl\(['"]\/controls['"]\)/);
         expect(MODAL_SRC).toMatch(/method:\s*['"]POST['"]/);
         // Same fields as the legacy page: name, optional code, description,
-        // category, frequency, isCustom=true.
-        expect(MODAL_SRC).toMatch(/name:\s*form\.name/);
-        expect(MODAL_SRC).toMatch(/code:\s*form\.code[\s\S]*\|\|\s*undefined/);
+        // category, frequency, isCustom=true. After the RHF migration the
+        // payload is built from RHF's `values.<field>` instead of the
+        // useState `form.<field>` — match either shape.
+        expect(MODAL_SRC).toMatch(/name:\s*(form|values)\.name/);
+        expect(MODAL_SRC).toMatch(
+            /code:\s*(form|values)\.code[\s\S]*\|\|\s*undefined/,
+        );
         expect(MODAL_SRC).toMatch(/isCustom:\s*true/);
     });
 
     it('follows up with the applicability POST when user chose NOT_APPLICABLE', () => {
-        expect(MODAL_SRC).toMatch(/applicability === ['"]NOT_APPLICABLE['"]/);
-        expect(MODAL_SRC).toMatch(/apiUrl\(`\/controls\/\$\{control\.id\}\/applicability`\)/);
+        // After RHF migration, the conditional reads from `values.applicability`
+        // rather than the local useState; the resulting record id is bound to
+        // either `control` (legacy) or `created` (new).
+        expect(MODAL_SRC).toMatch(
+            /(applicability|values\.applicability)\s*===\s*['"]NOT_APPLICABLE['"]/,
+        );
+        expect(MODAL_SRC).toMatch(
+            /apiUrl\(`\/controls\/\$\{(control|created)\.id\}\/applicability`\)/,
+        );
     });
 
     it('invalidates the Controls react-query cache on success', () => {
@@ -106,7 +123,12 @@ describe('NewControlModal — business behaviour preserved', () => {
     });
 
     it('navigates to the new control detail page after create (preserves downstream E2E chain)', () => {
-        expect(MODAL_SRC).toMatch(/router\.push\(tenantHref\(`\/controls\/\$\{control\.id\}`\)\)/);
+        // `control` was the legacy variable name; `created` is the RHF-era
+        // name. Either is acceptable as long as the navigation target is
+        // the new entity's detail page.
+        expect(MODAL_SRC).toMatch(
+            /router\.push\(tenantHref\(`\/controls\/\$\{(control|created)\.id\}`\)\)/,
+        );
     });
 
     it('surfaces API error messages in an alert region', () => {
@@ -116,10 +138,17 @@ describe('NewControlModal — business behaviour preserved', () => {
         expect(MODAL_SRC).toMatch(/Failed to create control/);
     });
 
-    it('disables the submit button until the name is non-empty + justification supplied for NA', () => {
-        expect(MODAL_SRC).toMatch(/canSubmit/);
-        expect(MODAL_SRC).toMatch(/form\.name\.trim\(\)\.length > 0/);
-        expect(MODAL_SRC).toMatch(/justification\.trim\(\)\.length > 0/);
+    it('enforces required-name + NA-needs-justification via Zod', () => {
+        // After Epic 64-FORM the form rules live in a Zod schema bound
+        // to RHF via zodResolver — not in a hand-rolled `canSubmit`.
+        // Locking the schema invariants here keeps the contract intact
+        // regardless of form-state plumbing.
+        // Required name:
+        expect(MODAL_SRC).toMatch(/name:\s*z\.string\(\)\.min\(1/);
+        // Cross-field rule for NOT_APPLICABLE → justification required:
+        expect(MODAL_SRC).toMatch(/superRefine/);
+        expect(MODAL_SRC).toMatch(/applicability === ['"]NOT_APPLICABLE['"]/);
+        expect(MODAL_SRC).toMatch(/justification/);
     });
 });
 

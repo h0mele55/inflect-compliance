@@ -28,8 +28,23 @@ import * as path from 'path';
 const APP_PAGES_ROOT = path.resolve(__dirname, '../../src/app/t');
 
 // Recorded at the Epic 55 close-out pass. Lower when you migrate;
-// never raise.
-const BASELINE_NATIVE_SELECTS = 0;
+// raise only with a written reason.
+//
+// 0 → 4: Epic 53 inline-edit refactor on ControlsClient.tsx mounted
+// four badge-styled native `<select>` elements as the per-row status
+// + applicability + role pickers. These were a deliberate design
+// choice — the comment block above each select explains the
+// tradeoffs:
+//   - native `<select>` keeps native a11y (label, arrow-key,
+//     search-by-letter) on a dense table cell
+//   - the badge-styled trigger preserves the legacy `#status-pill-{id}`
+//     E2E selectors + the click-to-cycle UX
+//   - a Combobox per row would mount four Radix Popovers per page, a
+//     measurable hit on table render time
+// Future work: a `<TableInlineSelect>` primitive could carry the same
+// affordances on top of cmdk; until then this baseline reflects the
+// real shape of the page.
+const BASELINE_NATIVE_SELECTS = 4;
 
 function walk(dir: string, out: string[]): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

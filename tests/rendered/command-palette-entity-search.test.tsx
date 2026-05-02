@@ -1,16 +1,21 @@
 /**
- * Epic 57 — Command Palette entity search tests.
+ * Epic 47 — Command Palette entity search (UNIFIED ENDPOINT VERSION).
  *
- * Verifies the search surface the audit asks for: typing into the
- * palette issues tenant-scoped requests to the existing list APIs,
- * groups results by entity kind, and navigates to the correct detail
- * route on select. Tenant safety is covered by asserting every
- * fetched URL carries the current pathname's slug — outside a tenant
- * route, no network call is made at all.
+ * Original Epic 57 fan-out (5 parallel calls to per-entity list APIs)
+ * was replaced by a single call to `GET /api/t/<slug>/search?q=`. The
+ * server returns pre-ranked, pre-shaped `SearchHit[]` rows. These
+ * tests assert the unified contract:
  *
- * `global.fetch` is stubbed to return canned payloads so we can
- * assert both the request shape (URL, query params) and the rendered
- * output deterministically.
+ *   1. Outside a tenant route, no fetch fires + the empty state shows.
+ *   2. With a long-enough query, the palette hits ONE URL:
+ *      `/api/t/<slug>/search?q=<encoded-query>`.
+ *   3. Below the threshold, no fetch fires.
+ *   4. Hits render grouped by `type` with title/subtitle/badge.
+ *   5. Selecting a hit navigates to its `href` and closes the palette.
+ *   6. Repeated keystrokes debounce to a single batch.
+ *   7. The slug in every URL matches the current pathname.
+ *
+ * `global.fetch` is stubbed to return canned `SearchResponse` payloads.
  */
 
 import React from 'react';
@@ -20,6 +25,7 @@ import {
     act,
     waitFor,
 } from '@testing-library/react';
+import type { SearchHit, SearchResponse } from '@/lib/search/types';
 
 // Mock next/navigation — the palette reads pathname + router.
 const navigationMock = {
@@ -68,68 +74,102 @@ interface FetchCall {
 }
 const calls: FetchCall[] = [];
 
-function installFetchStub() {
+/**
+ * Build a canned `/search` response. The unified endpoint pre-ranks
+ * results across all entity types; tests can pass a curated `hits`
+ * list to assert how the palette renders the response.
+ */
+function searchResponse(
+    hits: SearchHit[],
+    query: string = 'security',
+): SearchResponse {
+    return {
+        hits,
+        meta: {
+            query,
+            perTypeCounts: {
+                control: hits.filter((h) => h.type === 'control').length,
+                risk: hits.filter((h) => h.type === 'risk').length,
+                policy: hits.filter((h) => h.type === 'policy').length,
+                evidence: hits.filter((h) => h.type === 'evidence').length,
+                framework: hits.filter((h) => h.type === 'framework').length,
+            },
+            truncated: false,
+            perTypeLimit: 10,
+        },
+    };
+}
+
+const SAMPLE_HITS: SearchHit[] = [
+    {
+        type: 'control',
+        id: 'ctrl-1',
+        title: 'Information security policies',
+        subtitle: 'A.5.1',
+        badge: 'IMPLEMENTED',
+        href: '/t/acme-corp/controls/ctrl-1',
+        score: 0.95,
+        iconKey: 'shield-check',
+        category: 'Controls',
+    },
+    {
+        type: 'risk',
+        id: 'risk-1',
+        title: 'Phishing compromise',
+        subtitle: 'Score 20',
+        badge: 'OPEN',
+        href: '/t/acme-corp/risks/risk-1',
+        score: 0.9,
+        iconKey: 'alert-triangle',
+        category: 'Risks',
+    },
+    {
+        type: 'policy',
+        id: 'pol-1',
+        title: 'Access Control Policy',
+        subtitle: null,
+        badge: 'PUBLISHED',
+        href: '/t/acme-corp/policies/pol-1',
+        score: 0.85,
+        iconKey: 'file-text',
+        category: 'Policies',
+    },
+    {
+        type: 'evidence',
+        id: 'ev-1',
+        title: 'MFA screenshot',
+        subtitle: null,
+        badge: 'FILE',
+        href: '/t/acme-corp/evidence/ev-1',
+        score: 0.8,
+        iconKey: 'paperclip',
+        category: 'Evidence',
+    },
+    {
+        type: 'framework',
+        id: 'ISO27001',
+        title: 'ISO 27001:2022',
+        subtitle: '2022',
+        badge: null,
+        href: '/t/acme-corp/frameworks/ISO27001',
+        score: 0.7,
+        iconKey: 'layers',
+        category: 'Frameworks',
+    },
+];
+
+function installFetchStub(hits: SearchHit[] = SAMPLE_HITS) {
+    // The real backend ranks results server-side from the `?q=`
+    // value. The stub doesn't need to ape ranking — it just returns
+    // the canned hits unchanged so the palette has multi-type rows
+    // to render. Tests that need filter-aware behaviour can pass a
+    // narrower `hits` array to `installFetchStub(...)`.
     (global as unknown as { fetch: jest.Mock }).fetch = jest.fn(
         async (url: string) => {
             calls.push({ url });
-            if (url.includes('/controls?')) {
-                return canned({
-                    items: [
-                        {
-                            id: 'ctrl-1',
-                            code: 'A.5.1',
-                            name: 'Information security policies',
-                            status: 'IMPLEMENTED',
-                        },
-                    ],
-                    pageInfo: { hasNextPage: false },
-                });
-            }
-            if (url.includes('/risks?')) {
-                return canned({
-                    items: [
-                        {
-                            id: 'risk-1',
-                            title: 'Phishing compromise',
-                            status: 'OPEN',
-                            score: 20,
-                        },
-                    ],
-                    pageInfo: { hasNextPage: false },
-                });
-            }
-            if (url.includes('/policies?')) {
-                return canned({
-                    items: [
-                        {
-                            id: 'pol-1',
-                            title: 'Access Control Policy',
-                            status: 'PUBLISHED',
-                        },
-                    ],
-                    pageInfo: { hasNextPage: false },
-                });
-            }
-            if (url.includes('/evidence?')) {
-                return canned({
-                    items: [
-                        {
-                            id: 'ev-1',
-                            title: 'MFA screenshot',
-                            type: 'FILE',
-                            status: 'APPROVED',
-                        },
-                    ],
-                    pageInfo: { hasNextPage: false },
-                });
-            }
-            if (url.endsWith('/frameworks')) {
-                return canned([
-                    { key: 'ISO27001', name: 'ISO 27001:2022', version: '2022' },
-                    { key: 'SOC2', name: 'SOC 2', version: 'TSC 2017' },
-                ]);
-            }
-            return canned(null);
+            const match = url.match(/[?&]q=([^&]+)/);
+            const query = match ? decodeURIComponent(match[1]) : 'security';
+            return canned(searchResponse(hits, query));
         },
     );
 }
@@ -182,7 +222,7 @@ afterEach(() => {
 
 // ─── Behaviour ───────────────────────────────────────────────────────
 
-describe('CommandPalette — entity search', () => {
+describe('CommandPalette — entity search (unified /search)', () => {
     it('renders no results and issues no fetch outside a tenant route', async () => {
         navigationMock.pathname = '/login';
         render(<Shell />);
@@ -193,29 +233,15 @@ describe('CommandPalette — entity search', () => {
         expect(emptyText).toMatch(/after sign-in|search is available/i);
     });
 
-    it('issues tenant-scoped list requests when the query is long enough', async () => {
+    it('issues exactly one /search request when the query is long enough', async () => {
         render(<Shell />);
         await openPaletteAndType('sec');
 
-        // One call per entity type the first time we search.
-        const urls = calls.map((c) => c.url);
-        expect(urls.some((u) =>
-            u.startsWith('/api/t/acme-corp/controls?') && u.includes('q=sec'),
-        )).toBe(true);
-        expect(urls.some((u) => u.startsWith('/api/t/acme-corp/risks?'))).toBe(
-            true,
+        // ONE call — the unified endpoint replaces five fan-out calls.
+        expect(calls).toHaveLength(1);
+        expect(calls[0].url).toMatch(
+            /^\/api\/t\/acme-corp\/search\?q=sec$/,
         );
-        expect(urls.some((u) => u.startsWith('/api/t/acme-corp/policies?'))).toBe(
-            true,
-        );
-        expect(urls.some((u) => u.startsWith('/api/t/acme-corp/evidence?'))).toBe(
-            true,
-        );
-        expect(urls.some((u) => u === '/api/t/acme-corp/frameworks')).toBe(true);
-
-        // Every request must be scoped to the current tenant — no
-        // other slug is ever reached.
-        expect(urls.every((u) => u.startsWith('/api/t/acme-corp/'))).toBe(true);
     });
 
     it('does not fire a request for a query that is shorter than the threshold', async () => {
@@ -224,7 +250,7 @@ describe('CommandPalette — entity search', () => {
         expect(calls).toHaveLength(0);
     });
 
-    it('groups results by entity kind with readable metadata', async () => {
+    it('renders hits grouped by type with title/subtitle/badge', async () => {
         render(<Shell />);
         await openPaletteAndType('security');
 
@@ -263,7 +289,12 @@ describe('CommandPalette — entity search', () => {
         expect(evidence.textContent).toContain('FILE');
     });
 
-    it('client-filters frameworks against the query', async () => {
+    it('renders framework hits returned by the server', async () => {
+        // Server-side ranking now decides what frameworks come back.
+        // The palette no longer client-filters frameworks — the
+        // unified API does it server-side from the same `?q=`. The
+        // test asserts a framework hit renders when present in the
+        // canned response.
         render(<Shell />);
         await openPaletteAndType('iso');
 
@@ -274,15 +305,6 @@ describe('CommandPalette — entity search', () => {
                 ).length,
             ).toBeGreaterThan(0);
         });
-
-        const fwRows = Array.from(
-            document.querySelectorAll(
-                '[data-testid="command-palette-result-framework"]',
-            ),
-        ).map((el) => el.textContent);
-        // ISO27001 matches, SOC2 does not.
-        expect(fwRows.some((t) => t && t.includes('ISO27001'))).toBe(true);
-        expect(fwRows.some((t) => t && t.includes('SOC2'))).toBe(false);
     });
 
     it('navigates to the entity detail route on select + closes the palette', async () => {
@@ -305,7 +327,7 @@ describe('CommandPalette — entity search', () => {
         });
     });
 
-    it('debounces repeated keystrokes — one batch of requests per quiet period', async () => {
+    it('debounces repeated keystrokes — one /search per quiet period', async () => {
         render(<Shell />);
         const input = document.querySelector(
             '[data-testid="command-palette-input"]',
@@ -317,14 +339,12 @@ describe('CommandPalette — entity search', () => {
         await act(async () => {
             await new Promise((r) => setTimeout(r, 250));
         });
-        // Only the final query actually fires (earlier timers were
-        // cancelled by the hook's debounce). We expect exactly one
-        // controls request, not three.
-        const controlCalls = calls.filter((c) =>
-            c.url.startsWith('/api/t/acme-corp/controls?'),
+        // Only the final query actually fires.
+        const searchCalls = calls.filter((c) =>
+            c.url.startsWith('/api/t/acme-corp/search'),
         );
-        expect(controlCalls).toHaveLength(1);
-        expect(controlCalls[0].url).toContain('q=sec');
+        expect(searchCalls).toHaveLength(1);
+        expect(searchCalls[0].url).toContain('q=sec');
     });
 
     it('stays scoped to the tenant in the current URL — cannot reach another tenant', async () => {
@@ -342,9 +362,6 @@ describe('CommandPalette — entity search', () => {
     });
 
     it('re-scopes to the new tenant when the URL switches', async () => {
-        // Starts on tenant-b so the pathname is fresh for this test —
-        // avoids the framework cache (keyed on slug) from carrying
-        // tenant-a state into the assertion.
         navigationMock.pathname = '/t/tenant-b/controls';
         render(<Shell />);
         await openPaletteAndType('bar');

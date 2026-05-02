@@ -31,7 +31,14 @@ const APP_PAGES_ROOT = path.resolve(__dirname, '../../src/app/t');
  * each — planned as a separate rollout after the visual QA of `<Button>`.
  */
 const BASELINES = {
-    btn: 242,
+    // 242 → 245 with Epic 49 (compliance calendar): three new
+    // `btn btn-ghost btn-sm` chevron-nav buttons in CalendarClient
+    // (prev/next month) + `btn btn-secondary btn-sm` in error states.
+    // 245 → 246 when audits/readiness empty state was inlined (server
+    // component can't pass forwardRef icons to <EmptyState>; the
+    // inlined version uses one `btn btn-primary` for "+ New Audit
+    // Cycle"). All slot into the existing legacy-btn migration backlog.
+    btn: 246,
     badge: 78,
 } as const;
 
