@@ -30,6 +30,7 @@ import { runInTenantContext } from '@/lib/db-context';
 import type { PrismaTx } from '@/lib/db-context';
 import { assertCanRead } from '../policies/common';
 import { TERMINAL_WORK_ITEM_STATUSES } from '../domain/work-item-status';
+import type { WorkItemStatus } from '@prisma/client';
 import type { RequestContext } from '../types';
 import {
     type CalendarEvent,
@@ -715,7 +716,15 @@ export async function getUpcomingDeadlineCount(
                         tenantId: ctx.tenantId,
                         dueAt: { not: null, lte: horizon },
                         status: {
-                            notIn: TERMINAL_WORK_ITEM_STATUSES as unknown as string[],
+                            // Cast through readonly → mutable WorkItemStatus[]
+                            // because Prisma's `notIn` rejects the
+                            // `as const` literal type, and the shared
+                            // ACTIVE_STATUS_FILTER constant types its
+                            // payload as `string[]` which Prisma's
+                            // newer generated client also rejects.
+                            notIn: [
+                                ...TERMINAL_WORK_ITEM_STATUSES,
+                            ] as WorkItemStatus[],
                         },
                     },
                     take: MAX_BADGE_COUNT + 1,
