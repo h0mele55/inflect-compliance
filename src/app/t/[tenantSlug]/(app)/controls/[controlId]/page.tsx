@@ -611,7 +611,7 @@ export default function ControlDetailPage() {
         <EntityDetailLayout
             id="control-detail-page"
             breadcrumbs={[
-                { label: 'Dashboard', href: tenantHref('/') },
+                { label: 'Dashboard', href: tenantHref('/dashboard') },
                 { label: 'Controls', href: tenantHref('/controls') },
                 { label: control.name },
             ]}

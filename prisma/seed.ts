@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { createTenantWithOwner } from '@/app-layer/usecases/tenant-lifecycle';
 import { hashForLookup } from '@/lib/security/encryption';
+import { seedDefaultOrgDashboard } from '@/app-layer/usecases/org-dashboard-presets';
 
 const prisma = new PrismaClient();
 
@@ -139,6 +140,17 @@ async function main() {
         data: { organizationId: organization.id },
     });
     console.log('✅ Tenant linked to organization');
+
+    // Seed the eight default org-dashboard widgets (KPI tiles +
+    // donut + trend + tenant-coverage list + drill-down CTAs). The
+    // ciso-portfolio E2E suite asserts on `#org-stat-coverage` etc.
+    // — those id anchors come from the dispatched widgets, so the
+    // dashboard must be pre-populated before the test runs.
+    // Idempotent — short-circuits on any pre-existing widget row.
+    const dashboardSeed = await seedDefaultOrgDashboard(prisma, organization.id);
+    if (dashboardSeed.seeded) {
+        console.log(`✅ Org dashboard widgets seeded (${dashboardSeed.created})`);
+    }
 
     // CISO is the canonical ORG_ADMIN — sees every child tenant as
     // AUDITOR via the auto-provisioning fan-out below.

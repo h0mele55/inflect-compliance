@@ -31,7 +31,7 @@ test.describe('Framework Coverage UI', () => {
 
     test('frameworks page loads', async () => {
         await page.goto(`/t/${tenantSlug}/frameworks`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#frameworks-heading', { timeout: 60000 });
         await expect(page.locator('#frameworks-heading')).toContainText('Compliance Frameworks');
     });
@@ -230,7 +230,7 @@ test.describe('Framework Coverage UI', () => {
 
     test('install wizard loads', async () => {
         await page.goto(`/t/${tenantSlug}/frameworks/ISO27001/install`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await expect(page.locator('#install-wizard-heading')).toContainText('Install', { timeout: 30_000 });
     });
 

@@ -16,7 +16,10 @@ export default function MfaChallengePage() {
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
     const searchParams = useSearchParams();
-    const next = searchParams.get('next') || tenantHref('/');
+    // Default to /dashboard, not /, because `/t/<slug>/` has no
+    // page.tsx (404) and post-MFA navigation would land on a broken
+    // route if the URL didn't carry an explicit `next`.
+    const next = searchParams.get('next') || tenantHref('/dashboard');
 
     const [code, setCode] = useState('');
     const [error, setError] = useState<string | null>(null);

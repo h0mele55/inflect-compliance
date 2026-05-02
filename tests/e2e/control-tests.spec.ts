@@ -25,7 +25,7 @@ test.describe('Control Tests (Test-of-Control)', () => {
 
         // Go to Tests tab — TestPlansPanel fetches data on mount, wait for the API to settle
         await page.click('#tab-tests');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#create-test-plan-btn', { timeout: 30000 });
 
         // Create a test plan
@@ -36,7 +36,7 @@ test.describe('Control Tests (Test-of-Control)', () => {
         await page.click('#save-test-plan-btn');
 
         // Wait for API round-trip
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Plan should appear in the list
         await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 10000 });
@@ -49,26 +49,26 @@ test.describe('Control Tests (Test-of-Control)', () => {
         // Use search to find the specific control
         await page.locator('#control-search').fill(`Test Ctrl ${uid}`);
         await page.locator('#control-search').press('Enter');
-        await page.waitForLoadState('networkidle'); /* replaced wait */
+        await page.waitForLoadState('networkidle').catch(() => {}); /* replaced wait */
         await page.click(`text=Test Ctrl ${uid}`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#control-title', { timeout: 30000 });
 
         // Go to Tests tab — wait for TestPlansPanel fetch to complete
         await page.click('#tab-tests');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 30000 });
 
         // Click the test plan name to go to detail page
         await page.click(`text=Access Review ${uid}`);
         // The test plan detail route may need cold compilation — wait for data to load
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#test-plan-title', { timeout: 30000 });
         await expect(page.locator('#test-plan-title')).toContainText(`Access Review ${uid}`);
 
         // Create a run
         await page.click('#create-test-run-btn');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#test-run-title', { timeout: 30000 });
         await expect(page.locator('#test-run-status')).toContainText('PLANNED', { timeout: 10000 });
     });
@@ -80,11 +80,11 @@ test.describe('Control Tests (Test-of-Control)', () => {
         // Use search to find the specific control
         await page.locator('#control-search').fill(`Test Ctrl ${uid}`);
         await page.locator('#control-search').press('Enter');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });
         await page.click('#tab-tests');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await expect(page.locator(`text=Access Review ${uid}`)).toBeVisible({ timeout: 10000 });
         const planLink = page.locator(`[id^="test-plan-link-"]`).filter({ hasText: `Access Review ${uid}` }).first();
         await planLink.click();
@@ -130,11 +130,11 @@ test.describe('Control Tests (Test-of-Control)', () => {
         // Use search to find the specific control
         await page.locator('#control-search').fill(`Test Ctrl ${uid}`);
         await page.locator('#control-search').press('Enter');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.click(`text=Test Ctrl ${uid}`);
         await page.waitForSelector('#control-title', { timeout: 10000 });
         await page.click('#tab-tests');
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         const planLink = page.locator(`[id^="test-plan-link-"]`).filter({ hasText: `Access Review ${uid}` }).first();
         await planLink.click();
         await page.waitForSelector('#test-plan-title', { timeout: 10000 });

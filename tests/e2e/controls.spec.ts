@@ -13,7 +13,7 @@ test.describe('Controls Center', () => {
     test('controls list page loads with filters and CTAs', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('h1', { timeout: 15000 });
         await expect(page.locator('#new-control-btn')).toBeVisible({ timeout: 5000 });
         await expect(page.locator('#install-templates-btn')).toBeVisible();

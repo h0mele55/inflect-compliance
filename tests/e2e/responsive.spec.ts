@@ -102,7 +102,7 @@ test.describe('Desktop viewport (1280×720)', () => {
         await gotoAndVerify(page, `/t/${slug}/dashboard`, 'aside');
 
         // Wait for CSS parsing and hydration to finalize layout
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Desktop sidebar should be visible
         const sidebar = page.locator('aside');

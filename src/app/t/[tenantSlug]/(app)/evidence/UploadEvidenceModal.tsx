@@ -53,6 +53,7 @@ import { Modal } from '@/components/ui/modal';
 import {
     FileDropzone,
     type FileDropzoneHandle,
+    type FileUploadEntry,
 } from '@/components/ui/FileDropzone';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
@@ -297,11 +298,16 @@ export function UploadEvidenceModal({
         setQueuedCount((prev) => prev + files.length);
     }, []);
 
-    const onAllSettled = useCallback(() => {
+    const onAllSettled = useCallback((settled: FileUploadEntry[]) => {
         setUploadingAll(false);
-        const entries = dropzoneRef.current?.getEntries() ?? [];
+        // Use the entries argument from FileDropzone — `getEntries()`
+        // returns the ref-snapshot which still reflects the previous
+        // commit at the moment `onAllSettled` fires (the ref-syncing
+        // useEffect in FileDropzone hasn't run yet on this microtask).
+        // Without using the live argument, the modal stayed open after
+        // a successful POST in `evidence-upload-modal.spec.ts`.
         const allOk =
-            entries.length > 0 && entries.every((e) => e.status === 'success');
+            settled.length > 0 && settled.every((e) => e.status === 'success');
         if (allOk) {
             // Drop the modal once every queued file landed cleanly.
             close();

@@ -29,7 +29,7 @@ test.describe('DataTable Platform — Cross-page regression', () => {
         filterSelector?: string;
     }) {
         await page.goto(`/t/${tenantSlug}${path}`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
 
         // Wait for heading
         if (opts?.heading) {
@@ -180,7 +180,7 @@ test.describe('DataTable Platform — Row click navigation', () => {
     test('Controls row click navigates to detail', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('h1', { timeout: 15000 });
 
         // Seed provisions 4 tenant controls; assert visibility. Selection
@@ -200,7 +200,7 @@ test.describe('DataTable Platform — Row click navigation', () => {
     test('Policies row click navigates to detail', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/policies`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('h1', { timeout: 15000 });
 
         // Seed provisions 3 published policies.
@@ -218,7 +218,7 @@ test.describe('DataTable Platform — Filter interaction', () => {
     test('Controls search filter works', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/controls`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('h1', { timeout: 15000 });
 
         const searchInput = page.locator('#control-search');
@@ -245,7 +245,7 @@ test.describe('DataTable Platform — Filter interaction', () => {
     test('Tasks filter bar is interactive', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
         await page.goto(`/t/${tenantSlug}/tasks`);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('h1', { timeout: 15000 });
 
         // Check filter bar exists

@@ -437,6 +437,15 @@ jobs:
         env:
           NODE_ENV: production
           NEXT_TEST_MODE: "1"
+          # NEXT_PUBLIC_* env vars are inlined at BUILD time, so they
+          # must be set on the build step (not just on `playwright test`)
+          # to take effect in the runtime bundle. Mirrors what
+          # `scripts/e2e-local.mjs` does. Suppresses the Driver.js
+          # onboarding tour AND the sidebar calendar-badge polling —
+          # both produce background network noise that keeps
+          # `waitForLoadState('networkidle')` from settling within the
+          # 180s test timeout on slow CI runners.
+          NEXT_PUBLIC_TEST_MODE: "1"
 
       # ── Playwright with browser cache ──
       - name: Get Playwright version

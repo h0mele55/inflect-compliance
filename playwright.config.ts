@@ -64,7 +64,22 @@ export default defineConfig({
         // case some part of the runtime re-reads it. Suppresses the
         // Driver.js onboarding-tour auto-trigger so the tour overlay
         // doesn't cover every authenticated page in E2E sessions.
-        command: `npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 NEXT_PUBLIC_TEST_MODE=1 AUTH_URL=http://localhost:${port} NEXTAUTH_URL=http://localhost:${port} PORT=${port} npx next start -p ${port}`,
+        // DATA_ENCRYPTION_KEY: `next start` overwrites process.env.NODE_ENV
+        // to "production" regardless of what cross-env passed in. The Epic B
+        // encryption sentinel inside src/instrumentation.ts reads NODE_ENV at
+        // runtime and refuses to start a "production" process without a
+        // 32+ char DATA_ENCRYPTION_KEY. We seed a default via shell `${VAR:-…}`
+        // expansion (NOT cross-env, which would override the value the
+        // surrounding env already set) so:
+        //   • direct `npx playwright test …` works locally without env wiring
+        //   • CI keeps its own `DATA_ENCRYPTION_KEY` (the seed step uses the
+        //     same value, so the HMAC-derived `emailHash` matches between
+        //     seed and login). Forcing a different value here causes
+        //     `unknown_email` login failures because the seed and the
+        //     webserver hash `admin@acme.com` under different keys.
+        // NOT a real secret; visible in source so no operator confuses it
+        // for prod.
+        command: `DATA_ENCRYPTION_KEY=\${DATA_ENCRYPTION_KEY:-e2e-deterministic-test-encryption-key-32+-chars} npx cross-env NODE_ENV=test NODE_OPTIONS="--max-old-space-size=4096" NEXT_IGNORE_INCORRECT_LOCKFILE=1 AUTH_TEST_MODE=1 NEXT_TEST_MODE=1 NEXT_PUBLIC_TEST_MODE=1 AUTH_URL=http://localhost:${port} NEXTAUTH_URL=http://localhost:${port} PORT=${port} npx next start -p ${port}`,
         port,
         reuseExistingServer: !isCI,
         timeout: 120_000,
