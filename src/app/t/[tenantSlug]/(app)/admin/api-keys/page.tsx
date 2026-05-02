@@ -476,7 +476,7 @@ export default function ApiKeysPage() {
                 <div>
                     <Breadcrumbs
                         items={[
-                            { label: 'Dashboard', href: tenantHref('/') },
+                            { label: 'Dashboard', href: tenantHref('/dashboard') },
                             { label: 'Admin', href: tenantHref('/admin') },
                             { label: 'API keys' },
                         ]}

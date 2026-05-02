@@ -58,7 +58,11 @@ test.describe('Policy Center', () => {
         await page.click('#new-version-btn');
         await page.waitForSelector('#version-editor', { timeout: 15000 });
 
-        await page.fill('#version-editor', '# Updated Policy\n\nVersion 2 of the policy.');
+        // Epic 45 migrated to Tiptap-backed `<RichTextEditor>` — the
+        // `id="version-editor"` now sits on the wrapper `<div>`. The
+        // actual fillable element is the inner Markdown `<textarea>`,
+        // exposed via `data-testid="rich-text-editor-textarea"`.
+        await page.fill('[data-testid="rich-text-editor-textarea"]', '# Updated Policy\n\nVersion 2 of the policy.');
         await page.fill('#change-summary-input', 'Updated for e2e test');
         await page.click('#save-version-btn');
 

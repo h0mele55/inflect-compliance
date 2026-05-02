@@ -8,7 +8,7 @@ import {
  */
 export default function AssetsLoading() {
     return (
-        <div className="space-y-6 animate-fadeIn" aria-busy="true" aria-label="Loading assets">
+        <div role="status" aria-live="polite" className="space-y-6 animate-fadeIn" aria-busy="true" aria-label="Loading assets">
             <SkeletonPageHeader />
             <SkeletonDataTable rows={8} cols={6} />
         </div>

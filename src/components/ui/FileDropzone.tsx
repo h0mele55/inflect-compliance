@@ -256,17 +256,27 @@ function FileDropzoneInner(
     );
 
     // ── Run the upload for one queued entry ──────────────────────────
+    //
+    // Returns the FINAL settled entry so callers can compose
+    // `onAllSettled` from the live values WITHOUT depending on
+    // `entriesRef.current` — the ref is updated by a `useEffect` that
+    // fires AFTER the React commit, so reading it inside the same
+    // microtask as `setEntries` produces the previous (queued) entry,
+    // not the success/error one. That race silently kept the upload
+    // modal open after a successful POST in
+    // `evidence-upload-modal.spec.ts`.
     const runOne = useCallback(
-        async (entry: FileUploadEntry) => {
+        async (entry: FileUploadEntry): Promise<FileUploadEntry> => {
             const ac = new AbortController();
             abortersRef.current.set(entry.id, ac);
             patch(entry.id, { status: 'uploading', percent: 0 });
+            let settled: FileUploadEntry;
             try {
                 const response = await onUpload(entry.file, {
                     onProgress: (percent) => patch(entry.id, { percent }),
                     signal: ac.signal,
                 });
-                const settled: FileUploadEntry = {
+                settled = {
                     ...entry,
                     status: 'success',
                     percent: 100,
@@ -282,7 +292,7 @@ function FileDropzoneInner(
                     ac.signal.aborted;
                 const message =
                     err instanceof Error ? err.message : String(err);
-                const settled: FileUploadEntry = {
+                settled = {
                     ...entry,
                     status: aborted ? 'aborted' : 'error',
                     error: aborted ? 'Cancelled' : message,
@@ -294,6 +304,7 @@ function FileDropzoneInner(
             } finally {
                 abortersRef.current.delete(entry.id);
             }
+            return settled;
         },
         [onUpload, onFileSettled, patch],
     );
@@ -345,17 +356,12 @@ function FileDropzoneInner(
             // anyway); parallelising at the dropzone layer offers
             // little practical gain but adds complexity.
             (async () => {
+                const settled: FileUploadEntry[] = [];
                 for (const entry of accepted) {
                     // eslint-disable-next-line no-await-in-loop
-                    await runOne(entry);
+                    settled.push(await runOne(entry));
                 }
-                if (onAllSettled) {
-                    // Read settled state from the latest entries snapshot.
-                    const final = entriesRef.current.filter((e) =>
-                        accepted.some((a) => a.id === e.id),
-                    );
-                    onAllSettled(final);
-                }
+                onAllSettled?.(settled);
             })();
         },
         [
@@ -374,16 +380,12 @@ function FileDropzoneInner(
     const startAll = useCallback(async () => {
         const queued = entriesRef.current.filter((e) => e.status === 'queued');
         if (queued.length === 0) return;
+        const settled: FileUploadEntry[] = [];
         for (const entry of queued) {
             // eslint-disable-next-line no-await-in-loop
-            await runOne(entry);
+            settled.push(await runOne(entry));
         }
-        if (onAllSettled) {
-            const final = entriesRef.current.filter((e) =>
-                queued.some((q) => q.id === e.id),
-            );
-            onAllSettled(final);
-        }
+        onAllSettled?.(settled);
     }, [onAllSettled, runOne]);
     const cancelAll = useCallback(() => {
         for (const ac of abortersRef.current.values()) ac.abort();

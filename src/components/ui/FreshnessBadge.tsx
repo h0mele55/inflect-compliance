@@ -56,29 +56,35 @@ interface FreshnessBadgeProps {
     'data-testid'?: string;
 }
 
+// Colour pairs use the semantic status tokens
+// (`text-content-{success,warning,error}`) rather than raw Tailwind
+// emerald/amber/rose scales so each theme's tokens.css governs the
+// contrast. Both themes have already had these tokens contrast-tuned
+// (GAP-CI-77) to clear WCAG AA 4.5:1 against the alpha-blended
+// `bg-{success,warning,error}` tints sitting over `bg-default`.
 const LEVEL_STYLES: Record<
     FreshnessLevel,
     { dot: string; text: string; bg: string; border: string; label: string }
 > = {
     fresh: {
         dot: 'bg-emerald-500',
-        text: 'text-emerald-300',
-        bg: 'bg-emerald-500/10',
-        border: 'border-emerald-500/30',
+        text: 'text-content-success',
+        bg: 'bg-success',
+        border: 'border-success',
         label: 'Fresh',
     },
     stale: {
         dot: 'bg-amber-500',
-        text: 'text-amber-300',
-        bg: 'bg-amber-500/10',
-        border: 'border-amber-500/30',
+        text: 'text-content-warning',
+        bg: 'bg-warning',
+        border: 'border-warning',
         label: 'Stale',
     },
     outdated: {
         dot: 'bg-rose-500',
-        text: 'text-rose-300',
-        bg: 'bg-rose-500/10',
-        border: 'border-rose-500/30',
+        text: 'text-content-error',
+        bg: 'bg-error',
+        border: 'border-error',
         label: 'Outdated',
     },
     unknown: {

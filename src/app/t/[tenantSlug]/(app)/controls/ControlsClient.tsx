@@ -439,7 +439,7 @@ function ControlsPageInner({
                         {row.original.name}
                     </Link>
                     {row.original.description && (
-                        <p className="text-xs text-content-subtle mt-0.5 truncate max-w-xs">{row.original.description}</p>
+                        <p className="text-xs text-content-muted mt-0.5 truncate max-w-xs">{row.original.description}</p>
                     )}
                 </div>
             ),
@@ -659,7 +659,15 @@ function ControlsPageInner({
             className="animate-fadeIn gap-6"
             header={{
                 breadcrumbs: [
-                    { label: 'Dashboard', href: tenantHref('/') },
+                    // Was `tenantHref('/')` — that resolves to `/t/<slug>/`
+                    // which has no page.tsx and 404s. Next.js auto-prefetches
+                    // every visible <Link>, so the failing prefetch kept the
+                    // page in a perpetual "fetch in flight" state and made
+                    // `waitForLoadState('networkidle')` hang for the full
+                    // 180s test timeout in every Playwright spec on this
+                    // page (create-control-modal, controls-filter-epic53,
+                    // control-edit-modal, controls-enhanced).
+                    { label: 'Dashboard', href: tenantHref('/dashboard') },
                     { label: 'Controls' },
                 ],
                 title: (

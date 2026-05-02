@@ -291,7 +291,7 @@ function TasksPageInner({
                     return (
                         <div>
                             <Link href={tenantHref(`/tasks/${task.id}`)} className="font-medium text-content-emphasis hover:text-[var(--brand-default)] transition" onClick={(e) => e.stopPropagation()}>
-                                {task.key && <span className="text-xs font-mono text-content-subtle mr-2">{task.key}</span>}
+                                {task.key && <span className="text-xs font-mono text-content-muted mr-2">{task.key}</span>}
                                 {task.title}
                             </Link>
                             {isOverdue(task) && <span className="badge badge-danger text-xs ml-2">Overdue</span>}

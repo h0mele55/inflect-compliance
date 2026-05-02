@@ -151,6 +151,18 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
     });
 
     const applicability = watch('applicability');
+    // Watch name so the submit button can mirror the legacy disabled
+    // gate (`disabled until name is non-empty`). RHF's `formState.isValid`
+    // is unreliable under `mode: 'onTouched'` for the initial render
+    // (true before the user touches anything); explicit watch matches
+    // the documented E2E selector + assertion.
+    const nameValue = watch('name');
+    const justificationValue = watch('justification');
+    const submitDisabled =
+        isSubmitting ||
+        nameValue.trim().length === 0 ||
+        (applicability === 'NOT_APPLICABLE' &&
+            (justificationValue?.trim().length ?? 0) === 0);
 
     // Reset form + focus the name input each time the modal opens.
     useEffect(() => {
@@ -416,7 +428,7 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                         type="submit"
                         className="btn btn-primary btn-sm"
                         id="create-control-btn"
-                        disabled={isSubmitting}
+                        disabled={submitDisabled}
                     >
                         {isSubmitting ? 'Creating…' : 'Create Control'}
                     </button>

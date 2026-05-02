@@ -80,13 +80,17 @@ test.describe('Controls — Epic 53 filter system', () => {
         await page.getByRole('button', { name: /filter/i }).first().click();
         await expect(page.getByRole('listbox').first()).toBeVisible({ timeout: 10000 });
 
-        // Drill into Status
-        const statusRow = page.getByRole('option', { name: /^Status$/ });
+        // Drill into Status — scope to the cmdk listbox so the lookup
+        // doesn't collide with the inline <select> status pills on
+        // every control row (which expose `<option>Implemented</option>`
+        // accessible names).
+        const filterListbox = page.getByLabel('Suggestions');
+        const statusRow = filterListbox.getByRole('option', { name: /^Status$/ });
         await statusRow.waitFor({ state: 'visible', timeout: 5000 });
         await statusRow.click();
 
         // Pick "Implemented"
-        const implemented = page.getByRole('option', { name: /Implemented/ });
+        const implemented = filterListbox.getByRole('option', { name: /Implemented/ });
         await implemented.waitFor({ state: 'visible', timeout: 5000 });
         await implemented.click();
 
