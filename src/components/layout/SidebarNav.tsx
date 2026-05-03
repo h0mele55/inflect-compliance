@@ -17,6 +17,7 @@ import {
     Paperclip,
     FileText,
     ClipboardList,
+    ClipboardCheck,
     FlaskConical,
     Truck,
     Map,
@@ -72,6 +73,7 @@ export function useNavSections(): NavSectionDef[] {
                     icon: CalendarIcon,
                     badge: calendarBadge,
                 },
+                { href: tenantHref('/audits'), label: 'Audits', icon: ClipboardCheck },
             ],
         },
         {
