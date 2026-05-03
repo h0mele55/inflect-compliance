@@ -81,3 +81,10 @@ export {
     type CelebrateAdHocInput,
     type UseCelebrationResult,
 } from "./use-celebration";
+
+// ─── View mode (Epic 66) ──────────────────────────────────────────────
+export {
+    useViewMode,
+    viewModeStorageKey,
+    type ViewMode,
+} from "./use-view-mode";

@@ -30,6 +30,7 @@ import type {
 
 import {
     DrillDownCtas,
+    TenantCoverageCards,
     TenantCoverageList,
 } from './dashboard-sections';
 
@@ -276,15 +277,24 @@ export function DispatchedWidget({
             const cfg = widget.config as {
                 sortBy?: 'rag' | 'name' | 'coverage';
                 limit?: number;
+                display?: 'list' | 'cards';
             };
             title = widget.title ?? 'Coverage by Tenant';
             body = (
                 <div className="overflow-y-auto h-full -mx-2 px-2">
-                    <TenantCoverageList
-                        rows={data.tenantHealth}
-                        sortBy={cfg.sortBy}
-                        limit={cfg.limit}
-                    />
+                    {cfg.display === 'cards' ? (
+                        <TenantCoverageCards
+                            rows={data.tenantHealth}
+                            sortBy={cfg.sortBy}
+                            limit={cfg.limit}
+                        />
+                    ) : (
+                        <TenantCoverageList
+                            rows={data.tenantHealth}
+                            sortBy={cfg.sortBy}
+                            limit={cfg.limit}
+                        />
+                    )}
                 </div>
             );
             break;

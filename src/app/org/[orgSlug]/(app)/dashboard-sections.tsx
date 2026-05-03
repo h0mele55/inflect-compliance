@@ -15,8 +15,11 @@ import Link from 'next/link';
 import { AlertTriangle, ChevronRight, Layers, Paperclip, ShieldCheck } from 'lucide-react';
 
 import { AnimatedNumber } from '@/components/ui/animated-number';
+import { CardList } from '@/components/ui/card-list';
 import { EmptyState } from '@/components/ui/empty-state';
+import { MiniAreaChart } from '@/components/ui/mini-area-chart';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 import type {
     PortfolioSummary,
     RagBadge,
@@ -147,6 +150,173 @@ export function CoverageBar({
                 }
             />
         </div>
+    );
+}
+
+// ─── Tenant coverage cards (Epic 66) ──────────────────────────────
+//
+// Card-based representation of the same `TenantHealthRow[]` data
+// `<TenantCoverageList>` consumes. Designed for the portfolio
+// dashboard's `TENANT_LIST` widget when the operator wants a richer
+// per-tenant summary (RAG badge + sparkline + control count + last
+// activity) instead of the dense list. Built on the shared
+// `<CardList>` compound primitives so the layout, hover, focus,
+// and selection affordances stay consistent with every other
+// card-based surface.
+
+export interface TenantCoverageCardsProps {
+    rows: TenantHealthRow[];
+    sortBy?: 'rag' | 'name' | 'coverage';
+    limit?: number;
+    /**
+     * Optional per-tenant trend series for the sparkline. Keyed by
+     * `tenantId`. When a tenant has no series (or the prop is
+     * omitted entirely), the card falls back to a plain coverage
+     * percentage and skips the sparkline. Lets pages adopt the
+     * card view incrementally — sparklines can be wired in later
+     * without forcing a schema/API change first.
+     */
+    trends?: Record<
+        string,
+        ReadonlyArray<{ date: Date; value: number }>
+    >;
+}
+
+export function TenantCoverageCards({
+    rows,
+    sortBy = 'rag',
+    limit,
+    trends,
+}: TenantCoverageCardsProps) {
+    if (rows.length === 0) {
+        return (
+            <EmptyState
+                icon={Layers}
+                title="No tenants linked"
+                description="Add tenants to this organization to see per-tenant coverage and health."
+            />
+        );
+    }
+
+    // Same sort + slice contract as TenantCoverageList so a widget
+    // can flip `display: 'list' | 'cards'` without re-ranking.
+    const ragOrder: Record<RagBadge | 'PENDING', number> = {
+        RED: 0,
+        AMBER: 1,
+        GREEN: 2,
+        PENDING: 3,
+    };
+    const sorted = [...rows].sort((a, b) => {
+        if (sortBy === 'rag') {
+            const ra = ragOrder[a.rag ?? 'PENDING'];
+            const rb = ragOrder[b.rag ?? 'PENDING'];
+            if (ra !== rb) return ra - rb;
+            return a.name.localeCompare(b.name);
+        }
+        if (sortBy === 'coverage') {
+            const ca = a.coveragePercent ?? -1;
+            const cb = b.coveragePercent ?? -1;
+            if (ca !== cb) return ca - cb;
+            return a.name.localeCompare(b.name);
+        }
+        return a.name.localeCompare(b.name);
+    });
+    const visible = limit ? sorted.slice(0, limit) : sorted;
+
+    return (
+        <CardList aria-label="Tenant coverage" data-testid="org-tenant-coverage-cards">
+            {visible.map((row) => {
+                const series = trends?.[row.tenantId] ?? [];
+                const hasSparkline = series.length > 1;
+                const variant: 'success' | 'warning' | 'error' | 'neutral' =
+                    row.rag === 'GREEN'
+                        ? 'success'
+                        : row.rag === 'AMBER'
+                        ? 'warning'
+                        : row.rag === 'RED'
+                        ? 'error'
+                        : 'neutral';
+                return (
+                    <CardList.Card
+                        key={row.tenantId}
+                        data-testid={`org-tenant-card-${row.slug}`}
+                        // Whole-card click navigates to the tenant
+                        // — match the existing `<TenantCoverageList>`
+                        // navigation behaviour. The Link below is a
+                        // visible affordance + keyboard-accessible
+                        // backstop (anchor click is intercepted by
+                        // the card's interactive-child guard, so it
+                        // navigates via its own href without
+                        // double-triggering the card click).
+                        onClick={() => {
+                            if (typeof window !== 'undefined') {
+                                window.location.href = row.drillDownUrl;
+                            }
+                        }}
+                    >
+                        <CardList.CardHeader
+                            title={
+                                <Link
+                                    href={row.drillDownUrl}
+                                    className="text-content-emphasis hover:underline"
+                                >
+                                    {row.name}
+                                </Link>
+                            }
+                            subtitle={row.slug}
+                            badge={<RagPill rag={row.rag} />}
+                        />
+                        <CardList.CardContent
+                            kv={[
+                                {
+                                    label: 'Coverage',
+                                    value:
+                                        row.coveragePercent !== null
+                                            ? `${row.coveragePercent.toFixed(1)}%`
+                                            : '—',
+                                },
+                                {
+                                    label: 'Open risks',
+                                    value: row.openRisks ?? '—',
+                                },
+                                {
+                                    label: 'Critical',
+                                    value: row.criticalRisks ?? 0,
+                                },
+                                {
+                                    label: 'Overdue evidence',
+                                    value: row.overdueEvidence ?? 0,
+                                },
+                            ]}
+                        >
+                            {hasSparkline ? (
+                                <div
+                                    className="h-10 w-full"
+                                    data-testid={`org-tenant-card-spark-${row.slug}`}
+                                >
+                                    <MiniAreaChart
+                                        data={series}
+                                        variant={variant}
+                                        aria-label={`${row.name} coverage trend`}
+                                    />
+                                </div>
+                            ) : (
+                                <CoverageBar
+                                    percent={row.coveragePercent}
+                                    rag={row.rag}
+                                />
+                            )}
+                            {row.snapshotDate && (
+                                <p className="text-xs text-content-subtle">
+                                    Last activity{' '}
+                                    <TimestampTooltip date={row.snapshotDate} />
+                                </p>
+                            )}
+                        </CardList.CardContent>
+                    </CardList.Card>
+                );
+            })}
+        </CardList>
     );
 }
 
