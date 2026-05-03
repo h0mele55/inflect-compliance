@@ -34,6 +34,7 @@ import {
     WidgetPicker,
     type WidgetLayoutChange,
 } from '@/components/ui/dashboard-widgets';
+import { AnimatedNumber } from '@/components/ui/animated-number';
 import type {
     CreateOrgDashboardWidgetInput,
     OrgDashboardWidgetDto,
@@ -181,11 +182,24 @@ export function PortfolioDashboard({
                     <h1 className="text-2xl font-semibold text-content-emphasis">
                         Portfolio Overview
                     </h1>
-                    <p className="text-sm text-content-muted mt-1">
-                        {data.summary.tenants.total} tenant
-                        {data.summary.tenants.total === 1 ? '' : 's'}
+                    <p
+                        className="text-sm text-content-muted mt-1"
+                        data-portfolio-header-stats
+                    >
+                        <AnimatedNumber
+                            value={data.summary.tenants.total}
+                            format={{ kind: 'integer' }}
+                        />
+                        {' '}tenant{data.summary.tenants.total === 1 ? '' : 's'}
                         {data.summary.tenants.pending > 0 && (
-                            <> · {data.summary.tenants.pending} pending first snapshot</>
+                            <>
+                                {' · '}
+                                <AnimatedNumber
+                                    value={data.summary.tenants.pending}
+                                    format={{ kind: 'integer' }}
+                                />
+                                {' pending first snapshot'}
+                            </>
                         )}
                     </p>
                 </div>

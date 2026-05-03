@@ -28,6 +28,10 @@
  */
 import { type LucideIcon } from 'lucide-react';
 
+import {
+    AnimatedNumber,
+    type AnimatedNumberFormat,
+} from '@/components/ui/animated-number';
 import { MiniAreaChart, type MiniAreaChartVariant } from '@/components/ui/mini-area-chart';
 import { computeKpiTrend, formatTrendAbsolute, formatTrendPercent, trendDirectionIcon, type TrendPolarity } from '@/lib/kpi-trend';
 
@@ -97,20 +101,29 @@ export interface KpiCardProps {
     trendAriaLabel?: string;
 }
 
-// ─── Formatters ─────────────────────────────────────────────────────
-
-function formatValue(value: number | null | undefined, format: KpiFormat): string {
-    if (value === null || value === undefined) return '—';
+// ─── Format mapping ─────────────────────────────────────────────────
+//
+// Maps the KpiCard's coarse format vocabulary onto the underlying
+// AnimatedNumber preset. Compact uses Intl's `notation: 'compact'`
+// (which bakes "K" / "M" into the formatter output) so the animated
+// digits and the unit suffix transition together rather than the
+// suffix re-mounting on each tier change.
+function kpiFormatToAnimated(format: KpiFormat): AnimatedNumberFormat {
     switch (format) {
         case 'percent':
-            return `${value.toFixed(1)}%`;
+            return { kind: 'percent', fractionDigits: 1 };
         case 'compact':
-            if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-            if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-            return value.toLocaleString();
+            return {
+                kind: 'intl',
+                options: {
+                    notation: 'compact',
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                },
+            };
         case 'number':
         default:
-            return value.toLocaleString();
+            return { kind: 'integer' };
     }
 }
 
@@ -130,7 +143,69 @@ interface TrendIndicator {
     direction: 'up' | 'down' | 'flat';
     semantic: 'good' | 'bad' | 'neutral';
     icon: string;
+    /**
+     * Pre-rendered text — kept for backward compatibility with any
+     * caller / test that asserts on the indicator's full string. The
+     * decomposed (sign + magnitude + unit) fields below are what the
+     * card renders so the magnitude can animate smoothly through
+     * AnimatedNumber.
+     */
     text: string;
+    /** '+' (positive), '−' (Unicode minus, negative), '' (flat). */
+    sign: '+' | '−' | '';
+    /** Magnitude — always non-negative. Fed to AnimatedNumber. */
+    magnitude: number;
+    /**
+     * Unit string appended after the animated magnitude. '%' for
+     * percent-deltas, 'pp' for absolute percent-point deltas, '' when
+     * the format itself bakes its unit in (Intl compact).
+     */
+    unit: string;
+    /** Format spec for the AnimatedNumber that renders `magnitude`. */
+    animatedFormat: AnimatedNumberFormat;
+}
+
+// ─── Magnitude format mapping ───────────────────────────────────────
+//
+// The trend indicator splits the formatter's output into
+// (sign, magnitude, unit) so the magnitude can be animated in
+// isolation. The format spec returned here mirrors the existing
+// `formatTrendAbsolute` / `formatTrendPercent` digit conventions.
+
+function magnitudeFormatForPercent(): AnimatedNumberFormat {
+    return { kind: 'decimal', fractionDigits: 1 };
+}
+
+function magnitudeFormatForAbsolute(format: KpiFormat): AnimatedNumberFormat {
+    switch (format) {
+        case 'percent':
+            // Percentage-point delta — the unit ("pp") is appended
+            // separately. Just animate the digits.
+            return { kind: 'decimal', fractionDigits: 1 };
+        case 'compact':
+            // Intl compact bakes "K" / "M" into the formatter output,
+            // so the unit string stays empty and the suffix tier
+            // transitions visually with the digits.
+            return {
+                kind: 'intl',
+                options: {
+                    notation: 'compact',
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                },
+            };
+        case 'number':
+        default:
+            // Plain count — toLocaleString() defaults; AnimatedNumber's
+            // 'intl' preset with no constraints matches that.
+            return { kind: 'intl', options: {} };
+    }
+}
+
+function signFromDelta(delta: number): '+' | '−' | '' {
+    if (delta > 0) return '+';
+    if (delta < 0) return '−';
+    return '';
 }
 
 function resolveTrendIndicator(input: {
@@ -152,11 +227,17 @@ function resolveTrendIndicator(input: {
                     (input.polarity === 'down-good' && direction === 'down')
                   ? 'good'
                   : 'bad';
+        const magnitude = Math.abs(input.delta);
+        const unit = input.format === 'percent' ? 'pp' : '';
         return {
             direction,
             semantic,
             icon: trendDirectionIcon(direction),
             text: formatTrendAbsolute(input.delta, input.format),
+            sign: signFromDelta(input.delta),
+            magnitude,
+            unit,
+            animatedFormat: magnitudeFormatForAbsolute(input.format),
         };
     }
 
@@ -174,6 +255,10 @@ function resolveTrendIndicator(input: {
             semantic: 'neutral',
             icon: trendDirectionIcon('flat'),
             text: formatTrendPercent(0),
+            sign: '',
+            magnitude: 0,
+            unit: '%',
+            animatedFormat: magnitudeFormatForPercent(),
         };
     }
     return {
@@ -181,6 +266,10 @@ function resolveTrendIndicator(input: {
         semantic: trend.semantic,
         icon: trendDirectionIcon(trend.direction),
         text: formatTrendPercent(trend.deltaPercent),
+        sign: signFromDelta(trend.deltaPercent),
+        magnitude: Math.abs(trend.deltaPercent),
+        unit: '%',
+        animatedFormat: magnitudeFormatForPercent(),
     };
 }
 
@@ -203,8 +292,8 @@ export default function KpiCard({
     trendVariant = 'brand',
     trendAriaLabel,
 }: KpiCardProps) {
-    const formatted = formatValue(value, format);
     const isEmpty = value === null || value === undefined;
+    const animatedFormat = kpiFormatToAnimated(format);
     const indicator = resolveTrendIndicator({
         value: value ?? null,
         delta: delta ?? null,
@@ -234,7 +323,11 @@ export default function KpiCard({
                         : `bg-gradient-to-r ${gradient} bg-clip-text text-transparent`
                 }`}
             >
-                {formatted}
+                {isEmpty ? (
+                    '—'
+                ) : (
+                    <AnimatedNumber value={value} format={animatedFormat} />
+                )}
             </p>
 
             {/* Trend indicator (delta direction + magnitude + optional label) */}
@@ -247,7 +340,12 @@ export default function KpiCard({
                     >
                         {indicator.icon}
                         {' '}
-                        {indicator.text}
+                        {indicator.sign}
+                        <AnimatedNumber
+                            value={indicator.magnitude}
+                            format={indicator.animatedFormat}
+                        />
+                        {indicator.unit}
                     </span>
                     {deltaLabel && (
                         <span className="text-xs text-content-subtle">{deltaLabel}</span>

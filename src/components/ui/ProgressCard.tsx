@@ -19,6 +19,8 @@
  * ```
  */
 
+import { AnimatedNumber } from '@/components/ui/animated-number';
+
 // ─── Props ──────────────────────────────────────────────────────────
 
 export interface ProgressSegment {
@@ -59,7 +61,6 @@ export default function ProgressCard({
     id,
 }: ProgressCardProps) {
     const percent = max > 0 ? Math.min((value / max) * 100, 100) : 0;
-    const displayPercent = percent.toFixed(1);
 
     return (
         <div id={id} className={`glass-card p-5 ${className}`}>
@@ -92,7 +93,10 @@ export default function ProgressCard({
                     )}
                 </div>
                 <span className="text-sm font-medium text-content-default tabular-nums min-w-[3.5rem] text-right">
-                    {displayPercent}%
+                    <AnimatedNumber
+                        value={percent}
+                        format={{ kind: 'percent', fractionDigits: 1 }}
+                    />
                 </span>
             </div>
 
