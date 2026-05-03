@@ -30,6 +30,7 @@ import {
     TimeSeriesChart,
     type TimeSeriesDatum,
 } from "@/components/ui/charts";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import { formatDate } from "@/lib/format-date";
 import { useMemo } from "react";
 
@@ -80,8 +81,17 @@ export function TrendCard({
             <div className="flex items-baseline justify-between">
                 <span className="text-xs text-content-muted">{label}</span>
                 <span className="text-sm font-semibold text-content-emphasis tabular-nums">
-                    {value}
-                    {suffix}
+                    <AnimatedNumber
+                        value={value}
+                        // TrendCard only knows the suffix as a string,
+                        // not a structured format. Use the `intl`
+                        // passthrough with no constraints — preserves
+                        // whatever digit shape the caller passed
+                        // (integers stay integer, decimals stay
+                        // decimal). The suffix prop carries the unit.
+                        format={{ kind: 'intl', options: {} }}
+                        suffix={suffix}
+                    />
                 </span>
             </div>
             <div

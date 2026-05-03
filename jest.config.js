@@ -209,6 +209,12 @@ const jsdomProject = {
         '^react-markdown$': '<rootDir>/tests/rendered/react-markdown-mock.tsx',
         // CSS and static asset stubs for jsdom.
         '\\.(css|less|scss|sass)$': '<rootDir>/tests/rendered/style-mock.ts',
+        // Epic 61 — `@number-flow/react` ships a custom-element + Web
+        // Animations runtime that jsdom only partially supports. The
+        // mock renders the same Intl.NumberFormat output the real
+        // component settles on, so card render tests can assert on the
+        // formatted text deterministically.
+        '^@number-flow/react$': '<rootDir>/tests/rendered/number-flow-mock.tsx',
     },
     testMatch: ['<rootDir>/tests/rendered/**/*.test.{ts,tsx}'],
     testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],

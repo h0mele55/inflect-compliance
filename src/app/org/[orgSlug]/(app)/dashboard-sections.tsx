@@ -14,6 +14,7 @@
 import Link from 'next/link';
 import { AlertTriangle, ChevronRight, Layers, Paperclip, ShieldCheck } from 'lucide-react';
 
+import { AnimatedNumber } from '@/components/ui/animated-number';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import type {
@@ -82,9 +83,14 @@ export function TenantCoverageList({
                                     {row.name}
                                 </span>
                                 <span className="text-xs tabular-nums text-content-muted">
-                                    {row.coveragePercent !== null
-                                        ? `${row.coveragePercent.toFixed(1)}%`
-                                        : '—'}
+                                    {row.coveragePercent !== null ? (
+                                        <AnimatedNumber
+                                            value={row.coveragePercent}
+                                            format={{ kind: 'percent', fractionDigits: 1 }}
+                                        />
+                                    ) : (
+                                        '—'
+                                    )}
                                 </span>
                             </div>
                             <CoverageBar percent={row.coveragePercent} rag={row.rag} />
@@ -211,7 +217,10 @@ export function DrillDownCtas({
                         />
                     </div>
                     <p className="mt-2 text-xl font-bold text-content-emphasis tabular-nums">
-                        {cta.count.toLocaleString()}
+                        <AnimatedNumber
+                            value={cta.count}
+                            format={{ kind: 'integer' }}
+                        />
                     </p>
                     <p className="text-xs text-content-muted">
                         {cta.count === 1 ? 'item' : 'items'} across the portfolio
