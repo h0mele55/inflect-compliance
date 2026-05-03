@@ -24,6 +24,8 @@
  */
 import { Fragment } from 'react';
 
+import { ShimmerDots } from '@/components/ui/shimmer-dots';
+
 // ─── Props ──────────────────────────────────────────────────────────
 
 export interface HeatmapCell {
@@ -41,6 +43,12 @@ export interface RiskHeatmapProps {
     className?: string;
     /** Optional test-id */
     id?: string;
+    /**
+     * Epic 64 — render `<ShimmerDots>` in place of the heatmap grid
+     * (preserving the matrix footprint) while data is loading.
+     * Distinct from `cells=[]` which renders the "no risks" state.
+     */
+    loading?: boolean;
 }
 
 // ─── Color Logic ────────────────────────────────────────────────────
@@ -68,7 +76,31 @@ export default function RiskHeatmap({
     scale = 5,
     className = '',
     id,
+    loading = false,
 }: RiskHeatmapProps) {
+    // Loading state — preserve matrix footprint with a same-size
+    // shimmer grid so the dashboard doesn't reflow when data arrives.
+    if (loading) {
+        return (
+            <div
+                id={id}
+                className={`glass-card p-5 ${className}`}
+                data-heatmap-loading
+            >
+                <h3 className="text-sm font-semibold text-content-default mb-3">
+                    Risk Heatmap
+                </h3>
+                <ShimmerDots
+                    rows={scale}
+                    cols={scale}
+                    dotSize="size-3"
+                    className="aspect-square w-full"
+                    aria-label="Heatmap loading"
+                />
+            </div>
+        );
+    }
+
     // Build lookup: `${likelihood}-${impact}` → count
     const lookup = new Map<string, number>();
     for (const cell of cells) {
