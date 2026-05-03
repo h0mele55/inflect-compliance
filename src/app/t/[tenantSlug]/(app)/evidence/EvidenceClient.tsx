@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Client component receiving server-rendered domain data; tanstack column callbacks; or library-boundary callbacks. Per-site narrowing requires generated DTOs / per-cell CellContext imports — out of scope for the lint cleanup PR. */
 import { formatDate } from '@/lib/format-date';
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
@@ -43,6 +43,9 @@ import {
 import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
 import { EvidenceGallery } from '@/components/ui/EvidenceGallery';
 import { ToggleGroup } from '@/components/ui/toggle-group';
+import { useCelebration } from '@/components/ui/hooks';
+import { MILESTONES } from '@/lib/celebrations';
+import { isAllEvidenceCurrent } from '@/lib/evidence-freshness';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import {
     buildEvidenceFilters,
@@ -154,6 +157,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [controls] = useState<any[]>(initialControls);
     const retentionFilter = (filters.tab || 'active') as RetentionFilter;
+    const { celebrate } = useCelebration();
     const viewMode: 'list' | 'gallery' =
         filters.view === 'gallery' ? 'gallery' : 'list';
     const [showUpload, setShowUpload] = useState(false);
@@ -269,6 +273,35 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
         : retentionFilter === 'expiring'
             ? expiringEvidence
             : activeEvidence;
+
+    // Epic 62 — celebrate when every active evidence row is fresh.
+    // Gates that suppress false positives:
+    //   - hydratedNow set (skips SSR / first-render race)
+    //   - default 'active' retention tab + no other filters
+    //   - query has actually loaded data at least once
+    // Session dedupe in `useCelebration` prevents repeat fires across
+    // refreshes / re-renders.
+    useEffect(() => {
+        if (!hydratedNow) return;
+        if (retentionFilter !== 'active') return;
+        if (anyFilterActive) return;
+        if (evidenceQuery.isLoading) return;
+        if (!isAllEvidenceCurrent(evidence, { now: hydratedNow })) return;
+        const def = MILESTONES['evidence-all-current'];
+        celebrate({
+            preset: def.preset,
+            key: def.key,
+            message: def.message,
+            description: def.description,
+        });
+    }, [
+        evidence,
+        hydratedNow,
+        retentionFilter,
+        anyFilterActive,
+        evidenceQuery.isLoading,
+        celebrate,
+    ]);
 
     // ─── Column visibility (Epic 52) ───
     // Pagination removed — internal scroll inside the table card
