@@ -571,7 +571,11 @@ describe('Vendor Renewal Check — DueItem output', () => {
                     tenantId: 't-1',
                     name: 'SecureInc',
                     type: 'RENEWAL_DUE',
-                    dueDate: new Date('2026-05-10T00:00:00Z'),
+                    // Relative so the test stays in the UPCOMING bucket
+                    // (>7 days out) regardless of when it runs — a fixed
+                    // calendar date drifts into URGENT once today's date
+                    // is within 7 days of it.
+                    dueDate: new Date(Date.now() + 30 * 86_400_000),
                 },
             ]),
         }));
