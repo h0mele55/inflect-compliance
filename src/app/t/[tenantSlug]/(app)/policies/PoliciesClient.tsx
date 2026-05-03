@@ -1,7 +1,7 @@
 'use client';
 /* eslint-disable react-hooks/exhaustive-deps -- Various useEffect/useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers recreated each render) or use selector functions whose change-detection happens elsewhere. Adding the deps would either trigger unnecessary re-runs OR cause infinite render loops; the proper structural fix is to wrap parent-level callbacks in useCallback. Tracked as follow-up. */
 /* eslint-disable @typescript-eslint/no-explicit-any -- Server payload is loosely typed at the page boundary; per-cell TanStack column callbacks need a per-row narrowing pass to remove the `any`s, tracked as follow-up. */
-import { formatDate } from '@/lib/format-date';
+import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -303,7 +303,7 @@ function PoliciesPageInner({
                     p.status !== 'ARCHIVED';
                 return (
                     <span className="inline-flex items-center gap-1 text-xs text-content-muted">
-                        {formatDate(p.nextReviewAt)}
+                        <TimestampTooltip date={p.nextReviewAt} />
                         {isOverdue && (
                             <span
                                 className="badge badge-danger text-xs"
@@ -322,9 +322,10 @@ function PoliciesPageInner({
             header: 'Updated',
             accessorFn: (p: any) => p.updatedAt,
             cell: ({ getValue }: any) => (
-                <span className="text-xs text-content-subtle">
-                    {formatDate(getValue())}
-                </span>
+                <TimestampTooltip
+                    date={getValue() as string | null | undefined}
+                    className="text-xs text-content-subtle"
+                />
             ),
         },
     ]), [tenantHref, hydratedNow]);
