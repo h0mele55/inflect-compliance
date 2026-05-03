@@ -7,6 +7,8 @@ import { RequirePermission } from '@/components/require-permission';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { FrameworkExplorer } from '@/components/frameworks/FrameworkExplorer';
 import { FrameworkBuilder } from '@/components/ui/FrameworkBuilder';
+import { useCelebration } from '@/components/ui/hooks';
+import { MILESTONES, scopedMilestone } from '@/lib/celebrations';
 import type { FrameworkTreePayload } from '@/lib/framework-tree/types';
 
 type Tab = 'requirements' | 'packs' | 'coverage' | 'builder';
@@ -25,6 +27,24 @@ export default function FrameworkDetailPage() {
     const [coverage, setCoverage] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Epic 62 — celebrate when this framework hits 100% coverage.
+    // `scopedMilestone` namespaces the dedupe key per framework so
+    // each framework's first reach earns its own moment in the same
+    // session (otherwise a single global `framework-100` key would
+    // mean only the first framework ever celebrates).
+    const { celebrate } = useCelebration();
+    useEffect(() => {
+        if (coverage?.coveragePercent !== 100) return;
+        const baseDescription = MILESTONES['framework-100'].description ?? '';
+        celebrate(
+            scopedMilestone('framework-100', frameworkKey, {
+                descriptionOverride: framework?.name
+                    ? `${framework.name} — ${baseDescription}`.trim()
+                    : undefined,
+            }),
+        );
+    }, [coverage?.coveragePercent, frameworkKey, framework?.name, celebrate]);
 
     useEffect(() => {
         // Epic 46 — fetch the new `/tree` endpoint instead of the

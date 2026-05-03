@@ -9,6 +9,8 @@ import { RequirePermission } from '@/components/require-permission';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import { CopyButton } from '@/components/ui/copy-button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { useCelebration } from '@/components/ui/hooks';
+import { scopedMilestone } from '@/lib/celebrations';
 import { Package } from 'lucide-react';
 
 const ENTITY_ICON: Record<string, AppIconName> = {
@@ -66,6 +68,28 @@ export default function PackDetailPage() {
             }
         } finally { setSharing(false); }
     };
+
+    // Epic 62 — celebrate when the pack reaches its "complete" state
+    // (FROZEN or its downstream EXPORTED). Per-pack dedupe key so a
+    // user managing several packs in the same session gets one
+    // celebration per pack, not one per session globally.
+    //
+    // The effect must sit BEFORE the early returns above so React's
+    // hook order stays stable across loading → loaded transitions.
+    const { celebrate } = useCelebration();
+    const packStatus: string | undefined = pack?.status;
+    const packComplete = packStatus === 'FROZEN' || packStatus === 'EXPORTED';
+    const packName: string | undefined = pack?.name;
+    useEffect(() => {
+        if (!packComplete) return;
+        celebrate(
+            scopedMilestone('audit-pack-complete', packId, {
+                descriptionOverride: packName
+                    ? `${packName} — frozen and shareable with your auditor.`
+                    : undefined,
+            }),
+        );
+    }, [packComplete, packId, packName, celebrate]);
 
     if (loading) return <div className="p-8"><div className="glass-card animate-pulse h-64" /></div>;
     if (!pack) return <div className="p-8 text-center text-content-muted">Pack not found</div>;

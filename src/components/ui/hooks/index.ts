@@ -73,3 +73,11 @@ export {
     type UseCursorPaginationOptions,
     type UseCursorPaginationResult,
 } from "./use-cursor-pagination";
+
+// ─── Celebration (Epic 62) ────────────────────────────────────────────
+export {
+    useCelebration,
+    type CelebrateInput,
+    type CelebrateAdHocInput,
+    type UseCelebrationResult,
+} from "./use-celebration";
