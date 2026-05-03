@@ -25,6 +25,8 @@
  * ```
  */
 
+import { ShimmerDots } from '@/components/ui/shimmer-dots';
+
 // ─── Props ──────────────────────────────────────────────────────────
 
 export interface DonutSegment {
@@ -53,6 +55,13 @@ export interface DonutChartProps {
     className?: string;
     /** Optional test-id */
     id?: string;
+    /**
+     * Epic 64 — render `<ShimmerDots>` inside the donut frame
+     * (preserving size for layout stability) while the underlying
+     * data is still loading. Distinct from `segments=[]` which
+     * renders the "No data" empty state.
+     */
+    loading?: boolean;
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -66,7 +75,31 @@ export default function DonutChart({
     showLegend = true,
     className = '',
     id,
+    loading = false,
 }: DonutChartProps) {
+    // Loading takes precedence — shimmer in a same-size box keeps
+    // layout stable while the data resolves.
+    if (loading) {
+        return (
+            <div
+                id={id}
+                className={`flex flex-col items-center ${className}`}
+                data-donut-loading
+            >
+                <div
+                    className="rounded-full overflow-hidden"
+                    style={{ width: size, height: size }}
+                >
+                    <ShimmerDots
+                        rows={Math.max(4, Math.round(size / 16))}
+                        cols={Math.max(4, Math.round(size / 16))}
+                        className="h-full w-full"
+                        aria-label="Chart loading"
+                    />
+                </div>
+            </div>
+        );
+    }
     const total = segments.reduce((sum, s) => sum + s.value, 0);
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;

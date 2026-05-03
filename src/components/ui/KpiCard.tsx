@@ -33,6 +33,7 @@ import {
     type AnimatedNumberFormat,
 } from '@/components/ui/animated-number';
 import { MiniAreaChart, type MiniAreaChartVariant } from '@/components/ui/mini-area-chart';
+import { ShimmerDots } from '@/components/ui/shimmer-dots';
 import { computeKpiTrend, formatTrendAbsolute, formatTrendPercent, trendDirectionIcon, type TrendPolarity } from '@/lib/kpi-trend';
 
 // ─── Props ──────────────────────────────────────────────────────────
@@ -99,6 +100,13 @@ export interface KpiCardProps {
     trendVariant?: MiniAreaChartVariant;
     /** Override the sparkline's accessible label. Defaults to `${label} 30-day trend`. */
     trendAriaLabel?: string;
+    /**
+     * Epic 64 — show animated `<ShimmerDots>` in place of the
+     * headline value (and suppress the trend indicator) while the
+     * underlying data is loading. Distinct from `value === null`,
+     * which renders the static `—` "no data" placeholder.
+     */
+    loading?: boolean;
 }
 
 // ─── Format mapping ─────────────────────────────────────────────────
@@ -291,16 +299,21 @@ export default function KpiCard({
     trend,
     trendVariant = 'brand',
     trendAriaLabel,
+    loading = false,
 }: KpiCardProps) {
     const isEmpty = value === null || value === undefined;
     const animatedFormat = kpiFormatToAnimated(format);
-    const indicator = resolveTrendIndicator({
-        value: value ?? null,
-        delta: delta ?? null,
-        previousValue: previousValue ?? null,
-        format,
-        polarity: trendPolarity,
-    });
+    // While loading, suppress the trend indicator — showing a stale
+    // delta against an unknown current value would be misleading.
+    const indicator = loading
+        ? null
+        : resolveTrendIndicator({
+              value: value ?? null,
+              delta: delta ?? null,
+              previousValue: previousValue ?? null,
+              format,
+              polarity: trendPolarity,
+          });
 
     return (
         <div
@@ -315,20 +328,34 @@ export default function KpiCard({
                 </span>
             </div>
 
-            {/* Headline value */}
-            <p
-                className={`text-2xl font-bold ${
-                    isEmpty
-                        ? 'text-content-subtle'
-                        : `bg-gradient-to-r ${gradient} bg-clip-text text-transparent`
-                }`}
-            >
-                {isEmpty ? (
-                    '—'
-                ) : (
-                    <AnimatedNumber value={value} format={animatedFormat} />
-                )}
-            </p>
+            {/* Headline value — shimmer while loading, "—" when null,
+                animated otherwise. Loading wins over null because a
+                resolved-null value rendered alongside a "loading
+                things" page would feel like a flash of bad data. */}
+            {loading ? (
+                <div className="h-8 flex items-center" data-kpi-loading>
+                    <ShimmerDots
+                        rows={2}
+                        cols={20}
+                        className="h-6"
+                        aria-label={`${label} loading`}
+                    />
+                </div>
+            ) : (
+                <p
+                    className={`text-2xl font-bold ${
+                        isEmpty
+                            ? 'text-content-subtle'
+                            : `bg-gradient-to-r ${gradient} bg-clip-text text-transparent`
+                    }`}
+                >
+                    {isEmpty ? (
+                        '—'
+                    ) : (
+                        <AnimatedNumber value={value} format={animatedFormat} />
+                    )}
+                </p>
+            )}
 
             {/* Trend indicator (delta direction + magnitude + optional label) */}
             {indicator && (

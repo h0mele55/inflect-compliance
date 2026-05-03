@@ -108,6 +108,15 @@ module.exports = {
                     '0%': { filter: 'drop-shadow(rgba(0, 0, 0, 0.1) -2px 10px 6px)' },
                     '100%': { filter: 'drop-shadow(rgba(0, 0, 0, 0) -2px 10px 6px)' },
                 },
+                // Epic 64 — shimmer wave for ShimmerDots. Each dot in
+                // the grid stamps an `animation-delay` derived from its
+                // (row, col) coordinates so a diagonal wave reads
+                // across the surface. Deliberately gentle (opacity
+                // 0.25 → 1 → 0.25) to feel polished rather than noisy.
+                'shimmer-pulse': {
+                    '0%, 100%': { opacity: '0.25' },
+                    '50%': { opacity: '1' },
+                },
             },
             animation: {
                 'slide-up-fade': 'slide-up-fade 0.2s ease-out',
@@ -115,6 +124,7 @@ module.exports = {
                 'scale-in': 'scale-in 0.15s ease-out',
                 'fade-in': 'fade-in 0.15s ease-out',
                 'table-pinned-shadow': 'table-pinned-shadow cubic-bezier(0, 0, 1, 0)',
+                'shimmer-pulse': 'shimmer-pulse 1.6s ease-in-out infinite',
             },
         },
     },

@@ -48,6 +48,7 @@ import {
 } from "react";
 import { Drawer } from "vaul";
 import { useMediaQuery } from "./hooks";
+import { ProgressiveBlur } from "./progressive-blur";
 import { Tooltip } from "./tooltip";
 
 // ─── Size variants ──────────────────────────────────────────────────
@@ -320,16 +321,50 @@ function Header({
  * pinned header and footer so long forms scroll inside the modal without
  * the overlay itself scrolling.
  */
-function Body({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
+type ProgressiveBlurEdge = boolean | "top" | "bottom" | "both";
+
+interface BodyProps extends HTMLAttributes<HTMLDivElement> {
+    /**
+     * Epic 64 — paint a `<ProgressiveBlur>` overlay at the body's
+     * scroll edge so long content tapers off rather than abruptly
+     * cutting at the footer. `true` shorthand = `"both"`.
+     *
+     * Off by default to keep every existing call site visually
+     * unchanged. Opt in on long-form modals (linked-items lists,
+     * scrollable forms) where the affordance materially helps.
+     */
+    progressiveBlur?: ProgressiveBlurEdge;
+}
+
+function Body({ className, progressiveBlur = false, children, ...rest }: BodyProps) {
+    if (!progressiveBlur) {
+        return (
+            <div
+                data-modal-body
+                className={cn(
+                    "scrollbar-thin flex-1 overflow-y-auto px-5 py-4 text-sm text-content-default",
+                    className,
+                )}
+                {...rest}
+            >
+                {children}
+            </div>
+        );
+    }
+    const edge = progressiveBlur === true ? "both" : progressiveBlur;
     return (
         <div
             data-modal-body
+            data-modal-body-progressive-blur={edge}
             className={cn(
-                "scrollbar-thin flex-1 overflow-y-auto px-5 py-4 text-sm text-content-default",
+                "scrollbar-thin relative flex-1 overflow-y-auto px-5 py-4 text-sm text-content-default",
                 className,
             )}
             {...rest}
-        />
+        >
+            {children}
+            <ProgressiveBlur side={edge} size="3rem" />
+        </div>
     );
 }
 
