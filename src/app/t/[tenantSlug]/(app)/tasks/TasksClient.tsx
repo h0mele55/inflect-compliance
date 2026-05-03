@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { formatDate } from '@/lib/format-date';
+import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 import { DataTable, createColumns } from '@/components/ui/table';
 import {
@@ -339,12 +339,22 @@ function TasksPageInner({
             {
                 id: 'dueAt',
                 header: 'Due Date',
-                cell: ({ row }) => <span className="text-xs text-content-muted">{row.original.dueAt ? formatDate(row.original.dueAt) : '—'}</span>,
+                cell: ({ row }) => (
+                    <TimestampTooltip
+                        date={row.original.dueAt}
+                        className="text-xs text-content-muted"
+                    />
+                ),
             },
             {
                 id: 'updatedAt',
                 header: 'Updated',
-                cell: ({ row }) => <span className="text-xs text-content-muted">{formatDate(row.original.updatedAt)}</span>,
+                cell: ({ row }) => (
+                    <TimestampTooltip
+                        date={row.original.updatedAt}
+                        className="text-xs text-content-muted"
+                    />
+                ),
             },
         );
 

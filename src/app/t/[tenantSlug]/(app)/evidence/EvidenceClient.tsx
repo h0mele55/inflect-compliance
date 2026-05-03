@@ -1,6 +1,5 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Client component receiving server-rendered domain data; tanstack column callbacks; or library-boundary callbacks. Per-site narrowing requires generated DTOs / per-cell CellContext imports — out of scope for the lint cleanup PR. */
-import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
@@ -42,6 +41,7 @@ import {
 } from '@/components/ui/file-type-icon';
 import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
 import { EvidenceGallery } from '@/components/ui/EvidenceGallery';
+import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 import { ToggleGroup } from '@/components/ui/toggle-group';
 import { useCelebration } from '@/components/ui/hooks';
 import { MILESTONES } from '@/lib/celebrations';
@@ -417,7 +417,11 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                             </span>
                         </div>
                         {ev.retentionUntil && !ev.isArchived && (
-                            <div className="text-content-subtle mt-0.5">{formatDate(ev.retentionUntil)}</div>
+                            <TimestampTooltip
+                                date={ev.retentionUntil}
+                                className="text-content-subtle mt-0.5 block"
+                                data-testid={`evidence-row-retention-date-${ev.id}`}
+                            />
                         )}
                         {editingRetention === ev.id && (
                             <div className="mt-2 flex gap-1 items-center">

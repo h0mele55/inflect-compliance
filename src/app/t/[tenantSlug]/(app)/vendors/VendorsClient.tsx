@@ -1,6 +1,6 @@
 'use client';
 /* eslint-disable react-hooks/exhaustive-deps -- Various useEffect/useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers recreated each render) or use selector functions whose change-detection happens elsewhere. Adding the deps would either trigger unnecessary re-runs OR cause infinite render loops; the proper structural fix is to wrap parent-level callbacks in useCallback. Tracked as follow-up. */
-import { formatDate } from '@/lib/format-date';
+import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMemo } from 'react';
 import Link from 'next/link';
@@ -31,11 +31,6 @@ const STATUS_VARIANT: Record<string, 'success' | 'info' | 'warning' | 'neutral'>
 const CRIT_VARIANT: Record<string, 'neutral' | 'warning' | 'error'> = {
     LOW: 'neutral', MEDIUM: 'warning', HIGH: 'error', CRITICAL: 'error',
 };
-
-function fmtDate(d: string | null) {
-    if (!d) return '—';
-    return formatDate(d);
-}
 
 function isOverdue(d: string | null, now: Date | null) {
     if (!d || !now) return false;
@@ -152,7 +147,7 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
             header: 'Next Review',
             cell: ({ row }: any) => (
                 <span>
-                    {fmtDate(row.original.nextReviewAt)}
+                    <TimestampTooltip date={row.original.nextReviewAt} />
                     {isOverdue(row.original.nextReviewAt, hydratedNow) && <span className="ml-1 text-xs text-content-error font-semibold">Overdue</span>}
                 </span>
             ),
@@ -162,7 +157,7 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
             header: 'Contract Renewal',
             cell: ({ row }: any) => (
                 <span>
-                    {fmtDate(row.original.contractRenewalAt)}
+                    <TimestampTooltip date={row.original.contractRenewalAt} />
                     {isOverdue(row.original.contractRenewalAt, hydratedNow) && <span className="ml-1 text-xs text-content-warning font-semibold">Due</span>}
                 </span>
             ),

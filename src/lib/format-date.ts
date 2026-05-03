@@ -31,6 +31,19 @@
  *   formatDateLong     → "16 April 2026"                      (formal docs, legal-style layouts)
  *   formatDateCompact  → "16 Apr"                             (chart axes, mini-calendars — year is context)
  *   formatDateRange    → adaptive (see the function's docblock) (all range chrome — pickers, filters, legends)
+ *   formatRelativeTime → "2 hours ago" / "in 3 days"           (Epic 63 — the underlying helper for <TimestampTooltip>)
+ *
+ * RELATIVE-TIME RENDERING (Epic 63)
+ * ─────────────────────────────────
+ * For "X ago" / "in X" cells in lists and tables, do NOT call
+ * `formatRelativeTime` from JSX directly. Use
+ * `<TimestampTooltip date={…}>` from `@/components/ui/timestamp-tooltip`
+ * instead — it pairs the relative phrasing with an exact-timestamp
+ * tooltip and is hydration-safe (the component handles the
+ * `useHydratedNow()` dance internally). The structural ratchet at
+ * `tests/guards/epic63-timestamp-rollout.test.ts` enforces this on
+ * the five primary list pages (Evidence, Policies, Tasks, Vendors,
+ * Risks).
  *
  * WHAT YOU MUST NOT DO
  * ────────────────────
@@ -163,6 +176,44 @@ export function formatDateTimeLong(
 ): string {
     const d = toDate(value);
     return d ? DATETIME_LONG_FMT.format(d) : fallback;
+}
+
+// ─── Relative time (Epic 63) ─────────────────────────────────────────────────
+//
+// Centralised so every "2 hours ago" / "in 3 days" string in the UI
+// goes through one helper. Wraps date-fns's `formatDistance` rather
+// than `formatDistanceToNow` so the caller can pin "now" — this is
+// what makes `<TimestampTooltip>` hydration-safe (the component
+// passes the `useHydratedNow()` value as `now`).
+//
+// Both past and future dates supported via `addSuffix: true` —
+// past becomes "X ago", future becomes "in X".
+//
+// Returns the fallback string (default `'—'`) when EITHER `value`
+// or `now` is null / invalid; the visible text on a card with a
+// missing date should not flash "less than a minute ago".
+
+import { formatDistance } from 'date-fns';
+
+export interface FormatRelativeTimeOptions {
+    /** Show "less than a minute ago" instead of "less than a minute". Defaults to true. */
+    addSuffix?: boolean;
+    /** Round to seconds for sub-minute deltas. Defaults to true. */
+    includeSeconds?: boolean;
+}
+
+export function formatRelativeTime(
+    value: string | Date | null | undefined,
+    now: Date | null | undefined,
+    options: FormatRelativeTimeOptions = {},
+    fallback = '—',
+): string {
+    const d = toDate(value);
+    if (!d || !now) return fallback;
+    return formatDistance(d, now, {
+        addSuffix: options.addSuffix ?? true,
+        includeSeconds: options.includeSeconds ?? true,
+    });
 }
 
 /**
