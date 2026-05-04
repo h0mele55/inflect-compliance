@@ -28,10 +28,7 @@
  */
 import { type LucideIcon } from 'lucide-react';
 
-import {
-    AnimatedNumber,
-    type AnimatedNumberFormat,
-} from '@/components/ui/animated-number';
+import { AnimatedNumber, type AnimatedNumberFormat } from '@/components/ui/animated-number';
 import { MiniAreaChart, type MiniAreaChartVariant } from '@/components/ui/mini-area-chart';
 import { ShimmerDots } from '@/components/ui/shimmer-dots';
 import { computeKpiTrend, formatTrendAbsolute, formatTrendPercent, trendDirectionIcon, type TrendPolarity } from '@/lib/kpi-trend';
