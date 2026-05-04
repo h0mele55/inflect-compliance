@@ -40,6 +40,7 @@
 import { cn } from "@dub/utils";
 import { Command, useCommandState } from "cmdk";
 import { ChevronDown } from "lucide-react";
+import * as React from "react";
 import {
     cloneElement,
     forwardRef,
@@ -67,6 +68,12 @@ import { Popover, PopoverProps } from "../popover";
 import { ScrollContainer } from "../scroll-container";
 import { Tooltip } from "../tooltip";
 import { COMBOBOX_DEFAULT_MESSAGES } from "./messages";
+import {
+    COMBOBOX_VIRTUALIZE_THRESHOLD,
+    VirtualizedComboboxOptions,
+} from "./virtualized-options";
+
+export { COMBOBOX_VIRTUALIZE_THRESHOLD } from "./virtualized-options";
 
 export {
     COMBOBOX_DEFAULT_MESSAGES,
@@ -236,6 +243,12 @@ export function Combobox<
     const setIsOpen = onOpenChange ?? setIsOpenInternal;
 
     const [search, setSearch] = useState("");
+    // Epic 68 — ref to the search <input>. When the option count
+    // exceeds the threshold the virtualized renderer attaches a
+    // capture-phase keydown handler here for ArrowDown / ArrowUp /
+    // Enter so cmdk's nav (which assumes items are mounted in the
+    // DOM) doesn't dead-end at the visible edge.
+    const searchInputRef = React.useRef<HTMLInputElement | null>(null);
     const [shouldSortOptions, setShouldSortOptions] = useState(false);
     const [sortedOptions, setSortedOptions] = useState<
         ComboboxOption<TMeta>[] | undefined
@@ -488,6 +501,7 @@ export function Combobox<
                             {!hideSearch && (
                                 <div className="border-border-subtle flex items-center overflow-hidden rounded-t-lg border-b">
                                     <Command.Input
+                                        ref={searchInputRef}
                                         placeholder={searchPlaceholder}
                                         value={search}
                                         onValueChange={setSearch}
@@ -539,6 +553,31 @@ export function Combobox<
                                                 <LoadingSpinner />
                                             </div>
                                         </Command.Loading>
+                                    ) : sortedOptions!.length >
+                                      COMBOBOX_VIRTUALIZE_THRESHOLD ? (
+                                        // Epic 68 — virtualized branch.
+                                        // Only the visible window of
+                                        // options renders to DOM;
+                                        // keyboard navigation runs from
+                                        // a bespoke handler bound to the
+                                        // search input.
+                                        <>
+                                            <VirtualizedComboboxOptions<TMeta>
+                                                options={sortedOptions!}
+                                                selected={selected}
+                                                onSelect={handleSelect}
+                                                multiple={isMultiple}
+                                                maxSelected={maxSelected}
+                                                optionRight={optionRight}
+                                                optionDescription={optionDescription}
+                                                optionClassName={optionClassName}
+                                                searchInputRef={searchInputRef}
+                                            />
+                                            {onCreate &&
+                                                multiple &&
+                                                search.length > 0 &&
+                                                createOptionItem}
+                                        </>
                                     ) : (
                                         <>
                                             {sortedOptions!.map((option) => {

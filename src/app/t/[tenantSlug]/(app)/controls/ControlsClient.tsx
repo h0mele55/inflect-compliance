@@ -729,6 +729,12 @@ function ControlsPageInner({
                 columns: controlColumns,
                 loading,
                 getRowId: (c) => c.id,
+                // Epic 68 — Controls page is the canonical opt-out
+                // for auto-virtualization. Per product directive the
+                // existing card scrolling on Controls stays as it is;
+                // bespoke per-row affordances + the JS whole-row clip
+                // depend on the standard <table> layout.
+                virtualize: false,
                 onRowClick: (row) => router.push(tenantHref(`/controls/${row.original.id}`)),
                 emptyState: hasActive
                     ? 'No controls match your filters. Try adjusting your search or filters.'

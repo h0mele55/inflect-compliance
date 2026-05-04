@@ -11,3 +11,8 @@ export * from "./table-utils";
 export * from "./types";
 export * from "./use-list-pagination";
 export * from "./use-table-pagination";
+export {
+    VirtualTable,
+    DEFAULT_VIRTUAL_ROW_HEIGHT,
+    type VirtualTableProps,
+} from "./virtual-table-body";
