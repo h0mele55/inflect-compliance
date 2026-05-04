@@ -74,6 +74,45 @@ async function resolveRateLimitScope(
 }
 
 /**
+ * Type-level transform — converts an inner handler's sync `params`
+ * shape (`{ params: P }`) into Next 16's required `{ params: Promise<P> }`
+ * for the route-level signature. Pass-through for handlers whose
+ * Context already uses `Promise<P>` (idempotent), and pass-through
+ * for Contexts without a `params` field at all (single-arg handlers).
+ *
+ * Why: Next 16 enforces `RouteHandlerConfig` where every dynamic
+ * route handler is `(req, { params: Promise<{...}> })`. The 249
+ * existing handlers in this codebase type `params` synchronously
+ * because the runtime shim below resolves the Promise before
+ * forwarding ctx. The type transform makes the OUTER wrapper
+ * signature match Next's expectation without forcing every inner
+ * handler to add `await params`.
+ */
+type AsyncifyParams<C> = C extends { params: infer P }
+    ? Omit<C, 'params'> & {
+          params: P extends Promise<unknown> ? P : Promise<P>;
+      }
+    : C;
+
+/**
+ * Dual-call signature for the wrapped handler — Next 16 invokes
+ * route exports with `{ params: Promise<P> }`, while unit tests
+ * invoke them directly with the sync `{ params: P }` shape. The
+ * runtime shim accepts both (it awaits only when params is a
+ * Promise), so the type surface should too.
+ */
+interface ApiRouteHandler<Context> {
+    (
+        req: NextRequest,
+        ctx: AsyncifyParams<Context>,
+    ): Promise<NextResponse | Response>;
+    (
+        req: NextRequest,
+        ctx: Context,
+    ): Promise<NextResponse | Response>;
+}
+
+/**
  * High-Order Wrapper for all app/api routes.
  *
  * Catch all throws (ZodError, AppError, primitive errors) and shapes them
@@ -94,8 +133,18 @@ async function resolveRateLimitScope(
 export function withApiErrorHandling<Context = any>(
     handler: (req: NextRequest, ctx: Context) => Promise<NextResponse | Response> | NextResponse | Response,
     options: ApiWrapperOptions = {},
-) {
-    return async (req: NextRequest, ctx: Context): Promise<NextResponse | Response> => {
+): ApiRouteHandler<Context> {
+    const impl = async (
+        req: NextRequest,
+        ctxIn: unknown,
+    ): Promise<NextResponse | Response> => {
+        // The outer signature is `ApiRouteHandler<Context>` so both
+        // Next 16's RouteHandlerConfig (Promise<params>) and existing
+        // unit tests (sync params) can call this. Internally we reify
+        // `params` to its sync form (the runtime shim below) so the
+        // inner handler — which still types `params` synchronously —
+        // sees the expected shape.
+        let ctx = ctxIn as Context;
         // ── GAP-05: Next 15 async-params transparent await ──
         // Next 15 made `params` a Promise. Most route handlers in this
         // codebase wrap their inner handler in `withApiErrorHandling`
@@ -269,5 +318,6 @@ export function withApiErrorHandling<Context = any>(
             },
         );
     };
+    return impl as ApiRouteHandler<Context>;
 }
 
