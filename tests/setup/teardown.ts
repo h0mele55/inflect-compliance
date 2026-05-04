@@ -1,15 +1,9 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+// Prisma 7 — `new PrismaClient()` requires an adapter. The teardown
+// is purely a "close anything that survived" hook; it does not need
+// to issue queries. Skip the local construction and just disconnect
+// any singletons the parent process has on `globalThis`.
 
 export default async () => {
-    // Disconnect the teardown-local Prisma instance.
-    await prisma.$disconnect();
-
-    // Also close any app-layer singletons that parent-process workers
-    // might have materialised. The per-file `afterAll` in
-    // `setupFilesAfterEnv` handles worker processes; this handles any
-    // state that survived into the main Jest process.
     type Globals = typeof globalThis & {
         prisma?: { $disconnect?: () => Promise<void> };
         __bullmq_queue?: { close?: () => Promise<void> };

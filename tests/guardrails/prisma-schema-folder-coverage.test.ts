@@ -69,9 +69,21 @@ describe('GAP-09 — multi-file Prisma schema layout', () => {
         });
     }
 
-    it('base.prisma enables prismaSchemaFolder preview feature', () => {
-        const src = fs.readFileSync(path.join(SCHEMA_DIR, 'base.prisma'), 'utf-8');
-        expect(src).toMatch(/previewFeatures\s*=\s*\[\s*"prismaSchemaFolder"\s*\]/);
+    it('Prisma resolves the schema folder layout', () => {
+        // Prisma 7 — multi-file schemas are GA, so the
+        // `prismaSchemaFolder` preview flag was removed and the
+        // location is now declared in `prisma.config.ts`. Pin the
+        // config path so a future cleanup can't silently revert to
+        // the monolith.
+        const config = fs.readFileSync(
+            path.resolve(REPO_ROOT, 'prisma.config.ts'),
+            'utf-8',
+        );
+        // Pin the `schema:` field pointing at the folder. The exact
+        // expression is `path.join('prisma', 'schema')` — match
+        // either that literal or the constants.
+        expect(config).toMatch(/schema:\s*path\.join\(/);
+        expect(config).toContain("'schema'");
     });
 
     it('base.prisma owns the only generator + datasource blocks', () => {

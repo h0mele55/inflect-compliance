@@ -31,19 +31,20 @@
 // ─────────────────────────────────────────────────────────────────
 
 generator client {
-  provider        = "prisma-client-js"
+  provider      = "prisma-client-js"
   // linux-musl-openssl-3.0.x → Alpine 3.19+ / node:22-alpine runtime.
   // native → local dev. Both required for the image to run on any
   // target without regenerating.
-  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
-  // GAP-09 — multi-file schema support. Prisma 5.x reads every
-  // `.prisma` file under `prisma/schema/` only when this preview
-  // feature is enabled. GA in Prisma 6.0+; on 5.x it must stay opt-in.
-  previewFeatures = ["prismaSchemaFolder"]
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  // GAP-09 — multi-file schema. `prismaSchemaFolder` graduated to GA
+  // in Prisma 6+ and is removed entirely in v7 — no flag needed.
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  // Prisma 7 — connection URLs are NOT defined here. The adapter
+  // pattern in `src/lib/prisma.ts` passes the runtime URL via
+  // `@prisma/adapter-pg`; CLI tools (migrate / generate) resolve
+  // it via `prisma.config.ts` at the repo root. Schema only
+  // declares the provider; everything else is config.
+  provider = "postgresql"
 }

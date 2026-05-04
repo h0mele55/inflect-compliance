@@ -37,12 +37,19 @@ function collectTsFiles(dir: string, results: string[] = []): string[] {
 describe('Audit Guardrails — Middleware Registration', () => {
     const prismaModule = readFile('lib/prisma.ts');
 
-    it('prisma.ts contains $use( middleware registration', () => {
-        expect(prismaModule).toContain('$use(');
+    it('prisma.ts wires the audit extension via $extends', () => {
+        // Prisma 7 — `$use` was removed; the audit middleware is now
+        // a `client.$extends({ query: { $allModels: ... } })`
+        // extension. Pin the new wiring so a future PR can't strip
+        // it silently.
+        expect(prismaModule).toContain('$extends(');
     });
 
-    it('prisma.ts contains audit middleware function registration', () => {
-        expect(prismaModule).toContain('registerAuditMiddleware');
+    it('prisma.ts builds the audit extension from buildAuditExtension', () => {
+        // Was `registerAuditMiddleware` in Prisma 5; renamed to
+        // `buildAuditExtension` (factory returning the extension
+        // descriptor) in the Prisma 7 migration.
+        expect(prismaModule).toContain('buildAuditExtension');
     });
 
     it('prisma.ts excludes AuditLog model to prevent recursion', () => {

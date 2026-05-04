@@ -18,9 +18,16 @@
  */
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { jsonResponse } from '@/lib/api-response';
 
-const prisma = new PrismaClient();
+// Prisma 7 — `new PrismaClient()` requires an adapter. The probe
+// constructs a standalone client (deliberately not the app
+// singleton) so it never trips the audit / soft-delete extensions
+// while pinging the DB.
+const prisma = new PrismaClient({
+    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL ?? '' }),
+});
 
 interface CheckResult {
     status: 'ok' | 'error';

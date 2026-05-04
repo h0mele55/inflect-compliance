@@ -10,16 +10,16 @@
  *   6. Models without soft-delete still hard-delete
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { registerSoftDeleteMiddleware, SOFT_DELETE_MODELS, withDeleted } from '@/lib/soft-delete';
 import { restoreSoftDeleted, purgeSoftDeleted, listSoftDeleted } from '@/app-layer/usecases/soft-delete-lifecycle';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
 import { randomUUID } from 'crypto';
-import { piiEncryptionMiddleware } from '@/lib/security/pii-middleware';
+import { withPiiEncryptionExtension } from '@/lib/security/pii-middleware';
 
-const prisma = new PrismaClient({
-    datasources: { db: { url: DB_URL } },
-});
-prisma.$use(piiEncryptionMiddleware);
+const prisma = withPiiEncryptionExtension(new PrismaClient({
+    adapter: new PrismaPg({ connectionString: DB_URL }),
+}));
 registerSoftDeleteMiddleware(prisma);
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;

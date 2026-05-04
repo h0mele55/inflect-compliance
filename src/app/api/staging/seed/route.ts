@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { logger } from '@/lib/observability/logger';
 import { jsonResponse } from '@/lib/api-response';
 import { hashForLookup } from '@/lib/security/encryption';
@@ -43,7 +44,10 @@ export async function POST(req: NextRequest) {
 
     // ── Gate 3: Execute seed ──
     logger.info('Staging seed triggered via API', { component: 'staging-seed' });
-    const prisma = new PrismaClient();
+    // Prisma 7 — adapter is required for connection initialisation.
+    const prisma = new PrismaClient({
+        adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL ?? '' }),
+    });
 
     try {
         // Run the base seed inline (simplified version — core entities only)

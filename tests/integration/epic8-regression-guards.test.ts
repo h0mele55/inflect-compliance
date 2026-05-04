@@ -13,15 +13,15 @@
  * Failing any of these tests means Epic 8 protections have regressed.
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { registerSoftDeleteMiddleware, SOFT_DELETE_MODELS, withDeleted } from '@/lib/soft-delete';
 import { encryptField, decryptField, hashForLookup, isEncryptedValue } from '@/lib/security/encryption';
-import { piiEncryptionMiddleware, _getPiiFieldMap } from '@/lib/security/pii-middleware';
+import { withPiiEncryptionExtension, _getPiiFieldMap } from '@/lib/security/pii-middleware';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
 
-const prisma = new PrismaClient({
-    datasources: { db: { url: DB_URL } },
-});
-prisma.$use(piiEncryptionMiddleware);
+const prisma = withPiiEncryptionExtension(new PrismaClient({
+    adapter: new PrismaPg({ connectionString: DB_URL }),
+}));
 registerSoftDeleteMiddleware(prisma);
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;

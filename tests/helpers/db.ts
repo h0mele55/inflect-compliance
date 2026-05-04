@@ -16,6 +16,7 @@
  *   beforeEach(() => resetDatabase(prisma));
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import * as path from 'path';
 import * as fs from 'fs';
 import { execSync } from 'child_process';
@@ -73,14 +74,22 @@ export function migrateTestDb(): void {
 
 /**
  * Create and return a PrismaClient connected to the test database.
+ *
+ * Prisma 7 — connections go through the adapter pattern instead of
+ * `datasources: { db: { url } }`. The PII encryption middleware is
+ * wired via `$extends` (was `$use` in v5). Both adapters take the
+ * same env-derived URL.
  */
-let _client: PrismaClient | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _client: any = null;
 
-export function prismaTestClient(): PrismaClient {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function prismaTestClient(): any {
     if (!_client) {
         const url = getTestDatabaseUrl();
-        _client = new PrismaClient({ datasources: { db: { url } } });
-        // GAP-21: register the same PII middleware production uses so
+        const adapter = new PrismaPg({ connectionString: url });
+        const base = new PrismaClient({ adapter });
+        // GAP-21: wire the same PII middleware production uses so
         // integration tests that write to encrypted-only models
         // (User, AuditorAccount, UserIdentityLink) auto-populate the
         // *Hash columns. Tests that need to bypass the middleware
@@ -91,8 +100,8 @@ export function prismaTestClient(): PrismaClient {
         // globalSetup context (which doesn't apply the moduleNameMapper
         // for the `@/` alias).
         // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { piiEncryptionMiddleware } = require('../../src/lib/security/pii-middleware');
-        _client.$use(piiEncryptionMiddleware);
+        const { withPiiEncryptionExtension } = require('../../src/lib/security/pii-middleware');
+        _client = withPiiEncryptionExtension(base);
     }
     return _client;
 }

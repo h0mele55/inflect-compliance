@@ -8,6 +8,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'crypto';
 import { runWithAuditContext, getAuditContext } from '@/lib/audit-context';
 import { redactSensitiveFields, extractChangedFields } from '@/lib/audit-redact';
@@ -40,53 +41,69 @@ function buildDiffJson(action: string, data: any, result: any) {
 }
 
 /**
- * Creates a PrismaClient with the audit middleware registered.
+ * Creates an extended PrismaClient with hand-rolled audit middleware
+ * (mirrors the production extension in `src/lib/prisma.ts`). Migrated
+ * from `client.$use(...)` (removed in Prisma 7) to
+ * `client.$extends({ query: { $allModels: ... } })`.
+ *
+ * The handler body is unchanged from the v5 form — only the API
+ * shape (`{ model, operation, args, query }` instead of
+ * `(params, next)`) changed.
  */
-function createTestPrismaWithMiddleware(): PrismaClient {
+function createTestPrismaWithMiddleware() {
     const client = new PrismaClient({
-        datasources: { db: { url: RealDbUrl } },
+        adapter: new PrismaPg({ connectionString: RealDbUrl }),
     });
 
-    client.$use(async (params, next) => {
-        if (!WRITE_ACTIONS.has(params.action)) return next(params);
-        if (params.model && EXCLUDED_MODELS.has(params.model)) return next(params);
+    const handle = async ({
+        model,
+        operation,
+        args,
+        query,
+    }: {
+        model: string;
+        operation: string;
+        args: any;
+        query: (a: any) => Promise<any>;
+    }) => {
+        if (!WRITE_ACTIONS.has(operation)) return query(args);
+        if (EXCLUDED_MODELS.has(model)) return query(args);
 
         const ctx = getAuditContext();
         const tenantId = ctx?.tenantId;
-        if (!tenantId) return next(params);
+        if (!tenantId) return query(args);
 
         const actorUserId = ctx?.actorUserId || null;
         const requestId = ctx?.requestId || null;
         const source = ctx?.source || 'test';
-        const updateData = params.action === 'upsert'
-            ? params.args?.update ?? null
-            : params.args?.data ?? null;
+        const updateData = operation === 'upsert'
+            ? args?.update ?? null
+            : args?.data ?? null;
 
-        const result = await next(params);
+        const result = await query(args);
 
         try {
-            const model = params.model || 'Unknown';
-            const action = params.action.toUpperCase();
+            const action = operation.toUpperCase();
 
             let entityId = 'unknown';
             let recordIds: any = null;
 
-            if (['create', 'update', 'upsert', 'delete'].includes(params.action)) {
+            if (['create', 'update', 'upsert', 'delete'].includes(operation)) {
                 entityId = result?.id || 'unknown';
-            } else if (params.action === 'createMany') {
+            } else if (operation === 'createMany') {
                 entityId = 'batch';
                 recordIds = { count: result?.count ?? 0 };
-            } else if (params.action === 'updateMany' || params.action === 'deleteMany') {
+            } else if (operation === 'updateMany' || operation === 'deleteMany') {
                 entityId = 'batch';
                 recordIds = { count: result?.count ?? 0 };
             }
 
             const metadataJson: Record<string, any> = { source };
-            if (params.args?.where && (params.action === 'updateMany' || params.action === 'deleteMany')) {
-                metadataJson.filterKeys = Object.keys(params.args.where);
+            if (args?.where && (operation === 'updateMany' || operation === 'deleteMany')) {
+                metadataJson.filterKeys = Object.keys(args.where);
             }
 
-            const diffJson = buildDiffJson(params.action, updateData, result);
+            const diffJson = buildDiffJson(operation, updateData, result);
 
             const id = generateCuid();
             await client.$executeRawUnsafe(
@@ -103,13 +120,26 @@ function createTestPrismaWithMiddleware(): PrismaClient {
         }
 
         return result;
-    });
+    };
 
-    return client;
+    return client.$extends({
+        name: 'test-audit-middleware',
+        query: {
+            $allModels: {
+                async create(args) { return handle(args); },
+                async createMany(args) { return handle(args); },
+                async update(args) { return handle(args); },
+                async updateMany(args) { return handle(args); },
+                async upsert(args) { return handle(args); },
+                async delete(args) { return handle(args); },
+                async deleteMany(args) { return handle(args); },
+            },
+        },
+    });
 }
 
 // Raw client for verification queries (no middleware)
-const rawPrisma = new PrismaClient({ datasources: { db: { url: RealDbUrl } } });
+const rawPrisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: RealDbUrl }) });
 const appPrisma = createTestPrismaWithMiddleware();
 
 const testRunId = randomUUID();

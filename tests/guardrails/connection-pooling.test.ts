@@ -13,15 +13,33 @@ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf-8');
 
 describe('Connection Pooling Configuration', () => {
 
-    describe('Prisma schema', () => {
+    describe('Prisma schema + config', () => {
+        // Prisma 7 — `url` / `directUrl` moved out of `datasource db`
+        // and into `prisma.config.ts` (`datasource.url`). Pin both:
+        //   - the schema datasource block exists (provider line),
+        //   - the config file passes DATABASE_URL through (the runtime
+        //     adapter reads it directly so this is also the source of
+        //     truth that `prisma migrate / generate` reads).
         const schema = readPrismaSchema();
+        const config = read('prisma.config.ts');
 
-        test('datasource has url (pooled connection)', () => {
-            expect(schema).toContain('url       = env("DATABASE_URL")');
+        test('datasource block declares postgresql provider', () => {
+            expect(schema).toMatch(
+                /datasource\s+db\s*\{[\s\S]*?provider\s*=\s*"postgresql"/,
+            );
         });
 
-        test('datasource has directUrl (migration connection)', () => {
-            expect(schema).toContain('directUrl = env("DIRECT_DATABASE_URL")');
+        test('prisma.config.ts wires DATABASE_URL into datasource.url', () => {
+            expect(config).toContain('DATABASE_URL');
+            expect(config).toMatch(/url:\s*process\.env\./);
+        });
+
+        test('prisma.config.ts falls back to DIRECT_DATABASE_URL for migrations', () => {
+            // Prisma 7 dropped the `directUrl` field. The CLI uses the
+            // single `url` from prisma.config.ts; we point that at
+            // DIRECT_DATABASE_URL in non-runtime contexts. Pin the
+            // env-name reference so future cleanups can't drop it.
+            expect(config).toContain('DIRECT_DATABASE_URL');
         });
     });
 
