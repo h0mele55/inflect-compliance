@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Inflect Compliance API",
-    "version": "1.40.0",
+    "version": "1.75.5",
     "description": "Multi-tenant compliance-management API. The schema layer in `src/lib/schemas/index.ts` (request bodies) and `src/lib/dto/*.dto.ts` (response shapes) is the single source of truth — this document is generated from those Zod schemas via `npm run openapi:generate`.",
     "license": {
       "name": "Proprietary"
@@ -126,13 +126,15 @@
                         "id",
                         "name",
                         "status"
-                      ]
+                      ],
+                      "additionalProperties": {}
                     }
                   },
                   "required": [
                     "id",
                     "control"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "risks": {
@@ -160,16 +162,19 @@
                         "id",
                         "title",
                         "status"
-                      ]
+                      ],
+                      "additionalProperties": {}
                     }
                   },
                   "required": [
                     "id",
                     "risk"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
-            }
+            },
+            "additionalProperties": {}
           }
         ],
         "description": "Asset with linked controls and risks. Returned by GET /assets/{id}."
@@ -313,6 +318,7 @@
           "name",
           "type"
         ],
+        "additionalProperties": {},
         "description": "Asset as it appears in list views. CIA scores are 1-5 ints; criticality is derived from the CIA tuple via the asset-tiering policy."
       },
       "AssetUpdateRequest": {
@@ -441,6 +447,7 @@
           "title",
           "status"
         ],
+        "additionalProperties": {},
         "description": "Audit cycle record. Status flows PLANNED → IN_PROGRESS → COMPLETED (or CANCELLED)."
       },
       "AuditCreateRequest": {
@@ -539,6 +546,7 @@
           "details",
           "createdAt"
         ],
+        "additionalProperties": {},
         "description": "A single audit-log row. Hash-chained at the DB layer; this DTO is the read view exposed via the audit/activity endpoints."
       },
       "AuditUpdateRequest": {
@@ -720,7 +728,8 @@
               "WEEKLY",
               "MONTHLY",
               "QUARTERLY",
-              "ANNUALLY"
+              "ANNUALLY",
+              null
             ]
           },
           "ownerUserId": {
@@ -736,7 +745,8 @@
             ],
             "enum": [
               "MANUAL",
-              "INTEGRATION"
+              "INTEGRATION",
+              null
             ]
           },
           "automationKey": {
@@ -882,7 +892,8 @@
                   "required": [
                     "id",
                     "user"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "controlTasks": {
@@ -944,7 +955,8 @@
                     "description",
                     "status",
                     "dueAt"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "evidenceLinks": {
@@ -996,7 +1008,8 @@
                   "required": [
                     "id",
                     "kind"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "evidence": {
@@ -1010,7 +1023,8 @@
                   },
                   "required": [
                     "id"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "risks": {
@@ -1040,13 +1054,15 @@
                       "required": [
                         "id",
                         "title"
-                      ]
+                      ],
+                      "additionalProperties": {}
                     }
                   },
                   "required": [
                     "id",
                     "risk"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "policyLinks": {
@@ -1074,13 +1090,15 @@
                         "id",
                         "title",
                         "status"
-                      ]
+                      ],
+                      "additionalProperties": {}
                     }
                   },
                   "required": [
                     "id",
                     "policy"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "frameworkMappings": {
@@ -1152,10 +1170,12 @@
                   },
                   "required": [
                     "id"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
-            }
+            },
+            "additionalProperties": {}
           }
         ],
         "description": "Control with all relations included — contributors, tasks, evidence links, mapped risks/policies, and framework requirement mappings. Returned by GET /controls/{id}."
@@ -1318,6 +1338,7 @@
           "frequency",
           "ownerUserId"
         ],
+        "additionalProperties": {},
         "description": "Control as it appears in list views — summary fields plus aggregate counts. The detail endpoint returns ControlDetail with the full include shape."
       },
       "ControlRequirementMapRequest": {
@@ -1516,7 +1537,8 @@
               "WEEKLY",
               "MONTHLY",
               "QUARTERLY",
-              "ANNUALLY"
+              "ANNUALLY",
+              null
             ]
           },
           "evidenceSource": {
@@ -1526,7 +1548,8 @@
             ],
             "enum": [
               "MANUAL",
-              "INTEGRATION"
+              "INTEGRATION",
+              null
             ]
           },
           "automationKey": {
@@ -1649,22 +1672,120 @@
         "description": "Create an evidence record. type=FILE expects a paired multipart upload via /evidence/uploads; type=TEXT/LINK can use this JSON body directly. content is encrypted at rest for TEXT type."
       },
       "EvidenceDetail": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/EvidenceListItem"
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
           },
-          {
-            "type": "object",
+          "tenantId": {
+            "type": "string"
+          },
+          "controlId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "content": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fileName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fileSize": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dateCollected": {
+            "type": "string"
+          },
+          "owner": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewCycle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nextReviewDate": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "control": {
+            "type": [
+              "object",
+              "null"
+            ],
             "properties": {
-              "reviews": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/EvidenceReview"
-                }
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
+            },
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": {}
+          },
+          "reviews": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceReview"
             }
           }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "type",
+          "title",
+          "status"
         ],
+        "additionalProperties": {},
         "description": "Evidence record with the full review history attached. Returned by GET /evidence/{id}."
       },
       "EvidenceLinkRequest": {
@@ -1800,7 +1921,8 @@
             "required": [
               "id",
               "name"
-            ]
+            ],
+            "additionalProperties": {}
           }
         },
         "required": [
@@ -1810,6 +1932,7 @@
           "title",
           "status"
         ],
+        "additionalProperties": {},
         "description": "Evidence record as shown in list views. content is encrypted at rest for TEXT type and decrypted transparently on read by the field-encryption middleware."
       },
       "EvidenceReview": {
@@ -1857,6 +1980,7 @@
           "action",
           "createdAt"
         ],
+        "additionalProperties": {},
         "description": "A single evidence-review event (submission/approval/rejection) — append-only audit row attached to the evidence record."
       },
       "EvidenceReviewRequest": {
@@ -2068,6 +2192,7 @@
           "key",
           "name"
         ],
+        "additionalProperties": {},
         "description": "Compliance framework record (e.g. ISO 27001:2022, SOC 2, NIS2). Key is the stable lookup identifier."
       },
       "PolicyApprovalDecideRequest": {
@@ -2276,7 +2401,8 @@
                         "required": [
                           "id",
                           "status"
-                        ]
+                        ],
+                        "additionalProperties": {}
                       }
                     }
                   },
@@ -2286,7 +2412,8 @@
                     "versionNumber",
                     "contentType",
                     "createdAt"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "controlLinks": {
@@ -2316,13 +2443,15 @@
                       "required": [
                         "id",
                         "name"
-                      ]
+                      ],
+                      "additionalProperties": {}
                     }
                   },
                   "required": [
                     "id",
                     "control"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "approvals": {
@@ -2378,10 +2507,12 @@
                   "required": [
                     "id",
                     "status"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
-            }
+            },
+            "additionalProperties": {}
           }
         ],
         "description": "Policy with full version history, control links, and approval audit trail. Returned by GET /policies/{id}."
@@ -2560,7 +2691,8 @@
                   "required": [
                     "id",
                     "status"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             },
@@ -2570,7 +2702,8 @@
               "versionNumber",
               "contentType",
               "createdAt"
-            ]
+            ],
+            "additionalProperties": {}
           },
           "owner": {
             "allOf": [
@@ -2607,6 +2740,7 @@
           "title",
           "status"
         ],
+        "additionalProperties": {},
         "description": "Policy as it appears in list views — includes the currently published version, owner, and aggregate counts. The detail endpoint adds full version history + control links."
       },
       "PolicyMetadataUpdateRequest": {
@@ -2745,6 +2879,7 @@
         "required": [
           "id"
         ],
+        "additionalProperties": {},
         "description": "A single requirement within a framework (e.g. ISO 27001:2022 A.5.1). Mapped to controls via ControlRequirementMapRequest."
       },
       "RiskControlLinkRequest": {
@@ -2846,16 +2981,19 @@
                     },
                     "control": {
                       "type": "object",
-                      "properties": {}
+                      "properties": {},
+                      "additionalProperties": {}
                     }
                   },
                   "required": [
                     "id",
                     "control"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
-            }
+            },
+            "additionalProperties": {}
           }
         ],
         "description": "Risk with full linked-control objects. Returned by GET /risks/{id}."
@@ -2996,13 +3134,15 @@
                     "id",
                     "name",
                     "status"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "required": [
                 "id",
                 "control"
-              ]
+              ],
+              "additionalProperties": {}
             }
           }
         },
@@ -3016,6 +3156,7 @@
           "score",
           "status"
         ],
+        "additionalProperties": {},
         "description": "Risk as it appears in list views. inherentScore = impact × likelihood; score is the residual after treatment. controls is a summary array of linked mitigating controls."
       },
       "RiskSetStatusRequest": {
@@ -3239,6 +3380,7 @@
           "type",
           "status"
         ],
+        "additionalProperties": {},
         "description": "Unified work-item record covering audit findings, control gaps, incidents, improvements, and ad-hoc tasks. The type field discriminates which UI surfaces this row appears in."
       },
       "TaskAssignRequest": {
@@ -3604,7 +3746,8 @@
               "LOW",
               "MEDIUM",
               "HIGH",
-              "CRITICAL"
+              "CRITICAL",
+              null
             ]
           },
           "dataAccess": {
@@ -3616,7 +3759,8 @@
               "NONE",
               "LOW",
               "MEDIUM",
-              "HIGH"
+              "HIGH",
+              null
             ]
           },
           "isSubprocessor": {
@@ -3731,7 +3875,8 @@
                   "required": [
                     "id",
                     "type"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "assessments": {
@@ -3745,7 +3890,8 @@
                   },
                   "required": [
                     "id"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               },
               "links": {
@@ -3759,10 +3905,12 @@
                   },
                   "required": [
                     "id"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
-            }
+            },
+            "additionalProperties": {}
           }
         ],
         "description": "Vendor with full document set + assessment history + linked entities. Returned by GET /vendors/{id}."
@@ -3861,6 +4009,7 @@
           "name",
           "status"
         ],
+        "additionalProperties": {},
         "description": "Vendor as shown in list views. residualRisk is the risk score after control coverage; null = not yet assessed."
       },
       "VendorUpdateRequest": {
@@ -3940,7 +4089,8 @@
               "LOW",
               "MEDIUM",
               "HIGH",
-              "CRITICAL"
+              "CRITICAL",
+              null
             ]
           },
           "residualRisk": {
@@ -3952,7 +4102,8 @@
               "LOW",
               "MEDIUM",
               "HIGH",
-              "CRITICAL"
+              "CRITICAL",
+              null
             ]
           },
           "dataAccess": {
@@ -3964,7 +4115,8 @@
               "NONE",
               "LOW",
               "MEDIUM",
-              "HIGH"
+              "HIGH",
+              null
             ]
           },
           "isSubprocessor": {

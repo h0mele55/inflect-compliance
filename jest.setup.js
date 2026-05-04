@@ -15,10 +15,10 @@ if (!process.env.DATABASE_URL) {
   } catch { /* no .env — fall through to dummy */ }
 }
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgres://user:password@localhost:5432/testdb';
-process.env.AUTH_SECRET = 'supersecretstringthatis16charplus';
-process.env.JWT_SECRET = 'supersecretstringthatis16charplus';
+process.env.AUTH_SECRET = 'supersecretstringthatis16charplus'; // pragma: allowlist secret -- test fixture
+process.env.JWT_SECRET = 'supersecretstringthatis16charplus'; // pragma: allowlist secret -- test fixture
 process.env.GOOGLE_CLIENT_ID = 'test-google-id';
-process.env.GOOGLE_CLIENT_SECRET = 'test-google-secret';
+process.env.GOOGLE_CLIENT_SECRET = 'test-google-secret'; // pragma: allowlist secret -- test fixture
 process.env.MICROSOFT_CLIENT_ID = 'test-ms-id';
 process.env.MICROSOFT_CLIENT_SECRET = 'test-ms-secret';
 process.env.UPLOAD_DIR = 'uploads';
@@ -34,4 +34,18 @@ if (typeof globalThis.fail === 'undefined') {
   globalThis.fail = (message) => {
     throw new Error(typeof message === 'string' ? message : 'Test failed via fail()');
   };
+}
+
+// Jest's jsdom environment doesn't expose `TextEncoder` / `TextDecoder`
+// on globalThis — Node has them, but Jest's jsdom stripping doesn't
+// pass them through. Some unit tests use `@jest-environment jsdom`
+// and transitively load `@prisma/client`, which pulls in `cuid2`
+// → `@noble/hashes` → `new TextEncoder()` at module load. Without
+// this polyfill those tests fail with "TextEncoder is not defined".
+// Cheap workaround pinned to the Node-builtin implementation.
+if (typeof globalThis.TextEncoder === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { TextEncoder, TextDecoder } = require('node:util');
+  globalThis.TextEncoder = TextEncoder;
+  globalThis.TextDecoder = TextDecoder;
 }

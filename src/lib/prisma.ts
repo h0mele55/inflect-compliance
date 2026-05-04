@@ -1,9 +1,11 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { env } from '@/env';
 import { getAuditContext } from './audit-context';
 import { redactSensitiveFields, extractChangedFields } from './audit-redact';
-import { registerSoftDeleteMiddleware } from './soft-delete';
-import { piiEncryptionMiddleware } from './security/pii-middleware';
+import { withSoftDeleteExtension } from './soft-delete';
+import { withPiiEncryptionExtension } from './security/pii-middleware';
+import { withRlsTripwireExtension } from './db/rls-middleware';
 import { logger as auditMiddlewareLogger } from '@/lib/observability/logger';
 
 // ─── Write actions to intercept ───
@@ -79,84 +81,112 @@ function buildDiffJson(
 }
 
 /**
- * Register audit middleware on a PrismaClient instance.
- * Automatically logs all write operations to AuditLog via raw SQL.
+ * Audit-trail extension factory.
  *
- * Features:
- * - Diff capture for update/upsert (changedFields + redacted after)
- * - Redaction of sensitive fields in metadata and diffs
- * - Best-effort logging (never breaks the original operation)
+ * Returns a Prisma 7 client extension that intercepts every WRITE
+ * action ($allModels.create/update/upsert/delete/createMany/
+ * updateMany/deleteMany) and writes a hash-chained AuditLog row
+ * AFTER the operation completes. Best-effort — never breaks the
+ * original write if audit logging itself fails.
  *
- * MUST only be called in Node.js runtime (not Edge).
+ * This was a `$use` middleware in Prisma 5; `$use` was removed in
+ * Prisma 7. The new shape composes via `client.$extends({ query })`
+ * with per-action handlers.
+ *
+ * Composition order MATTERS: this extension runs INSIDE soft-delete
+ * + PII encryption + field-level encryption. Audit sees the final
+ * transformed args (delete → update from soft-delete; encrypted
+ * values from PII / field encryption) and logs them post-write.
+ *
+ * MUST only be wired in Node.js runtime (not Edge) — `appendAuditEntry`
+ * pulls in heavy server deps. The wiring at module bottom guards
+ * with `typeof EdgeRuntime === 'undefined'`.
  */
-function registerAuditMiddleware(client: PrismaClient): void {
-    client.$use(async (params, next) => {
-        // Skip non-write actions (reads, aggregations, etc.)
-        if (!WRITE_ACTIONS.has(params.action)) {
-            return next(params);
+function buildAuditExtension() {
+    // Per-action wrapper — same shape for create/update/upsert/delete/etc.
+    // The Prisma 7 query extension API has separate handlers for each
+    // operation; we factor the common audit logic into one function.
+    const handle = async ({
+        model,
+        operation,
+        args,
+        query,
+    }: {
+        model: string;
+        operation: string;
+        args: Record<string, unknown>;
+        query: (a: typeof args) => Promise<unknown>;
+    }) => {
+        // Fast-path non-write operations and excluded models. Reads
+        // don't need audit; AuditLog itself must skip to avoid an
+        // infinite write loop.
+        if (!WRITE_ACTIONS.has(operation)) {
+            return query(args);
+        }
+        if (EXCLUDED_MODELS.has(model)) {
+            return query(args);
         }
 
-        // Skip excluded models to prevent recursion
-        if (params.model && EXCLUDED_MODELS.has(params.model)) {
-            return next(params);
-        }
-
-        // ⚠️ CRITICAL: Capture audit context BEFORE calling next(params).
-        // Prisma's next() runs in a detached async context.
+        // ⚠️ Capture audit context BEFORE running the query —
+        // Prisma's underlying execution may detach from the AsyncLocalStorage
+        // chain.
         const ctx = getAuditContext();
         const tenantId = ctx?.tenantId;
-
-        // We need a tenantId for AuditLog's required FK — skip if absent
         if (!tenantId) {
-            return next(params);
+            return query(args);
         }
 
         const actorUserId = ctx?.actorUserId || null;
         const requestId = ctx?.requestId || null;
         const source = ctx?.source || 'api';
 
-        // Capture update data BEFORE next() for diff
-        // For upsert, the update payload is in params.args.update, not params.args.data
-        const updateData = params.action === 'upsert'
-            ? params.args?.update ?? null
-            : params.args?.data ?? null;
+        // For upsert, the update payload is in args.update, not args.data
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const argsAny = args as any;
+        const updateData =
+            operation === 'upsert'
+                ? argsAny?.update ?? null
+                : argsAny?.data ?? null;
 
         // Execute the original operation first — never block it
-        const result = await next(params);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result: any = await query(args);
 
         // Best-effort audit logging — never throw
         try {
-            const model = params.model || 'Unknown';
-            const action = params.action.toUpperCase();
+            const action = operation.toUpperCase();
 
             // Extract record ID(s) from the result
             let entityId = 'unknown';
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             let recordIds: any = null;
 
-            if (params.action === 'create' || params.action === 'update' || params.action === 'upsert' || params.action === 'delete') {
+            if (
+                operation === 'create' ||
+                operation === 'update' ||
+                operation === 'upsert' ||
+                operation === 'delete'
+            ) {
                 entityId = result?.id || 'unknown';
-            } else if (params.action === 'createMany') {
+            } else if (operation === 'createMany') {
                 entityId = 'batch';
                 recordIds = { count: result?.count ?? 0 };
-            } else if (params.action === 'updateMany' || params.action === 'deleteMany') {
+            } else if (operation === 'updateMany' || operation === 'deleteMany') {
                 entityId = 'batch';
                 recordIds = { count: result?.count ?? 0 };
             }
 
-            // Build safe metadata (no raw data payloads, no secrets)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const metadataJson: Record<string, any> = { source };
-
-            // For *Many operations, include a safe summary of the filter
-            if (params.args?.where && (params.action === 'updateMany' || params.action === 'deleteMany')) {
-                metadataJson.filterKeys = Object.keys(params.args.where);
+            if (
+                argsAny?.where &&
+                (operation === 'updateMany' || operation === 'deleteMany')
+            ) {
+                metadataJson.filterKeys = Object.keys(argsAny.where);
             }
 
-            // Build diff for update/upsert
-            const diffJson = buildDiffJson(params.action, updateData, result);
+            const diffJson = buildDiffJson(operation, updateData, result);
 
-            // Build structured detailsJson for entity_lifecycle events
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const detailsJson: Record<string, any> = {
                 category: 'entity_lifecycle',
@@ -169,7 +199,6 @@ function registerAuditMiddleware(client: PrismaClient): void {
             }
             detailsJson.summary = `${action} ${model}${entityId !== 'unknown' ? ` ${entityId}` : ''}`;
 
-            // Use hash-chained writer for integrity
             const { appendAuditEntry } = require('./audit/audit-writer');
             await appendAuditEntry({
                 tenantId,
@@ -186,58 +215,144 @@ function registerAuditMiddleware(client: PrismaClient): void {
                 detailsJson,
             });
         } catch (auditError) {
-            // Best effort — never break the original operation
             if (env.NODE_ENV === 'development') {
-                auditMiddlewareLogger.warn('Failed to write audit log', { component: 'audit-middleware', error: auditError instanceof Error ? auditError.message : String(auditError) });
+                auditMiddlewareLogger.warn('Failed to write audit log', {
+                    component: 'audit-middleware',
+                    error:
+                        auditError instanceof Error
+                            ? auditError.message
+                            : String(auditError),
+                });
             }
         }
 
         return result;
-    });
+    };
+
+    return {
+        name: 'audit-middleware',
+        query: {
+            $allModels: {
+                async create({ model, operation, args, query }: { model: string; operation: string; args: Record<string, unknown>; query: (a: typeof args) => Promise<unknown> }) {
+                    return handle({ model, operation, args, query });
+                },
+                async createMany({ model, operation, args, query }: { model: string; operation: string; args: Record<string, unknown>; query: (a: typeof args) => Promise<unknown> }) {
+                    return handle({ model, operation, args, query });
+                },
+                async update({ model, operation, args, query }: { model: string; operation: string; args: Record<string, unknown>; query: (a: typeof args) => Promise<unknown> }) {
+                    return handle({ model, operation, args, query });
+                },
+                async updateMany({ model, operation, args, query }: { model: string; operation: string; args: Record<string, unknown>; query: (a: typeof args) => Promise<unknown> }) {
+                    return handle({ model, operation, args, query });
+                },
+                async upsert({ model, operation, args, query }: { model: string; operation: string; args: Record<string, unknown>; query: (a: typeof args) => Promise<unknown> }) {
+                    return handle({ model, operation, args, query });
+                },
+                async delete({ model, operation, args, query }: { model: string; operation: string; args: Record<string, unknown>; query: (a: typeof args) => Promise<unknown> }) {
+                    return handle({ model, operation, args, query });
+                },
+                async deleteMany({ model, operation, args, query }: { model: string; operation: string; args: Record<string, unknown>; query: (a: typeof args) => Promise<unknown> }) {
+                    return handle({ model, operation, args, query });
+                },
+            },
+        },
+    } as const;
 }
 
 // ─── Singleton ───
+//
+// Prisma 7 — `PrismaClient` requires an adapter for connections.
+// The runtime adapter is `@prisma/adapter-pg` which speaks to
+// Postgres directly. CLI tooling (prisma migrate / generate /
+// studio) reads the URL via `prisma.config.ts` at the repo root.
+//
+// Middleware moved from `prisma.$use(...)` (removed in Prisma 7) to
+// `client.$extends({ query: { ... } })`. Composition order is
+// preserved from the v5 layout — `$extends` chains apply in
+// reverse-call order: the LAST `.$extends(...)` is the OUTERMOST
+// wrapper (intercepts caller first). To match the v5 order
+// (PII outermost → soft-delete → audit innermost), the chain is:
+//
+//     baseClient
+//       .$extends(audit)        // innermost — closest to DB
+//       .$extends(softDelete)   // middle — delete → update transform
+//       .$extends(piiEncryption) // outermost — first to see args
+//
+// The Epic A.1 RLS tripwire and Epic B field-level encryption work
+// on per-transaction clients inside `runInTenantContext` (in
+// `src/lib/db/rls-middleware.ts` + `src/lib/db/encryption-middleware.ts`)
+// — they re-extend the inner transactional client, NOT this
+// singleton.
+
+type ExtendedClient = ReturnType<typeof buildClient>;
+
+function buildClient(): PrismaClient {
+    // `??  ''` is load-bearing for build-time analysis. Next 16's
+    // "Collecting page data" phase imports every route module to
+    // discover route metadata, which transitively loads this module.
+    // In that environment `SKIP_ENV_VALIDATION=1` is set but
+    // `DATABASE_URL` is often unset — passing `undefined` to
+    // `PrismaPg`'s `connectionString` throws ("p is not a function"
+    // in the minified chunk) and the whole route fails to collect.
+    // Falling back to an empty string lets module load succeed; the
+    // first real query will surface the missing-URL error at request
+    // time, not module-import time.
+    const adapter = new PrismaPg({
+        connectionString: env.DATABASE_URL ?? '',
+    });
+    return new PrismaClient({ adapter });
+}
+
+function buildExtended() {
+    const base = buildClient();
+    if (typeof EdgeRuntime !== 'undefined') {
+        // Edge Runtime — extensions either don't bundle or import
+        // server-only deps (audit-writer pulls in node:crypto). Ship
+        // the bare client; reads/writes won't have audit/PII logic
+        // but Edge code paths don't perform writes that need them.
+        return base as unknown as ReturnType<typeof base.$extends>;
+    }
+    // `withRlsTripwireExtension` is now imported statically at the
+    // top of this file. The "circular import" comment that lived
+    // here previously was only theoretical — `rls-middleware.ts`
+    // only references `@/lib/prisma` from inside a function body
+    // (`getPrismaClient()` for `runWithoutRls`), so there is no
+    // module-init cycle. Turbopack's production bundle didn't
+    // resolve the dynamic `require('./db/rls-middleware')` correctly
+    // during Next 16's "Collecting page data" phase ("p is not a
+    // function") which made the static form load-bearing.
+    //
+    // Composition order — the tripwire is observation-only so its
+    // position in the chain is irrelevant; placing it outermost
+    // makes the logged model/action match the caller's intent
+    // before soft-delete / PII rewrite.
+    return withRlsTripwireExtension(
+        withPiiEncryptionExtension(
+            withSoftDeleteExtension(
+                base.$extends(buildAuditExtension()),
+            ),
+        ),
+    );
+}
 
 const globalForPrisma = globalThis as unknown as {
-    prisma: PrismaClient;
-    prismaAuditMiddlewareRegistered?: boolean;
+    prisma?: ExtendedClient;
 };
 
-export const prisma = globalForPrisma.prisma || new PrismaClient();
+export const prisma = (globalForPrisma.prisma ?? buildExtended()) as ExtendedClient;
 
 if (env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
-// ── Register middlewares (Node.js runtime only) ──
-// Edge Runtime (Next.js middleware) imports this module via auth.ts → PrismaAdapter.
-// $use is NOT supported in Edge Runtime, so we guard with a typeof check.
-// `EdgeRuntime` is declared globally in src/types/globals.d.ts.
-if (typeof EdgeRuntime === 'undefined' && !globalForPrisma.prismaAuditMiddlewareRegistered) {
-    // Middleware execution order (Prisma processes in reverse registration order for writes):
-    //   1. PII encryption — populates *Encrypted/*Hash columns on write, decrypts on read
-    //   2. Soft-delete — transforms delete → update before audit sees it
-    //   3. Audit — logs the final transformed operation
-    //
-    // NOTE: the Epic A.1 RLS tripwire (`installRlsTripwire`) is
-    // installed separately from `src/instrumentation.ts` to avoid a
-    // circular module-load between `prisma.ts` ↔ `db/rls-middleware.ts`.
-    // Both touch the same singleton client; order between audit and
-    // tripwire doesn't matter because the tripwire only observes.
-    prisma.$use(piiEncryptionMiddleware);
-    registerSoftDeleteMiddleware(prisma);
-    registerAuditMiddleware(prisma);
-    globalForPrisma.prismaAuditMiddlewareRegistered = true;
-
-    // Diagnostic — observed on prod 2026-04-29 that PII decryption
-    // wasn't running on NextAuth's adapter reads even though this
-    // module was imported. Pair this `registered` log with
-    // `pii.middleware_first_invocation` (emitted from
-    // pii-middleware.ts on first query) to distinguish:
-    //   • both seen           → middleware works
-    //   • registered, no inv. → adapter is on a different prisma instance
-    //   • no registered       → $use skipped (Edge Runtime / bundling)
+// Diagnostic — log once per process that the extended client is
+// constructed. Pairs with the per-invocation logging inside
+// pii-middleware.ts to distinguish:
+//   • both seen           → extension works
+//   • constructed, no inv. → adapter is on a different prisma instance
+//   • no constructed log  → Edge Runtime path skipped extension wiring
+if (typeof EdgeRuntime === 'undefined') {
     auditMiddlewareLogger.info('pii.middleware_registered', {
         component: 'pii-middleware',
-        runtime: typeof (globalThis as { EdgeRuntime?: unknown }).EdgeRuntime === 'undefined' ? 'node' : 'edge',
+        runtime: 'node',
         nodeEnv: env.NODE_ENV,
     });
 }

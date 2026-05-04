@@ -42,6 +42,7 @@ import type { FullConfig } from '@playwright/test';
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 const TRACKER_PATH = resolvePath(__dirname, '.tenant-tracker.jsonl');
 
@@ -222,7 +223,12 @@ export default async function globalTeardown(_config: FullConfig): Promise<void>
         `[global-teardown] cleaning up ${entries.length} test tenant(s)…`,
     );
 
-    const prisma = new PrismaClient();
+    // Prisma 7 — adapter is required for construction.
+    const prisma = new PrismaClient({
+        adapter: new PrismaPg({
+            connectionString: process.env.DATABASE_URL ?? '',
+        }),
+    });
     let deleted = 0;
     let failed = 0;
     const failures: string[] = [];

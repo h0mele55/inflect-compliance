@@ -53,6 +53,7 @@
  * and reported as a structured CheckResult.
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { env } from '@/env';
 import { jsonResponse } from '@/lib/api-response';
@@ -61,7 +62,10 @@ import { logger } from '@/lib/observability/logger';
 const CHECK_TIMEOUT_MS = 2000;
 
 // Reuse module-level clients so probe traffic doesn't churn pools.
-const prisma = new PrismaClient();
+// Prisma 7 — adapter is required for connection initialisation.
+const prisma = new PrismaClient({
+    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL ?? '' }),
+});
 
 // Redis is optional — import dynamically to avoid a hard dependency
 // on the cache layer in environments where it's unconfigured.

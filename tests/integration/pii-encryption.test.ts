@@ -9,15 +9,15 @@
  *   5. Middleware idempotency (double-write doesn't corrupt)
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { encryptField, decryptField, hashForLookup, isEncryptedValue } from '@/lib/security/encryption';
-import { piiEncryptionMiddleware } from '@/lib/security/pii-middleware';
+import { withPiiEncryptionExtension } from '@/lib/security/pii-middleware';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
 
 // Use a separate client so we control middleware registration
-const prisma = new PrismaClient({
-    datasources: { db: { url: DB_URL } },
-});
-prisma.$use(piiEncryptionMiddleware);
+const prisma = withPiiEncryptionExtension(new PrismaClient({
+    adapter: new PrismaPg({ connectionString: DB_URL }),
+}));
 
 // Skip entire suite when DB is not reachable
 const describeFn = DB_AVAILABLE ? describe : describe.skip;

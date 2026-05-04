@@ -134,14 +134,10 @@ export function OnboardingTourProvider({
         // Lazy import — chunk only loads when start() is called.
         const [{ driver }] = await Promise.all([
             import('driver.js'),
-            // The CSS side-effect import has no .d.ts in driver.js's
-            // package and ambient `*.css` declarations don't apply
-            // to deep node_modules paths. Webpack handles it at
-            // build time; TypeScript just needs to skip the lookup
-            // for this one line.
-            // @ts-ignore -- side-effect CSS import; React 19 + Next 16 ts module
-            // resolution sometimes resolves the path so @ts-expect-error becomes
-            // "unused" — @ts-ignore is the safer no-op for ambient CSS modules.
+            // CSS side-effect import — typed via the explicit
+            // `declare module 'driver.js/dist/driver.css'` in
+            // `src/types/globals.d.ts`. No directive suppression
+            // needed.
             import('driver.js/dist/driver.css'),
         ]);
 

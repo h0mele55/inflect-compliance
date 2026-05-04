@@ -11,6 +11,7 @@
  *   7. dryRun does not mutate anything
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { registerSoftDeleteMiddleware, withDeleted } from '@/lib/soft-delete';
 import {
     purgeSoftDeletedOlderThan,
@@ -18,12 +19,11 @@ import {
     runRetentionSweep,
 } from '@/app-layer/jobs/data-lifecycle';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
-import { piiEncryptionMiddleware } from '@/lib/security/pii-middleware';
+import { withPiiEncryptionExtension } from '@/lib/security/pii-middleware';
 
-const prisma = new PrismaClient({
-    datasources: { db: { url: DB_URL } },
-});
-prisma.$use(piiEncryptionMiddleware);
+const prisma = withPiiEncryptionExtension(new PrismaClient({
+    adapter: new PrismaPg({ connectionString: DB_URL }),
+}));
 registerSoftDeleteMiddleware(prisma);
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;

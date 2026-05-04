@@ -39,10 +39,12 @@ function collectFiles(dir: string, extensions = ['.ts', '.tsx']): string[] {
 describe('Soft-Delete CI Guardrails', () => {
     const allFiles = collectFiles(SRC_DIR);
 
-    test('soft-delete middleware is registered in prisma.ts', () => {
+    test('soft-delete extension is wired in prisma.ts', () => {
         const content = fs.readFileSync(PRISMA_FILE, 'utf-8');
-        expect(content).toContain('registerSoftDeleteMiddleware');
-        expect(content).toContain("import { registerSoftDeleteMiddleware } from './soft-delete'");
+        // Prisma 7 — v5 `registerSoftDeleteMiddleware($use)` was replaced
+        // by `withSoftDeleteExtension($extends)`. Pin the new symbol.
+        expect(content).toContain('withSoftDeleteExtension');
+        expect(content).toContain("import { withSoftDeleteExtension } from './soft-delete'");
     });
 
     test('soft-delete.ts exports SOFT_DELETE_MODELS with all 5 models', () => {
@@ -108,15 +110,28 @@ describe('Soft-Delete CI Guardrails', () => {
         expect(violations).toEqual([]);
     });
 
-    test('soft-delete middleware registered BEFORE audit middleware', () => {
+    test('soft-delete extension wraps audit extension (composition order)', () => {
+        // Prisma 7 — the v5 registration-order check was replaced by an
+        // outer/inner composition check. The chain in prisma.ts is:
+        //   withSoftDeleteExtension( base.$extends(buildAuditExtension()) )
+        // so audit is innermost (closest to DB) and soft-delete is the
+        // wrapper around it. delete → update transform happens BEFORE
+        // audit sees the operation, so the audit row records the
+        // resulting `update` not the original `delete`. This is the
+        // load-bearing invariant.
         const content = fs.readFileSync(PRISMA_FILE, 'utf-8');
-        const softDeleteIdx = content.indexOf('registerSoftDeleteMiddleware(prisma)');
-        const auditIdx = content.indexOf('registerAuditMiddleware(prisma)');
+        const softDeleteIdx = content.indexOf('withSoftDeleteExtension(');
+        // Anchor on the call site inside buildExtended (`base.$extends(
+        // buildAuditExtension())`) — this is unique vs the audit
+        // function declaration earlier in the file. The wrapping
+        // `withSoftDeleteExtension(` call must appear BEFORE the inner
+        // `base.$extends(buildAuditExtension())` it wraps in source
+        // order — i.e. soft-delete is outside, audit is inside.
+        const auditCallIdx = content.indexOf('base.$extends(buildAuditExtension())');
 
         expect(softDeleteIdx).toBeGreaterThan(-1);
-        expect(auditIdx).toBeGreaterThan(-1);
-        // Soft-delete must come BEFORE audit
-        expect(softDeleteIdx).toBeLessThan(auditIdx);
+        expect(auditCallIdx).toBeGreaterThan(-1);
+        expect(softDeleteIdx).toBeLessThan(auditCallIdx);
     });
 
     test('SOFT_DELETE_MODELS allowlist has exactly 12 models', () => {

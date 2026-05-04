@@ -57,7 +57,8 @@
  * an empty string wastes bytes with no security gain.
  */
 
-import type { PrismaClient } from '@prisma/client';
+// PrismaClient import removed — Prisma 7 extensions accept any
+// client-with-$extends instead of a typed PrismaClient instance.
 import {
     encryptField,
     decryptField,
@@ -446,70 +447,134 @@ function walkReadResult(
 
 // ─── Middleware registration ─────────────────────────────────────────
 
-let installed = false;
+/**
+ * @deprecated v5 mutating shape — Prisma 7 removed `$use`. Use
+ * `withEncryptionExtension(client)` instead, which returns a new
+ * extended client. This stub remains so existing test files that
+ * import the legacy name continue to compile.
+ *
+ * Production wiring is in `runInTenantContext` (per-transaction);
+ * tests that called this on the singleton to test direct prisma
+ * calls need to migrate to `withEncryptionExtension` and rebind
+ * their `prisma` reference. FIXME — remove once migrated.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+export function registerEncryptionMiddleware(_client: any): void {
+    /* no-op — see docstring */
+}
 
 /**
- * Register the encryption middleware on the given Prisma client.
- * Idempotent — subsequent calls on the same client no-op.
+ * Wire the field-level encryption extension onto a Prisma 7 client.
  *
- * Install once at process boot alongside `pii-middleware` +
- * `soft-delete` + `audit`. Install order doesn't matter
- * cryptographically; audit logs any rotation / mismatch warnings on
- * the same log stream either way.
+ * Prisma 7 removed `$use`; the same per-action logic now ships as
+ * a `$extends({ query })` extension. The handler shape changed from
+ * `(params, next)` to `({ model, operation, args, query })`; we
+ * adapt the call site and otherwise preserve the encrypt-on-write /
+ * decrypt-on-read body byte-for-byte.
+ *
+ * Idempotency: the original `$use` form had a module-level
+ * `installed` flag to prevent double-registration. Extensions don't
+ * mutate the client; calling this twice would just produce two
+ * stacked extensions. Callers (today: `runInTenantContext` in
+ * `rls-middleware.ts`) wire it exactly once on the inner
+ * transactional client.
  */
-export function registerEncryptionMiddleware(client: PrismaClient): void {
-    if (installed) return;
-    installed = true;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withEncryptionExtension<T extends { $extends: any }>(
+    client: T,
+): T {
+    return client.$extends({
+        name: 'field-encryption',
+        query: {
+            $allModels: {
+                async $allOperations({
+                    model,
+                    operation,
+                    args,
+                    query,
+                }: {
+                    model: string;
+                    operation: string;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    args: any;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    query: (a: any) => Promise<any>;
+                }) {
+                    const isWrite = WRITE_ACTIONS.has(operation);
+                    const isRead = RESULT_DECRYPT_ACTIONS.has(operation);
 
-    client.$use(async (params, next) => {
-        const model = params.model;
-        const isWrite = WRITE_ACTIONS.has(params.action);
-        const isRead = RESULT_DECRYPT_ACTIONS.has(params.action);
+                    // Pre-resolve the DEK pair once for the whole
+                    // operation. Cache hit after the first lookup per
+                    // tenant in this process for the primary; the
+                    // previous slot is null in steady state and only
+                    // populated during an in-flight rotation.
+                    const deks: TenantDekPair =
+                        isWrite || isRead
+                            ? await resolveTenantDekPair(model)
+                            : NO_DEK_PAIR;
 
-        // Pre-resolve the DEK pair once for the whole operation.
-        // Cache hit after the first lookup per tenant in this process
-        // for the primary; the previous slot is null in steady state
-        // and only populated during an in-flight rotation.
-        const deks: TenantDekPair = (isWrite || isRead)
-            ? await resolveTenantDekPair(model)
-            : NO_DEK_PAIR;
+                    // ── Write path ──
+                    if (isWrite) {
+                        const targetModel = isEncryptedModel(model)
+                            ? model
+                            : '*';
 
-        // ── Write path ──
-        if (isWrite) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const args = params.args as any;
-            const targetModel =
-                model && isEncryptedModel(model) ? model : '*';
+                        // Writes always use the primary DEK (or fall
+                        // back to global KEK when null). The previous
+                        // slot is irrelevant for writes — it exists
+                        // solely so reads of stale rows can find
+                        // their key during a rotation.
+                        if (args?.data) {
+                            walkWriteArgument(
+                                args.data,
+                                targetModel,
+                                deks.primary,
+                            );
+                        }
+                        if (operation === 'upsert') {
+                            if (args?.create) {
+                                walkWriteArgument(
+                                    args.create,
+                                    targetModel,
+                                    deks.primary,
+                                );
+                            }
+                            if (args?.update) {
+                                walkWriteArgument(
+                                    args.update,
+                                    targetModel,
+                                    deks.primary,
+                                );
+                            }
+                        }
+                    }
 
-            // Writes always use the primary DEK (or fall back to
-            // global KEK when null). The previous slot is irrelevant
-            // for writes — it exists solely so reads of stale rows
-            // can find their key during a rotation.
-            if (args?.data) walkWriteArgument(args.data, targetModel, deks.primary);
-            if (params.action === 'upsert') {
-                if (args?.create) walkWriteArgument(args.create, targetModel, deks.primary);
-                if (args?.update) walkWriteArgument(args.update, targetModel, deks.primary);
-            }
-        }
+                    const result = await query(args);
 
-        const result = await next(params);
+                    // ── Read / result-decrypt path ──
+                    if (isRead) {
+                        const targetModel = isEncryptedModel(model)
+                            ? model
+                            : '*';
+                        walkReadResult(result, targetModel, deks);
+                    }
 
-        // ── Read / result-decrypt path ──
-        if (isRead) {
-            const targetModel =
-                model && isEncryptedModel(model) ? model : '*';
-            walkReadResult(result, targetModel, deks);
-        }
-
-        return result;
-    });
+                    return result;
+                },
+            },
+        },
+    }) as T;
 }
 
 // ─── Test-only helpers ───────────────────────────────────────────────
 
-/** @internal — test hook that resets the install guard. */
+/**
+ * @internal — kept as a no-op so the existing v5 test suite calls
+ * still compile. Prisma 7 extensions are stateless re: registration
+ * (no `installed` guard), so there's nothing to reset.
+ */
 export function _resetEncryptionMiddlewareForTests(): void {
-    installed = false;
+    /* no-op — see docstring */
 }
 
 /** @internal — exposed for direct unit-testing of the traversal logic. */

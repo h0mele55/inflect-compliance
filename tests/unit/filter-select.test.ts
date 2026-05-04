@@ -20,6 +20,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as React from 'react';
 import { ListFilter } from 'lucide-react';
 import {
     activeRangeTokenFor,
@@ -92,11 +93,14 @@ describe('isEmptyStateObject / resolveEmptyStateFor', () => {
     });
 
     it('treats a ReactElement as NOT a record (isValidElement guard)', () => {
-        const el = {
-            $$typeof: Symbol.for('react.element'),
-            type: 'div',
-            props: {},
-        } as unknown as React.ReactNode;
+        // React 19 changed the element symbol from
+        // `Symbol.for('react.element')` to
+        // `Symbol.for('react.transitional.element')`. Build a real
+        // element via `React.createElement` so the test stays
+        // version-agnostic — the implementation calls `isValidElement`,
+        // which is the canonical way to recognise an element regardless
+        // of which internal symbol the runtime uses.
+        const el = React.createElement('div') as unknown as React.ReactNode;
         expect(isEmptyStateObject(el)).toBe(false);
     });
 

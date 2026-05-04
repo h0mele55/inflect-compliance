@@ -66,23 +66,22 @@ function collectAnnotatedSchemas(
     return out;
 }
 
-// `.openapi(name, …)` writes the metadata onto `_def.openapi`. Reading
-// it back is the cleanest way to assert "this schema was registered".
-// Prefer `metadata?._internal_baseObject ?? metadata` because the
-// asteasolutions package nests the fields differently across versions.
-function getOpenApiMetadata(schema: unknown): { _internal?: { refId?: string }; metadata?: { id?: string }; refId?: string } | undefined {
-    return (schema as { _def?: { openapi?: unknown } })._def?.openapi as never;
+// In zod-to-openapi v8, `.openapi(name, …)` no longer writes onto
+// `_def.openapi` — it stores metadata in an internal WeakMap keyed by
+// the zod schema instance. The package exports `getRefId` which is
+// the canonical way to read the registered ref id back out, so the
+// test re-uses that.
+import { getRefId as getOpenApiRefId } from '@asteasolutions/zod-to-openapi';
+
+function getOpenApiMetadata(
+    schema: unknown,
+): { refId?: string } | undefined {
+    const refId = getOpenApiRefId(schema as never);
+    return refId ? { refId } : undefined;
 }
 
 function getRefId(schema: unknown): string | undefined {
-    const meta = getOpenApiMetadata(schema) as
-        | { _internal?: { refId?: string }; metadata?: { id?: string } }
-        | undefined;
-    if (!meta) return undefined;
-    // Normalise across asteasolutions versions:
-    //   - newer: meta._internal.refId
-    //   - older: meta.metadata.id
-    return meta._internal?.refId ?? meta.metadata?.id;
+    return getOpenApiRefId(schema as never);
 }
 
 describe('GAP-10 foundation — Zod→OpenAPI extension', () => {
@@ -255,12 +254,13 @@ describe('GAP-10 foundation — registry is wired and reusable', () => {
         registry.register('OpenApiFoundationTest', TestSchema);
         // The registry exposes definitions (the array the generator
         // walks). Asserting the entry exists is enough to prove the
-        // generator pattern from GAP-10 step 3 will work.
+        // generator pattern from GAP-10 step 3 will work. v8 stores
+        // the ref id in an external WeakMap rather than on
+        // `_def.openapi`, so we use the package-exported `getRefId`.
         const defs = registry.definitions;
         const found = defs.find((d) => {
-            const name = (d as { type: string; route?: unknown; schema?: { _def?: { openapi?: { _internal?: { refId?: string } } } } })
-                .schema?._def?.openapi?._internal?.refId;
-            return name === 'OpenApiFoundationTest';
+            const schema = (d as { schema?: unknown }).schema;
+            return schema && getRefId(schema) === 'OpenApiFoundationTest';
         });
         expect(found).toBeDefined();
     });

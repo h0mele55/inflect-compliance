@@ -11,6 +11,7 @@
  * ⚠️  Requires a live database. Automatically skipped if the DB is unreachable.
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 const CONCURRENCY_LEVEL = 60;
 
@@ -20,11 +21,9 @@ describe('Connection pooling: concurrent query handling', () => {
 
     beforeAll(async () => {
         prisma = new PrismaClient({
-            datasources: {
-                db: {
-                    url: process.env.DATABASE_URL!,
-                },
-            },
+            adapter: new PrismaPg({
+                connectionString: process.env.DATABASE_URL!,
+            }),
         });
 
         // Probe DB connectivity — skip all tests if unreachable

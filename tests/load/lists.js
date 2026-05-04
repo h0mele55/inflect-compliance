@@ -26,7 +26,7 @@
 import http from 'k6/http';
 import { check, group, sleep } from 'k6';
 import { Counter, Rate } from 'k6/metrics';
-import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
+import { textSummary } from './vendor/k6-summary.js';
 import { loadConfig } from './lib/config.js';
 import { login } from './lib/auth.js';
 

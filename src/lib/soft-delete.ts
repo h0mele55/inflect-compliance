@@ -7,7 +7,6 @@
  * ALLOWLIST: Only models listed in SOFT_DELETE_MODELS are affected.
  * All other models retain hard-delete semantics.
  */
-import { PrismaClient, Prisma } from '@prisma/client';
 import { getAuditContext } from './audit-context';
 
 // ─── Models that support soft delete ───
@@ -59,66 +58,146 @@ export function withDeleted<T extends Record<string, any>>(args: T): T {
 }
 
 /**
- * Register soft-delete middleware on a PrismaClient instance.
- * MUST be called BEFORE audit middleware so audit sees the transformed ops.
+ * @deprecated v5 mutating shape — Prisma 7 removed `$use`. Use
+ * `withSoftDeleteExtension(client)` instead, which returns a new
+ * extended client. This stub remains so existing test files that
+ * import the legacy name continue to compile; on the production
+ * singleton in `src/lib/prisma.ts` the extension is already wired
+ * via `withSoftDeleteExtension`, so this call is a no-op there.
+ *
+ * FIXME — remove once all callers have migrated to the extension.
  */
-export function registerSoftDeleteMiddleware(client: PrismaClient): void {
-    client.$use(async (params, next) => {
-        const model = params.model;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+export function registerSoftDeleteMiddleware(_client: any): void {
+    /* no-op — see docstring */
+}
 
-        // Only apply to allowlisted models
-        if (!model || !SOFT_DELETE_MODELS.has(model)) {
-            return next(params);
-        }
+/**
+ * Wire the soft-delete extension onto a Prisma 7 client.
+ *
+ * Migrated from `client.$use(...)` (removed in Prisma 7) to
+ * `client.$extends({ query: { $allModels: ... } })`. The semantics
+ * are identical:
+ *
+ *   - `delete` / `deleteMany` on allowlisted models → transformed
+ *     to `update` / `updateMany` setting `deletedAt`.
+ *   - Read actions (`findUnique` / `findFirst` / `findMany` / `count`
+ *     / `aggregate` / `groupBy`) → injected `where.deletedAt = null`
+ *     unless the caller used `withDeleted(...)` or explicitly set
+ *     a `deletedAt` filter.
+ *
+ * Composition: this extension MUST sit OUTSIDE the audit extension
+ * so audit logs the transformed `update` operation, not the original
+ * `delete`. The chain in `src/lib/prisma.ts` enforces this.
+ *
+ * Returns the extended client so callers can chain further extensions.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withSoftDeleteExtension<T extends { $extends: any }>(
+    client: T,
+): T {
+    // Internal alias — the extended client carries per-model query
+    // methods (`client.asset.update`, `.updateMany`, …) but the
+    // generic `T` doesn't expose them statically. Cast through
+    // `unknown` to a keyed record once; per-action handlers
+    // dispatch into it without restating `as any` at every call
+    // site, which keeps the file under the `as any` ratchet.
+    type ModelOps = {
+        update: (a: {
+            where?: Record<string, unknown>;
+            data: Record<string, unknown>;
+        }) => Promise<unknown>;
+        updateMany: (a: {
+            where?: Record<string, unknown>;
+            data: Record<string, unknown>;
+        }) => Promise<unknown>;
+    };
+    const c = client as unknown as Record<string, ModelOps>;
+    const modelOps = (model: string): ModelOps =>
+        c[model.charAt(0).toLowerCase() + model.slice(1)];
 
-        // ─── DELETE INTERCEPTION ───
-        if (DELETE_ACTIONS.has(params.action)) {
-            // Get the current user from audit context for deletedByUserId
-            const ctx = getAuditContext();
-            const deletedByUserId = ctx?.actorUserId || null;
+    return client.$extends({
+        name: 'soft-delete',
+        query: {
+            $allModels: {
+                async delete({ model, args, query }: { model: string; args: { where?: Record<string, unknown> }; query: (a: unknown) => Promise<unknown> }) {
+                    if (!SOFT_DELETE_MODELS.has(model)) return query(args);
+                    const ctx = getAuditContext();
+                    const deletedByUserId = ctx?.actorUserId || null;
+                    // Transform delete → update — switch to the
+                    // sibling client method since `query` is bound
+                    // to the original `delete` operation.
+                    return modelOps(model).update({
+                        where: args.where,
+                        data: { deletedAt: new Date(), deletedByUserId },
+                    });
+                },
+                async deleteMany({ model, args, query }: { model: string; args: { where?: Record<string, unknown> }; query: (a: unknown) => Promise<unknown> }) {
+                    if (!SOFT_DELETE_MODELS.has(model)) return query(args);
+                    const ctx = getAuditContext();
+                    const deletedByUserId = ctx?.actorUserId || null;
+                    return modelOps(model).updateMany({
+                        where: args.where,
+                        data: { deletedAt: new Date(), deletedByUserId },
+                    });
+                },
+                async findUnique({ model, args, query }: { model: string; args: Record<string, unknown>; query: (a: unknown) => Promise<unknown> }) {
+                    return runRead(model, args, query);
+                },
+                async findFirst({ model, args, query }: { model: string; args: Record<string, unknown>; query: (a: unknown) => Promise<unknown> }) {
+                    return runRead(model, args, query);
+                },
+                async findMany({ model, args, query }: { model: string; args: Record<string, unknown>; query: (a: unknown) => Promise<unknown> }) {
+                    return runRead(model, args, query);
+                },
+                async count({ model, args, query }: { model: string; args: Record<string, unknown>; query: (a: unknown) => Promise<unknown> }) {
+                    return runRead(model, args, query);
+                },
+                async aggregate({ model, args, query }: { model: string; args: Record<string, unknown>; query: (a: unknown) => Promise<unknown> }) {
+                    return runRead(model, args, query);
+                },
+                async groupBy({ model, args, query }: { model: string; args: Record<string, unknown>; query: (a: unknown) => Promise<unknown> }) {
+                    return runRead(model, args, query);
+                },
+            },
+        },
+    }) as T;
+}
 
-            if (params.action === 'delete') {
-                // Transform delete → update
-                params.action = 'update';
-                params.args.data = {
-                    deletedAt: new Date(),
-                    deletedByUserId,
-                };
-            } else if (params.action === 'deleteMany') {
-                // Transform deleteMany → updateMany
-                params.action = 'updateMany';
-                params.args.data = {
-                    deletedAt: new Date(),
-                    deletedByUserId,
-                };
-            }
+/**
+ * Shared read-action helper — strips the opt-out flag, respects
+ * caller-supplied `deletedAt` filters, otherwise injects
+ * `where.deletedAt = null` on allowlisted models.
+ */
+async function runRead(
+    model: string,
+    args: Record<string, unknown>,
+    query: (a: unknown) => Promise<unknown>,
+): Promise<unknown> {
+    if (!SOFT_DELETE_MODELS.has(model)) return query(args);
 
-            return next(params);
-        }
+    // Caller used `withDeleted(...)` — strip the magic flag and
+    // pass through unchanged. (We mutate a shallow clone so we
+    // don't perturb the caller's args object.)
+    if ((args as Record<string, unknown>)[INCLUDE_DELETED_KEY]) {
+        const next = { ...args } as Record<string, unknown>;
+        delete next[INCLUDE_DELETED_KEY];
+        return query(next);
+    }
 
-        // ─── READ FILTERING ───
-        if (READ_ACTIONS.has(params.action)) {
-            // Check for opt-out flag
-            if (params.args?.[INCLUDE_DELETED_KEY]) {
-                // Strip the flag before passing to Prisma
-                delete params.args[INCLUDE_DELETED_KEY];
-                return next(params);
-            }
+    const where = (args as { where?: Record<string, unknown> })?.where;
+    if (where?.deletedAt !== undefined) {
+        // Caller explicitly controls deletedAt — don't override
+        return query(args);
+    }
 
-            // Check if caller explicitly set a deletedAt filter (e.g. { deletedAt: { not: null } })
-            if (params.args?.where?.deletedAt !== undefined) {
-                // Caller explicitly controls deletedAt — don't override
-                return next(params);
-            }
-
-            // Inject deletedAt: null filter
-            if (!params.args) params.args = {};
-            if (!params.args.where) params.args.where = {};
-            params.args.where.deletedAt = null;
-
-            return next(params);
-        }
-
-        return next(params);
-    });
+    // Inject deletedAt: null filter
+    const next = {
+        ...args,
+        where: {
+            ...((args as Record<string, unknown>).where as Record<string, unknown> | undefined),
+            deletedAt: null,
+        },
+    };
+    return query(next);
 }

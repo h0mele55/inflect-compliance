@@ -7,13 +7,15 @@
  * RUN: npx jest tests/integration/control-test-flow.test.ts
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'crypto';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
 import { computeNextDueAt } from '@/app-layer/utils/cadence';
-import { piiEncryptionMiddleware } from '@/lib/security/pii-middleware';
+import { withPiiEncryptionExtension } from '@/lib/security/pii-middleware';
 
-const prisma = new PrismaClient({ datasources: { db: { url: DB_URL } } });
-prisma.$use(piiEncryptionMiddleware);
+const prisma = withPiiEncryptionExtension(new PrismaClient({
+    adapter: new PrismaPg({ connectionString: DB_URL }),
+}));
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 

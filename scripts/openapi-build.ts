@@ -24,7 +24,11 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { OpenApiGeneratorV31, type OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
+import {
+    OpenApiGeneratorV31,
+    getRefId as getOpenApiRefId,
+    type OpenAPIRegistry,
+} from '@asteasolutions/zod-to-openapi';
 import { registry } from '@/lib/openapi/registry';
 
 // Path resolution. We deliberately use `process.cwd()` rather than
@@ -65,7 +69,7 @@ export const OUTPUT_PATH = resolve(REPO_ROOT, 'public/openapi.json');
 
 interface ZodLike {
     parse: unknown;
-    _def?: { openapi?: { _internal?: { refId?: string }; metadata?: { id?: string } } };
+    _def?: unknown;
 }
 
 function isAnnotatedZod(value: unknown): value is ZodLike {
@@ -77,10 +81,12 @@ function isAnnotatedZod(value: unknown): value is ZodLike {
     );
 }
 
+// zod-to-openapi v8 stores `.openapi(name)` metadata in an internal
+// WeakMap keyed by the zod schema instance — it is NOT on `_def.openapi`
+// any more (v7 layout). Use the package's exported `getRefId` helper
+// to read the registered ref id back out.
 function getRefId(schema: ZodLike): string | undefined {
-    const meta = schema._def?.openapi;
-    if (!meta) return undefined;
-    return meta._internal?.refId ?? meta.metadata?.id;
+    return getOpenApiRefId(schema as never);
 }
 
 function registerAnnotated(

@@ -55,15 +55,18 @@ import { Prisma } from '@prisma/client';
 import { getAuditContext } from '@/lib/audit-context';
 import { logger } from '@/lib/observability/logger';
 import type { PrismaTx } from '@/lib/db-context';
+import * as prismaModule from '@/lib/prisma';
 
-// `prisma` is lazy-loaded inside functions to avoid a circular import:
-// `src/lib/prisma.ts` imports this module to install the tripwire at
-// startup. Importing `prisma` at the top of this file would create a
-// TDZ hazard where `installRlsTripwire` is called before this module
-// has finished evaluating its own `let` bindings.
+// Same pattern as `audit-writer.ts` — `import * as prismaModule` gives
+// a live namespace binding; reading `prismaModule.prisma` inside the
+// function defers the dereference to call-time. That sidesteps both
+// the historical TDZ hazard (prisma.ts statically imports this module
+// for the tripwire extension, but only USES the runtime helpers like
+// `runWithoutRls` after both modules have evaluated) AND Turbopack's
+// production-build issue with dynamic TS-module `require()` returning
+// `undefined`.
 function getPrismaClient(): PrismaClient {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@/lib/prisma').prisma;
+    return prismaModule.prisma as unknown as PrismaClient;
 }
 
 // ─── Re-exports: the canonical RLS API ────────────────────────────────
@@ -255,13 +258,6 @@ const PRISMA_WRITE_ACTIONS = new Set([
 ]);
 
 /**
- * Tracks clients where the tripwire has already been installed so
- * repeated calls (HMR, duplicate imports) don't register the
- * middleware N times. WeakSet lets the client be GC'd normally.
- */
-let installedClients = new WeakSet<PrismaClient>();
-
-/**
  * Install the dev-time RLS tripwire on the provided PrismaClient.
  *
  * Behaviour per query:
@@ -281,49 +277,101 @@ let installedClients = new WeakSet<PrismaClient>();
  * wrap in `runInTenantContext`, the logs point to the right file
  * immediately instead of "why is my query returning nothing".
  */
-export function installRlsTripwire(client: PrismaClient): void {
-    if (installedClients.has(client)) return;
-    installedClients.add(client);
+/**
+ * Wire the RLS tripwire as a Prisma 7 `$extends` extension.
+ *
+ * Returns the extended client. The tripwire is observation-only —
+ * the `$allOperations` handler reads model + operation, decides
+ * whether to log a missing-tenant-context warning, then passes
+ * through unchanged. It does NOT change query behaviour; the
+ * authoritative isolation remains the database's RLS policies.
+ *
+ * Migrated from `client.$use(...)` (removed in Prisma 7). The v5
+ * idempotency guard (`installedClients` WeakSet) is gone — Prisma
+ * 7 extensions don't mutate the client, so calling this twice just
+ * stacks two read-only handlers and the tripwire fires twice (a
+ * harmless duplicate log line).
+ *
+ * Composition: callers in `src/lib/prisma.ts` apply this as the
+ * OUTERMOST extension so the tripwire sees the original call shape
+ * before soft-delete / PII rewrite the args. That way the logged
+ * `model` / `action` match the caller's intent in the source.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withRlsTripwireExtension<T extends { $extends: any }>(
+    client: T,
+): T {
+    return client.$extends({
+        name: 'rls-tripwire',
+        query: {
+            $allModels: {
+                async $allOperations({
+                    model,
+                    operation,
+                    args,
+                    query,
+                }: {
+                    model: string;
+                    operation: string;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    args: any;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    query: (a: any) => Promise<any>;
+                }) {
+                    if (!isTenantScopedModel(model)) {
+                        return query(args);
+                    }
 
-    client.$use(async (params, next) => {
-        if (!isTenantScopedModel(params.model)) {
-            return next(params);
-        }
+                    const ctx = getAuditContext();
+                    const hasTenant = !!ctx?.tenantId;
+                    const source = ctx?.source;
 
-        const ctx = getAuditContext();
-        const hasTenant = !!ctx?.tenantId;
-        const source = ctx?.source;
+                    const isBypassContext =
+                        source === 'seed' ||
+                        source === 'job' ||
+                        source === 'system';
 
-        // Known bypass paths — not a violation.
-        const isBypassContext =
-            source === 'seed' ||
-            source === 'job' ||
-            source === 'system';
+                    if (hasTenant || isBypassContext) {
+                        return query(args);
+                    }
 
-        if (hasTenant || isBypassContext) {
-            return next(params);
-        }
+                    const isWrite = PRISMA_WRITE_ACTIONS.has(operation);
+                    const logFn = isWrite ? logger.warn : logger.debug;
+                    logFn('rls-middleware.missing_tenant_context', {
+                        component: 'rls-middleware',
+                        model,
+                        action: operation,
+                        hasAuditContext: !!ctx,
+                        source: source ?? null,
+                    });
 
-        // No tenant context AND not an advertised bypass. Log with
-        // enough detail to locate the offending call site without
-        // leaking query payloads.
-        const isWrite = PRISMA_WRITE_ACTIONS.has(params.action);
-        const logFn = isWrite ? logger.warn : logger.debug;
-        logFn('rls-middleware.missing_tenant_context', {
-            component: 'rls-middleware',
-            model: params.model,
-            action: params.action,
-            hasAuditContext: !!ctx,
-            source: source ?? null,
-        });
+                    return query(args);
+                },
+            },
+        },
+    }) as T;
+}
 
-        return next(params);
-    });
+/**
+ * Compatibility shim — the old name kept so the existing call in
+ * `src/instrumentation.ts` (which mutates the singleton) continues
+ * to compile while we migrate all wiring into `src/lib/prisma.ts`.
+ * This shim no-ops; the real wiring is now in the extension chain.
+ *
+ * @deprecated Remove once `instrumentation.ts` stops calling it.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+export function installRlsTripwire(_client: any): void {
+    /* no-op — see docstring */
 }
 
 // ─── Test-only reset ─────────────────────────────────────────────────
 
-/** @internal — clear install tracking so tests can re-install cleanly. */
+/**
+ * @internal — kept as a no-op so existing v5 tests that called this
+ * to clear the install guard still compile. Extensions don't carry
+ * registration state.
+ */
 export function _resetTripwireInstallState(): void {
-    installedClients = new WeakSet<PrismaClient>();
+    /* no-op — see docstring */
 }

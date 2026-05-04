@@ -39,7 +39,6 @@
  * with the same guard — only structural identifiers (model, field
  * names) may appear in log payloads.
  */
-import { Prisma } from '@prisma/client';
 import { encryptField, decryptField, hashForLookup, isEncryptedValue } from './encryption';
 import { logger } from '@/lib/observability/logger';
 
@@ -392,7 +391,25 @@ function rewriteArgsWhere(
  */
 let _firstInvocationLogged = false;
 
-export const piiEncryptionMiddleware: Prisma.Middleware = async (params, next) => {
+/**
+ * Core PII encrypt/decrypt logic — shared between the legacy
+ * Prisma 5 `$use` middleware shape (preserved for unit-test
+ * mocking) and the Prisma 7 `$extends` wrapper.
+ *
+ * The handler shape is the v5 `(params, next)` contract because it
+ * reads cleanly and the body uses `params.action` / `params.model`
+ * / `params.args` extensively. The v7 wrapper below adapts this to
+ * the `$extends` per-action handler shape.
+ */
+async function runPiiEncryption(
+    params: {
+        action: string;
+        model?: string;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        args: any;
+    },
+    next: (p: typeof params) => Promise<unknown>,
+): Promise<unknown> {
     if (!_firstInvocationLogged) {
         _firstInvocationLogged = true;
         logger.info('pii.middleware_first_invocation', {
@@ -488,7 +505,74 @@ export const piiEncryptionMiddleware: Prisma.Middleware = async (params, next) =
     }
 
     return result;
-};
+}
+
+/**
+ * Legacy v5 middleware shape — preserved as a thin wrapper around
+ * `runPiiEncryption` so existing unit tests can mock the
+ * `(params, next)` contract directly without learning the v7
+ * `$extends` API. Production code paths use
+ * `withPiiEncryptionExtension` below.
+ */
+export const piiEncryptionMiddleware = async (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    params: any,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    next: (p: any) => Promise<any>,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> => runPiiEncryption(params, next);
+
+/**
+ * Wire the PII encryption extension onto a Prisma 7 client.
+ *
+ * Each per-action handler in the `$allModels` extension adapts the
+ * v7 call shape `({ model, operation, args, query })` into the v5
+ * `(params, next)` shape that `runPiiEncryption` already speaks.
+ * This keeps the encrypt/decrypt/where-rewrite logic in one
+ * place — the only thing that changes between v5 and v7 is the
+ * adapter glue.
+ *
+ * Composition: this extension MUST sit OUTSIDE soft-delete and
+ * audit so that:
+ *   - PII gets encrypted BEFORE soft-delete transforms `delete` →
+ *     `update` (the resulting update has encrypted columns)
+ *   - PII WHERE-rewrites apply BEFORE soft-delete injects
+ *     `deletedAt: null`
+ *   - Audit sees the final encrypted args, not plaintext (the
+ *     audit row's `detailsJson.after` carries safe values)
+ *
+ * The chain order is enforced in `src/lib/prisma.ts`.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function withPiiEncryptionExtension<T extends { $extends: any }>(
+    client: T,
+): T {
+    return client.$extends({
+        name: 'pii-encryption',
+        query: {
+            $allModels: {
+                async $allOperations({
+                    model,
+                    operation,
+                    args,
+                    query,
+                }: {
+                    model: string;
+                    operation: string;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    args: any;
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    query: (a: any) => Promise<any>;
+                }) {
+                    return runPiiEncryption(
+                        { action: operation, model, args },
+                        ({ args: nextArgs }) => query(nextArgs),
+                    );
+                },
+            },
+        },
+    }) as T;
+}
 
 /**
  * Returns the PII field map for a specific model.

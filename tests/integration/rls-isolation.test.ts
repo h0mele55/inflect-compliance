@@ -1,15 +1,12 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { withTenantDb } from '@/lib/db-context';
 import { randomUUID } from 'crypto';
 import { DB_URL, DB_AVAILABLE } from './db-helper';
 import { hashForLookup } from '@/lib/security/encryption';
 
 const globalPrisma = new PrismaClient({
-    datasources: {
-        db: {
-            url: DB_URL,
-        },
-    },
+    adapter: new PrismaPg({ connectionString: DB_URL }),
 });
 
 // Skip entire suite when DB is not reachable
