@@ -130,6 +130,9 @@ export type EntityListPageTable<TRow> = Pick<
     | 'rowCount'
     | 'className'
     | 'scrollWrapperClassName'
+    | 'virtualize'
+    | 'virtualRowHeight'
+    | 'virtualHeight'
 > & {
     /** Test id forwarded to the DataTable. */
     'data-testid'?: string;

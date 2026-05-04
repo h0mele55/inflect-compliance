@@ -907,3 +907,37 @@ test layout (hook hardening at
 `src/components/ui/hooks/__tests__/use-toast-with-undo.test.ts`,
 baseline + UI tests under `tests/rendered/`, structural ratchet
 under `tests/guards/`).
+
+### Epic 68 — List virtualization
+
+Single shared windowing primitive (`<VirtualizedList>`) wraps
+`react-window` + `react-virtualized-auto-sizer`. Don't import
+`react-window` directly — the primitive is the only seam.
+
+Two production rollouts:
+
+- **`<DataTable>` rows** — auto-virtualizes when `data.length > 100`.
+  `virtualize={false}` opts out (Controls page contract).
+  `virtualize={{ threshold: N }}` customises. Falls back to the
+  standard `<Table>` automatically when pagination, column resizing,
+  column pinning, or empty/error/loading chrome is requested.
+- **`<Combobox>` / `<UserCombobox>` dropdowns** — auto-virtualize
+  when visible options exceed `COMBOBOX_VIRTUALIZE_THRESHOLD = 50`.
+  cmdk's nav (which assumes items live in the DOM) is bypassed in
+  the virtualized branch via a bespoke capture-phase keyboard layer
+  bound to the search input — ArrowDown / ArrowUp / Home / End /
+  Enter all flow through there with `aria-activedescendant` tracking.
+  `<UserCombobox>` is a thin wrapper over `<Combobox>` so it gets
+  virtualization for free.
+
+Performance contract: any list above the threshold renders ≤30 row /
+option nodes regardless of dataset size. The benchmark test in
+`tests/rendered/combobox-virtualize.test.tsx` locks both the
+DOM-count invariant AND a wall-clock budget (1000 options + open in
+<2s on CI) so accidental regressions are caught.
+
+See `docs/list-virtualization.md` for the rollout decision tree
+(when to use the primitive directly vs reach for `<DataTable>` /
+`<Combobox>`), the four `VirtualizedList` contract rules, the
+DataTable + Combobox preserved/dropped feature lists, and the test
+layout.

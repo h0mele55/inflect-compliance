@@ -28,6 +28,7 @@ import { Dispatch, MouseEvent, ReactNode, SetStateAction, useCallback, useState 
 import { type BatchAction, renderBatchActions } from "./selection-toolbar";
 import { Table, useTable } from "./table";
 import { cn } from "./table-utils";
+import { VirtualTable } from "./virtual-table-body";
 
 // ── Public Column Helper ────────────────────────────────────────────
 
@@ -166,7 +167,59 @@ export interface DataTableProps<T> {
 
   /** Test ID for automated testing. */
   "data-testid"?: string;
+
+  // ── Virtualization (Epic 68) ──
+
+  /**
+   * Enable react-window-backed row virtualization for large data.
+   *
+   * Behaviour:
+   *   - `undefined` (default) — auto: virtualize when `data.length`
+   *     exceeds the default threshold (`VIRTUALIZE_DEFAULT_THRESHOLD`,
+   *     currently 100). Pages opt in by doing nothing.
+   *   - `true`               — force virtualization on regardless of
+   *                            row count.
+   *   - `false`              — force virtualization OFF. Use this on
+   *                            pages where the existing
+   *                            non-virtualized layout is intentionally
+   *                            preserved (e.g. the Controls page,
+   *                            where bespoke row affordances rely on
+   *                            the standard `<table>` layout).
+   *   - `{ threshold: N }`   — auto with a custom threshold.
+   *
+   * When virtualization is on, the table renders via `<VirtualTable>`
+   * which uses `display: grid` for headers + rows (column alignment
+   * is enforced by a single `gridTemplateColumns` value). Column
+   * resizing, column pinning, and the standard pagination footer are
+   * not supported in virtualized mode — DataTable falls back to the
+   * non-virtualized `<Table>` automatically when those features are
+   * requested.
+   */
+  virtualize?: boolean | { threshold: number };
+
+  /**
+   * Pixel height of each row when virtualization is on. Default 44
+   * matches the standard table's row geometry. Override only when
+   * row content is intentionally taller (multi-line cells).
+   */
+  virtualRowHeight?: number;
+
+  /**
+   * Explicit body height (px) when virtualization is on. When
+   * omitted, the body fills its parent via AutoSizer — which is the
+   * production default (use inside `<ListPageShell.Body>` or any
+   * sized flex parent). Set this only when AutoSizer can't reach a
+   * sized ancestor (e.g. test harnesses, or ad-hoc layouts).
+   */
+  virtualHeight?: number;
 }
+
+/**
+ * Default row count above which DataTable auto-virtualizes. Exported
+ * so structural ratchets and rollout tests can assert against the
+ * same value the runtime uses.
+ */
+export const VIRTUALIZE_DEFAULT_THRESHOLD = 100;
 
 // ── DataTable Component ─────────────────────────────────────────────
 
@@ -196,6 +249,9 @@ export function DataTable<T>({
   scrollWrapperClassName,
   fillBody,
   "data-testid": dataTestId,
+  virtualize,
+  virtualRowHeight,
+  virtualHeight,
 }: DataTableProps<T>) {
   // Compose the viewport-fill classes onto the existing className /
   // scrollWrapperClassName slots. Tailwind's `md:` prefixes mean
@@ -293,6 +349,50 @@ export function DataTable<T>({
     ? "md:flex md:flex-col md:max-h-full md:min-h-0 md:overflow-hidden"
     : undefined;
 
+  // Epic 68 — auto-virtualize above the threshold unless the caller
+  // overrides. Virtualization is force-disabled when features
+  // unsupported by the virtualized renderer are requested:
+  //   - server-side pagination (the footer + page buttons live on
+  //     <Table> only; virtualization replaces pagination by rendering
+  //     the full row set with a windowed viewport)
+  //   - error / empty / loading rendering paths still need <Table>
+  //     today — when no rows exist there's nothing to virtualize, so
+  //     <Table>'s richer empty/error chrome is the correct surface.
+  const wantsPagination =
+    !!pagination && !!onPaginationChange && rowCount !== undefined;
+  const hasRows = data.length > 0 && !error && !loading;
+  const virtualizationDecision = decideVirtualization(
+    virtualize,
+    data.length,
+  );
+  const useVirtual =
+    virtualizationDecision && hasRows && !wantsPagination;
+
+  if (useVirtual) {
+    // The table instance is typed `Table<unknown>` here because the
+    // upstream `useTable(tableProps as any)` cast erases the row
+    // generic. VirtualTable is row-generic and TanStack table's
+    // structural shape is identical, so this re-cast is safe.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tableT = table as any;
+    return (
+      <div id={dataTestId} data-testid={dataTestId} className={wrapperClassName}>
+        <VirtualTable<T>
+          table={tableT}
+          rowHeight={virtualRowHeight}
+          height={virtualHeight}
+          onRowClick={onRowClick}
+          sortableColumns={sortableColumns}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSortChange={onSortChange}
+          containerClassName={filledContainerClassName}
+          scrollWrapperClassName={filledScrollWrapperClassName}
+        />
+      </div>
+    );
+  }
+
   return (
     <div id={dataTestId} data-testid={dataTestId} className={wrapperClassName}>
       <Table
@@ -302,4 +402,21 @@ export function DataTable<T>({
       />
     </div>
   );
+}
+
+/**
+ * Resolve the `virtualize` prop into a boolean. Pure function, also
+ * exported for direct test coverage of the threshold contract.
+ */
+export function decideVirtualization(
+  virtualize: DataTableProps<unknown>["virtualize"],
+  rowCount: number,
+): boolean {
+  if (virtualize === false) return false;
+  if (virtualize === true) return true;
+  const threshold =
+    typeof virtualize === "object" && virtualize !== null
+      ? virtualize.threshold
+      : VIRTUALIZE_DEFAULT_THRESHOLD;
+  return rowCount > threshold;
 }
