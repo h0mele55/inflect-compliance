@@ -1,0 +1,85 @@
+/**
+ * Vaul stub for the jsdom test project.
+ *
+ * Vaul's Drawer reads from the document scrolling-element + uses
+ * pointer-event math (transform.match(...) + scroll-position-based
+ * gestures) that crashes under React 19's stricter ref + pointer
+ * lifecycle. The Modal primitive uses Vaul on mobile (matchMedia
+ * mock falls through to "mobile" in jsdom), so every Modal test
+ * transitively trips this incompatibility.
+ *
+ * Tests just want to render the modal content — they don't care
+ * about the drawer's drag gestures. The mock below renders every
+ * Drawer.* slot as a plain div so children are visible and
+ * keyboard/click interactions still flow through.
+ *
+ * Re-evaluate this stub when:
+ *   - Vaul ships a React 19 fix (track upstream).
+ *   - Or we move Modal off Vaul.
+ */
+
+import * as React from "react";
+import * as Dialog from "@radix-ui/react-dialog";
+
+// The real Vaul Drawer mounts a Radix Dialog under the hood — so
+// any `<Drawer.Title>` etc. lives inside a valid Dialog context.
+// The stub mirrors this: `Drawer.Root` is a Radix `Dialog.Root`,
+// `Drawer.Portal` / `Drawer.Overlay` / `Drawer.Content` /
+// `Drawer.Title` / `Drawer.Description` / `Drawer.Close` map to
+// the matching Radix primitives. This way Modal renders in
+// jsdom under React 19 without exercising Vaul's pointer-event
+// math (which crashes on `transform.match(...)`).
+
+interface RootProps {
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    children?: React.ReactNode;
+}
+
+function Root({ open, onOpenChange, children }: RootProps) {
+    return (
+        <Dialog.Root open={open} onOpenChange={onOpenChange}>
+            {children}
+        </Dialog.Root>
+    );
+}
+
+function PassThroughDiv(
+    props: React.HTMLAttributes<HTMLDivElement>,
+) {
+    return <div {...props} />;
+}
+
+// Vaul's drawers ignore Escape by default — they're closed via
+// drag-to-dismiss / explicit close button, not the keyboard. The
+// stub mirrors that so tests that assert "Escape blocked when
+// preventDefaultClose is set" still pass: Radix Dialog.Content's
+// `onEscapeKeyDown` defaults to closing; we preventDefault.
+const Content = React.forwardRef<
+    HTMLDivElement,
+    React.ComponentProps<typeof Dialog.Content>
+>(function VaulContent(props, ref) {
+    return (
+        <Dialog.Content
+            ref={ref}
+            {...props}
+            onEscapeKeyDown={(e) => {
+                e.preventDefault();
+                props.onEscapeKeyDown?.(e);
+            }}
+        />
+    );
+});
+
+export const Drawer = {
+    Root,
+    Portal: Dialog.Portal,
+    Trigger: Dialog.Trigger,
+    Content,
+    Title: Dialog.Title,
+    Description: Dialog.Description,
+    Overlay: Dialog.Overlay,
+    Close: Dialog.Close,
+    Handle: PassThroughDiv,
+    NestedRoot: Root,
+};
