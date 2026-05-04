@@ -84,6 +84,12 @@ function renderTable(
             columns={thingColumns}
             getRowId={(r) => r.id}
             virtualHeight={600}
+            // Force virtualize=true on every virtualization-targeted
+            // test in this file. The default threshold (1000) is too
+            // high for most fixtures here; tests that explicitly
+            // verify auto-engage at the threshold boundary still
+            // override `virtualize` themselves.
+            virtualize
             {...props}
         />,
     );
@@ -100,17 +106,22 @@ async function flushAutoSizer(): Promise<void> {
 // ─── decideVirtualization (pure function) ───────────────────────────
 
 describe("decideVirtualization — threshold contract", () => {
-    it("default threshold is 100", () => {
-        expect(VIRTUALIZE_DEFAULT_THRESHOLD).toBe(100);
+    it("default threshold is 1000", () => {
+        // Threshold raised 100 → 1000 in a follow-up PR. See the
+        // history block on `VIRTUALIZE_DEFAULT_THRESHOLD` for
+        // rationale: medium-sized tables (100-1000 rows) hit
+        // Playwright click-intercept regressions in CI when the
+        // virtualized div wrapper sat above row interactions.
+        expect(VIRTUALIZE_DEFAULT_THRESHOLD).toBe(1000);
     });
 
     it("returns false below the default threshold", () => {
-        expect(decideVirtualization(undefined, 99)).toBe(false);
-        expect(decideVirtualization(undefined, 100)).toBe(false);
+        expect(decideVirtualization(undefined, 999)).toBe(false);
+        expect(decideVirtualization(undefined, 1000)).toBe(false);
     });
 
     it("returns true above the default threshold", () => {
-        expect(decideVirtualization(undefined, 101)).toBe(true);
+        expect(decideVirtualization(undefined, 1001)).toBe(true);
         expect(decideVirtualization(undefined, 5_000)).toBe(true);
     });
 
@@ -133,10 +144,10 @@ describe("decideVirtualization — threshold contract", () => {
 // ─── DataTable rendering — virtualization auto-engages above threshold ──
 
 describe("DataTable — auto-virtualize above threshold", () => {
-    it("100 rows: standard <table> renders (NOT virtualized)", () => {
+    it("1000 rows: standard <table> renders (NOT virtualized)", () => {
         const { container } = render(
             <DataTable<ThingRow>
-                data={makeRows(100)}
+                data={makeRows(1000)}
                 columns={thingColumns}
                 getRowId={(r) => r.id}
             />,
@@ -145,8 +156,19 @@ describe("DataTable — auto-virtualize above threshold", () => {
         expect(container.querySelector("[data-virtual-table]")).toBeNull();
     });
 
-    it("101 rows: VirtualTable renders, no <table> element", () => {
-        const { container } = renderTable({ data: makeRows(101) });
+    it("1001 rows: VirtualTable renders, no <table> element", () => {
+        // Explicitly do NOT use the renderTable helper here — the
+        // helper force-sets `virtualize` for the rest of this file's
+        // tests, but this test is about the threshold boundary
+        // engaging WITHOUT an explicit override.
+        const { container } = render(
+            <DataTable<ThingRow>
+                data={makeRows(1001)}
+                columns={thingColumns}
+                getRowId={(r) => r.id}
+                virtualHeight={600}
+            />,
+        );
         expect(container.querySelector("[data-virtual-table]")).toBeInTheDocument();
         expect(container.querySelector("table")).toBeNull();
     });
@@ -251,6 +273,7 @@ describe("DataTable — virtualized behaviour parity", () => {
                     columns={thingColumns}
                     getRowId={(r) => r.id}
                     virtualHeight={600}
+                    virtualize
                     selectedRows={selected}
                     onRowSelectionChange={(rows) => {
                         const next: Record<string, boolean> = {};

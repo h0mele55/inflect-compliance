@@ -916,11 +916,16 @@ Single shared windowing primitive (`<VirtualizedList>`) wraps
 
 Two production rollouts:
 
-- **`<DataTable>` rows** — auto-virtualizes when `data.length > 100`.
-  `virtualize={false}` opts out (Controls page contract).
-  `virtualize={{ threshold: N }}` customises. Falls back to the
-  standard `<Table>` automatically when pagination, column resizing,
-  column pinning, or empty/error/loading chrome is requested.
+- **`<DataTable>` rows** — auto-virtualizes when `data.length > 1000`.
+  Threshold raised from 100 → 1000 in a follow-up to scope auto-
+  virtualization to genuinely large unpaginated tables (the lower
+  threshold caused click-intercept regressions on medium-sized
+  tables in Playwright). `virtualize={false}` opts out (Controls
+  page contract). `virtualize={{ threshold: N }}` customises.
+  Pages that legitimately need virtualization on smaller datasets
+  should opt in explicitly. Falls back to the standard `<Table>`
+  automatically when pagination, column resizing, column pinning,
+  or empty/error/loading chrome is requested.
 - **`<Combobox>` / `<UserCombobox>` dropdowns** — auto-virtualize
   when visible options exceed `COMBOBOX_VIRTUALIZE_THRESHOLD = 50`.
   cmdk's nav (which assumes items live in the DOM) is bypassed in

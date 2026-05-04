@@ -218,8 +218,24 @@ export interface DataTableProps<T> {
  * Default row count above which DataTable auto-virtualizes. Exported
  * so structural ratchets and rollout tests can assert against the
  * same value the runtime uses.
+ *
+ * History — Epic 68 originally shipped with threshold 100 but the
+ * auto-virtualize kicked in too aggressively for medium-sized tables
+ * (100-1000 rows). Two concrete fallouts:
+ *   - E2E tests that accumulate rows from prior tests crossed 100
+ *     and then failed Playwright clicks because the virtualized div
+ *     wrapper intercepted pointer events on row interactions.
+ *   - The virtualized branch's keyboard / focus contract for table
+ *     bodies (vs. the standard <table>) needs more bake time before
+ *     it's right for medium-traffic tables.
+ *
+ * Threshold raised to 1000 to scope auto-virtualization to genuinely
+ * large unpaginated tables. Pages that legitimately need it for
+ * smaller datasets can opt in with `virtualize={true}` or
+ * `virtualize={{ threshold: N }}`. The Controls opt-out
+ * (`virtualize={false}`) stays as documented.
  */
-export const VIRTUALIZE_DEFAULT_THRESHOLD = 100;
+export const VIRTUALIZE_DEFAULT_THRESHOLD = 1000;
 
 // ── DataTable Component ─────────────────────────────────────────────
 
