@@ -57,16 +57,23 @@ Rules:
 
 ## Rolled-out surfaces
 
-### `<DataTable>` rows (auto above 100)
+### `<DataTable>` rows (auto above 1000)
 
 `<DataTable>` accepts `virtualize?: boolean | { threshold: number }`:
 
 | Caller passes | Result |
 |---|---|
-| Nothing (default) | Auto-virtualize when `data.length > 100` |
+| Nothing (default) | Auto-virtualize when `data.length > 1000` |
 | `virtualize={true}` | Always virtualize |
 | `virtualize={false}` | Never virtualize (Controls page contract) |
-| `virtualize={{ threshold: 500 }}` | Auto with custom threshold |
+| `virtualize={{ threshold: N }}` | Auto with custom threshold |
+
+The default threshold was raised from 100 → 1000 in a follow-up
+because the lower threshold caused click-intercept regressions in
+medium-sized tables (100-1000 rows) where the virtualized div
+wrapper sat above row interactions in Playwright. The 1000 default
+scopes auto-virtualization to genuinely large unpaginated tables;
+pages that need it for smaller datasets should opt in explicitly.
 
 When virtualized, `<DataTable>` renders via `<VirtualTable>` (file:
 `virtual-table-body.tsx`):
