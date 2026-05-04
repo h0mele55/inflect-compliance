@@ -49,7 +49,7 @@ function StatusBadge({ value }: { value: string | null }) {
 }
 
 function GapBadges({ entry }: { entry: SoAEntryDTO }) {
-    const gaps: JSX.Element[] = [];
+    const gaps: React.JSX.Element[] = [];
     if (entry.applicable === null) {
         gaps.push(
             <span key="unmapped" className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/20 text-red-300 border border-red-500/30">
