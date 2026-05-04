@@ -3,8 +3,14 @@
  * Verifies BillingAccount model behavior, state transitions, and idempotency.
  */
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-const prisma = new PrismaClient();
+// Prisma 7 — adapter is required to instantiate PrismaClient.
+const prisma = new PrismaClient({
+    adapter: new PrismaPg({
+        connectionString: process.env.DATABASE_URL ?? '',
+    }),
+});
 
 // ─── Track test tenants for cleanup ───
 const testTenantIds: string[] = [];
@@ -34,7 +40,11 @@ async function setupTestTenant() {
 describe('Billing State Transitions', () => {
     beforeAll(async () => {
         try {
-            await prisma.$connect();
+            // Prisma 7 — `$connect()` no longer fails fast when the DB
+            // is unreachable (the adapter connects lazily on the first
+            // query). Probe with a real query so the skip works as
+            // intended in offline / no-DB environments.
+            await prisma.$queryRawUnsafe('SELECT 1');
             dbAvailable = true;
         } catch {
             console.warn('[billing.test] Database not reachable — skipping integration tests');
