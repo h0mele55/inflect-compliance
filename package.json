@@ -146,7 +146,7 @@
     "tailwind-merge": "^3.5.0",
     "use-debounce": "^10.1.1",
     "vaul": "^1.1.2",
-    "zod": "^3.25.76"
+    "zod": "^4.4.3"
   },
   "optionalDependencies": {
     "@next/swc-darwin-arm64": "14.2.35",

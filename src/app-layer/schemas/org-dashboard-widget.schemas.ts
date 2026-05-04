@@ -251,7 +251,7 @@ export const UpdateOrgDashboardWidgetInput = z
         // schema by stripping `type` so the caller doesn't have to
         // re-state it.
         chartType: z.string().min(1).max(80).optional(),
-        config: z.record(z.unknown()).optional(),
+        config: z.record(z.string(), z.unknown()).optional(),
     })
     .strict()
     .superRefine((value, ctx) => {

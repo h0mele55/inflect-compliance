@@ -26,7 +26,7 @@ describe('Error Types & Utilities', () => {
 
         it('structures ZodErrors correctly', () => {
             const zError = new ZodError([
-                { code: 'invalid_type', path: ['email'], message: 'Required', expected: 'string', received: 'undefined' }
+                { code: 'invalid_type', path: ['email'], message: 'Required', expected: 'string', input: undefined }
             ]);
             const { payload, status } = toApiErrorResponse(zError, 'zod-req');
 

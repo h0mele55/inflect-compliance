@@ -15,7 +15,7 @@ const mockGetSuccess = withApiErrorHandling(async (req) => {
 });
 
 const mockZodThrow = withApiErrorHandling(async (req) => {
-    throw new ZodError([{ code: 'invalid_type', path: ['name'], expected: 'string', received: 'number', message: 'Name must be string' }]);
+    throw new ZodError([{ code: 'invalid_type', path: ['name'], expected: 'string', input: 1, message: 'Name must be string' }]);
 });
 
 const mockAppThrow = withApiErrorHandling(async (req) => {

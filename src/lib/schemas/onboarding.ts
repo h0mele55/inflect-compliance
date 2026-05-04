@@ -39,7 +39,7 @@ export const SKIPPABLE_STEPS: OnboardingStep[] = [
  */
 export const SaveStepSchema = z.object({
     step: OnboardingStepEnum,
-    data: z.record(z.unknown()).default({}),
+    data: z.record(z.string(), z.unknown()).default({}),
 }).strip();
 
 /**

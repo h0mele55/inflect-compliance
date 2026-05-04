@@ -273,7 +273,13 @@ export const PublishPolicySchema = z.object({
 
 // ─── Evidence ───
 
-export const CreateEvidenceSchema = z.object({
+// Shared internal base — no .openapi() metadata, so derived schemas
+// (e.g. CreateEvidenceFormSchema) don't inherit a colliding component
+// id. zod 4's metadata system propagates `.openapi(id)` through
+// `.extend()` whereas zod 3 dropped it; building both schemas from
+// this base prevents a duplicate-component-id collision in the
+// OpenAPI document.
+const _CreateEvidenceBase = z.object({
     controlId: z.string().optional().nullable(),
     type: z.enum(['TEXT', 'FILE', 'LINK', 'SCREENSHOT']).optional().default('TEXT'),
     title: z.string().min(1, 'Title is required'),
@@ -285,11 +291,13 @@ export const CreateEvidenceSchema = z.object({
     ownerUserId: z.string().optional().nullable(),    // Real user reference (preferred)
     reviewCycle: z.string().optional().nullable(),
     nextReviewDate: z.string().optional().nullable(),
-}).strip().openapi('EvidenceCreateRequest', {
+});
+
+export const CreateEvidenceSchema = _CreateEvidenceBase.strip().openapi('EvidenceCreateRequest', {
     description: 'Create an evidence record. type=FILE expects a paired multipart upload via /evidence/uploads; type=TEXT/LINK can use this JSON body directly. content is encrypted at rest for TEXT type.',
 });
 
-export const CreateEvidenceFormSchema = CreateEvidenceSchema.extend({
+export const CreateEvidenceFormSchema = _CreateEvidenceBase.extend({
     file: z.any().optional(), // File object caught from FormData
 }).strip();
 

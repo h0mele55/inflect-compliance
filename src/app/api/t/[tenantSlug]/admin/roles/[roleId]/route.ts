@@ -9,7 +9,7 @@ const UpdateRoleSchema = z.object({
     name: z.string().min(1).max(100).optional(),
     description: z.string().max(500).optional().nullable(),
     baseRole: z.enum(['ADMIN', 'EDITOR', 'AUDITOR', 'READER']).optional(),
-    permissionsJson: z.record(z.record(z.boolean())).optional(),
+    permissionsJson: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
 });
 
 export const PATCH = withApiErrorHandling(

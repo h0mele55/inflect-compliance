@@ -242,7 +242,7 @@ describe('Epic E — withApiErrorHandling HTTP contract', () => {
                         path: ['email'],
                         message: 'Required',
                         expected: 'string',
-                        received: 'undefined',
+                        input: undefined,
                     },
                 ]);
             });

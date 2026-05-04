@@ -80,7 +80,7 @@ export const UpsertSsoConfigInput = z.object({
     /** Domains associated with this IdP */
     emailDomains: z.array(EmailDomainSchema).default([]),
     /** IdP-specific configuration — will be validated by type */
-    config: z.record(z.unknown()),
+    config: z.record(z.string(), z.unknown()),
     /** Allow JIT (just-in-time) provisioning of users whose email matches allowed domains */
     allowJitProvisioning: z.boolean().default(false),
     /** Default role for JIT-provisioned users (restricted to safe roles) */
@@ -124,7 +124,7 @@ export const SsoConfigOutput = z.object({
     isEnabled: z.boolean(),
     isEnforced: z.boolean(),
     emailDomains: z.array(z.string()),
-    configJson: z.record(z.unknown()),
+    configJson: z.record(z.string(), z.unknown()),
     createdAt: z.date(),
     updatedAt: z.date(),
 });

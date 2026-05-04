@@ -9,7 +9,7 @@ const CreateRoleSchema = z.object({
     name: z.string().min(1).max(100),
     description: z.string().max(500).optional().nullable(),
     baseRole: z.enum(['ADMIN', 'EDITOR', 'AUDITOR', 'READER']),
-    permissionsJson: z.record(z.record(z.boolean())),
+    permissionsJson: z.record(z.string(), z.record(z.string(), z.boolean())),
 });
 
 export const GET = withApiErrorHandling(
