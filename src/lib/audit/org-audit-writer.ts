@@ -35,20 +35,22 @@
  */
 import { createHash } from 'crypto';
 import { PrismaClient, OrgAuditAction } from '@prisma/client';
+import * as prismaModule from '../prisma';
 import { computeOrgEntryHash } from './org-canonical-hash';
 import { toCanonicalTimestamp } from './canonical-hash';
 
 /**
  * Lazy getter for the default PrismaClient singleton.
  *
- * Same circular-import dance as audit-writer.ts: prisma.ts loads
- * audit-writer.ts via the audit middleware registration; this module
- * is imported directly by usecases and would loop if it imported
- * prisma at module scope.
+ * Same pattern as audit-writer.ts — `import * as prismaModule`
+ * gives a live namespace binding; reading `prismaModule.prisma`
+ * inside the function defers the dereference to call-time, which
+ * dodges Turbopack's unreliable production-build resolution of
+ * dynamic TS-module `require()`. See the longer note in
+ * `audit-writer.ts` for the historical context.
  */
 function getDefaultPrisma(): PrismaClient {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('../prisma').prisma;
+    return prismaModule.prisma as unknown as PrismaClient;
 }
 
 // ─── Types ──────────────────────────────────────────────────────────

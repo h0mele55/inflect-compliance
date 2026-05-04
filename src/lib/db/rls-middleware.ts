@@ -55,15 +55,18 @@ import { Prisma } from '@prisma/client';
 import { getAuditContext } from '@/lib/audit-context';
 import { logger } from '@/lib/observability/logger';
 import type { PrismaTx } from '@/lib/db-context';
+import * as prismaModule from '@/lib/prisma';
 
-// `prisma` is lazy-loaded inside functions to avoid a circular import:
-// `src/lib/prisma.ts` imports this module to install the tripwire at
-// startup. Importing `prisma` at the top of this file would create a
-// TDZ hazard where `installRlsTripwire` is called before this module
-// has finished evaluating its own `let` bindings.
+// Same pattern as `audit-writer.ts` — `import * as prismaModule` gives
+// a live namespace binding; reading `prismaModule.prisma` inside the
+// function defers the dereference to call-time. That sidesteps both
+// the historical TDZ hazard (prisma.ts statically imports this module
+// for the tripwire extension, but only USES the runtime helpers like
+// `runWithoutRls` after both modules have evaluated) AND Turbopack's
+// production-build issue with dynamic TS-module `require()` returning
+// `undefined`.
 function getPrismaClient(): PrismaClient {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('@/lib/prisma').prisma;
+    return prismaModule.prisma as unknown as PrismaClient;
 }
 
 // ─── Re-exports: the canonical RLS API ────────────────────────────────

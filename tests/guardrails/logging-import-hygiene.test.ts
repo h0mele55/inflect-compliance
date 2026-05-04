@@ -123,13 +123,6 @@ describe('Dynamic require() usage is minimized', () => {
      */
     const REQUIRE_ALLOWLIST: Record<string, string[]> = {
         'lib/prisma.ts': ['./audit/audit-writer'],
-        'lib/audit/audit-writer.ts': ['../prisma'],
-        // Epic B — same circular-import dance as audit-writer.ts.
-        // `prisma.ts` registers middleware that lives in the audit
-        // chain; org-audit-writer is imported directly by usecases
-        // and needs the singleton prisma client at runtime, not at
-        // module-load time.
-        'lib/audit/org-audit-writer.ts': ['../prisma'],
         'lib/retention-purge.ts': ['./audit/audit-writer'],
         'lib/mailer.ts': ['@/env'],
         'lib/observability/instrumentation.ts': ['./logger'],
@@ -139,10 +132,6 @@ describe('Dynamic require() usage is minimized', () => {
         'app/api/readyz/route.ts': ['@/lib/redis'],
         // GAP-13 — same conditional Redis check pattern as readyz.
         'app/api/health/route.ts': ['@/lib/redis'],
-        // Epic A.1 — `rls-middleware` is imported by `lib/prisma.ts` to
-        // install the tripwire at startup; the prisma reference must be
-        // lazy to avoid a TDZ cycle.
-        'lib/db/rls-middleware.ts': ['@/lib/prisma'],
         // Epic B.2 — the encryption middleware resolves a per-tenant
         // DEK on every query; the key-manager module is lazy-required
         // so the middleware module evaluates without the key-manager

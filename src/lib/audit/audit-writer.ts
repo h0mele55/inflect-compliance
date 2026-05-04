@@ -24,27 +24,38 @@
  */
 import { createHash } from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import * as prismaModule from '../prisma';
 import { computeEntryHash, toCanonicalTimestamp } from './canonical-hash';
 import type { AuditDetails } from './types';
 
 /**
  * Lazy getter for the default PrismaClient singleton.
  *
- * ARCHITECTURE NOTE: audit-writer.ts MUST NOT import prisma at module scope.
- * prisma.ts registers the audit middleware that `require()`s this file,
- * creating a circular dependency:
- *   prisma.ts → (require) audit-writer.ts → (import) prisma.ts
+ * ARCHITECTURE NOTE: audit-writer.ts and prisma.ts form a cyclic
+ * graph at runtime:
  *
- * Webpack tries to resolve this cycle at compile time and fails with
- * "Cannot read properties of undefined (reading 'call')" because the
- * prisma.ts module isn't fully initialized yet when audit-writer.ts loads.
+ *   prisma.ts → require('./audit/audit-writer') (inside the audit
+ *               extension's handler — only runs at request time)
+ *   audit-writer.ts → import * as prismaModule from '../prisma'
  *
- * The lazy getter defers the import to first actual use (at runtime),
- * by which point both modules are fully initialized.
+ * The cycle is resolved by deferring the dereference of
+ * `prismaModule.prisma` to function-call time. The static
+ * `import * as` form gives us a live namespace binding; reading
+ * `prismaModule.prisma` inside `getDefaultPrisma()` happens after
+ * both modules have finished evaluating, so we always observe the
+ * fully-constructed extended client.
+ *
+ * Why this changed: the previous form was
+ * `require('../prisma').prisma` inside the function. That worked
+ * under Webpack but Turbopack's production bundle resolves dynamic
+ * TS-module `require()` unreliably — it returned `undefined`,
+ * surfacing as "Cannot read properties of undefined (reading
+ * '$transaction')" on the first audit write under prod. Static
+ * import + deferred read fixes it without re-introducing the cycle
+ * at module-init time.
  */
 function getDefaultPrisma(): PrismaClient {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('../prisma').prisma;
+    return prismaModule.prisma as unknown as PrismaClient;
 }
 
 // ─── Types ──────────────────────────────────────────────────────────
