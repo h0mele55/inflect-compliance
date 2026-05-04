@@ -873,3 +873,37 @@ write a wiring test. Action handlers, rule-builder UI, and filter
 DSL evolution all plug into clearly-marked seams — don't bypass
 them. See `docs/automation-events.md` for the full contributor
 guide and the decision-tree for extensions.
+
+### Epic 67 — Destructive-action undo-toast convention
+
+Every delete / unlink / remove flow in the product MUST use
+`useToastWithUndo()` from `@/components/ui/hooks`. The hook returns
+a stable `trigger` function that schedules the destructive commit
+to fire 5 seconds after the click; during that window a custom
+toast renders with an Undo button + animated countdown bar. Click
+Undo and the timer is cancelled — the destructive write never
+happens. The pending state lives at module scope (NOT in component
+state) so commits survive client-side navigation, mirroring Gmail's
+"undo send" UX.
+
+The wired sites today: cross-entity unlink in `TraceabilityPanel`,
+control-evidence + control-requirement unlink on the control detail
+page, task link removal on the task detail page, and vendor
+document removal on the vendor detail page. The structural ratchet
+at `tests/guards/epic-67-rollout-coverage.test.ts` locks the wiring
+in — adding a new site means appending it to `SITE_CONTRACTS`.
+
+Never write a `confirm()` blocking dialog or a fire-and-forget
+direct DELETE for a routine destructive action — those are the
+anti-patterns Epic 67 replaces. Top-level entity deletion (tenant,
+organization, framework) is the documented exception: cascading
+consequences mean the 5-second window is too short, so use a
+typed-confirmation modal there instead.
+
+See `docs/destructive-actions.md` for the canonical wiring (snapshot
++ optimistic remove + trigger), the four invariants every site must
+satisfy, message-tone rules, when NOT to use the pattern, and the
+test layout (hook hardening at
+`src/components/ui/hooks/__tests__/use-toast-with-undo.test.ts`,
+baseline + UI tests under `tests/rendered/`, structural ratchet
+under `tests/guards/`).

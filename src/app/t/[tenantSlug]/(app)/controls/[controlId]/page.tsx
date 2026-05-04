@@ -11,6 +11,7 @@ const PencilIcon = ({ size = 14 }: { size?: number }) => (
 );
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { extractMutationError } from '@/lib/mutations';
+import { useToastWithUndo } from '@/components/ui/hooks';
 import { Modal } from '@/components/ui/modal';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -90,6 +91,7 @@ export default function ControlDetailPage() {
     const { permissions, tenantSlug } = useTenantContext();
     const controlId = params?.controlId as string;
     const queryClient = useQueryClient();
+    const triggerUndoToast = useToastWithUndo();
 
     // ─── Query: control + sync (single page-data call) ───
     //
@@ -428,9 +430,42 @@ export default function ControlDetailPage() {
         setSavingEvidence(false);
     };
 
-    const unlinkEvidence = async (linkId: string) => {
-        await fetch(apiUrl(`/controls/${controlId}/evidence/${linkId}`), { method: 'DELETE' });
-        await refetch();
+    // Epic 67 — delayed-commit unlink. Optimistic remove via setQueryData
+    // so the row disappears immediately; the actual DELETE fires after
+    // the 5s undo window. Snapshot is the WHOLE pageData so undo can
+    // restore even if the user concurrently triggered another change.
+    const unlinkEvidence = (linkId: string) => {
+        const cacheKey = queryKeys.controls.detail(tenantSlug, controlId);
+        const previous = queryClient.getQueryData<ControlPageDataDTO>(cacheKey);
+        if (previous) {
+            queryClient.setQueryData<ControlPageDataDTO>(cacheKey, {
+                ...previous,
+                control: {
+                    ...previous.control,
+                    evidenceLinks: (previous.control.evidenceLinks || []).filter(
+                        (link: EvidenceLinkDTO) => link.id !== linkId,
+                    ),
+                },
+            });
+        }
+        triggerUndoToast({
+            message: 'Evidence unlinked',
+            undoMessage: 'Undo',
+            action: async () => {
+                const res = await fetch(
+                    apiUrl(`/controls/${controlId}/evidence/${linkId}`),
+                    { method: 'DELETE' },
+                );
+                if (!res.ok) throw new Error('Unlink failed');
+                await refetch();
+            },
+            undoAction: () => {
+                if (previous) queryClient.setQueryData(cacheKey, previous);
+            },
+            onError: () => {
+                if (previous) queryClient.setQueryData(cacheKey, previous);
+            },
+        });
     };
 
     const handleFileUpload = async (e: React.FormEvent) => {
@@ -473,12 +508,43 @@ export default function ControlDetailPage() {
         setSavingMap(false);
     };
 
-    const unmapRequirement = async (reqId: string) => {
-        await fetch(apiUrl(`/controls/${controlId}/requirements`), {
-            method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requirementId: reqId }),
+    // Epic 67 — delayed-commit unmap. Same shape as unlinkEvidence; the
+    // requirement is filtered out of the cached page-data immediately so
+    // the table updates, and the DELETE fires after the 5s undo window.
+    const unmapRequirement = (reqId: string) => {
+        const cacheKey = queryKeys.controls.detail(tenantSlug, controlId);
+        const previous = queryClient.getQueryData<ControlPageDataDTO>(cacheKey);
+        if (previous) {
+            queryClient.setQueryData<ControlPageDataDTO>(cacheKey, {
+                ...previous,
+                control: {
+                    ...previous.control,
+                    frameworkMappings: (previous.control.frameworkMappings || []).filter(
+                        (m: FrameworkMappingDTO) =>
+                            m.fromRequirement?.id !== reqId && m.fromRequirementId !== reqId,
+                    ),
+                },
+            });
+        }
+        triggerUndoToast({
+            message: 'Requirement unmapped',
+            undoMessage: 'Undo',
+            action: async () => {
+                const res = await fetch(apiUrl(`/controls/${controlId}/requirements`), {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requirementId: reqId }),
+                });
+                if (!res.ok) throw new Error('Unmap failed');
+                await refetch();
+            },
+            undoAction: () => {
+                if (previous) queryClient.setQueryData(cacheKey, previous);
+            },
+            onError: () => {
+                if (previous) queryClient.setQueryData(cacheKey, previous);
+            },
         });
-        await refetch();
     };
 
     // Loading / error / empty states render through the shared
