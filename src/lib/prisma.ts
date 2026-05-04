@@ -5,6 +5,7 @@ import { getAuditContext } from './audit-context';
 import { redactSensitiveFields, extractChangedFields } from './audit-redact';
 import { withSoftDeleteExtension } from './soft-delete';
 import { withPiiEncryptionExtension } from './security/pii-middleware';
+import { withRlsTripwireExtension } from './db/rls-middleware';
 import { logger as auditMiddlewareLogger } from '@/lib/observability/logger';
 
 // ─── Write actions to intercept ───
@@ -286,8 +287,18 @@ function buildAuditExtension() {
 type ExtendedClient = ReturnType<typeof buildClient>;
 
 function buildClient(): PrismaClient {
+    // `??  ''` is load-bearing for build-time analysis. Next 16's
+    // "Collecting page data" phase imports every route module to
+    // discover route metadata, which transitively loads this module.
+    // In that environment `SKIP_ENV_VALIDATION=1` is set but
+    // `DATABASE_URL` is often unset — passing `undefined` to
+    // `PrismaPg`'s `connectionString` throws ("p is not a function"
+    // in the minified chunk) and the whole route fails to collect.
+    // Falling back to an empty string lets module load succeed; the
+    // first real query will surface the missing-URL error at request
+    // time, not module-import time.
     const adapter = new PrismaPg({
-        connectionString: env.DATABASE_URL,
+        connectionString: env.DATABASE_URL ?? '',
     });
     return new PrismaClient({ adapter });
 }
@@ -301,18 +312,20 @@ function buildExtended() {
         // but Edge code paths don't perform writes that need them.
         return base as unknown as ReturnType<typeof base.$extends>;
     }
-    // Lazy require to avoid the rls-middleware ↔ prisma circular
-    // import that the original code path documented in detail. The
-    // tripwire is observation-only so its position in the chain is
-    // irrelevant; placing it outermost makes the logged model/action
-    // match the caller's intent before soft-delete / PII rewrite.
-    const { withRlsTripwireExtension } = require('./db/rls-middleware') as {
-        withRlsTripwireExtension: <T>(c: T) => T;
-    };
-    // The cast keeps the inferred extended type without forcing every
-    // consumer to import the helper extension types. App code uses
-    // `prisma` as if it were `PrismaClient` — extension methods don't
-    // change the public surface.
+    // `withRlsTripwireExtension` is now imported statically at the
+    // top of this file. The "circular import" comment that lived
+    // here previously was only theoretical — `rls-middleware.ts`
+    // only references `@/lib/prisma` from inside a function body
+    // (`getPrismaClient()` for `runWithoutRls`), so there is no
+    // module-init cycle. Turbopack's production bundle didn't
+    // resolve the dynamic `require('./db/rls-middleware')` correctly
+    // during Next 16's "Collecting page data" phase ("p is not a
+    // function") which made the static form load-bearing.
+    //
+    // Composition order — the tripwire is observation-only so its
+    // position in the chain is irrelevant; placing it outermost
+    // makes the logged model/action match the caller's intent
+    // before soft-delete / PII rewrite.
     return withRlsTripwireExtension(
         withPiiEncryptionExtension(
             withSoftDeleteExtension(

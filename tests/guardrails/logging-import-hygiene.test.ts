@@ -122,17 +122,7 @@ describe('Dynamic require() usage is minimized', () => {
      * - readyz/route.ts → require('@/lib/redis')
      */
     const REQUIRE_ALLOWLIST: Record<string, string[]> = {
-        'lib/prisma.ts': [
-            './audit/audit-writer',
-            // Prisma 7 migration — the RLS tripwire moved into a
-            // `$extends` extension wired from `buildExtended()`. The
-            // require is lazy because rls-middleware itself imports
-            // `@/lib/prisma` at runtime (the `runWithoutRls` bypass
-            // helper passes the singleton through to its callback) —
-            // the cycle is the same TDZ-avoidance dance as the
-            // existing audit-writer entry above.
-            './db/rls-middleware',
-        ],
+        'lib/prisma.ts': ['./audit/audit-writer'],
         'lib/audit/audit-writer.ts': ['../prisma'],
         // Epic B — same circular-import dance as audit-writer.ts.
         // `prisma.ts` registers middleware that lives in the audit

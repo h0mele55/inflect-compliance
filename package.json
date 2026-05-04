@@ -25,7 +25,7 @@
     "test:coverage": "jest --coverage",
     "test:all": "jest && playwright test",
     "typecheck": "tsc --noEmit",
-    "lint": "cross-env NEXT_IGNORE_INCORRECT_LOCKFILE=1 next lint",
+    "lint": "cross-env ESLINT_USE_FLAT_CONFIG=true eslint .",
     "count-any": "node scripts/count-any.js",
     "ci:local": "node scripts/ci-local.mjs",
     "e2e:local": "node scripts/e2e-local.mjs",

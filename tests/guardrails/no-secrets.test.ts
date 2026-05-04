@@ -94,7 +94,11 @@ const REPO_BASELINE: readonly KnownHit[] = [
     // Test setup + integration/unit fixtures: every entry below is a
     // synthetic test value (auth secret stubs, encryption keys for
     // unit tests, hardcoded test passwords for credential flows).
-    { file: 'jest.setup.js', pattern: 'Hardcoded Password Assignment', reason: 'Test runtime env stubs.' },
+    // jest.setup.js entry removed — the three test-fixture secret
+    // literals there now carry inline `pragma: allowlist secret`
+    // markers, so the scanner walks past them without surfacing a
+    // baseline entry. Keeping the entry here would fail the
+    // "no stale baseline" check.
     { file: 'tests/integration/credentials-end-to-end.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Test fixtures for credential flow.' },
     { file: 'tests/integration/github-provider.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'GitHub provider test fixtures.' },
     { file: 'tests/integration/integration-regression.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Integration test fixtures.' },
