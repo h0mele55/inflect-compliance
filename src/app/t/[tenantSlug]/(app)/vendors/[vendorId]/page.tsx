@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { useToastWithUndo } from '@/components/ui/hooks';
 import { normaliseHref } from '@/lib/security/safe-url';
 
 const STATUS_BADGE: Record<string, string> = {
@@ -40,6 +41,7 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
     const tenantHref = useTenantHref();
     const { permissions, role } = useTenantContext();
     const canWrite = permissions?.canWrite;
+    const triggerUndoToast = useToastWithUndo();
 
     const [vendor, setVendor] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -145,10 +147,28 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
         }
     };
 
-    const removeDoc = async (docId: string) => {
-        if (!confirm('Remove this document?')) return;
-        await fetch(apiUrl(`/vendors/${params.vendorId}/documents/${docId}`), { method: 'DELETE' });
-        fetchDocs();
+    // Epic 67 — delayed-commit doc removal. The 5-second undo window
+    // replaces the previous `confirm()` modal: the user gets a more
+    // forgiving "you have time to take it back" affordance instead of
+    // a blocking double-click. Snapshot + optimistic-filter pattern,
+    // identical shape to tasks/removeLink and the other rolled-out
+    // sites — see docs/destructive-actions.md.
+    const removeDoc = (docId: string) => {
+        const previous = docs;
+        setDocs(prev => prev.filter(d => d.id !== docId));
+        triggerUndoToast({
+            message: 'Document removed',
+            undoMessage: 'Undo',
+            action: async () => {
+                const res = await fetch(
+                    apiUrl(`/vendors/${params.vendorId}/documents/${docId}`),
+                    { method: 'DELETE' },
+                );
+                if (!res.ok) throw new Error('Remove document failed');
+            },
+            undoAction: () => setDocs(previous),
+            onError: () => setDocs(previous),
+        });
     };
 
     const startAssessment = async () => {

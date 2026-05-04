@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { Combobox } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
+import { useToastWithUndo } from '@/components/ui/hooks';
 
 interface TraceabilityPanelProps {
     apiBase: string;            // e.g. /api/t/acme-corp
@@ -35,6 +36,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
     // Extract tenantSlug from apiBase if not provided (e.g. /api/t/acme-corp → acme-corp)
     const tenantSlug = tenantSlugProp || apiBase.split('/t/')[1]?.split('/')[0] || '';
     const queryClient = useQueryClient();
+    const triggerUndoToast = useToastWithUndo();
 
     // Add forms
     const [showAddRisk, setShowAddRisk] = useState(false);
@@ -158,56 +160,29 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
         },
     });
 
-    // ─── Mutation: unlink ───
-    const unlinkMutation = useMutation({
-        mutationFn: async ({ type, linkedId }: { type: 'risk' | 'control' | 'asset'; linkedId: string }) => {
-            let url = '';
-            if (entityType === 'control' && type === 'risk') url = `${apiBase}/controls/${entityId}/risks/${linkedId}`;
-            else if (entityType === 'control' && type === 'asset') url = `${apiBase}/assets/${linkedId}/controls/${entityId}`;
-            else if (entityType === 'risk' && type === 'control') url = `${apiBase}/controls/${linkedId}/risks/${entityId}`;
-            else if (entityType === 'risk' && type === 'asset') url = `${apiBase}/assets/${linkedId}/risks/${entityId}`;
-            else if (entityType === 'asset' && type === 'control') url = `${apiBase}/assets/${entityId}/controls/${linkedId}`;
-            else if (entityType === 'asset' && type === 'risk') url = `${apiBase}/assets/${entityId}/risks/${linkedId}`;
-            const res = await fetch(url, { method: 'DELETE' });
-            if (!res.ok) throw new Error('Unlink failed');
-            return { type, linkedId };
-        },
-        onMutate: async ({ type, linkedId }) => {
-            await queryClient.cancelQueries({ queryKey: traceabilityKey(tenantSlug, entityType, entityId) });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const previous = queryClient.getQueryData<any>(traceabilityKey(tenantSlug, entityType, entityId));
+    // ─── Unlink — Epic 67 delayed-commit via useToastWithUndo ───
+    //
+    // Optimistic removal applies immediately on click via setQueryData
+    // so the row visually disappears. The actual DELETE is deferred 5s
+    // by the shared hook; clicking Undo restores the snapshot. If the
+    // commit fails the snapshot also restores. Cross-entity invalidation
+    // runs on commit success, mirroring the pre-Epic-67 mutation's
+    // onSettled fan-out.
+    const unlinkUrl = (type: 'risk' | 'control' | 'asset', linkedId: string): string => {
+        if (entityType === 'control' && type === 'risk') return `${apiBase}/controls/${entityId}/risks/${linkedId}`;
+        if (entityType === 'control' && type === 'asset') return `${apiBase}/assets/${linkedId}/controls/${entityId}`;
+        if (entityType === 'risk' && type === 'control') return `${apiBase}/controls/${linkedId}/risks/${entityId}`;
+        if (entityType === 'risk' && type === 'asset') return `${apiBase}/assets/${linkedId}/risks/${entityId}`;
+        if (entityType === 'asset' && type === 'control') return `${apiBase}/assets/${entityId}/controls/${linkedId}`;
+        if (entityType === 'asset' && type === 'risk') return `${apiBase}/assets/${entityId}/risks/${linkedId}`;
+        return '';
+    };
 
-            if (previous) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const updated = { ...previous };
-                const section = type === 'risk' ? 'risks' : type === 'control' ? 'controls' : 'assets';
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                updated[section] = (updated[section] || []).filter((l: any) => {
-                    const linked = l[type];
-                    return linked?.id !== linkedId;
-                });
-                queryClient.setQueryData(traceabilityKey(tenantSlug, entityType, entityId), updated);
-            }
-
-            return { previous };
-        },
-        onError: (_err, _vars, context) => {
-            if (context?.previous) {
-                queryClient.setQueryData(traceabilityKey(tenantSlug, entityType, entityId), context.previous);
-            }
-        },
-        onSettled: (_data, _err, vars) => {
-            queryClient.invalidateQueries({ queryKey: traceabilityKey(tenantSlug, entityType, entityId) });
-            if (vars) {
-                queryClient.invalidateQueries({ queryKey: traceabilityKey(tenantSlug, vars.type, vars.linkedId) });
-                if (vars.type === 'control') {
-                    queryClient.invalidateQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
-                } else if (vars.type === 'risk') {
-                    queryClient.invalidateQueries({ queryKey: queryKeys.risks.all(tenantSlug) });
-                }
-            }
-        },
-    });
+    const UNLINK_LABEL: Record<'risk' | 'control' | 'asset', string> = {
+        risk: 'Risk unlinked',
+        control: 'Control unlinked',
+        asset: 'Asset unlinked',
+    };
 
     const handleLink = (type: 'risk' | 'control' | 'asset') => {
         if (!addId) return;
@@ -215,7 +190,49 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
     };
 
     const handleUnlink = (type: 'risk' | 'control' | 'asset', linkedId: string) => {
-        unlinkMutation.mutate({ type, linkedId });
+        const cacheKey = traceabilityKey(tenantSlug, entityType, entityId);
+        // Snapshot BEFORE the optimistic write so undo restores exactly
+        // what the user saw — not a stale snapshot from before some
+        // other concurrent mutation.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const previous = queryClient.getQueryData<any>(cacheKey);
+
+        if (previous) {
+            const updated = { ...previous };
+            const section = type === 'risk' ? 'risks' : type === 'control' ? 'controls' : 'assets';
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            updated[section] = (updated[section] || []).filter((l: any) => {
+                const linked = l[type];
+                return linked?.id !== linkedId;
+            });
+            queryClient.setQueryData(cacheKey, updated);
+        }
+
+        triggerUndoToast({
+            message: UNLINK_LABEL[type],
+            undoMessage: 'Undo',
+            action: async () => {
+                const url = unlinkUrl(type, linkedId);
+                const res = await fetch(url, { method: 'DELETE' });
+                if (!res.ok) throw new Error('Unlink failed');
+                // Invalidate this entity + the linked entity's mirror
+                // view + the entity's parent list so RAG counts on the
+                // index pages stay correct after a commit.
+                queryClient.invalidateQueries({ queryKey: cacheKey });
+                queryClient.invalidateQueries({ queryKey: traceabilityKey(tenantSlug, type, linkedId) });
+                if (type === 'control') {
+                    queryClient.invalidateQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
+                } else if (type === 'risk') {
+                    queryClient.invalidateQueries({ queryKey: queryKeys.risks.all(tenantSlug) });
+                }
+            },
+            undoAction: () => {
+                if (previous) queryClient.setQueryData(cacheKey, previous);
+            },
+            onError: () => {
+                if (previous) queryClient.setQueryData(cacheKey, previous);
+            },
+        });
     };
 
     if (loading) return <div className="p-6 text-center text-content-subtle animate-pulse">Loading traceability...</div>;
@@ -276,7 +293,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                                 {canWrite && (
                                                     <td>
                                                         <Tooltip content="Unlink risk">
-                                                            <button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('risk', r?.id)} disabled={unlinkMutation.isPending} id={`unlink-risk-${r?.id}`} aria-label="Unlink risk">×</button>
+                                                            <button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('risk', r?.id)} id={`unlink-risk-${r?.id}`} aria-label="Unlink risk">×</button>
                                                         </Tooltip>
                                                     </td>
                                                 )}
@@ -334,7 +351,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                                 {canWrite && (
                                                     <td>
                                                         <Tooltip content="Unlink control">
-                                                            <button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('control', c?.id)} disabled={unlinkMutation.isPending} id={`unlink-control-${c?.id}`} aria-label="Unlink control">×</button>
+                                                            <button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('control', c?.id)} id={`unlink-control-${c?.id}`} aria-label="Unlink control">×</button>
                                                         </Tooltip>
                                                     </td>
                                                 )}
@@ -392,7 +409,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                                 {canWrite && (
                                                     <td>
                                                         <Tooltip content="Unlink asset">
-                                                            <button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('asset', a?.id)} disabled={unlinkMutation.isPending} id={`unlink-asset-${a?.id}`} aria-label="Unlink asset">×</button>
+                                                            <button className="text-red-400 text-xs hover:text-red-300" onClick={() => handleUnlink('asset', a?.id)} id={`unlink-asset-${a?.id}`} aria-label="Unlink asset">×</button>
                                                         </Tooltip>
                                                     </td>
                                                 )}

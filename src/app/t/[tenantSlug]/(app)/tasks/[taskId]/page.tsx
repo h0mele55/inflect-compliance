@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { useToastWithUndo } from '@/components/ui/hooks';
 import { SkeletonLine, SkeletonCard } from '@/components/ui/skeleton';
 import { UserCombobox } from '@/components/ui/user-combobox';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
@@ -84,6 +85,7 @@ export default function TaskDetailPage() {
     const tenantHref = useTenantHref();
     const { permissions, role, tenantSlug } = useTenantContext();
     const taskId = params?.taskId as string;
+    const triggerUndoToast = useToastWithUndo();
 
     const [task, setTask] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -204,9 +206,25 @@ export default function TaskDetailPage() {
         setSavingLink(false);
     };
 
-    const removeLink = async (linkId: string) => {
-        await fetch(apiUrl(`/tasks/${taskId}/links/${linkId}`), { method: 'DELETE' });
+    // Epic 67 — delayed-commit link removal. Optimistic local filter so
+    // the row disappears immediately. On undo we refetch to restore;
+    // on commit success we leave the local state alone (already correct).
+    const removeLink = (linkId: string) => {
+        const previous = links;
         setLinks(prev => prev.filter(l => l.id !== linkId));
+        triggerUndoToast({
+            message: 'Link removed',
+            undoMessage: 'Undo',
+            action: async () => {
+                const res = await fetch(
+                    apiUrl(`/tasks/${taskId}/links/${linkId}`),
+                    { method: 'DELETE' },
+                );
+                if (!res.ok) throw new Error('Remove link failed');
+            },
+            undoAction: () => setLinks(previous),
+            onError: () => setLinks(previous),
+        });
     };
 
     const addComment = async (e: React.FormEvent) => {

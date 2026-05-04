@@ -88,3 +88,11 @@ export {
     viewModeStorageKey,
     type ViewMode,
 } from "./use-view-mode";
+
+// ─── Toast with undo (Epic 67) ────────────────────────────────────────
+export {
+    useToastWithUndo,
+    cancelPendingUndoToast,
+    type TriggerUndoToast,
+    type TriggerUndoToastInput,
+} from "./use-toast-with-undo";

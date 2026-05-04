@@ -96,6 +96,12 @@ const nodeProject = {
         '<rootDir>/tests/e2e/',
         '<rootDir>/tests/rendered/',
         '<rootDir>/dub-reference/',
+        // Epic 67 — co-located UI hook tests live next to the hook
+        // (`src/components/ui/hooks/__tests__/`) but require jsdom
+        // (RTL render, real React lifecycle). Excluded from the node
+        // project so they run exclusively under the jsdom project's
+        // testMatch.
+        '<rootDir>/src/.*/__tests__/',
     ],
     transform: {
         '^.+\\.(ts|tsx)$': 'ts-jest',
@@ -216,7 +222,15 @@ const jsdomProject = {
         // formatted text deterministically.
         '^@number-flow/react$': '<rootDir>/tests/rendered/number-flow-mock.tsx',
     },
-    testMatch: ['<rootDir>/tests/rendered/**/*.test.{ts,tsx}'],
+    testMatch: [
+        '<rootDir>/tests/rendered/**/*.test.{ts,tsx}',
+        // Epic 67 — co-located UI hook tests pattern. Establishes the
+        // future home for hook-level RTL tests so they live next to the
+        // hook they verify rather than under tests/rendered/. The
+        // existing `tests/rendered/` location stays valid for tests
+        // that span multiple primitives or pages.
+        '<rootDir>/src/**/__tests__/**/*.test.{ts,tsx}',
+    ],
     testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
     transform: {
         '^.+\\.(ts|tsx)$': [
