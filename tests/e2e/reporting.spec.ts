@@ -38,9 +38,11 @@ test.describe('Reporting & Audit Narrative', () => {
 
         await expect(page.locator('#frameworks-heading')).toContainText('Compliance Frameworks');
 
-        // Wait for cards to hydrate
+        // Wait for cards to hydrate. Epic 66 switched the per-card
+        // selector from `id="fw-card-..."` to `data-testid="fw-card-..."`
+        // when migrating to the `<CardList>` primitive.
         await page.waitForLoadState('networkidle').catch(() => {});
-        const cardCount = await page.locator('[id^="fw-card-"]').count();
+        const cardCount = await page.locator('[data-testid^="fw-card-"]').count();
         expect(cardCount).toBeGreaterThanOrEqual(1);
     });
 

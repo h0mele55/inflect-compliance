@@ -37,18 +37,24 @@ test.describe('Framework Coverage UI', () => {
     });
 
     test('framework cards are visible', async () => {
-        // Reverted: Epic 46.4's DataTable migration was rolled
-        // back; the list page is the original card grid again
-        // (the tree-view explorer on the detail page stays).
-        // Seed guarantees ISO27001 + SOC2 + NIS2 + ISO9001 +
-        // ISO28000 + ISO39001.
-        const cards = page.locator('[id^="fw-card-"]');
+        // Epic 66 reshaped this page from the legacy `id="fw-card-..."`
+        // card grid to a `<CardList>` primitive that uses
+        // `data-testid="fw-card-..."` instead. The visual contract
+        // (one card per seeded framework) is unchanged. Seed
+        // guarantees ISO27001 + SOC2 + NIS2 + ISO9001 + ISO28000 +
+        // ISO39001.
+        const cards = page.locator('[data-testid^="fw-card-"]');
         await expect(cards.first()).toBeVisible({ timeout: 30_000 });
         expect(await cards.count()).toBeGreaterThanOrEqual(1);
     });
 
     test('can navigate to framework detail', async () => {
-        const viewBtn = page.locator('[id^="view-framework-"]').first();
+        // Epic 66 also removed the per-card "View Details" link
+        // (`id="view-framework-..."`); the whole card is now
+        // clickable via its onClick. We click the first card row to
+        // navigate. The card title's anchor would also work; either
+        // path lands on the same /frameworks/<key> URL.
+        const viewBtn = page.locator('[data-testid^="fw-card-"]').first();
         await expect(viewBtn).toBeVisible({ timeout: 30_000 });
         await viewBtn.click();
         // Framework detail is a client page that fetches 4 API endpoints.
