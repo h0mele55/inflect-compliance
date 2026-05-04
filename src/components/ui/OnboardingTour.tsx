@@ -139,7 +139,9 @@ export function OnboardingTourProvider({
             // to deep node_modules paths. Webpack handles it at
             // build time; TypeScript just needs to skip the lookup
             // for this one line.
-            // @ts-expect-error -- side-effect CSS import without types
+            // @ts-ignore -- side-effect CSS import; React 19 + Next 16 ts module
+            // resolution sometimes resolves the path so @ts-expect-error becomes
+            // "unused" — @ts-ignore is the safer no-op for ambient CSS modules.
             import('driver.js/dist/driver.css'),
         ]);
 

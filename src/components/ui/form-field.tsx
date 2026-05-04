@@ -113,8 +113,12 @@ const FormField = React.forwardRef<HTMLDivElement, FormFieldProps>(
                 .filter(Boolean)
                 .join(" ") || undefined;
 
-        const injectedChild = React.cloneElement<InjectedControlProps>(
-            children,
+        // React 19 made `cloneElement`'s overload stricter — the
+        // children's prop type must match the props arg exactly. Cast
+        // the children to the InjectedControlProps element shape so
+        // the overload picks the typed branch.
+        const injectedChild = React.cloneElement(
+            children as React.ReactElement<InjectedControlProps>,
             {
                 id: controlId,
                 "aria-describedby": describedBy,

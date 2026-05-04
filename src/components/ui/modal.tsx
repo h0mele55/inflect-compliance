@@ -461,7 +461,7 @@ export interface ConfirmModalProps {
     onCancel?: () => void;
 }
 
-const toneIcon: Record<ConfirmTone, JSX.Element> = {
+const toneIcon: Record<ConfirmTone, React.JSX.Element> = {
     danger: (
         <AlertTriangle className="size-5 text-content-error" aria-hidden="true" />
     ),
