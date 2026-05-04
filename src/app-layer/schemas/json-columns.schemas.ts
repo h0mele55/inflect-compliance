@@ -40,9 +40,9 @@ export const AuditDetailsJsonSchema = z.object({
     /** Changed field names (for updates) */
     changedFields: z.array(z.string()).optional(),
     /** State before the change */
-    before: z.record(z.unknown()).optional(),
+    before: z.record(z.string(), z.unknown()).optional(),
     /** State after the change */
-    after: z.record(z.unknown()).optional(),
+    after: z.record(z.string(), z.unknown()).optional(),
     /** Human-readable summary */
     summary: z.string().optional(),
     /** Status change: from */
@@ -74,7 +74,7 @@ export type AuditDetailsJson = z.infer<typeof AuditDetailsJsonSchema>;
 // ─── Audit Log: metadataJson ─────────────────────────────────────────
 // Free-form but must be a plain object (no arrays, no primitives at root).
 
-export const MetadataJsonSchema = z.record(z.unknown());
+export const MetadataJsonSchema = z.record(z.string(), z.unknown());
 
 export type MetadataJson = z.infer<typeof MetadataJsonSchema>;
 
@@ -103,7 +103,7 @@ export type VendorCertifications = z.infer<typeof VendorCertificationsSchema>;
 // Connection-specific config — validated shape depends on provider,
 // so we enforce "must be a plain object" at the column level.
 
-export const IntegrationConfigJsonSchema = z.record(z.unknown()).default({});
+export const IntegrationConfigJsonSchema = z.record(z.string(), z.unknown()).default({});
 
 export type IntegrationConfigJson = z.infer<typeof IntegrationConfigJsonSchema>;
 
@@ -122,7 +122,7 @@ export type MappingMetadataJson = z.infer<typeof MappingMetadataJsonSchema>;
 // ─── Task: metadataJson ──────────────────────────────────────────────
 // Optional task metadata — must be a plain object.
 
-export const TaskMetadataJsonSchema = z.record(z.unknown()).nullable().optional();
+export const TaskMetadataJsonSchema = z.record(z.string(), z.unknown()).nullable().optional();
 
 export type TaskMetadataJson = z.infer<typeof TaskMetadataJsonSchema>;
 
@@ -130,6 +130,7 @@ export type TaskMetadataJson = z.infer<typeof TaskMetadataJsonSchema>;
 // Onboarding wizard step completion data.
 
 export const OnboardingStepDataSchema = z.record(
+    z.string(),
     z.boolean().or(z.string()).or(z.number()).or(z.null())
 ).default({});
 

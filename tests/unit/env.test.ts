@@ -53,7 +53,7 @@ describe('Environment Variable Validation', () => {
         const result = runEnvScript({ AUTH_SECRET: undefined });
         expect(result.success).toBe(false);
         expect(result.error).toContain('AUTH_SECRET');
-        expect(result.error).toContain('Required'); // Zod error indicator
+        expect(result.error).toContain('expected string'); // Zod error indicator
     });
 
     it('should fail when AUTH_SECRET is too short', () => {
@@ -67,7 +67,7 @@ describe('Environment Variable Validation', () => {
         const result = runEnvScript({ DATABASE_URL: 'not-a-db-url' });
         expect(result.success).toBe(false);
         expect(result.error).toContain('DATABASE_URL');
-        expect(result.error).toContain('Invalid url');
+        expect(result.error).toContain('Invalid URL');
     });
 
     it('should pass validation even if NEXTAUTH_URL & AUTH_URL omitted entirely, relying on Vercel URL mapping if theoretically present', () => {

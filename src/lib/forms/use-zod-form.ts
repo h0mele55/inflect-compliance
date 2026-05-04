@@ -121,7 +121,13 @@ export function useZodForm<TSchema extends ZodTypeAny>(
 
     const setField = React.useCallback(
         <K extends keyof TValues>(key: K, value: TValues[K]) => {
-            setValuesState((prev) => ({ ...prev, [key]: value }));
+            // zod 4 — `z.input<TSchema>` is `unknown` when TSchema is
+            // a free generic bound; the spread on TValues needs an
+            // explicit object cast for tsc to accept it.
+            setValuesState((prev) => ({
+                ...(prev as Record<string, unknown>),
+                [key]: value,
+            } as TValues));
         },
         [],
     );
@@ -169,7 +175,9 @@ export function useZodForm<TSchema extends ZodTypeAny>(
         // Mark everything touched so errors surface on the next render.
         setTouched(() => {
             const next: Partial<Record<keyof TValues, true>> = {};
-            for (const key of Object.keys(values)) {
+            // zod 4 — `z.input<TSchema>` collapses to `unknown` for free
+            // generic bounds; cast for Object.keys to accept it.
+            for (const key of Object.keys(values as Record<string, unknown>)) {
                 next[key as keyof TValues] = true;
             }
             return next;

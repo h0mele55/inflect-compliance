@@ -21,8 +21,8 @@ export const EntityLifecycleSchema = z.object({
     entityName: z.string().min(1),
     operation: z.enum(['created', 'updated', 'deleted', 'restored', 'purged']),
     changedFields: z.array(z.string()).optional(),
-    before: z.record(z.unknown()).optional(),
-    after: z.record(z.unknown()).optional(),
+    before: z.record(z.string(), z.unknown()).optional(),
+    after: z.record(z.string(), z.unknown()).optional(),
     summary: z.string().optional(),
 }).strict();
 

@@ -11,7 +11,7 @@ import { jsonResponse } from '@/lib/api-response';
 const StepBodySchema = z.object({
     step: OnboardingStepEnum,
     action: z.enum(['save', 'complete', 'skip']),
-    data: z.record(z.unknown()).optional().default({}),
+    data: z.record(z.string(), z.unknown()).optional().default({}),
 }).strip();
 
 export const POST = withApiErrorHandling(withValidatedBody(StepBodySchema, async (req, { params }: { params: Promise<{ tenantSlug: string }> }, body) => {
