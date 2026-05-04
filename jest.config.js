@@ -213,6 +213,12 @@ const jsdomProject = {
         '^\\./tooltip$': '<rootDir>/tests/rendered/tooltip-mock.tsx',
         // Same problem with react-markdown directly.
         '^react-markdown$': '<rootDir>/tests/rendered/react-markdown-mock.tsx',
+        // Vaul drawer crashes under React 19 (`transform.match(...)`
+        // on undefined during pointer-up math). Render tests for
+        // Modal etc. don't exercise drag gestures; a pass-through
+        // stub keeps them decoupled. Re-evaluate when Vaul ships a
+        // React 19 fix.
+        '^vaul$': '<rootDir>/tests/rendered/vaul-mock.tsx',
         // CSS and static asset stubs for jsdom.
         '\\.(css|less|scss|sass)$': '<rootDir>/tests/rendered/style-mock.ts',
         // Epic 61 — `@number-flow/react` ships a custom-element + Web
