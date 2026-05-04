@@ -173,23 +173,30 @@ describe('Widget Dependency Guard', () => {
         }
     });
 
-    test('KpiCard only imports lucide-react + MiniAreaChart + kpi-trend math', () => {
+    test('KpiCard only imports approved primitives', () => {
         const content = fs.readFileSync(path.join(UI_DIR, 'KpiCard.tsx'), 'utf-8');
         const importLines = content.split('\n').filter(l => l.trim().startsWith('import'));
         // Allowed externals:
         //   - lucide-react (icons)
-        //   - MiniAreaChart (Epic 59 sparkline)
+        //   - @/components/ui/mini-area-chart (Epic 59 sparkline)
+        //   - @/components/ui/animated-number (Epic 61 number-flow)
+        //   - @/components/ui/shimmer-dots (Epic 64 ShimmerDots primitive)
         //   - @/lib/kpi-trend (Epic 41.5 — pure trend math: computeKpiTrend,
         //     formatTrendAbsolute, formatTrendPercent, trendDirectionIcon,
         //     and the TrendPolarity type. Lives outside the component so
         //     the math is reusable + tested + server-renderable.)
-        // Kept tight so new chart/state libraries don't leak in uninvited.
+        // Cap raised 3 → 5 with Epic 61 + Epic 64 (animated-number,
+        // shimmer-dots). Each addition is a deliberate KpiCard polish
+        // pass on a shared primitive — kept tight so new chart/state
+        // libraries don't leak in uninvited.
         const externalImports = importLines.filter(l => !l.includes('./') && !l.includes('../'));
-        expect(externalImports.length).toBeLessThanOrEqual(3);
+        expect(externalImports.length).toBeLessThanOrEqual(5);
         for (const line of externalImports) {
             const allowed =
                 line.includes('lucide-react') ||
                 line.includes('@/components/ui/mini-area-chart') ||
+                line.includes('@/components/ui/animated-number') ||
+                line.includes('@/components/ui/shimmer-dots') ||
                 line.includes('@/lib/kpi-trend');
             expect(allowed).toBe(true);
         }

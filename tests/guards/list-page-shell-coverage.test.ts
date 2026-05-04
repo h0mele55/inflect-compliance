@@ -95,6 +95,14 @@ const EXEMPTIONS: Record<string, string> = {
     // wizard step; not a primary list-page experience.
     'risks/import/page.tsx':
         'import wizard flow',
+
+    // Epic 66 — frameworks client island that owns the table/cards
+    // view toggle. Cards mode is a responsive grid (no clamping
+    // needed); table mode delegates fillBody to the inner
+    // <DataTable>. Wrapping the toggle outer in <ListPageShell>
+    // would compress the toggle chrome unnaturally in cards view.
+    'frameworks/FrameworksClient.tsx':
+        'Epic 66 toggle — cards = grid (no clamp), table = inner fillBody',
 };
 
 // Accept either the raw `ListPageShell` primitive or the `EntityListPage`

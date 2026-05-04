@@ -146,8 +146,9 @@ export function ControlsTable({ rows: initialRows, nextCursor: initialNextCursor
                     // Epic 68 — Controls is the canonical opt-out site
                     // for auto-virtualization. The bespoke load-more
                     // pagination + per-row affordances rely on the
-                    // standard <table> layout. Per product directive,
-                    // card scrolling on Controls stays as it is.
+                    // standard non-virtualized DataTable layout. Per
+                    // product directive, card scrolling on Controls
+                    // stays as it is.
                     virtualize={false}
                     data={sorted}
                     columns={columns}
