@@ -6,6 +6,13 @@ import { EvidenceClient } from './EvidenceClient';
 
 export const dynamic = 'force-dynamic';
 
+// SSR fetch caps at SSR_PAGE_LIMIT rows for both evidence and the
+// supporting controls list (used to populate filters / dropdowns).
+// The Epic 69 SWR client immediately fetches the unbounded list in
+// the background, swapped in by SWR's keepPreviousData. Mirrors
+// the PR #146 Tasks pattern.
+const SSR_PAGE_LIMIT = 100;
+
 /**
  * Evidence — Server Component wrapper.
  * Fetches evidence + controls server-side, delegates all interaction to client island.
@@ -26,8 +33,8 @@ export default async function EvidencePage({
 
     // Data fetches depend on ctx but are independent of each other
     const [evidence, controls] = await Promise.all([
-        listEvidence(ctx),
-        listControls(ctx),
+        listEvidence(ctx, undefined, { take: SSR_PAGE_LIMIT }),
+        listControls(ctx, undefined, { take: SSR_PAGE_LIMIT }),
     ]);
 
     return (

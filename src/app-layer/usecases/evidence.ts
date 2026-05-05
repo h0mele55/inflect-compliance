@@ -8,16 +8,24 @@ import { runInTenantContext } from '@/lib/db-context';
 import { cachedListRead, bumpEntityCacheVersion } from '@/lib/cache/list-cache';
 import type { EvidenceType, ReviewCadence } from '@prisma/client';
 
-export async function listEvidence(ctx: RequestContext, filters?: EvidenceListFilters) {
+export async function listEvidence(
+    ctx: RequestContext,
+    filters?: EvidenceListFilters,
+    options: { take?: number } = {},
+) {
     assertCanRead(ctx);
     return cachedListRead({
         ctx,
         entity: 'evidence',
         operation: 'list',
-        params: filters ?? {},
+        // `take` participates in the cache key so a bounded SSR
+        // result can't poison the unbounded API GET cache.
+        params: options.take
+            ? { ...(filters ?? {}), _take: options.take }
+            : (filters ?? {}),
         loader: () =>
             runInTenantContext(ctx, (db) =>
-                EvidenceRepository.list(db, ctx, filters),
+                EvidenceRepository.list(db, ctx, filters, options),
             ),
     });
 }

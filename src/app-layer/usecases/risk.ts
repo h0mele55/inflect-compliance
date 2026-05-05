@@ -23,16 +23,22 @@ function sanitizeOptional(v: string | null | undefined): string | null | undefin
 
 // ─── Tenant-level usecases ───
 
-export async function listRisks(ctx: RequestContext, filters: RiskFilters = {}) {
+export async function listRisks(
+    ctx: RequestContext,
+    filters: RiskFilters = {},
+    options: { take?: number } = {},
+) {
     assertCanRead(ctx);
     return cachedListRead({
         ctx,
         entity: 'risk',
         operation: 'list',
-        params: filters,
+        // `take` participates in the cache key so a bounded SSR
+        // result can't poison the unbounded API GET cache.
+        params: options.take ? { ...filters, _take: options.take } : filters,
         loader: async () => {
             const rows = await runInTenantContext(ctx, (db) =>
-                RiskRepository.list(db, ctx, filters),
+                RiskRepository.list(db, ctx, filters, options),
             );
             return attachOwnerUsers(ctx, rows);
         },

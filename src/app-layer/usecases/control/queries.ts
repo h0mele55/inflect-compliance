@@ -9,18 +9,27 @@ import { cachedListRead } from '@/lib/cache/list-cache';
 
 // ─── Queries ───
 
-export async function listControls(ctx: RequestContext, filters?: {
-    status?: string; applicability?: string; ownerUserId?: string; q?: string; category?: string;
-}) {
+export async function listControls(
+    ctx: RequestContext,
+    filters?: {
+        status?: string; applicability?: string; ownerUserId?: string; q?: string; category?: string;
+    },
+    options: { take?: number } = {},
+) {
     assertCanReadControls(ctx);
     return cachedListRead({
         ctx,
         entity: 'control',
         operation: 'list',
-        params: filters ?? {},
+        // `take` participates in the cache key so a bounded SSR
+        // result can't poison the unbounded API GET cache (mirrors
+        // the PR #146 Tasks pattern).
+        params: options.take
+            ? { ...(filters ?? {}), _take: options.take }
+            : (filters ?? {}),
         loader: () =>
             runInTenantContext(ctx, (db) =>
-                ControlRepository.list(db, ctx, filters),
+                ControlRepository.list(db, ctx, filters, options),
             ),
     });
 }

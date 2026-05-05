@@ -28,13 +28,19 @@ export class RiskRepository {
     /**
      * List risks scoped to tenant (unpaginated — backward compat).
      */
-    static async list(db: PrismaTx, ctx: RequestContext, filters: RiskFilters = {}) {
+    static async list(
+        db: PrismaTx,
+        ctx: RequestContext,
+        filters: RiskFilters = {},
+        options: { take?: number } = {},
+    ) {
         return traceRepository('risk.list', ctx, async () => {
             const where = RiskRepository._buildWhere(ctx, filters);
             return db.risk.findMany({
                 where,
                 orderBy: { inherentScore: 'desc' },
                 include: riskIncludes,
+                ...(options.take ? { take: options.take } : {}),
             });
         });
     }

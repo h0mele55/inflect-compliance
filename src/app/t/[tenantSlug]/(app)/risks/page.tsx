@@ -6,6 +6,14 @@ import { RisksClient } from './RisksClient';
 
 export const dynamic = 'force-dynamic';
 
+// SSR fetch is capped at the most-relevant SSR_PAGE_LIMIT rows so
+// the initial HTML payload + DB query stay bounded as tenants
+// accumulate risks. The Epic 69 SWR client immediately fetches
+// the unbounded list in the background, swapped in by SWR's
+// keepPreviousData with no flicker. Mirrors the PR #146 Tasks
+// pattern.
+const SSR_PAGE_LIMIT = 100;
+
 /**
  * Risks — Server Component.
  * Fetches risk list server-side (with URL filters applied),
@@ -57,6 +65,7 @@ export default async function RisksPage({
             Object.keys(apiFilters).length > 0
                 ? (apiFilters as unknown as Parameters<typeof listRisks>[1])
                 : undefined,
+            { take: SSR_PAGE_LIMIT },
         ),
         getRiskMatrixConfig(ctx),
     ]);
