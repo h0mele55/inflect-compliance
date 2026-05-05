@@ -4,6 +4,10 @@ import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { ProgressBar, type ProgressBarVariant } from '@/components/ui/progress-bar';
 import { ProgressCircle } from '@/components/ui/progress-circle';
+import {
+    TestDashboardG2Section,
+    type DashboardUpcomingItem,
+} from '@/components/TestDashboardG2Section';
 
 interface DashboardMetrics {
     periodDays: number;
@@ -20,6 +24,24 @@ interface DashboardMetrics {
     overduePlans: number;
     repeatedFailures: Array<{ controlId: string; controlName: string; controlCode: string | null; failCount: number }>;
     runsWithEvidence: number;
+    // Epic G-2 — additive fields the dashboard endpoint merges in
+    // (route.ts Promise.alls the legacy + G-2 usecases). Optional
+    // because old API consumers may still hit a non-merged response
+    // shape during a rolling deploy.
+    automation?: {
+        plansManual: number;
+        plansScript: number;
+        plansIntegration: number;
+        plansScheduledActive: number;
+        overdueScheduled: number;
+    };
+    upcoming?: DashboardUpcomingItem[];
+    trend?: {
+        days: string[];
+        pass: number[];
+        fail: number[];
+        inconclusive: number[];
+    };
 }
 
 interface FrameworkReadiness {
@@ -177,6 +199,19 @@ export default function TestDashboardPage() {
                     )}
                 </div>
             </div>
+
+            {/* Epic G-2 — automation: pass/fail donut, overdue scheduled list, trend sparkline */}
+            {metrics.automation && metrics.upcoming && metrics.trend && (
+                <TestDashboardG2Section
+                    period={period}
+                    passRuns={metrics.passRuns}
+                    failRuns={metrics.failRuns}
+                    inconclusiveRuns={metrics.inconclusiveRuns}
+                    automation={metrics.automation}
+                    upcoming={metrics.upcoming}
+                    trend={metrics.trend}
+                />
+            )}
 
             {/* Framework Test Readiness */}
             {readiness.length > 0 && (
