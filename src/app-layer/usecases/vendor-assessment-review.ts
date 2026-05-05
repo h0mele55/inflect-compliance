@@ -239,7 +239,199 @@ export async function reviewAssessment(
     });
 }
 
-// ─── 2. closeAssessment ────────────────────────────────────────────
+// ─── 2. getReviewView ──────────────────────────────────────────────
+
+export interface ReviewViewQuestion {
+    id: string;
+    sectionId: string;
+    sortOrder: number;
+    prompt: string;
+    answerType: string;
+    required: boolean;
+    weight: number;
+    optionsJson: unknown;
+    scaleConfigJson: unknown;
+}
+export interface ReviewViewSection {
+    id: string;
+    sortOrder: number;
+    title: string;
+    description: string | null;
+    questions: ReviewViewQuestion[];
+}
+export interface ReviewViewAnswer {
+    questionId: string;
+    answerJson: unknown;
+    computedPoints: number;
+    reviewerOverridePoints: number | null;
+    reviewerNotes: string | null;
+    evidenceId: string | null;
+}
+export interface ReviewView {
+    assessmentId: string;
+    status: string;
+    vendor: { id: string; name: string };
+    template: {
+        id: string;
+        key: string;
+        version: number;
+        name: string;
+        description: string | null;
+        isPublished: boolean;
+    };
+    sections: ReviewViewSection[];
+    answers: ReviewViewAnswer[];
+    /** Live engine output computed against the current answer state. */
+    scoring: ScoringResult;
+    submittedAt: string | null;
+    reviewedAt: string | null;
+    reviewedByUserId: string | null;
+    reviewerNotes: string | null;
+    riskRating: string | null;
+    closedAt: string | null;
+}
+
+/**
+ * Read-only review view. Loads the assessment + template tree +
+ * answers and runs the scoring engine fresh against the current
+ * answer state (post-override) so the UI sees a live "what would
+ * the score be" preview before any save.
+ *
+ * Permission gate: canRead — every authenticated tenant member can
+ * inspect the review surface; only admins can submit it.
+ */
+export async function getReviewView(
+    ctx: RequestContext,
+    assessmentId: string,
+): Promise<ReviewView> {
+    if (!ctx.permissions.canRead) {
+        throw badRequest('Read access required.');
+    }
+
+    return runInTenantContext(ctx, async (db) => {
+        const assessment = await db.vendorAssessment.findFirst({
+            where: { id: assessmentId, tenantId: ctx.tenantId },
+            select: {
+                id: true,
+                status: true,
+                vendorId: true,
+                templateVersionId: true,
+                submittedAt: true,
+                reviewedAt: true,
+                reviewedByUserId: true,
+                reviewerNotes: true,
+                riskRating: true,
+                closedAt: true,
+            },
+        });
+        if (!assessment) throw notFound('Assessment not found');
+        if (!assessment.templateVersionId) {
+            throw badRequest(
+                'This assessment was not created from a G-3 template.',
+            );
+        }
+
+        const [vendor, template, answers] = await Promise.all([
+            db.vendor.findUnique({
+                where: { id: assessment.vendorId },
+                select: { id: true, name: true },
+            }),
+            db.vendorAssessmentTemplate.findUnique({
+                where: { id: assessment.templateVersionId },
+                select: {
+                    id: true,
+                    key: true,
+                    version: true,
+                    name: true,
+                    description: true,
+                    isPublished: true,
+                    scoringConfigJson: true,
+                    sections: {
+                        orderBy: { sortOrder: 'asc' },
+                        include: {
+                            questions: { orderBy: { sortOrder: 'asc' } },
+                        },
+                    },
+                    questions: { orderBy: { sortOrder: 'asc' } },
+                },
+            }),
+            db.vendorAssessmentAnswer.findMany({
+                where: {
+                    assessmentId: assessment.id,
+                    tenantId: ctx.tenantId,
+                },
+                select: {
+                    questionId: true,
+                    answerJson: true,
+                    computedPoints: true,
+                    reviewerOverridePoints: true,
+                    reviewerNotes: true,
+                    evidenceId: true,
+                },
+            }),
+        ]);
+        if (!vendor || !template) throw notFound('Assessment context not found');
+
+        const config = parseScoringConfig(template.scoringConfigJson);
+        const scoring = scoreAssessment({
+            questions: template.questions.map((q) => ({
+                id: q.id,
+                weight: q.weight,
+                required: q.required,
+            })),
+            answers,
+            config,
+        });
+
+        return {
+            assessmentId: assessment.id,
+            status: assessment.status,
+            vendor: { id: vendor.id, name: vendor.name },
+            template: {
+                id: template.id,
+                key: template.key,
+                version: template.version,
+                name: template.name,
+                description: template.description,
+                isPublished: template.isPublished,
+            },
+            sections: template.sections.map((s) => ({
+                id: s.id,
+                sortOrder: s.sortOrder,
+                title: s.title,
+                description: s.description,
+                questions: s.questions.map((q) => ({
+                    id: q.id,
+                    sectionId: q.sectionId,
+                    sortOrder: q.sortOrder,
+                    prompt: q.prompt,
+                    answerType: q.answerType,
+                    required: q.required,
+                    weight: q.weight,
+                    optionsJson: q.optionsJson,
+                    scaleConfigJson: q.scaleConfigJson,
+                })),
+            })),
+            answers: answers.map((a) => ({
+                questionId: a.questionId,
+                answerJson: a.answerJson,
+                computedPoints: a.computedPoints,
+                reviewerOverridePoints: a.reviewerOverridePoints,
+                reviewerNotes: a.reviewerNotes,
+                evidenceId: a.evidenceId,
+            })),
+            scoring,
+            submittedAt: assessment.submittedAt?.toISOString() ?? null,
+            reviewedAt: assessment.reviewedAt?.toISOString() ?? null,
+            reviewedByUserId: assessment.reviewedByUserId,
+            reviewerNotes: assessment.reviewerNotes,
+            riskRating: assessment.riskRating,
+            closedAt: assessment.closedAt?.toISOString() ?? null,
+        };
+    });
+}
+
+// ─── 3. closeAssessment ────────────────────────────────────────────
 
 export async function closeAssessment(
     ctx: RequestContext,

@@ -174,10 +174,15 @@ describe('New page token discipline', () => {
         //     classes that match the rest of the admin surface.
         //     Bounded follow-up to migrate alongside the other admin
         //     pages.
+        //   - 94 (+2): Epic G-3 prompt 7 added the reviewer page —
+        //     admin/vendor-assessment-reviews/[assessmentId]/page.tsx
+        //     + VendorAssessmentReviewClient.tsx. Same `glass-card`
+        //     + legacy `btn` / `badge` shape as the rest of the
+        //     admin surface; bounded follow-up.
         // Each increment names the epic + page + reason; promotion
         // to MIGRATED_PAGES is the path forward, never silent
         // floor-bumping.
-        expect(unmigrated.length).toBeLessThanOrEqual(92);
+        expect(unmigrated.length).toBeLessThanOrEqual(94);
     });
 
     it('migrated page count is at least 4', () => {
