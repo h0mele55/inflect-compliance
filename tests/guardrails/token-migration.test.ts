@@ -15,7 +15,16 @@ function read(...segments: string[]): string {
 }
 
 describe('Dashboard page token migration', () => {
-    const src = read('app/t/[tenantSlug]/(app)/dashboard/page.tsx');
+    // Epic 69 split the dashboard into a thin server shell + a
+    // client component that owns the card composition. The token /
+    // imports / button-variant assertions check the combined surface
+    // (page.tsx + DashboardClient.tsx) — what matters is that the
+    // primitives are used somewhere in the dashboard tree, not which
+    // side of the server/client boundary owns them.
+    const src =
+        read('app/t/[tenantSlug]/(app)/dashboard/page.tsx') +
+        '\n' +
+        read('app/t/[tenantSlug]/(app)/dashboard/DashboardClient.tsx');
 
     it('imports buttonVariants', () => {
         expect(src).toContain("from '@/components/ui/button-variants'");

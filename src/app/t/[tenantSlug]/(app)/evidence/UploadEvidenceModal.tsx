@@ -15,14 +15,18 @@
  *     `file`, `title?`, `controlId?`. Each queued file is uploaded
  *     individually; the same metadata fields apply to every file in
  *     the batch.
- *   - Optimistic pending row inserted into
- *     `queryKeys.evidence.list(tenantSlug)` while each upload is in
- *     flight, replaced on success / rolled back on error.
+ *   - Optimistic pending row inserted into the SWR cache for
+ *     `CACHE_KEYS.evidence.list()` while each upload is in flight
+ *     (Epic 69 — `useTenantMutation` handles the rollback on
+ *     throw automatically; the temp row sticks until the
+ *     post-success revalidation overwrites the cache with the
+ *     authoritative server-side list).
  *   - Follow-up `POST /evidence/:id/retention` when a retention date
  *     is supplied (per uploaded evidence record).
- *   - React-Query `queryKeys.evidence.all(tenantSlug)` invalidated on
- *     settle so filters, counts, and the expiring/archived tabs
- *     refresh.
+ *   - Sibling filter variants (`/evidence?type=…`, `/evidence?status=…`,
+ *     etc.) get a parallel background refetch via the function-form
+ *     `swrMutate(matcher, …)` after each successful upload so the
+ *     "Expiring" / "Archived" tabs and any filtered view refresh.
  *
  * E2E selectors preserved:
  *   - `#upload-form`, `#upload-evidence-cancel-btn`, `#submit-upload-btn`,
@@ -39,7 +43,7 @@
  * modal preserves the form-shaped flow operators are used to.
  */
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSWRConfig } from 'swr';
 import {
     useCallback,
     useEffect,
@@ -64,7 +68,8 @@ import {
     startOfUtcDay,
     toYMD,
 } from '@/components/ui/date-picker/date-utils';
-import { queryKeys } from '@/lib/queryKeys';
+import { useTenantMutation } from '@/lib/hooks/use-tenant-mutation';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 import {
     uploadWithProgress,
@@ -103,12 +108,13 @@ export interface UploadEvidenceModalProps {
 export function UploadEvidenceModal({
     open,
     setOpen,
-    tenantSlug,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- prop preserved on the public API for callers; Epic 69 SWR migration no longer consumes it (cache key derives from useTenantApiUrl + CACHE_KEYS).
+    tenantSlug: _tenantSlug,
     apiUrl,
     controls,
 }: UploadEvidenceModalProps) {
     const close = useCallback(() => setOpen(false), [setOpen]);
-    const queryClient = useQueryClient();
+    const { mutate: swrMutate } = useSWRConfig();
     const dropzoneRef = useRef<FileDropzoneHandle>(null);
 
     const [title, setTitle] = useState('');
@@ -145,19 +151,40 @@ export function UploadEvidenceModal({
 
     const telemetry = useFormTelemetry('UploadEvidenceModal');
 
-    // Single-file mutation is preserved as a thin wrapper so React
-    // Query handles the optimistic-row + invalidation flow per file.
-    // The actual HTTP work is `uploadWithProgress` so the dropzone's
-    // progress bar updates from real network events.
-    const mutation = useMutation({
-        mutationFn: async (vars: {
-            file: File;
-            applyTitle: boolean;
-            controlId: string;
-            retentionUntil: string;
-            onProgress: (percent: number | null) => void;
-            signal: AbortSignal;
-        }) => {
+    // ─── Mutation: per-file upload (Epic 69 — useTenantMutation) ───
+    //
+    // Migrated from React Query's `useMutation` + `onMutate` /
+    // `onError` rollback hooks. The Epic 69 hook handles three of
+    // the four lifecycle concerns (optimistic apply, rollback on
+    // throw, post-success revalidation) automatically — the only
+    // thing this file still owns is the temp-row shape.
+    //
+    // Why the unfiltered list key: multiple cache entries can exist
+    // (one per filter combo), but new uploads always land in the
+    // unfiltered baseline. The optimistic-prepend lands there and
+    // stays visible to the user; sibling filter variants get a
+    // background refetch via `swrMutate(matcher)` after `trigger()`
+    // resolves so they pick the new row up too.
+    //
+    // The actual HTTP work is `uploadWithProgress` (XMLHttpRequest)
+    // so the dropzone's progress bar updates from real network
+    // events — `fetch` can't surface upload progress.
+    const evidenceListKey = CACHE_KEYS.evidence.list();
+    const evidenceUrlPrefix = apiUrl(evidenceListKey);
+
+    interface UploadVars {
+        file: File;
+        applyTitle: boolean;
+        controlId: string;
+        retentionUntil: string;
+        onProgress: (percent: number | null) => void;
+        signal: AbortSignal;
+        tempId: string;
+    }
+
+    const mutation = useTenantMutation<unknown[], UploadVars, { id?: string }>({
+        key: evidenceListKey,
+        mutationFn: async (vars) => {
             const { file, applyTitle, onProgress, signal } = vars;
             const formData = new FormData();
             formData.append('file', file);
@@ -191,88 +218,39 @@ export function UploadEvidenceModal({
 
             return uploaded;
         },
-        // Optimistic pending row — keeps the list responsive while the
-        // upload is in flight. Identical shape to the legacy single-
-        // file flow so every column renderer (status badge, retention
-        // pill, file-type icon) works without special-casing.
-        onMutate: async (vars) => {
-            await queryClient.cancelQueries({
-                queryKey: queryKeys.evidence.all(tenantSlug),
-            });
-            const listKey = queryKeys.evidence.list(tenantSlug);
-            const previousList = queryClient.getQueryData<unknown[]>(listKey);
-
-            const tempId = `temp:${crypto.randomUUID()}`;
-            if (previousList) {
-                queryClient.setQueryData<unknown[]>(listKey, [
-                    {
-                        id: tempId,
-                        title: vars.applyTitle && title
-                            ? title
-                            : vars.file.name,
-                        fileName: vars.file.name,
-                        fileMimeType: vars.file.type || null,
-                        type: 'FILE',
-                        status: 'PENDING_UPLOAD',
-                        owner: null,
-                        control: null,
-                        controlId: null,
-                        retentionUntil: null,
-                        isArchived: false,
-                        expiredAt: null,
-                        deletedAt: null,
-                        fileRecordId: null,
-                    },
-                    ...previousList,
-                ]);
-            }
-            return { previousList, listKey, tempId };
-        },
-        onError: (err, _vars, context) => {
-            if (context?.previousList) {
-                queryClient.setQueryData(context.listKey, context.previousList);
-            }
-            telemetry.trackError(err);
-            const msg =
-                err instanceof UploadHttpError
-                    ? (() => {
-                          const body = err.parsedBody as
-                              | { error?: string; message?: string }
-                              | null;
-                          return body?.error || body?.message || err.message;
-                      })()
-                    : err instanceof Error
-                      ? err.message
-                      : 'Upload failed';
-            setError(msg);
-        },
-        onSuccess: (data, _vars, context) => {
-            if (context?.previousList) {
-                const currentList = queryClient.getQueryData<{ id: string }[]>(
-                    context.listKey,
-                );
-                if (currentList) {
-                    queryClient.setQueryData(
-                        context.listKey,
-                        currentList.filter((e) => e.id !== context.tempId),
-                    );
-                }
-            }
-            telemetry.trackSuccess({
-                evidenceId: (data as { id?: string })?.id,
-            });
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.evidence.all(tenantSlug),
-            });
+        // Optimistic pending row prepended to the list. Identical
+        // shape to the legacy single-file flow so every column
+        // renderer (status badge, retention pill, file-type icon)
+        // works without special-casing. The temp row sticks until
+        // the post-success revalidation overwrites the cache with
+        // the authoritative server-side list.
+        optimisticUpdate: (current, vars) => {
+            const pendingRow = {
+                id: vars.tempId,
+                title:
+                    vars.applyTitle && title ? title : vars.file.name,
+                fileName: vars.file.name,
+                fileMimeType: vars.file.type || null,
+                type: 'FILE',
+                status: 'PENDING_UPLOAD',
+                owner: null,
+                control: null,
+                controlId: null,
+                retentionUntil: null,
+                isArchived: false,
+                expiredAt: null,
+                deletedAt: null,
+                fileRecordId: null,
+            };
+            return [pendingRow, ...(current ?? [])];
         },
     });
 
     // Dropzone's `onUpload` — invoked once per file at submit time.
-    // The mutation owns optimistic-row + cache invalidation; this
-    // handler only bridges the dropzone's progress callback into the
-    // mutation's variables.
+    // The mutation owns the optimistic-row + revalidation flow per
+    // call; this handler only bridges the dropzone's progress
+    // callback into the mutation's input + generates a fresh
+    // tempId so concurrent uploads don't collide.
     const handleDropzoneUpload = useCallback(
         async (
             file: File,
@@ -280,16 +258,59 @@ export function UploadEvidenceModal({
         ) => {
             const total = dropzoneRef.current?.getEntries().length ?? 1;
             const applyTitle = total === 1;
-            return mutation.mutateAsync({
-                file,
-                applyTitle,
-                controlId,
-                retentionUntil,
-                onProgress: ctx.onProgress,
-                signal: ctx.signal,
-            });
+            const tempId = `temp:${crypto.randomUUID()}`;
+            try {
+                const uploaded = await mutation.trigger({
+                    file,
+                    applyTitle,
+                    controlId,
+                    retentionUntil,
+                    onProgress: ctx.onProgress,
+                    signal: ctx.signal,
+                    tempId,
+                });
+                telemetry.trackSuccess({ evidenceId: uploaded?.id });
+                // Fan out to sibling filter variants — the primary
+                // key revalidation only refreshes the unfiltered
+                // baseline. Without this, a user uploading while
+                // filtered to "type:FILE" would not see the new row
+                // until they cleared the filter.
+                await swrMutate(
+                    (key) =>
+                        typeof key === 'string' &&
+                        (key === evidenceUrlPrefix ||
+                            key.startsWith(`${evidenceUrlPrefix}?`)),
+                    undefined,
+                    { revalidate: true },
+                );
+                return uploaded;
+            } catch (err) {
+                telemetry.trackError(err);
+                const msg =
+                    err instanceof UploadHttpError
+                        ? (() => {
+                              const body = err.parsedBody as
+                                  | { error?: string; message?: string }
+                                  | null;
+                              return (
+                                  body?.error || body?.message || err.message
+                              );
+                          })()
+                        : err instanceof Error
+                          ? err.message
+                          : 'Upload failed';
+                setError(msg);
+                throw err;
+            }
         },
-        [mutation, controlId, retentionUntil],
+        [
+            mutation,
+            controlId,
+            retentionUntil,
+            telemetry,
+            swrMutate,
+            evidenceUrlPrefix,
+        ],
     );
 
     const onPick = useCallback((files: File[]) => {

@@ -12,6 +12,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSWRConfig } from 'swr';
 import {
     useCallback,
     useEffect,
@@ -25,6 +26,7 @@ import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
 import { queryKeys } from '@/lib/queryKeys';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 
 interface ControlOption {
@@ -51,6 +53,15 @@ export function NewEvidenceTextModal({
 }: NewEvidenceTextModalProps) {
     const close = useCallback(() => setOpen(false), [setOpen]);
     const queryClient = useQueryClient();
+    // Epic 69 — bridge cache invalidation. EvidenceClient now reads
+    // from `useTenantSWR(CACHE_KEYS.evidence.list())`, so the React
+    // Query invalidation below alone wouldn't refresh the page. We
+    // invalidate BOTH caches: RQ (in case other consumers still
+    // depend on it) and SWR (the actual source of truth for the
+    // list page after Epic 69). Once every consumer of the
+    // evidence list has migrated to SWR, the queryClient calls can
+    // be dropped.
+    const { mutate: swrMutate } = useSWRConfig();
     const titleRef = useRef<HTMLInputElement>(null);
 
     const [form, setForm] = useState({
@@ -109,9 +120,22 @@ export function NewEvidenceTextModal({
             return res.json();
         },
         onSuccess: (data) => {
+            // Invalidate React Query cache for any RQ-using consumers.
             queryClient.invalidateQueries({
                 queryKey: queryKeys.evidence.all(tenantSlug),
             });
+            // Invalidate every `/evidence?…` SWR cache entry so the
+            // list page (Epic 69 SWR-first) refreshes regardless of
+            // which filter view the user uploaded from.
+            const evidenceUrlPrefix = apiUrl(CACHE_KEYS.evidence.list());
+            swrMutate(
+                (key) =>
+                    typeof key === 'string' &&
+                    (key === evidenceUrlPrefix ||
+                        key.startsWith(`${evidenceUrlPrefix}?`)),
+                undefined,
+                { revalidate: true },
+            );
             telemetry.trackSuccess({
                 evidenceId: (data as { id?: string })?.id,
             });

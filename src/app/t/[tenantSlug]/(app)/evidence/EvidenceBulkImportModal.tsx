@@ -21,6 +21,8 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSWRConfig } from 'swr';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 import {
     useCallback,
     useEffect,
@@ -90,6 +92,9 @@ export function EvidenceBulkImportModal({
 }: EvidenceBulkImportModalProps) {
     const close = useCallback(() => setOpen(false), [setOpen]);
     const queryClient = useQueryClient();
+    // Epic 69 — bridge cache invalidation to SWR (EvidenceClient
+    // now reads from `useTenantSWR(CACHE_KEYS.evidence.list())`).
+    const { mutate: swrMutate } = useSWRConfig();
     const dropzoneRef = useRef<FileDropzoneHandle>(null);
 
     const [error, setError] = useState('');
@@ -128,6 +133,16 @@ export function EvidenceBulkImportModal({
                     queryClient.invalidateQueries({
                         queryKey: queryKeys.evidence.all(tenantSlug),
                     });
+                    // Bridge to the SWR cache the list page reads from.
+                    const evidenceUrlPrefix = apiUrl(CACHE_KEYS.evidence.list());
+                    swrMutate(
+                        (key) =>
+                            typeof key === 'string' &&
+                            (key === evidenceUrlPrefix ||
+                                key.startsWith(`${evidenceUrlPrefix}?`)),
+                        undefined,
+                        { revalidate: true },
+                    );
                     return; // stop polling
                 }
                 setTimeout(tick, POLL_INTERVAL_MS);

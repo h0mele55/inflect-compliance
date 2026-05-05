@@ -98,6 +98,15 @@ describe('Static Analysis: No process.env fallbacks', () => {
             // `waitForLoadState('networkidle')` from settling on slow
             // CI runners — see the docblock in use-calendar-badge.ts.
             if (file.endsWith('use-calendar-badge.ts')) continue;
+            // Epic 69 SWRDevTools is dev-only by design — it gates
+            // visibility on `process.env.NODE_ENV === 'development'`
+            // AND `process.env.NEXT_PUBLIC_TEST_MODE === '1'` so
+            // Next.js can tree-shake the entire panel from the prod
+            // bundle. NEXT_PUBLIC_* MUST be read via process.env for
+            // the build-time inlining to fire; routing through env.ts
+            // would break the inlining (same rationale as
+            // ClientProviders + use-calendar-badge above).
+            if (file.endsWith('dev/swr-devtools.tsx')) continue;
 
             const content = fs.readFileSync(file, 'utf8');
 

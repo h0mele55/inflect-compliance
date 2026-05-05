@@ -16,9 +16,17 @@ import * as path from 'path';
 const UI_DIR = path.resolve(__dirname, '../../src/components/ui');
 const REPO_FILE = path.resolve(__dirname, '../../src/app-layer/repositories/DashboardRepository.ts');
 const USECASE_FILE = path.resolve(__dirname, '../../src/app-layer/usecases/dashboard.ts');
-const DASHBOARD_FILE = path.resolve(
+const DASHBOARD_PAGE_FILE = path.resolve(
     __dirname,
     '../../src/app/t/[tenantSlug]/(app)/dashboard/page.tsx',
+);
+// Epic 69 split the dashboard into a thin server shell + a
+// `'use client'` component that owns the card composition. The
+// page imports moved with the JSX, so structural assertions read
+// both files as a single combined surface.
+const DASHBOARD_CLIENT_FILE = path.resolve(
+    __dirname,
+    '../../src/app/t/[tenantSlug]/(app)/dashboard/DashboardClient.tsx',
 );
 
 // ─── Widget Exports ────────────────────────────────────────────────
@@ -209,7 +217,10 @@ describe('Dashboard Usecase Updates', () => {
 // ─── Dashboard Page Integration ─────────────────────────────────────
 
 describe('Dashboard Page Integration', () => {
-    const content = fs.readFileSync(DASHBOARD_FILE, 'utf-8');
+    const content =
+        fs.readFileSync(DASHBOARD_PAGE_FILE, 'utf-8') +
+        '\n' +
+        fs.readFileSync(DASHBOARD_CLIENT_FILE, 'utf-8');
 
     // Epic 44 — the dashboard's heatmap migrated from the legacy
     // hardcoded `<RiskHeatmap>` to the config-driven `<RiskMatrix>`
