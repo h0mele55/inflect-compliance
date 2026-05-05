@@ -82,13 +82,12 @@ describe('Epic G-2 — control-test-scheduler registration', () => {
         );
     });
 
-    test('executor-registry.ts does NOT yet register control-test-runner', () => {
-        // Documents the scope boundary of this G-2 prompt: the
-        // scheduler is operational, the runner is forward-declared
-        // only. A future PR registering the runner must remove this
-        // assertion in the same diff, which is the intended hand-
-        // off signal between G-2 prompts.
-        expect(registryText).not.toMatch(
+    test('executor-registry.ts registers control-test-runner', () => {
+        // Prompt 3 wired the runner — the scheduler-runner pair is
+        // now both operational. The assertion was inverted in the
+        // prompt-3 diff (was: "NOT yet registered") so the hand-off
+        // moment between prompts is durable in the test history.
+        expect(registryText).toMatch(
             /executorRegistry\.register\(\s*'control-test-runner'/,
         );
     });

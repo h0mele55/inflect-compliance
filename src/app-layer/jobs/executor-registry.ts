@@ -566,14 +566,13 @@ executorRegistry.register('automation-event-dispatch', async (payload) => {
     );
 });
 
-// ── control-test-scheduler (Epic G-2) ────────────────────────────────
+// ── control-test-scheduler + control-test-runner (Epic G-2) ──────────
 //
-// Repeatable scan that claims due ControlTestPlan rows and enqueues
-// per-plan `control-test-runner` jobs. The runner itself is wired
-// into the type system but its executor is registered in a later
-// G-2 prompt — until then, runner jobs land in the queue and fail
-// with "no executor registered", which is the expected, observable
-// state.
+// Scheduler claims due ControlTestPlan rows and enqueues per-plan
+// runner jobs (deduplicated by `ctr:{planId}:{scheduledForIso}`).
+// The runner materializes each into a ControlTestRun + auto-evidence
+// + (on automated FAIL) a Finding linked to the control via the
+// FindingEvidence → Evidence → controlId chain.
 
 executorRegistry.register('control-test-scheduler', async (payload) => {
     const startedAt = new Date().toISOString();
@@ -603,6 +602,11 @@ executorRegistry.register('control-test-scheduler', async (payload) => {
             jobRunId: r.jobRunId,
         },
     );
+});
+
+executorRegistry.register('control-test-runner', async (payload) => {
+    const { controlTestRunnerExecutor } = await import('./control-test-runner');
+    return controlTestRunnerExecutor(payload);
 });
 
 // ── evidence-import (Epic 43.3) ──────────────────────────────────────
