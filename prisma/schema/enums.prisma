@@ -171,6 +171,18 @@ enum TestMethod {
   AUTOMATED
 }
 
+// Refines TestMethod for Epic G-2 scheduled execution. MANUAL plans
+// are never picked up by the scheduler; SCRIPT plans run a built-in
+// handler; INTEGRATION plans dispatch to an external connector.
+// `method` (TestMethod) stays the auditor-facing field — DAILY plans
+// can keep `method=AUTOMATED` while distinguishing SCRIPT vs
+// INTEGRATION here without breaking pre-G-2 callers.
+enum AutomationType {
+  MANUAL
+  SCRIPT
+  INTEGRATION
+}
+
 enum TestPlanStatus {
   ACTIVE
   PAUSED
