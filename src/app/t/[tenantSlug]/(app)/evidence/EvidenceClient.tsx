@@ -152,8 +152,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const evidenceQuery = useTenantSWR<any[]>(evidenceKey, {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        fallbackData: anyFilterActive ? undefined : (initialEvidence as any[]),
+        fallbackData: anyFilterActive ? undefined : initialEvidence,
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

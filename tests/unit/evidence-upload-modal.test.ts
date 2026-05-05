@@ -163,23 +163,41 @@ describe('UploadEvidenceModal — business contract preserved', () => {
         );
     });
 
+    // Epic 69 migrated this surface from React Query's
+    // `useMutation` + `onMutate` / `onError` / `onSettled` lifecycle
+    // hooks to `useTenantMutation`. The optimistic-apply / rollback
+    // / invalidation behaviour is preserved — the test shape just
+    // points at the new symbols (`optimisticUpdate:`, the hook's
+    // built-in `rollbackOnError: true` default, and the
+    // `swrMutate(matcher)` fan-out).
     it('inserts an optimistic PENDING_UPLOAD row into the list cache', () => {
-        expect(UPLOAD_MODAL_SRC).toMatch(/onMutate:\s*async/);
+        expect(UPLOAD_MODAL_SRC).toMatch(/optimisticUpdate:/);
         expect(UPLOAD_MODAL_SRC).toMatch(/status:\s*['"]PENDING_UPLOAD['"]/);
-        expect(UPLOAD_MODAL_SRC).toMatch(/temp:\$\{crypto\.randomUUID\(\)\}/);
+        // Each per-file call generates a fresh temp id at trigger
+        // time so concurrent uploads don't collide. The literal
+        // `temp:` prefix is the marker the EvidenceClient renderer
+        // recognises to draw the pending row.
+        expect(UPLOAD_MODAL_SRC).toMatch(/temp:/);
     });
 
     it('rolls back the temp row on error', () => {
-        expect(UPLOAD_MODAL_SRC).toMatch(
-            /onError:[\s\S]{0,300}setQueryData\(context\.listKey,\s*context\.previousList\)/,
-        );
+        // SWR's `useTenantMutation` enables `rollbackOnError: true`
+        // by default, so the rollback machinery doesn't appear as
+        // an explicit `onError` handler in the source. The negative
+        // pin: callers MUST NOT set `rollbackOnError: false` (which
+        // would suppress the auto-rollback). Pin the safe default
+        // by asserting the disable flag is absent.
+        expect(UPLOAD_MODAL_SRC).not.toMatch(/rollbackOnError:\s*false/);
+        expect(UPLOAD_MODAL_SRC).toContain('useTenantMutation');
     });
 
-    it('invalidates queryKeys.evidence.all(tenantSlug) on settle', () => {
-        expect(UPLOAD_MODAL_SRC).toMatch(/onSettled/);
-        expect(UPLOAD_MODAL_SRC).toMatch(
-            /queryKeys\.evidence\.all\(tenantSlug\)/,
-        );
+    it('invalidates the evidence cache fan-out via swrMutate matcher on success', () => {
+        // The post-success invalidation is now a function-form
+        // `swrMutate((key) => key.startsWith(prefix), …)` so every
+        // `/evidence?…` filter variant gets a refetch — which is
+        // a strict superset of what `queryKeys.evidence.all` did.
+        expect(UPLOAD_MODAL_SRC).toContain('swrMutate');
+        expect(UPLOAD_MODAL_SRC).toMatch(/swrMutate\(\s*\(key\)/);
     });
 
     it('closes the modal once every queued file uploaded successfully', () => {

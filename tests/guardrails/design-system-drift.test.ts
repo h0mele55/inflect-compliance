@@ -21,6 +21,10 @@ const COMPONENTS_DIR = path.resolve(__dirname, '../../src/components');
  */
 const MIGRATED_PAGES = [
     'dashboard/page.tsx',
+    // Epic 69 split the dashboard into a thin server shell + a
+    // `'use client'` component owning the card composition. Both
+    // sides of the split clean on the design-system checks.
+    'dashboard/DashboardClient.tsx',
     'vendors/VendorsClient.tsx',
     'risks/[riskId]/page.tsx',
     'admin/members/page.tsx',

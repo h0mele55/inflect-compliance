@@ -154,7 +154,7 @@ export default function DashboardClient({
     // `fallbackData` makes `data` defined synchronously on mount —
     // there is no loading state on first render. Background
     // revalidation kicks in on focus / reconnect.
-    const { data: exec } = useTenantSWR<ExecutiveDashboardPayload>(
+    const { data: execFromCache } = useTenantSWR<ExecutiveDashboardPayload>(
         CACHE_KEYS.dashboard.executive(),
         { fallbackData: initialExec },
     );
@@ -174,8 +174,10 @@ export default function DashboardClient({
     // SWR's contract is `data | undefined`; the fallback narrows it
     // for first paint. The `??` keeps TS happy AND defends against
     // the (theoretical) case where SWR clears the cache out from
-    // under us.
-    const execData = exec ?? initialExec;
+    // under us. Local name is `exec` to match the existing structural
+    // pins (E2E selectors + dashboard-page test reads `cells={exec.X}`,
+    // `items={exec.X}`).
+    const exec = execFromCache ?? initialExec;
     const trendBundle = deriveTrendBundle(trends ?? initialTrends ?? undefined);
 
     return (
@@ -193,14 +195,14 @@ export default function DashboardClient({
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {execData.stats.unreadNotifications > 0 && (
+                    {exec.stats.unreadNotifications > 0 && (
                         <Link
                             href={href('/notifications')}
                             className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
                         >
                             <Bell className="w-4 h-4" aria-hidden="true" />
                             <StatusBadge variant="error" icon={null} size="sm">
-                                {execData.stats.unreadNotifications}
+                                {exec.stats.unreadNotifications}
                             </StatusBadge>
                         </Link>
                     )}
@@ -215,54 +217,54 @@ export default function DashboardClient({
                 <KpiCard
                     id="kpi-coverage"
                     label={t('controls')}
-                    value={execData.controlCoverage.coveragePercent}
+                    value={exec.controlCoverage.coveragePercent}
                     format="percent"
                     icon={ShieldCheck}
                     gradient="from-emerald-500 to-teal-500"
-                    subtitle={`${execData.controlCoverage.implemented} of ${execData.controlCoverage.applicable} implemented`}
+                    subtitle={`${exec.controlCoverage.implemented} of ${exec.controlCoverage.applicable} implemented`}
                     trend={trendBundle?.coverage}
                     trendVariant="success"
                 />
                 <KpiCard
                     id="kpi-risks"
                     label={t('risks')}
-                    value={execData.stats.risks}
+                    value={exec.stats.risks}
                     icon={AlertTriangle}
                     gradient="from-amber-500 to-orange-500"
-                    subtitle={t('highCritical', { count: execData.stats.highRisks })}
+                    subtitle={t('highCritical', { count: exec.stats.highRisks })}
                     trend={trendBundle?.risks}
                     trendVariant="warning"
                 />
                 <KpiCard
                     id="kpi-evidence"
                     label={t('evidence')}
-                    value={execData.stats.evidence}
+                    value={exec.stats.evidence}
                     icon={Paperclip}
                     gradient="from-purple-500 to-pink-500"
-                    subtitle={`${execData.evidenceExpiry.overdue} overdue`}
+                    subtitle={`${exec.evidenceExpiry.overdue} overdue`}
                     trend={trendBundle?.evidence}
                     trendVariant="error"
                 />
                 <KpiCard
                     id="kpi-tasks"
                     label={t('openTasks')}
-                    value={execData.stats.openTasks}
+                    value={exec.stats.openTasks}
                     icon={CheckCircle2}
                     gradient="from-indigo-500 to-blue-500"
-                    subtitle={`${execData.taskSummary.overdue} overdue`}
+                    subtitle={`${exec.taskSummary.overdue} overdue`}
                 />
                 <KpiCard
                     id="kpi-policies"
                     label="Policies"
-                    value={execData.policySummary.total}
+                    value={exec.policySummary.total}
                     icon={FileText}
                     gradient="from-sky-500 to-cyan-500"
-                    subtitle={`${execData.policySummary.published} published`}
+                    subtitle={`${exec.policySummary.published} published`}
                 />
                 <KpiCard
                     id="kpi-findings"
                     label={t('openFindings')}
-                    value={execData.stats.openFindings}
+                    value={exec.stats.openFindings}
                     icon={Bug}
                     gradient="from-red-500 to-rose-500"
                     trend={trendBundle?.findings}
@@ -275,22 +277,22 @@ export default function DashboardClient({
                 <ProgressCard
                     id="control-coverage"
                     label="Control Coverage"
-                    value={execData.controlCoverage.implemented}
-                    max={execData.controlCoverage.applicable || 1}
+                    value={exec.controlCoverage.implemented}
+                    max={exec.controlCoverage.applicable || 1}
                     segments={[
                         {
                             label: 'Implemented',
-                            value: execData.controlCoverage.implemented,
+                            value: exec.controlCoverage.implemented,
                             color: 'bg-emerald-500',
                         },
                         {
                             label: 'In Progress',
-                            value: execData.controlCoverage.inProgress,
+                            value: exec.controlCoverage.inProgress,
                             color: 'bg-amber-500',
                         },
                         {
                             label: 'Not Started',
-                            value: execData.controlCoverage.notStarted,
+                            value: exec.controlCoverage.notStarted,
                             color: 'bg-border-emphasis',
                         },
                     ]}
@@ -303,13 +305,13 @@ export default function DashboardClient({
                         </Link>
                     }
                 />
-                <RiskDistributionSection exec={execData} />
+                <RiskDistributionSection exec={exec} />
             </div>
 
             {/* ─── Evidence Status + Compliance Alerts ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <EvidenceStatusSection exec={execData} />
-                <ComplianceAlerts exec={execData} t={t} />
+                <EvidenceStatusSection exec={exec} />
+                <ComplianceAlerts exec={exec} t={t} />
             </div>
 
             {/* ─── Risk Heatmap + Evidence Expiry ─── */}
@@ -317,12 +319,12 @@ export default function DashboardClient({
                 <RiskMatrix
                     id="risk-heatmap"
                     config={matrixConfig}
-                    cells={execData.riskHeatmap}
+                    cells={exec.riskHeatmap}
                     showSwapToggle={false}
                 />
                 <ExpiryCalendar
                     id="expiry-calendar"
-                    items={execData.upcomingExpirations}
+                    items={exec.upcomingExpirations}
                 />
             </div>
 

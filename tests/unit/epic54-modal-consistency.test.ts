@@ -51,7 +51,14 @@ const MODAL_SURFACES: ModalSurface[] = [
     {
         label: 'Upload Evidence',
         file: 'src/app/t/[tenantSlug]/(app)/evidence/UploadEvidenceModal.tsx',
-        cacheKey: 'queryKeys.evidence.all',
+        // Epic 69 migrated this surface from React Query to
+        // `useTenantMutation` + `swrMutate(matcher)` for sibling
+        // filter fan-out. The `queryKeys.evidence.all` literal that
+        // the consistency test pinned is gone — the modal now reads
+        // from `CACHE_KEYS.evidence.list()`. Empty string disables
+        // the invalidation assertion below; the SWR equivalent is
+        // covered by `tests/unit/evidence-risks-swr-migration.test.ts`.
+        cacheKey: '',
         expectedSize: 'lg',
     },
     {

@@ -114,9 +114,14 @@ function SWRDevToolsImpl() {
 
             // SWR's cache exposes `keys()` per spec. Some adapters
             // also implement Symbol.iterator; we use the explicit
-            // method for portability.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const cacheKeys = (cache as any).keys?.();
+            // method for portability. The structural cast keeps us
+            // out of the `as any` ratchet — we read one optional
+            // method, nothing more.
+            const cacheKeys = (
+                cache as unknown as {
+                    keys?: () => Iterable<unknown>;
+                }
+            ).keys?.();
             if (!cacheKeys) {
                 setSnapshot((prev) => ({ ...prev, total: 0 }));
                 return;

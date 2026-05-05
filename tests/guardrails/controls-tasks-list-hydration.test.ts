@@ -37,9 +37,20 @@ describe('list-page hydration shape', () => {
         expect(controlsClient).toMatch(/staleTime:\s*30_000/);
     });
 
-    test('TasksClient sets initialDataUpdatedAt + staleTime on the list useQuery', () => {
-        expect(tasksClient).toMatch(/initialDataUpdatedAt:\s*filtersMatchInitial\s*\?\s*Date\.now\(\)/);
-        expect(tasksClient).toMatch(/staleTime:\s*30_000/);
+    test('TasksClient gates fallbackData on filtersMatchInitial + tunes dedupingInterval (Epic 69)', () => {
+        // Epic 69 migrated TasksClient from React Query to
+        // `useTenantSWR`. The prior `initialData: filtersMatchInitial
+        // ? initialTasks : undefined` + `initialDataUpdatedAt:
+        // filtersMatchInitial ? Date.now() : 0` + `staleTime: 30_000`
+        // shape becomes `fallbackData: filtersMatchInitial ?
+        // initialTasks : undefined` + `dedupingInterval: 30_000` —
+        // same intent (use SSR data as the first paint, dampen
+        // refetch thrash for the bulk-select interaction), different
+        // mechanism. Pin the SWR shape.
+        expect(tasksClient).toMatch(
+            /fallbackData:\s*filtersMatchInitial\s*\?\s*initialTasks/,
+        );
+        expect(tasksClient).toMatch(/dedupingInterval:\s*30_000/);
     });
 
     test('neither client uses the regression shape `initialDataUpdatedAt: 0` standalone', () => {
