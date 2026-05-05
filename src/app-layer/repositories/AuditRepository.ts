@@ -3,13 +3,18 @@ import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
 
 export class AuditRepository {
-    static async list(db: PrismaTx, ctx: RequestContext) {
+    static async list(
+        db: PrismaTx,
+        ctx: RequestContext,
+        options: { take?: number } = {},
+    ) {
         return db.audit.findMany({
             where: { tenantId: ctx.tenantId },
             orderBy: { createdAt: 'desc' },
             include: {
                 _count: { select: { checklist: true, findings: true } },
             },
+            ...(options.take ? { take: options.take } : {}),
         });
     }
 

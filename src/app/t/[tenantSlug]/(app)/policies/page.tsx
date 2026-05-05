@@ -5,6 +5,13 @@ import { PoliciesClient } from './PoliciesClient';
 
 export const dynamic = 'force-dynamic';
 
+// SSR fetch is capped at SSR_PAGE_LIMIT rows so the initial HTML
+// payload + DB query stay bounded as tenants accumulate policies.
+// The Epic 69 SWR client immediately fetches the unbounded list
+// in the background and keepPreviousData swaps it in transparently.
+// Mirrors the PR #146 / #149 pattern.
+const SSR_PAGE_LIMIT = 100;
+
 /**
  * Policies — Server Component.
  * Fetches policy list server-side (with URL filters applied),
@@ -33,7 +40,11 @@ export default async function PoliciesPage({
         if (typeof val === 'string' && val) filters[key] = val;
     }
 
-    const policies = await listPolicies(ctx, Object.keys(filters).length > 0 ? filters : undefined);
+    const policies = await listPolicies(
+        ctx,
+        Object.keys(filters).length > 0 ? filters : undefined,
+        { take: SSR_PAGE_LIMIT },
+    );
 
     return (
         <PoliciesClient

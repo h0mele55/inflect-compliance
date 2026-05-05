@@ -3,11 +3,16 @@ import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
 
 export class FindingRepository {
-    static async list(db: PrismaTx, ctx: RequestContext) {
+    static async list(
+        db: PrismaTx,
+        ctx: RequestContext,
+        options: { take?: number } = {},
+    ) {
         return db.finding.findMany({
             where: { tenantId: ctx.tenantId },
             orderBy: { createdAt: 'desc' },
             include: { audit: { select: { id: true, title: true } } },
+            ...(options.take ? { take: options.take } : {}),
         });
     }
 

@@ -18,10 +18,13 @@ function sanitizeOptional(v: string | null | undefined): string | null | undefin
     return sanitizePlainText(v);
 }
 
-export async function listFindings(ctx: RequestContext) {
+export async function listFindings(
+    ctx: RequestContext,
+    options: { take?: number } = {},
+) {
     assertCanRead(ctx);
     return runInTenantContext(ctx, (db) =>
-        FindingRepository.list(db, ctx)
+        FindingRepository.list(db, ctx, options)
     );
 }
 

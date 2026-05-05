@@ -5,6 +5,13 @@ import { AuditsClient } from './AuditsClient';
 
 export const dynamic = 'force-dynamic';
 
+// SSR fetch is capped at SSR_PAGE_LIMIT rows so the initial HTML
+// payload + DB query stay bounded as tenants accumulate audits.
+// The Epic 69 SWR client immediately fetches the unbounded list
+// in the background and keepPreviousData swaps it in transparently.
+// Mirrors the PR #146 / #149 pattern.
+const SSR_PAGE_LIMIT = 100;
+
 /**
  * Audits — Server Component wrapper.
  * Fetches audits list server-side, delegates interactive master/detail to client island.
@@ -22,7 +29,7 @@ export default async function AuditsPage({
         getTranslations('common'),
         getTenantCtx({ tenantSlug }),
     ]);
-    const audits = await listAudits(ctx);
+    const audits = await listAudits(ctx, { take: SSR_PAGE_LIMIT });
 
     return (
         <div className="space-y-6 animate-fadeIn">

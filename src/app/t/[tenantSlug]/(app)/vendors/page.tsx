@@ -4,6 +4,13 @@ import { VendorsClient } from './VendorsClient';
 
 export const dynamic = 'force-dynamic';
 
+// SSR fetch is capped at SSR_PAGE_LIMIT rows so the initial HTML
+// payload + DB query stay bounded as tenants accumulate vendors.
+// The Epic 69 SWR client immediately fetches the unbounded list
+// in the background and keepPreviousData swaps it in transparently.
+// Mirrors the PR #146 / #149 pattern.
+const SSR_PAGE_LIMIT = 100;
+
 /**
  * Vendors — Server Component wrapper.
  * Fetches vendor list server-side (with URL filters applied),
@@ -27,7 +34,11 @@ export default async function VendorRegisterPage({
         if (typeof val === 'string' && val) filters[key] = val;
     }
 
-    const vendors = await listVendors(ctx, Object.keys(filters).length > 0 ? filters : undefined);
+    const vendors = await listVendors(
+        ctx,
+        Object.keys(filters).length > 0 ? filters : undefined,
+        { take: SSR_PAGE_LIMIT },
+    );
 
     return (
         <div className="space-y-6">

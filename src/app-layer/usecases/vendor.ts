@@ -29,9 +29,13 @@ const FREE_TEXT_VENDOR_FIELDS = [
 
 // ─── Vendor CRUD ───
 
-export async function listVendors(ctx: RequestContext, filters: VendorFilters = {}) {
+export async function listVendors(
+    ctx: RequestContext,
+    filters: VendorFilters = {},
+    options: { take?: number } = {},
+) {
     assertCanReadVendors(ctx);
-    return runInTenantContext(ctx, (db) => VendorRepository.list(db, ctx, filters));
+    return runInTenantContext(ctx, (db) => VendorRepository.list(db, ctx, filters, options));
 }
 
 export async function listVendorsPaginated(ctx: RequestContext, params: VendorListParams) {
