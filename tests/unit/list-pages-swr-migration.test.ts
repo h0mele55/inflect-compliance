@@ -82,12 +82,12 @@ describe.each(LIST_PAGES)(
         it('threads filters into the SWR key via a query-string suffix', () => {
             const src = read(filePath);
             // The key derivation builds `${list()}?${qs}` so each
-            // filter combo gets its own cache entry.
-            expect(src).toMatch(
-                new RegExp(
-                    `${cacheKey.replace(/[.()]/g, '\\$&')}\\}\\?\\$\\{qs\\}`,
-                ),
-            );
+            // filter combo gets its own cache entry. The rendered
+            // source contains the literal substring
+            // `${CACHE_KEYS.X.list()}?${qs}` — match it as a plain
+            // string to dodge the regex-escape edge case CodeQL
+            // flags on ad-hoc `.replace(/[.()]/g, '\\$&')` patterns.
+            expect(src).toContain(`${cacheKey}}?\${qs}`);
         });
 
         it('passes server-rendered data as fallbackData', () => {
