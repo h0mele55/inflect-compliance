@@ -18,7 +18,19 @@ import tsPlugin from '@typescript-eslint/eslint-plugin';
 export default [
     ...nextCoreWebVitals,
     {
-        ignores: ['.next/**', 'node_modules/**', 'coverage/**', 'playwright-report/**'],
+        ignores: [
+            '.next/**',
+            // Local E2E (`scripts/e2e-local.mjs`) writes a Next build
+            // to `.next-test/` (controlled by `distDir` when
+            // `NEXT_TEST_MODE=1`). The chunks there are minified
+            // bundler output that trip Next ESLint rules
+            // (`@next/next/no-assign-module-variable` etc.) — they're
+            // build artefacts, not source.
+            '.next-test/**',
+            'node_modules/**',
+            'coverage/**',
+            'playwright-report/**',
+        ],
     },
     {
         plugins: {
