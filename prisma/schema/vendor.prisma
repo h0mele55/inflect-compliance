@@ -185,6 +185,13 @@ model VendorAssessmentTemplate {
   isGlobal        Boolean                           @default(false)
   name            String
   description     String?
+  /// Epic G-3 prompt 5 — scoring configuration. Shape:
+  ///   { mode: 'SIMPLE_SUM' | 'WEIGHTED_AVERAGE' | 'PASS_FAIL_THRESHOLD',
+  ///     threshold?: number,        // PASS_FAIL_THRESHOLD only
+  ///     ratingThresholds?: Array<{ rating: 'LOW'|'MEDIUM'|'HIGH'|'CRITICAL',
+  ///                                 minScore?: number, maxScore?: number }> }
+  /// Null = SIMPLE_SUM with no rating mapping (legacy default).
+  scoringConfigJson Json?
   createdByUserId String?
   createdAt       DateTime                          @default(now())
   updatedAt       DateTime                          @updatedAt

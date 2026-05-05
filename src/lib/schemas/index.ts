@@ -714,6 +714,36 @@ export const AddVendorAssessmentTemplateQuestionSchema = z.object({
     sortOrder: z.number().int().nonnegative().optional(),
 }).strip();
 
+export const ReviewVendorAssessmentSchema = z.object({
+    /// Per-answer overrides. The reviewer can adjust a subset; any
+    /// answer not in this list keeps its auto-computed points.
+    overrides: z
+        .array(
+            z.object({
+                questionId: z.string().min(1).max(120),
+                /// Override numeric points. Null clears a previous
+                /// override; undefined leaves it untouched. Float
+                /// because some weighted modes produce fractional
+                /// effective points.
+                overridePoints: z.number().nullable().optional(),
+                /// Free-text reviewer commentary; max 5000 chars.
+                reviewerNotes: z.string().max(5000).nullable().optional(),
+            }),
+        )
+        .max(500)
+        .optional()
+        .default([]),
+    /// Manual final-rating override. Null = let the engine derive
+    /// from score + ratingThresholds. Undefined = no opinion (engine
+    /// derivation also wins).
+    finalRiskRating: z
+        .enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
+        .nullable()
+        .optional(),
+    /// Assessment-level reviewer note, distinct from per-answer notes.
+    reviewerNotes: z.string().max(10000).nullable().optional(),
+}).strip();
+
 export const CloneVendorAssessmentTemplateSchema = z.object({
     /// SAME_KEY_NEW_VERSION — produce a new draft revision of the
     /// existing template family. The previous latest version
