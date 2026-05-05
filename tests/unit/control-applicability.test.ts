@@ -142,8 +142,10 @@ describe('listControls with applicability filter', () => {
 
         await listControls(adminCtx, { applicability: 'NOT_APPLICABLE' });
 
+        // Fourth arg is the SSR-cap options bag added in the
+        // interim pagination work; default `{}` when no take is set.
         expect(ControlRepository.list).toHaveBeenCalledWith(
-            mockDb, adminCtx, { applicability: 'NOT_APPLICABLE' }
+            mockDb, adminCtx, { applicability: 'NOT_APPLICABLE' }, {}
         );
     });
 
@@ -153,7 +155,7 @@ describe('listControls with applicability filter', () => {
         await listControls(adminCtx);
 
         expect(ControlRepository.list).toHaveBeenCalledWith(
-            mockDb, adminCtx, undefined
+            mockDb, adminCtx, undefined, {}
         );
     });
 });

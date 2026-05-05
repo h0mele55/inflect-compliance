@@ -4,6 +4,15 @@ import { ControlsClient } from './ControlsClient';
 
 export const dynamic = 'force-dynamic';
 
+// SSR fetch is capped at the most-relevant SSR_PAGE_LIMIT rows so
+// the initial HTML payload + DB query stay bounded as tenants
+// accumulate controls. The Epic 69 SWR client immediately fetches
+// the unbounded list in the background (the existing API GET path),
+// and SWR's keepPreviousData swaps it in transparently. UX is
+// "first 100 instantly, rest within ~500 ms" — never a blank flash.
+// Mirrors the PR #146 Tasks pattern.
+const SSR_PAGE_LIMIT = 100;
+
 /**
  * Controls — Server Component.
  * Fetches controls list server-side (with URL filters applied),
@@ -30,7 +39,11 @@ export default async function ControlsPage({
         if (typeof val === 'string' && val) filters[key] = val;
     }
 
-    const controls = await listControls(ctx, Object.keys(filters).length > 0 ? filters : undefined);
+    const controls = await listControls(
+        ctx,
+        Object.keys(filters).length > 0 ? filters : undefined,
+        { take: SSR_PAGE_LIMIT },
+    );
 
     return (
         <ControlsClient

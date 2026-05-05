@@ -20,7 +20,12 @@ export interface ControlListParams {
 }
 
 export class ControlRepository {
-    static async list(db: PrismaTx, ctx: RequestContext, filters?: ControlListFilters) {
+    static async list(
+        db: PrismaTx,
+        ctx: RequestContext,
+        filters?: ControlListFilters,
+        options: { take?: number } = {},
+    ) {
         return traceRepository('control.list', ctx, async () => {
             const where = ControlRepository._buildWhere(ctx, filters);
 
@@ -31,6 +36,7 @@ export class ControlRepository {
                     owner: { select: { id: true, name: true, email: true } },
                     _count: { select: { controlTasks: true, evidenceLinks: true } },
                 },
+                ...(options.take ? { take: options.take } : {}),
             });
         });
     }

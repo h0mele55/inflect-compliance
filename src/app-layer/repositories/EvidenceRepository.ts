@@ -22,7 +22,12 @@ export interface EvidenceListParams {
 }
 
 export class EvidenceRepository {
-    static async list(db: PrismaTx, ctx: RequestContext, filters?: EvidenceListFilters) {
+    static async list(
+        db: PrismaTx,
+        ctx: RequestContext,
+        filters?: EvidenceListFilters,
+        options: { take?: number } = {},
+    ) {
         return traceRepository('evidence.list', ctx, async () => {
             const where = EvidenceRepository._buildWhere(ctx, filters);
             return db.evidence.findMany({
@@ -32,6 +37,7 @@ export class EvidenceRepository {
                     control: { select: { id: true, name: true, annexId: true } },
                     reviews: { orderBy: { createdAt: 'desc' }, take: 1 },
                 },
+                ...(options.take ? { take: options.take } : {}),
             });
         });
     }
