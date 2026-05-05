@@ -85,17 +85,14 @@ test.describe('Epic 56 — tooltip + copy primitives', () => {
         await expect(tip.locator('kbd')).toContainText('Esc');
     });
 
-    // FIXME(Epic 56 follow-up) — `#share-pack-btn` is gated behind both
-    // `RequirePermission(audits.share)` AND `UpgradeGate(AUDIT_PACK_SHARING)`.
-    // The seed admin user has the permission but the seed billing plan
-    // doesn't include the AUDIT_PACK_SHARING feature, so the upgrade
-    // gate hides the button and the test times out waiting for it.
-    // Has been red since Epic 66's CI run on main; not regressed by
-    // any individual epic. Skip until the seed adds the feature flag
-    // (or the test switches to programmatically setting plan via the
-    // billing API). Tracked separately from the Epic 67/68/CI-fix
-    // work so this E2E failure doesn't keep main yellow.
-    test.skip('audit pack share link — CopyButton writes to clipboard + shows toast', async ({ page }) => {
+    // The original skip rationale ("seed billing plan doesn't
+    // include AUDIT_PACK_SHARING") was stale —
+    // `<UpgradeGate>` treats a null `plan` (no `BillingAccount`
+    // row) as ungated, and the seed doesn't create one. The
+    // share-pack flow runs cleanly under the seeded admin tenant.
+    // Re-enabled in the Epic-69 follow-up pass that swept the
+    // remaining E2E skips.
+    test('audit pack share link — CopyButton writes to clipboard + shows toast', async ({ page }) => {
         const tenantSlug = await loginAndGetTenant(page, ADMIN_USER);
 
         // Navigate via the cycle list (no standalone /audits/packs route

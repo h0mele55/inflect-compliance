@@ -27,11 +27,7 @@ const READER_USER = { email: 'viewer@acme.com', password: 'password123' };
 const CUSTOM_LABEL = 'Probability of occurrence';
 
 test.describe('Risk matrix admin → live rendering loop', () => {
-    // FIXME — flaky on CI: failing intermittently since at least
-    // Epic 66 (E2E job has been red on main since then). Skip to
-    // unblock the dependabot queue; the live-rendering-loop settle
-    // behaviour needs separate investigation.
-    test.skip('admin can edit the axis title and see it propagate to /risks', async ({ page }) => {
+    test('admin can edit the axis title and see it propagate to /risks', async ({ page }) => {
         const tenantSlug = await loginAndGetTenant(page, ADMIN_USER);
 
         // ── 1. Admin lands on the matrix config page ──────────────
@@ -49,9 +45,26 @@ test.describe('Risk matrix admin → live rendering loop', () => {
         await titleInput.fill(CUSTOM_LABEL);
 
         // ── 3. Save ───────────────────────────────────────────────
+        //
+        // Previous shape used `toHaveText(/Save changes/i)` to wait
+        // for the save to settle. That label is the button's IDLE
+        // text — `'Saving…'` only briefly replaces it during the
+        // PUT — so the assertion could pass before React even
+        // re-rendered the saving state, and the next navigation to
+        // `/risks` raced the in-flight PUT. Wait on the real signal:
+        // the PUT response itself.
+        const savePromise = page.waitForResponse(
+            (res) =>
+                res.url().includes(
+                    `/api/t/${tenantSlug}/admin/risk-matrix-config`,
+                ) && res.request().method() === 'PUT',
+            { timeout: 30_000 },
+        );
         await page.click('#risk-matrix-save-btn');
-        // Toast is async + portal-mounted; the URL doesn't change so
-        // we wait on the save button settling back to "Save changes".
+        const saveRes = await savePromise;
+        expect(saveRes.ok()).toBe(true);
+        // Belt-and-braces: also wait for the button to settle back
+        // to its idle label (covers React state-update propagation).
         await expect(page.locator('#risk-matrix-save-btn')).toHaveText(
             /Save changes/i,
             { timeout: 15_000 },
@@ -84,7 +97,18 @@ test.describe('Risk matrix admin → live rendering loop', () => {
             timeout: 30_000,
         });
         await page.click('#risk-matrix-restore-defaults');
+        // Same response-wait as the main save above so cleanup
+        // fully lands before the test exits and other serial-mode
+        // tests start from the canonical default.
+        const cleanupPromise = page.waitForResponse(
+            (res) =>
+                res.url().includes(
+                    `/api/t/${tenantSlug}/admin/risk-matrix-config`,
+                ) && res.request().method() === 'PUT',
+            { timeout: 30_000 },
+        );
         await page.click('#risk-matrix-save-btn');
+        await cleanupPromise;
         await expect(page.locator('#risk-matrix-save-btn')).toHaveText(
             /Save changes/i,
             { timeout: 15_000 },
