@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { TestPlanScheduleSection } from '@/components/TestPlanScheduleSection';
 
 interface TestPlanDetail {
     id: string;
@@ -14,6 +15,13 @@ interface TestPlanDetail {
     frequency: string;
     status: string;
     nextDueAt: string | null;
+    // Epic G-2 — automation scheduling fields. Returned by the
+    // existing GET /tests/plans/:id; used by TestPlanScheduleSection
+    // to render the cadence picker + next-run indicator.
+    automationType: 'MANUAL' | 'SCRIPT' | 'INTEGRATION';
+    schedule: string | null;
+    scheduleTimezone: string | null;
+    nextRunAt: string | null;
     controlId: string;
     owner?: { id: string; name: string | null; email: string } | null;
     createdBy?: { id: string; name: string | null; email: string } | null;
@@ -204,6 +212,17 @@ export default function TestPlanDetailPage() {
                     </button>
                 </div>
             )}
+
+            {/* Epic G-2 — schedule picker + next-run indicator */}
+            <TestPlanScheduleSection
+                planId={plan.id}
+                initialAutomationType={plan.automationType}
+                initialSchedule={plan.schedule}
+                initialScheduleTimezone={plan.scheduleTimezone}
+                initialNextRunAt={plan.nextRunAt}
+                canEdit={permissions.canWrite}
+                onSaved={fetchPlan}
+            />
 
             {/* Info Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
