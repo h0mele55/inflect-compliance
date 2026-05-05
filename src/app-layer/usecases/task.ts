@@ -56,16 +56,23 @@ async function validateTypeRelevance(
 
 // ─── List / Get ───
 
-export async function listTasks(ctx: RequestContext, filters: TaskFilters = {}) {
+export async function listTasks(
+    ctx: RequestContext,
+    filters: TaskFilters = {},
+    options: { take?: number } = {},
+) {
     assertCanReadTasks(ctx);
     return cachedListRead({
         ctx,
         entity: 'task',
         operation: 'list',
-        params: filters,
+        // `take` must be in the cache key — bounded and unbounded
+        // results have different shapes; sharing a key would let a
+        // bounded SSR fetch poison the unbounded API GET cache.
+        params: options.take ? { ...filters, _take: options.take } : filters,
         loader: () =>
             runInTenantContext(ctx, (db) =>
-                WorkItemRepository.list(db, ctx, filters),
+                WorkItemRepository.list(db, ctx, filters, options),
             ),
     });
 }

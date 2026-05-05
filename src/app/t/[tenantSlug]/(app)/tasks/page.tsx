@@ -4,6 +4,17 @@ import { TasksClient } from './TasksClient';
 
 export const dynamic = 'force-dynamic';
 
+// SSR fetch is capped at the most-recent SSR_PAGE_LIMIT rows so the
+// initial HTML payload + DB query stay bounded as tenants accumulate
+// tasks. The Epic 69 SWR client immediately fetches the unbounded
+// list in the background (the existing API GET path), and SWR's
+// keepPreviousData swaps it in transparently. UX is "first 100
+// instantly, rest within ~500 ms" — never a blank flash. We use
+// `listTasks` (priority-asc, createdAt-desc) rather than
+// `listTasksPaginated` (createdAt-desc, id-desc) so SSR + SWR share
+// the same ordering and the row order doesn't reshuffle mid-load.
+const SSR_PAGE_LIMIT = 100;
+
 /**
  * Tasks — Server Component.
  * Fetches task list server-side (with URL filters applied),
@@ -27,7 +38,11 @@ export default async function TasksPage({
         if (typeof val === 'string' && val) filters[key] = val;
     }
 
-    const tasks = await listTasks(ctx, Object.keys(filters).length > 0 ? filters : undefined);
+    const tasks = await listTasks(
+        ctx,
+        Object.keys(filters).length > 0 ? filters : undefined,
+        { take: SSR_PAGE_LIMIT },
+    );
 
     return (
         <TasksClient
