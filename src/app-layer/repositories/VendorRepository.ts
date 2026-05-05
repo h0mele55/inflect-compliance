@@ -25,12 +25,18 @@ const vendorIncludes = {
 };
 
 export class VendorRepository {
-    static async list(db: PrismaTx, ctx: RequestContext, filters: VendorFilters = {}) {
+    static async list(
+        db: PrismaTx,
+        ctx: RequestContext,
+        filters: VendorFilters = {},
+        options: { take?: number } = {},
+    ) {
         const where = VendorRepository._buildWhere(ctx, filters);
         return db.vendor.findMany({
             where,
             orderBy: [{ criticality: 'desc' }, { name: 'asc' }],
             include: vendorIncludes,
+            ...(options.take ? { take: options.take } : {}),
         });
     }
 

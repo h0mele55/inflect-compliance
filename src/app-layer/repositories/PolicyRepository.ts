@@ -24,12 +24,18 @@ const policyListIncludes = {
 };
 
 export class PolicyRepository {
-    static async list(db: PrismaTx, ctx: RequestContext, filters?: PolicyFilters) {
+    static async list(
+        db: PrismaTx,
+        ctx: RequestContext,
+        filters?: PolicyFilters,
+        options: { take?: number } = {},
+    ) {
         const where = PolicyRepository._buildWhere(ctx, filters);
         return db.policy.findMany({
             where,
             orderBy: { updatedAt: 'desc' },
             include: policyListIncludes,
+            ...(options.take ? { take: options.take } : {}),
         });
     }
 

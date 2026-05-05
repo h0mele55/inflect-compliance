@@ -23,10 +23,14 @@ function slugify(text: string): string {
 
 // ─── Queries ───
 
-export async function listPolicies(ctx: RequestContext, filters?: PolicyFilters) {
+export async function listPolicies(
+    ctx: RequestContext,
+    filters?: PolicyFilters,
+    options: { take?: number } = {},
+) {
     assertCanRead(ctx);
     return runInTenantContext(ctx, (db) =>
-        PolicyRepository.list(db, ctx, filters)
+        PolicyRepository.list(db, ctx, filters, options)
     );
 }
 

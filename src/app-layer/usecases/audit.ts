@@ -14,10 +14,13 @@ function sanitizeOptional(v: string | null | undefined): string | null | undefin
     return sanitizePlainText(v);
 }
 
-export async function listAudits(ctx: RequestContext) {
+export async function listAudits(
+    ctx: RequestContext,
+    options: { take?: number } = {},
+) {
     assertCanRead(ctx);
     return runInTenantContext(ctx, (db) =>
-        AuditRepository.list(db, ctx)
+        AuditRepository.list(db, ctx, options)
     );
 }
 
