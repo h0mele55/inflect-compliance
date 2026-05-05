@@ -253,9 +253,21 @@ test.describe('CISO portfolio journey (Epic O-4)', () => {
         ).toBeVisible({ timeout: 30_000 });
 
         await page.fill('[data-testid="org-new-tenant-name"]', attemptName);
-        // The slug field auto-fills from the name; replace with a
-        // collision-proof slug for repeat runs.
-        await page.fill('[data-testid="org-new-tenant-slug"]', attemptSlug);
+        // The slug field auto-fills via a debounced effect after
+        // name input. Wait for it to settle (any non-empty value),
+        // THEN replace with a collision-proof slug. Without the
+        // wait, the auto-fill can fire AFTER our `fill` call and
+        // overwrite the collision-proof value back to a name-
+        // derived slug — which collides with prior runs and the
+        // create POST 409s. That race showed up as the test being
+        // marked "flaky" in CI.
+        const slugInput = page.locator('[data-testid="org-new-tenant-slug"]');
+        await expect(slugInput).not.toHaveValue('', { timeout: 10_000 });
+        await slugInput.fill(attemptSlug);
+        // Re-assert after a short settle window — if a debounced
+        // effect tries to overwrite the slug again, this fails
+        // deterministically rather than producing a 409 later.
+        await expect(slugInput).toHaveValue(attemptSlug, { timeout: 5_000 });
         // "Choose later" — keeps the post-create redirect to a stable
         // surface that doesn't depend on the framework catalog.
         await page.click('[data-testid="org-new-tenant-framework-later"]');

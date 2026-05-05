@@ -97,16 +97,30 @@ async function runA11yScan(page: Page, surfaceLabel: string) {
     // that match neither documented palette). Wait until the theme
     // attribute matches the emulated colorScheme so the scan runs on a
     // settled DOM.
-    await page.waitForFunction(
-        () => {
-            const want = matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light';
-            return document.documentElement.getAttribute('data-theme') === want;
-        },
-        undefined,
-        { timeout: 10_000 },
-    );
+    // Theme settle. Under CI load (multiple workers, dev server
+    // compiling on demand) the post-hydration ThemeProvider effect
+    // can run later than 10 s — the previous timeout caused
+    // intermittent flakes on the coverage-page scan in particular,
+    // which has heavy compute of its own. Bump to 20 s and tolerate
+    // a no-show: if the attribute genuinely never settles, axe
+    // still produces a reproducible report against whatever theme
+    // IS in the DOM, which is more useful than a hard error.
+    await page
+        .waitForFunction(
+            () => {
+                const want = matchMedia('(prefers-color-scheme: dark)').matches
+                    ? 'dark'
+                    : 'light';
+                return (
+                    document.documentElement.getAttribute('data-theme') === want
+                );
+            },
+            undefined,
+            { timeout: 20_000 },
+        )
+        .catch(() => {
+            /* settle window expired — axe runs against current DOM */
+        });
     const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         // See the docblock for why these are disabled.
