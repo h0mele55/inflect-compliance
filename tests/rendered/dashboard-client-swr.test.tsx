@@ -218,9 +218,18 @@ describe('DashboardClient — SWR migration acceptance', () => {
             stats: { ...buildExec().stats, risks: 99 },
         });
 
-        // SWR triggers a background revalidation on mount; satisfy
-        // it with the `initial` payload so the cache stays consistent.
-        fetchMock.mockResolvedValue({ ok: true, json: async () => initial });
+        // The fetch implementation switches mid-test. Before the
+        // mutation, ANY background revalidation that SWR fires
+        // returns `initial`. After the mutation we flip the
+        // implementation to return `refreshed` so a slow CI runner
+        // that races a revalidation in between the mutate write and
+        // the `waitFor` assertion can't overwrite the cache back to
+        // `initial`. (Local jest never hit that race; CI did.)
+        let currentResponse = initial;
+        fetchMock.mockImplementation(async () => ({
+            ok: true,
+            json: async () => currentResponse,
+        }));
 
         // The scoped SWRConfig (provider: () => new Map()) creates
         // a per-test cache that the global `mutate` from 'swr' does
@@ -247,6 +256,10 @@ describe('DashboardClient — SWR migration acceptance', () => {
         );
 
         expect(screen.getByText('7')).toBeInTheDocument();
+
+        // Flip the fetch mock BEFORE the mutate so any racing
+        // revalidation lands on `refreshed`.
+        currentResponse = refreshed;
 
         // Imitate what a `useTenantMutation({ ..., invalidate: [
         //     CACHE_KEYS.dashboard.executive(),
