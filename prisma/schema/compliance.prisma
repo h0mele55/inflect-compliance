@@ -565,6 +565,9 @@ model Evidence {
   retentionPolicy   RetentionPolicy           @default(NONE)
   retentionUntil    DateTime?
   testEvidenceLinks ControlTestEvidenceLink[]
+  // Epic G-3 — vendor questionnaire FILE_UPLOAD answers attach
+  // their proof here.
+  vendorAnswers     VendorAssessmentAnswer[]  @relation("VendorAnswerEvidence")
   control           Control?                  @relation(fields: [controlId], references: [id])
   fileRecord        FileRecord?               @relation(fields: [fileRecordId], references: [id])
   ownerUser         User?                     @relation("EvidenceOwner", fields: [ownerUserId], references: [id])

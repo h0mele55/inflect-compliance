@@ -519,13 +519,35 @@ enum AnswerType {
   MULTI_SELECT
   TEXT
   NUMBER
+  // Epic G-3 additions for the questionnaire builder.
+  // SCALE        — Likert-style 1..N (configured per-question via scaleConfigJson).
+  // FILE_UPLOAD  — answer is an Evidence row attached to the response.
+  SCALE
+  FILE_UPLOAD
 }
 
+// Vendor assessment lifecycle.
+//
+// Pre-G-3 approval workflow (still valid for paths that surface
+// internal review without an external respondent):
+//   DRAFT → IN_REVIEW → APPROVED / REJECTED
+//
+// G-3 send-and-collect (the new canonical questionnaire flow):
+//   DRAFT → SENT → IN_PROGRESS → SUBMITTED → REVIEWED → CLOSED
+//
+// Both branches share the DRAFT entry point. New code paths drive
+// the G-3 lifecycle; the legacy values remain enumerated so existing
+// rows stay valid without a data migration.
 enum AssessmentStatus {
   DRAFT
   IN_REVIEW
   APPROVED
   REJECTED
+  SENT
+  IN_PROGRESS
+  SUBMITTED
+  REVIEWED
+  CLOSED
 }
 
 enum VendorLinkEntityType {
