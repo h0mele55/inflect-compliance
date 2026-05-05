@@ -277,10 +277,18 @@ describe('NewEvidenceTextModal — shared Modal composition', () => {
     });
 
     it('invalidates the evidence cache on success and closes', () => {
+        // Epic 69 added an SWR cache bridge inside `onSuccess` (so
+        // EvidenceClient's `useTenantSWR` cache refreshes alongside
+        // the legacy React Query invalidation). The block grew past
+        // the prior 400-char window — bumped to 1200 so the new
+        // SWR `swrMutate(matcher, …)` fan-out fits comfortably.
+        // Both invalidations remain pinned: the React Query
+        // queryKey AND the SWR matcher symbol.
         expect(TEXT_MODAL_SRC).toMatch(
             /queryKeys\.evidence\.all\(tenantSlug\)/,
         );
-        expect(TEXT_MODAL_SRC).toMatch(/onSuccess:[\s\S]{0,400}close\(\)/);
+        expect(TEXT_MODAL_SRC).toContain('swrMutate');
+        expect(TEXT_MODAL_SRC).toMatch(/onSuccess:[\s\S]{0,1200}close\(\)/);
     });
 
     it('focuses the title input shortly after open', () => {
