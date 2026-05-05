@@ -95,5 +95,12 @@ export const SCHEDULED_JOBS: ScheduleDefinition[] = [
         description: 'Send weekly compliance digest email to tenant admins. Reuses snapshot data — no live aggregation.',
         defaultPayload: {},
     },
+    {
+        name: 'control-test-scheduler',
+        pattern: '*/5 * * * *',   // every 5 minutes
+        description:
+            'Epic G-2 — scan ControlTestPlan rows with automationType IN (SCRIPT, INTEGRATION) and nextRunAt <= now, enqueue per-plan control-test-runner jobs.',
+        defaultPayload: {},
+    },
 ];
 

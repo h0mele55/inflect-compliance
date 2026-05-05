@@ -566,6 +566,45 @@ executorRegistry.register('automation-event-dispatch', async (payload) => {
     );
 });
 
+// ── control-test-scheduler (Epic G-2) ────────────────────────────────
+//
+// Repeatable scan that claims due ControlTestPlan rows and enqueues
+// per-plan `control-test-runner` jobs. The runner itself is wired
+// into the type system but its executor is registered in a later
+// G-2 prompt — until then, runner jobs land in the queue and fail
+// with "no executor registered", which is the expected, observable
+// state.
+
+executorRegistry.register('control-test-scheduler', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runControlTestScheduler } = await import('./control-test-scheduler');
+    const r = await runControlTestScheduler({
+        tenantId: payload.tenantId,
+        now: payload.nowIso ? new Date(payload.nowIso) : undefined,
+        dryRun: payload.dryRun,
+    });
+    return makeResult(
+        'control-test-scheduler',
+        startedAt,
+        startMs,
+        r.totalDue,
+        r.enqueued,
+        r.skippedClaimRace +
+            r.skippedInvalidSchedule +
+            r.bootstrapped,
+        {
+            bootstrapped: r.bootstrapped,
+            enqueued: r.enqueued,
+            skippedClaimRace: r.skippedClaimRace,
+            skippedInvalidSchedule: r.skippedInvalidSchedule,
+            enqueueFailures: r.enqueueFailures,
+            dryRun: r.dryRun,
+            jobRunId: r.jobRunId,
+        },
+    );
+});
+
 // ── evidence-import (Epic 43.3) ──────────────────────────────────────
 //
 // One job invocation per uploaded ZIP. The HTTP layer stages the
