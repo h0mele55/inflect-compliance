@@ -35,12 +35,18 @@ const taskListIncludes = {
 // ─── Task Repository ───
 
 export class WorkItemRepository {
-    static async list(db: PrismaTx, ctx: RequestContext, filters: TaskFilters = {}) {
+    static async list(
+        db: PrismaTx,
+        ctx: RequestContext,
+        filters: TaskFilters = {},
+        options: { take?: number } = {},
+    ) {
         const where = WorkItemRepository._buildWhere(ctx, filters);
         return db.task.findMany({
             where,
             orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
             include: taskListIncludes,
+            ...(options.take ? { take: options.take } : {}),
         });
     }
 
