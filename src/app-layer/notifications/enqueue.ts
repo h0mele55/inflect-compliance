@@ -16,10 +16,12 @@ import {
     buildEvidenceExpiringEmail,
     buildPolicyApprovalRequestedEmail,
     buildPolicyDecisionEmail,
+    buildVendorAssessmentInvitationEmail,
     type TaskAssignedPayload,
     type EvidenceExpiringPayload,
     type PolicyApprovalRequestedPayload,
     type PolicyDecisionPayload,
+    type VendorAssessmentInvitationPayload,
 } from './templates';
 
 export interface EnqueueEmailInput {
@@ -27,7 +29,12 @@ export interface EnqueueEmailInput {
     type: EmailNotificationType;
     toEmail: string;
     entityId: string;
-    payload: TaskAssignedPayload | EvidenceExpiringPayload | PolicyApprovalRequestedPayload | PolicyDecisionPayload;
+    payload:
+        | TaskAssignedPayload
+        | EvidenceExpiringPayload
+        | PolicyApprovalRequestedPayload
+        | PolicyDecisionPayload
+        | VendorAssessmentInvitationPayload;
     sendAfter?: Date;
     requestId?: string;
 }
@@ -111,7 +118,12 @@ export async function enqueueEmail(
  */
 function buildEmailContent(
     type: EmailNotificationType,
-    payload: TaskAssignedPayload | EvidenceExpiringPayload | PolicyApprovalRequestedPayload | PolicyDecisionPayload,
+    payload:
+        | TaskAssignedPayload
+        | EvidenceExpiringPayload
+        | PolicyApprovalRequestedPayload
+        | PolicyDecisionPayload
+        | VendorAssessmentInvitationPayload,
 ): { subject: string; bodyText: string; bodyHtml: string } {
     switch (type) {
         case 'TASK_ASSIGNED':
@@ -124,6 +136,10 @@ function buildEmailContent(
             return buildPolicyDecisionEmail({ ...(payload as PolicyDecisionPayload), decision: 'APPROVED' });
         case 'POLICY_REJECTED':
             return buildPolicyDecisionEmail({ ...(payload as PolicyDecisionPayload), decision: 'REJECTED' });
+        case 'VENDOR_ASSESSMENT_INVITATION':
+            return buildVendorAssessmentInvitationEmail(
+                payload as VendorAssessmentInvitationPayload,
+            );
         default:
             throw new Error(`Unknown notification type: ${type}`);
     }

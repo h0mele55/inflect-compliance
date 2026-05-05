@@ -182,7 +182,84 @@ export function buildPolicyDecisionEmail(payload: PolicyDecisionPayload): EmailT
     };
 }
 
+// ─── Vendor assessment invitation (Epic G-3) ───
+
+export interface VendorAssessmentInvitationPayload {
+    /// Vendor / org name to address — falls back to "Vendor team".
+    recipientName: string;
+    /// Free-text vendor name shown in the body.
+    vendorName: string;
+    /// Template name for context.
+    templateName: string;
+    /// The full external response URL — INCLUDES the raw token.
+    /// This is the only place the raw token ever appears, so the
+    /// caller is responsible for ensuring it's transmitted only via
+    /// the email body and never logged elsewhere.
+    responseUrl: string;
+    /// ISO timestamp the link expires (formatted in the body).
+    expiresAtIso: string;
+    /// Optional inviter name for the by-line.
+    inviterName?: string;
+}
+
+export function buildVendorAssessmentInvitationEmail(
+    payload: VendorAssessmentInvitationPayload,
+): EmailTemplateResult {
+    const {
+        recipientName,
+        vendorName,
+        templateName,
+        responseUrl,
+        expiresAtIso,
+        inviterName,
+    } = payload;
+    const expiresFormatted = formatIsoDate(expiresAtIso);
+    const byLine = inviterName ? ` from ${inviterName}` : '';
+
+    return {
+        subject: `Action required: ${templateName} questionnaire`,
+        bodyText: [
+            `Hi ${recipientName},`,
+            '',
+            `You've received a vendor assessment questionnaire${byLine}.`,
+            '',
+            `  Vendor:    ${vendorName}`,
+            `  Template:  ${templateName}`,
+            `  Expires:   ${expiresFormatted}`,
+            '',
+            `Open the questionnaire: ${responseUrl}`,
+            '',
+            'This link is single-use and tied to your assessment. Please do',
+            'not forward it.',
+            '',
+            '— Inflect Compliance',
+        ].join('\n'),
+        bodyHtml: `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #1a1a2e; font-size: 18px; margin-bottom: 16px;">📋 Vendor assessment requested</h2>
+  <p style="color: #444; line-height: 1.5;">Hi ${escapeHtml(recipientName)},</p>
+  <p style="color: #444; line-height: 1.5;">You've received a vendor assessment questionnaire${byLine ? ` from <strong>${escapeHtml(inviterName!)}</strong>` : ''}.</p>
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr><td style="color: #888; padding: 4px 0; width: 100px;">Vendor</td><td style="color: #444;"><strong>${escapeHtml(vendorName)}</strong></td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Template</td><td style="color: #444;">${escapeHtml(templateName)}</td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Expires</td><td style="color: #444;">${escapeHtml(expiresFormatted)}</td></tr>
+  </table>
+  <a href="${escapeHtml(responseUrl)}" style="display: inline-block; background: #4f46e5; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">Open questionnaire</a>
+  <p style="color: #888; font-size: 12px; line-height: 1.5; margin-top: 16px;">This link is single-use and tied to your assessment. Please do not forward it.</p>
+  <p style="color: #999; font-size: 12px; margin-top: 24px;">— Inflect Compliance</p>
+</div>`.trim(),
+    };
+}
+
 // ─── Helpers ───
+
+function formatIsoDate(iso: string): string {
+    try {
+        return new Date(iso).toUTCString();
+    } catch {
+        return iso;
+    }
+}
 
 function escapeHtml(str: string): string {
     return str

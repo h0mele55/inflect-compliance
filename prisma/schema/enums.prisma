@@ -412,6 +412,10 @@ enum EmailNotificationType {
   DEADLINE_DIGEST
   EVIDENCE_EXPIRY_DIGEST
   VENDOR_RENEWAL_DIGEST
+  // Epic G-3 — outbound questionnaire invitation. Body carries the
+  // external access URL with the raw token (the only place the raw
+  // token ever appears in the system).
+  VENDOR_ASSESSMENT_INVITATION
 }
 
 enum EmailOutboxStatus {

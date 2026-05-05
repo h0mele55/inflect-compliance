@@ -256,10 +256,11 @@ model VendorAssessment {
   tenantId                      String
   vendorId                      String
   /// Legacy templateId — points at QuestionnaireTemplate. Existing
-  /// rows keep using this; new G-3 assessments populate
-  /// `templateVersionId` (below) which points at a specific
-  /// VendorAssessmentTemplate version.
-  templateId                    String
+  /// approval-flow rows keep using this; new G-3 sends leave it
+  /// null and populate `templateVersionId` instead. The column is
+  /// nullable so the FK doesn't force every G-3 send to also
+  /// allocate a stub QuestionnaireTemplate row.
+  templateId                    String?
   /// Epic G-3 — pin the assessment to a specific template version
   /// so subsequent template edits don't mutate live questionnaires.
   /// Nullable for legacy rows that only carry templateId.
@@ -308,7 +309,7 @@ model VendorAssessment {
   sentBy                        User?                     @relation("AssessmentSender", fields: [sentByUserId], references: [id])
   reviewedBy                    User?                     @relation("AssessmentReviewer", fields: [reviewedByUserId], references: [id])
   closedBy                      User?                     @relation("AssessmentCloser", fields: [closedByUserId], references: [id])
-  template                      QuestionnaireTemplate     @relation(fields: [templateId], references: [id])
+  template                      QuestionnaireTemplate?    @relation(fields: [templateId], references: [id])
   templateVersion               VendorAssessmentTemplate? @relation("AssessmentByTemplateVersion", fields: [templateVersionId], references: [id])
   tenant                        Tenant                    @relation(fields: [tenantId], references: [id])
   vendor                        Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
