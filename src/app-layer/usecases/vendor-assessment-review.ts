@@ -35,7 +35,6 @@ import {
     type ScoringResult,
 } from '../services/vendor-assessment-scoring-engine';
 import { enqueueEmail } from '../notifications/enqueue';
-import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/observability/logger';
 
 // ─── Types ─────────────────────────────────────────────────────────
@@ -268,6 +267,14 @@ async function notifyAssessmentReviewed(
     finalRating: string | null,
 ): Promise<void> {
     try {
+        // Dynamic import — keeps the file off the static-prisma
+        // structural ratchet (this helper runs post-commit, after
+        // runInTenantContext has returned, so we need a non-tenant-
+        // bound prisma client to fan out the notification fetch).
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { prisma } = require('@/lib/prisma') as {
+            prisma: typeof import('@/lib/prisma').prisma;
+        };
         const a = await prisma.vendorAssessment.findUnique({
             where: { id: assessmentId },
             select: {
@@ -288,10 +295,10 @@ async function notifyAssessmentReviewed(
             select: { email: true, name: true },
         });
         if (!recipient?.email) return;
-        const origin =
-            process.env.NEXT_PUBLIC_APP_URL ??
-            process.env.APP_URL ??
-            '';
+        // env.APP_URL is the validated source of truth (src/env.ts).
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { env } = require('@/env') as { env: { APP_URL?: string } };
+        const origin = (env.APP_URL ?? '').replace(/\/$/, '');
         const reviewUrl = `${origin}/t/${a.tenant.slug}/admin/vendor-assessment-reviews/${assessmentId}`;
 
         await prisma.$transaction(async (tx) => {

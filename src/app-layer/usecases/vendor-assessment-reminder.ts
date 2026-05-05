@@ -121,7 +121,9 @@ export async function sendAssessmentReminder(
 }
 
 function buildReminderUrl(assessmentId: string): string {
-    const origin =
-        process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? '';
-    return `${origin.replace(/\/$/, '')}/vendor-assessment/${assessmentId}`;
+    // env.APP_URL is the validated source of truth (src/env.ts).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { env } = require('@/env') as { env: { APP_URL?: string } };
+    const origin = (env.APP_URL ?? '').replace(/\/$/, '');
+    return `${origin}/vendor-assessment/${assessmentId}`;
 }

@@ -89,6 +89,13 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
             // route into /t/{tenantSlug}/... where standard tenant
             // isolation applies.
             'org',
+            // Epic G-3 — public token-gated vendor questionnaire response
+            // page. The external respondent has no session and no tenant
+            // membership; the page is reached via the email's
+            // ?t=<rawToken> link. Token verification matches against the
+            // assessment row's tenantId; the page lives outside /t/ by
+            // design. Mirrors the audit/shared shape.
+            'vendor-assessment',
         ]);
 
         // Get immediate children of app/ that are page directories
@@ -155,6 +162,16 @@ describe('Structural Guard: Tenant Isolation Conventions', () => {
             // never serves a request in a tenant-data context. The
             // tenant-scoping invariant doesn't apply to dev-only docs.
             'docs',
+            // Epic G-3 — public token-gated vendor questionnaire
+            // response surface. The external respondent has no
+            // session and no tenant-membership; tenant resolution
+            // happens through the assessment row's tenantId after
+            // the SHA-256 access-token verifier matches. The path
+            // is also in PUBLIC_PATH_PREFIXES so middleware skips
+            // JWT verification. See
+            // src/lib/security/external-assessment-access.ts and
+            // src/lib/errors/route-exemptions.ts (anti_enumeration).
+            'vendor-assessment',
         ]);
 
         // Legacy routes are allowed as documented thin wrappers

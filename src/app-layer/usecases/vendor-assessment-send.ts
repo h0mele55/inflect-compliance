@@ -98,11 +98,13 @@ function clamp(n: number, min: number, max: number): number {
 
 function resolveAppOrigin(override?: string): string {
     if (override) return override.replace(/\/$/, '');
-    const env = process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL;
-    if (env && env.length > 0) return env.replace(/\/$/, '');
-    // Last-resort default. The email's response URL still works
-    // because the route is relative; raw-origin fallback is a
-    // dev-only safety net.
+    // env.APP_URL is the validated source of truth (src/env.ts).
+    // Last-resort default keeps dev/test happy when APP_URL is unset.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { env } = require('@/env') as { env: { APP_URL?: string } };
+    if (env.APP_URL && env.APP_URL.length > 0) {
+        return env.APP_URL.replace(/\/$/, '');
+    }
     return 'http://localhost:3000';
 }
 
