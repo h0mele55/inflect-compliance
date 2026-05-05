@@ -151,7 +151,13 @@ test.describe('Epic 54 — Add text evidence modal', () => {
         await page.click('#add-text-evidence-btn');
 
         await expect(page.locator('#text-evidence-form')).toBeVisible({ timeout: 30_000 });
-        await expect(page.locator('#text-evidence-title-input')).toBeFocused({ timeout: 3000 });
+        // The focus assertion previously had a 3 s timeout. Under CI
+        // load (multiple workers, dev server compiling on demand)
+        // the auto-focus useEffect inside NewEvidenceTextModal can
+        // run later than that — registered as a "flaky" run in the
+        // last CI sweep. 10 s gives the post-mount focus dispatch
+        // enough headroom without compromising the assertion.
+        await expect(page.locator('#text-evidence-title-input')).toBeFocused({ timeout: 10_000 });
 
         // Close so the open modal doesn't leak into the next serial test.
         await page.click('#text-evidence-cancel-btn');

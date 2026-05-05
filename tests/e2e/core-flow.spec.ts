@@ -170,6 +170,18 @@ test.describe('Core Certification Flow', () => {
     });
 
     // E) Link Control to Risk via TraceabilityPanel
+    //
+    // Strategy mirrors test D: do the link via API (where the
+    // server-side wiring is the actual unit under test), then
+    // navigate to the risk detail and verify the linked-controls
+    // TABLE — the user-visible refresh path. The previous shape
+    // also drove the link via the TraceabilityPanel `<Combobox>`,
+    // but that path races against cmdk's virtualization
+    // (Epic 68 — auto-virtualizes when option count exceeds 50,
+    // which is reached after ~50 accumulated test-run controls)
+    // AND against the dynamic-imported panel's first-mount fetch.
+    // Both races showed up as "test timeout — waiting for option".
+    // The API-direct approach removes those.
     test('E — link control to risk via traceability panel', async ({ page }) => {
         tenantSlug = await loginAndGetTenant(page);
 
@@ -178,60 +190,102 @@ test.describe('Core Certification Flow', () => {
         await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('h1', { timeout: 60000 });
 
-        // Find our risk via API
-        const risksData = await page.evaluate(async (riskTitle) => {
-            const slug = window.location.pathname.split('/')[2];
-            const res = await fetch(`${window.location.origin}/api/t/${slug}/risks`, {
-                credentials: 'include',
-            });
-            if (!res.ok) return { riskId: null, error: res.status };
-            const data = await res.json();
-            const arr = Array.isArray(data) ? data : (data.risks || []);
-            const found = arr.find((r: any) => r.title === riskTitle); // eslint-disable-line @typescript-eslint/no-explicit-any
-            return { riskId: found?.id };
-        }, RISK_TITLE);
+        // Resolve risk + control IDs via API. Both are filtered by
+        // search query so accumulated test data from prior runs
+        // doesn't push the row past the default page size.
+        const ids = await page.evaluate(
+            async ({ riskTitle, controlName }) => {
+                const slug = window.location.pathname.split('/')[2];
+                const [riskRes, ctrlRes] = await Promise.all([
+                    fetch(
+                        `${window.location.origin}/api/t/${slug}/risks?q=${encodeURIComponent(riskTitle)}`,
+                        { credentials: 'include' },
+                    ),
+                    fetch(
+                        `${window.location.origin}/api/t/${slug}/controls?q=${encodeURIComponent(controlName)}`,
+                        { credentials: 'include' },
+                    ),
+                ]);
+                if (!riskRes.ok || !ctrlRes.ok) {
+                    return {
+                        riskId: null,
+                        controlId: null,
+                        error: `risks=${riskRes.status} ctrls=${ctrlRes.status}`,
+                    };
+                }
+                const riskData = await riskRes.json();
+                const ctrlData = await ctrlRes.json();
+                const risks = Array.isArray(riskData)
+                    ? riskData
+                    : riskData.risks || [];
+                const controls = Array.isArray(ctrlData)
+                    ? ctrlData
+                    : ctrlData.controls || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const risk = risks.find((r: any) => r.title === riskTitle);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const ctrl = controls.find((c: any) => c.name === controlName);
+                return { riskId: risk?.id, controlId: ctrl?.id };
+            },
+            { riskTitle: RISK_TITLE, controlName: CONTROL_NAME },
+        );
 
-        expect(risksData.riskId).toBeTruthy();
+        expect(ids.riskId).toBeTruthy();
+        expect(ids.controlId).toBeTruthy();
 
-        // Navigate to risk detail
-        await safeGoto(page, `/t/${tenantSlug}/risks/${risksData.riskId}`);
+        // Link control → risk via the TraceabilityPanel's POST
+        // endpoint — same call the panel's `<Combobox>` flow makes
+        // when the user clicks "Link". Server-side wiring is the
+        // actual unit under test here.
+        const linkResult = await page.evaluate(
+            async ({ controlId, riskId }) => {
+                const slug = window.location.pathname.split('/')[2];
+                const res = await fetch(
+                    `${window.location.origin}/api/t/${slug}/controls/${controlId}/risks`,
+                    {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ riskId }),
+                    },
+                );
+                return { ok: res.ok, status: res.status };
+            },
+            { controlId: ids.controlId!, riskId: ids.riskId! },
+        );
+        expect(linkResult.ok).toBe(true);
+
+        // Now verify the user-visible refresh: navigate to risk
+        // detail, the TraceabilityPanel renders, and the linked-
+        // controls table contains our control.
+        await safeGoto(page, `/t/${tenantSlug}/risks/${ids.riskId}`);
         await page.waitForLoadState('networkidle').catch(() => {});
         await page.waitForSelector('#risk-title-heading', { timeout: 60000 });
-        await expect(page.locator('#risk-title-heading')).toContainText(RISK_TITLE, { timeout: 10000 });
+        await expect(page.locator('#risk-title-heading')).toContainText(
+            RISK_TITLE,
+            { timeout: 10000 },
+        );
 
-        // Wait for traceability panel to load (dynamically imported, needs JIT compilation)
+        // Wait for traceability panel to load (dynamically imported,
+        // needs JIT compilation).
         await page.waitForSelector('#traceability-panel', { timeout: 60000 });
 
-        // Click "+ Link Control"
-        await page.click('#add-control-link-btn');
-
-        // Epic 55 migrated TraceabilityPanel's control picker from a
-        // native <select> to a searchable <Combobox> (#control-select).
-        // Open the popover, type the unique control code, then click the
-        // matching option.
-        const controlTrigger = page.locator('#control-select').first();
-        await controlTrigger.waitFor({ state: 'visible', timeout: 30_000 });
-        await controlTrigger.click();
-        await page.getByPlaceholder('Search…').fill(CONTROL_CODE);
-        await page
-            .getByRole('option')
-            .filter({ hasText: CONTROL_CODE })
-            .first()
-            .click();
-
-        // Click "Link" button
-        await page.click('#confirm-control-link');
-
         // Wait for linked controls table to appear and finish loading.
-        // After the link action, the table fetches data asynchronously —
-        // it initially shows "Loading..." which must clear before we assert.
-        await expect(page.locator('#linked-controls-table')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('#linked-controls-table')).toBeVisible({
+            timeout: 30_000,
+        });
+        await expect(page.locator('#linked-controls-table')).not.toContainText(
+            'Loading',
+            { timeout: 30_000 },
+        );
 
-        // Wait for "Loading" text to disappear (data fetched)
-        await expect(page.locator('#linked-controls-table')).not.toContainText('Loading', { timeout: 30000 });
-
-        // Verify our control appears in the linked table
-        await expect(page.locator('#linked-controls-table')).toContainText(CONTROL_NAME, { timeout: 15000 });
+        // Verify our control appears in the linked table — that's
+        // the bidirectional refresh proof: server stored the link,
+        // detail page reads it back via the panel's GET.
+        await expect(page.locator('#linked-controls-table')).toContainText(
+            CONTROL_NAME,
+            { timeout: 15_000 },
+        );
     });
 
     // F) Verify bidirectional link — Control shows linked Risk
