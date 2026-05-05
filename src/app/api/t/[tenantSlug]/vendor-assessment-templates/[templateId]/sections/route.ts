@@ -1,0 +1,28 @@
+/**
+ * POST /api/t/[tenantSlug]/vendor-assessment-templates/[templateId]/sections
+ * Body: AddVendorAssessmentTemplateSectionSchema
+ */
+import { NextRequest } from 'next/server';
+import { getTenantCtx } from '@/app-layer/context';
+import { addSection } from '@/app-layer/usecases/vendor-assessment-template';
+import { withValidatedBody } from '@/lib/validation/route';
+import { AddVendorAssessmentTemplateSectionSchema } from '@/lib/schemas';
+import { withApiErrorHandling } from '@/lib/errors/api';
+import { jsonResponse } from '@/lib/api-response';
+
+export const POST = withApiErrorHandling(
+    withValidatedBody(
+        AddVendorAssessmentTemplateSectionSchema,
+        async (
+            req,
+            {
+                params,
+            }: { params: { tenantSlug: string; templateId: string } },
+            body,
+        ) => {
+            const ctx = await getTenantCtx(params, req);
+            const section = await addSection(ctx, params.templateId, body);
+            return jsonResponse(section, { status: 201 });
+        },
+    ),
+);

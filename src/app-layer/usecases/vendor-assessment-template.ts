@@ -525,3 +525,149 @@ async function nextQuestionSortOrder(
     });
     return (max._max.sortOrder ?? -1) + 1;
 }
+
+// ─── 5. reorderTemplate ────────────────────────────────────────────
+
+export interface ReorderInput {
+    /// New section order. Each entry's sortOrder is the new position.
+    /// Questions inside a section may also rebalance their sortOrder
+    /// AND optionally migrate to a different section.
+    sections: Array<{
+        id: string;
+        sortOrder: number;
+        questions?: Array<{
+            id: string;
+            sectionId: string;
+            sortOrder: number;
+        }>;
+    }>;
+}
+
+/**
+ * Apply a batched reorder produced by the drag-and-drop builder.
+ * Every section + question gets its `sortOrder` rewritten, and
+ * questions can migrate across sections via the `sectionId` field.
+ *
+ * Publish-guard: rejects if the template is published. Reorder is
+ * an edit; the same clone-first contract applies.
+ */
+export async function reorderTemplate(
+    ctx: RequestContext,
+    templateId: string,
+    input: ReorderInput,
+) {
+    assertCanManageVendorAssessmentTemplates(ctx);
+
+    return runInTenantContext(ctx, async (db) => {
+        const template = await db.vendorAssessmentTemplate.findFirst({
+            where: { id: templateId, tenantId: ctx.tenantId },
+            select: { id: true, isPublished: true, name: true },
+        });
+        if (!template) throw notFound('Template not found');
+        assertEditable(template);
+
+        // Apply section + question rewrites in a single sweep. Each
+        // updateMany scopes to (id, tenantId, templateId) so a
+        // tampered sectionId / questionId in the input cannot mutate
+        // rows in another template.
+        for (const s of input.sections) {
+            await db.vendorAssessmentTemplateSection.updateMany({
+                where: {
+                    id: s.id,
+                    tenantId: ctx.tenantId,
+                    templateId,
+                },
+                data: { sortOrder: s.sortOrder },
+            });
+            if (s.questions) {
+                for (const q of s.questions) {
+                    await db.vendorAssessmentTemplateQuestion.updateMany({
+                        where: {
+                            id: q.id,
+                            tenantId: ctx.tenantId,
+                            templateId,
+                        },
+                        data: {
+                            sectionId: q.sectionId,
+                            sortOrder: q.sortOrder,
+                        },
+                    });
+                }
+            }
+        }
+
+        await logEvent(db, ctx, {
+            action: 'VENDOR_ASSESSMENT_TEMPLATE_REORDERED',
+            entityType: 'VendorAssessmentTemplate',
+            entityId: templateId,
+            details: `Reordered ${input.sections.length} section(s)`,
+            detailsJson: {
+                category: 'entity_lifecycle',
+                entityName: 'VendorAssessmentTemplate',
+                operation: 'reordered',
+                after: {
+                    sectionCount: input.sections.length,
+                    questionCount: input.sections.reduce(
+                        (n, s) => n + (s.questions?.length ?? 0),
+                        0,
+                    ),
+                },
+                summary: `Vendor questionnaire template reordered`,
+            },
+        });
+
+        return { id: templateId };
+    });
+}
+
+// ─── 6. getTemplateTree ────────────────────────────────────────────
+
+/**
+ * Read-side helper for the builder UI — full template tree with
+ * sections + questions ordered by sortOrder. Mirrors the public
+ * response-flow loader but without the token gate.
+ */
+export async function getTemplateTree(
+    ctx: RequestContext,
+    templateId: string,
+) {
+    if (!ctx.permissions.canRead) {
+        throw badRequest('Read access required.');
+    }
+    return runInTenantContext(ctx, async (db) => {
+        const template = await db.vendorAssessmentTemplate.findFirst({
+            where: { id: templateId, tenantId: ctx.tenantId },
+            include: {
+                sections: { orderBy: { sortOrder: 'asc' } },
+                questions: { orderBy: { sortOrder: 'asc' } },
+            },
+        });
+        if (!template) throw notFound('Template not found');
+        return template;
+    });
+}
+
+/** List templates for the admin index page. */
+export async function listTemplates(ctx: RequestContext) {
+    if (!ctx.permissions.canRead) {
+        throw badRequest('Read access required.');
+    }
+    return runInTenantContext(ctx, async (db) => {
+        return db.vendorAssessmentTemplate.findMany({
+            where: { tenantId: ctx.tenantId, isLatestVersion: true },
+            select: {
+                id: true,
+                key: true,
+                version: true,
+                name: true,
+                description: true,
+                isPublished: true,
+                isGlobal: true,
+                createdAt: true,
+                updatedAt: true,
+                _count: { select: { sections: true, questions: true } },
+            },
+            orderBy: { updatedAt: 'desc' },
+        });
+    });
+}

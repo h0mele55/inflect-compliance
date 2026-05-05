@@ -714,6 +714,22 @@ export const AddVendorAssessmentTemplateQuestionSchema = z.object({
     sortOrder: z.number().int().nonnegative().optional(),
 }).strip();
 
+export const ReorderVendorAssessmentTemplateSchema = z.object({
+    sections: z.array(
+        z.object({
+            id: z.string().min(1).max(120),
+            sortOrder: z.number().int().nonnegative(),
+            questions: z.array(
+                z.object({
+                    id: z.string().min(1).max(120),
+                    sectionId: z.string().min(1).max(120),
+                    sortOrder: z.number().int().nonnegative(),
+                }),
+            ).optional(),
+        }),
+    ).max(200),
+}).strip();
+
 export const ReviewVendorAssessmentSchema = z.object({
     /// Per-answer overrides. The reviewer can adjust a subset; any
     /// answer not in this list keeps its auto-computed points.
