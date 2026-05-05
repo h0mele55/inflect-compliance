@@ -630,3 +630,19 @@ export const LinkTestEvidenceSchema = z.object({
     integrationResultId: z.string().nullable().optional(),
     note: z.string().max(2000).nullable().optional(),
 }).strip();
+
+// Epic G-2 — schedule a ControlTestPlan. The cross-field invariants
+// (SCRIPT/INTEGRATION must have a schedule; MANUAL must not) are
+// enforced at the usecase boundary so the validation error message
+// can reference the plan rather than the raw zod path. Zod just
+// shape-checks here.
+export const ScheduleTestPlanSchema = z.object({
+    schedule: z.string().min(1).max(120).nullable(),
+    scheduleTimezone: z.string().min(1).max(64).nullable().optional(),
+    automationType: z.enum(['MANUAL', 'SCRIPT', 'INTEGRATION']),
+    // automationConfig is shaped per handler. We accept any
+    // JSON-serialisable blob here — the SCRIPT and INTEGRATION
+    // handlers (next G-2 prompt) carry their own per-handler shape
+    // checks.
+    automationConfig: z.unknown().nullable().optional(),
+}).strip();
