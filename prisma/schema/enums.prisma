@@ -416,6 +416,15 @@ enum EmailNotificationType {
   // external access URL with the raw token (the only place the raw
   // token ever appears in the system).
   VENDOR_ASSESSMENT_INVITATION
+  // Epic G-3 prompt 8 — admin-triggered resend of the same
+  // invitation; reuses the existing token, dedupes per-day.
+  VENDOR_ASSESSMENT_REMINDER
+  // Auto-fired from submitResponse → notifies the assessment
+  // requester that an external respondent has submitted answers.
+  VENDOR_ASSESSMENT_SUBMITTED
+  // Auto-fired from reviewAssessment → notifies the vendor owner
+  // (or requester) that internal review is complete.
+  VENDOR_ASSESSMENT_REVIEWED
 }
 
 enum EmailOutboxStatus {

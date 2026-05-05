@@ -26,6 +26,8 @@ import {
 import { logEvent } from '../events/audit';
 import { runWithAuditContext } from '@/lib/audit-context';
 import type { RequestContext } from '../types';
+import { enqueueEmail } from '../notifications/enqueue';
+import { logger } from '@/lib/observability/logger';
 
 /** Synthetic audit ctx for the public response flow. */
 function makeExternalAuditCtx(
@@ -417,6 +419,13 @@ export async function submitResponse(
                 });
             });
 
+            // ── SUBMITTED notification — fired AFTER the
+            // transaction commits so a stalled email never holds
+            // the assessment row's lock. The assessment.requestedByUserId
+            // gets the email; we re-load just the email/name pair we
+            // need rather than dragging the full ctx through.
+            await notifyAssessmentSubmitted(assessment, provisionalScore);
+
             return {
                 submittedAt,
                 status: 'SUBMITTED' as const,
@@ -424,6 +433,83 @@ export async function submitResponse(
             };
         },
     );
+}
+
+/**
+ * Best-effort SUBMITTED notification for the internal requester.
+ * Failures are logged + swallowed: the assessment is already
+ * committed; missing the email is a known-ack flow we'd rather
+ * tolerate than reverse the submit.
+ */
+async function notifyAssessmentSubmitted(
+    assessment: { id: string; tenantId: string; requestedByUserId: string },
+    provisionalScore: number,
+): Promise<void> {
+    try {
+        const { prisma } = await import('@/lib/prisma');
+        const requester = await prisma.user.findUnique({
+            where: { id: assessment.requestedByUserId },
+            select: { email: true, name: true },
+        });
+        if (!requester?.email) return;
+        const ctx = await loadVendorAssessmentContext(assessment);
+        if (!ctx) return;
+
+        await prisma.$transaction(async (tx) => {
+            await enqueueEmail(tx, {
+                tenantId: assessment.tenantId,
+                type: 'VENDOR_ASSESSMENT_SUBMITTED',
+                toEmail: requester.email!,
+                entityId: assessment.id,
+                payload: {
+                    requesterName: requester.name ?? 'there',
+                    vendorName: ctx.vendorName,
+                    templateName: ctx.templateName,
+                    submittedAtIso: new Date().toISOString(),
+                    reviewUrl: ctx.reviewUrl,
+                    submittedScore: provisionalScore,
+                },
+            });
+        });
+    } catch (err) {
+        logger.warn('vendor-assessment-response: submitted-notify failed', {
+            component: 'vendor-assessment-response',
+            assessmentId: assessment.id,
+            err: err instanceof Error ? err : new Error(String(err)),
+        });
+    }
+}
+
+/**
+ * Look up vendor + template + tenant slug for assessment-related
+ * email payloads. Returns null when any link is missing.
+ */
+async function loadVendorAssessmentContext(assessment: {
+    id: string;
+    tenantId: string;
+}): Promise<{
+    vendorName: string;
+    templateName: string;
+    reviewUrl: string;
+} | null> {
+    const { prisma } = await import('@/lib/prisma');
+    const a = await prisma.vendorAssessment.findUnique({
+        where: { id: assessment.id },
+        select: {
+            vendor: { select: { name: true } },
+            templateVersion: { select: { name: true } },
+            tenant: { select: { slug: true } },
+        },
+    });
+    if (!a?.vendor || !a.templateVersion || !a.tenant) return null;
+    const origin =
+        process.env.NEXT_PUBLIC_APP_URL ?? process.env.APP_URL ?? '';
+    const reviewUrl = `${origin}/t/${a.tenant.slug}/admin/vendor-assessment-reviews/${assessment.id}`;
+    return {
+        vendorName: a.vendor.name,
+        templateName: a.templateVersion.name,
+        reviewUrl,
+    };
 }
 
 // ─── Validation helpers ────────────────────────────────────────────

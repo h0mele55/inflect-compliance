@@ -251,6 +251,177 @@ export function buildVendorAssessmentInvitationEmail(
     };
 }
 
+// ─── Vendor assessment reminder (Epic G-3 prompt 8) ───
+
+export interface VendorAssessmentReminderPayload {
+    recipientName: string;
+    vendorName: string;
+    templateName: string;
+    responseUrl: string;
+    expiresAtIso: string;
+    inviterName?: string;
+}
+
+export function buildVendorAssessmentReminderEmail(
+    payload: VendorAssessmentReminderPayload,
+): EmailTemplateResult {
+    const {
+        recipientName,
+        vendorName,
+        templateName,
+        responseUrl,
+        expiresAtIso,
+        inviterName,
+    } = payload;
+    const expiresFormatted = formatIsoDate(expiresAtIso);
+    const byLine = inviterName ? ` from ${inviterName}` : '';
+
+    return {
+        subject: `Reminder: ${templateName} questionnaire`,
+        bodyText: [
+            `Hi ${recipientName},`,
+            '',
+            `Just a reminder${byLine} — the vendor assessment questionnaire is still awaiting your response.`,
+            '',
+            `  Vendor:    ${vendorName}`,
+            `  Template:  ${templateName}`,
+            `  Expires:   ${expiresFormatted}`,
+            '',
+            `Open the questionnaire: ${responseUrl}`,
+            '',
+            '— Inflect Compliance',
+        ].join('\n'),
+        bodyHtml: `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #1a1a2e; font-size: 18px; margin-bottom: 16px;">Reminder: questionnaire response needed</h2>
+  <p style="color: #444; line-height: 1.5;">Hi ${escapeHtml(recipientName)},</p>
+  <p style="color: #444; line-height: 1.5;">Just a reminder${byLine ? ` from <strong>${escapeHtml(inviterName!)}</strong>` : ''} — the vendor assessment questionnaire is still awaiting your response.</p>
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr><td style="color: #888; padding: 4px 0; width: 100px;">Vendor</td><td style="color: #444;"><strong>${escapeHtml(vendorName)}</strong></td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Template</td><td style="color: #444;">${escapeHtml(templateName)}</td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Expires</td><td style="color: #444;">${escapeHtml(expiresFormatted)}</td></tr>
+  </table>
+  <a href="${escapeHtml(responseUrl)}" style="display: inline-block; background: #4f46e5; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">Open questionnaire</a>
+  <p style="color: #999; font-size: 12px; margin-top: 24px;">— Inflect Compliance</p>
+</div>`.trim(),
+    };
+}
+
+// ─── Vendor assessment submitted (Epic G-3 prompt 8) ───
+
+export interface VendorAssessmentSubmittedPayload {
+    /// Internal admin who initiated the assessment.
+    requesterName: string;
+    vendorName: string;
+    templateName: string;
+    submittedAtIso: string;
+    /// Internal review-page URL (not the external respondent link).
+    reviewUrl: string;
+    /// Auto-computed score at submit time. Reviewer may override.
+    submittedScore: number;
+}
+
+export function buildVendorAssessmentSubmittedEmail(
+    payload: VendorAssessmentSubmittedPayload,
+): EmailTemplateResult {
+    const {
+        requesterName,
+        vendorName,
+        templateName,
+        submittedAtIso,
+        reviewUrl,
+        submittedScore,
+    } = payload;
+    const ts = formatIsoDate(submittedAtIso);
+
+    return {
+        subject: `Vendor questionnaire submitted: ${vendorName}`,
+        bodyText: [
+            `Hi ${requesterName},`,
+            '',
+            `${vendorName} just submitted "${templateName}" for review.`,
+            '',
+            `  Submitted: ${ts}`,
+            `  Auto-score: ${submittedScore}`,
+            '',
+            `Review the response: ${reviewUrl}`,
+            '',
+            '— Inflect Compliance',
+        ].join('\n'),
+        bodyHtml: `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #1a1a2e; font-size: 18px; margin-bottom: 16px;">Vendor questionnaire submitted</h2>
+  <p style="color: #444; line-height: 1.5;">Hi ${escapeHtml(requesterName)},</p>
+  <p style="color: #444; line-height: 1.5;"><strong>${escapeHtml(vendorName)}</strong> just submitted <strong>"${escapeHtml(templateName)}"</strong> for review.</p>
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr><td style="color: #888; padding: 4px 0; width: 120px;">Submitted</td><td style="color: #444;">${escapeHtml(ts)}</td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Auto-score</td><td style="color: #444;"><strong>${submittedScore}</strong></td></tr>
+  </table>
+  <a href="${escapeHtml(reviewUrl)}" style="display: inline-block; background: #4f46e5; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">Review response</a>
+  <p style="color: #999; font-size: 12px; margin-top: 24px;">— Inflect Compliance</p>
+</div>`.trim(),
+    };
+}
+
+// ─── Vendor assessment reviewed (Epic G-3 prompt 8) ───
+
+export interface VendorAssessmentReviewedPayload {
+    recipientName: string;
+    vendorName: string;
+    templateName: string;
+    reviewedAtIso: string;
+    finalScore: number;
+    finalRating: string | null;
+    /// Internal review-page URL.
+    reviewUrl: string;
+}
+
+export function buildVendorAssessmentReviewedEmail(
+    payload: VendorAssessmentReviewedPayload,
+): EmailTemplateResult {
+    const {
+        recipientName,
+        vendorName,
+        templateName,
+        reviewedAtIso,
+        finalScore,
+        finalRating,
+        reviewUrl,
+    } = payload;
+    const ts = formatIsoDate(reviewedAtIso);
+    const ratingLine = finalRating ? `Risk rating: ${finalRating}` : '';
+
+    return {
+        subject: `Vendor assessment reviewed: ${vendorName}`,
+        bodyText: [
+            `Hi ${recipientName},`,
+            '',
+            `The "${templateName}" questionnaire for ${vendorName} has been reviewed.`,
+            '',
+            `  Reviewed:   ${ts}`,
+            `  Final score: ${finalScore}`,
+            ...(ratingLine ? [`  ${ratingLine}`] : []),
+            '',
+            `Open the review: ${reviewUrl}`,
+            '',
+            '— Inflect Compliance',
+        ].join('\n'),
+        bodyHtml: `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #1a1a2e; font-size: 18px; margin-bottom: 16px;">Vendor assessment reviewed</h2>
+  <p style="color: #444; line-height: 1.5;">Hi ${escapeHtml(recipientName)},</p>
+  <p style="color: #444; line-height: 1.5;">The <strong>"${escapeHtml(templateName)}"</strong> questionnaire for <strong>${escapeHtml(vendorName)}</strong> has been reviewed.</p>
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr><td style="color: #888; padding: 4px 0; width: 120px;">Reviewed</td><td style="color: #444;">${escapeHtml(ts)}</td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Final score</td><td style="color: #444;"><strong>${finalScore}</strong></td></tr>
+    ${finalRating ? `<tr><td style="color: #888; padding: 4px 0;">Risk rating</td><td style="color: #444;"><strong>${escapeHtml(finalRating)}</strong></td></tr>` : ''}
+  </table>
+  <a href="${escapeHtml(reviewUrl)}" style="display: inline-block; background: #4f46e5; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">Open review</a>
+  <p style="color: #999; font-size: 12px; margin-top: 24px;">— Inflect Compliance</p>
+</div>`.trim(),
+    };
+}
+
 // ─── Helpers ───
 
 function formatIsoDate(iso: string): string {

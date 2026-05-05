@@ -34,6 +34,9 @@ import {
     parseScoringConfig,
     type ScoringResult,
 } from '../services/vendor-assessment-scoring-engine';
+import { enqueueEmail } from '../notifications/enqueue';
+import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/observability/logger';
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -228,6 +231,20 @@ export async function reviewAssessment(
             },
         });
 
+        // ── Evidence attachment + REVIEWED notification (post-commit) ──
+        await attachReviewedAssessmentEvidence(
+            ctx,
+            db,
+            assessment.id,
+            scoring.score,
+            riskRating,
+        );
+        await notifyAssessmentReviewed(
+            assessment.id,
+            scoring.score,
+            riskRating,
+        );
+
         return {
             status: 'REVIEWED' as const,
             score: scoring.score,
@@ -236,6 +253,174 @@ export async function reviewAssessment(
             scoring,
             reviewedAt,
         };
+    });
+}
+
+/**
+ * Best-effort REVIEWED notification. Audited as part of the same
+ * txn in `notifyAssessmentReviewed`-internal logEvent shim is
+ * skipped — the reviewerNotes audit row already covers the human
+ * action; the email is operational only.
+ */
+async function notifyAssessmentReviewed(
+    assessmentId: string,
+    finalScore: number,
+    finalRating: string | null,
+): Promise<void> {
+    try {
+        const a = await prisma.vendorAssessment.findUnique({
+            where: { id: assessmentId },
+            select: {
+                tenantId: true,
+                vendor: { select: { name: true, ownerUserId: true } },
+                templateVersion: { select: { name: true } },
+                tenant: { select: { slug: true } },
+                requestedByUserId: true,
+                vendorId: true,
+            },
+        });
+        if (!a?.vendor || !a.templateVersion || !a.tenant) return;
+        // Recipient: vendor owner if set, else the assessment requester.
+        const recipientId =
+            a.vendor.ownerUserId ?? a.requestedByUserId;
+        const recipient = await prisma.user.findUnique({
+            where: { id: recipientId },
+            select: { email: true, name: true },
+        });
+        if (!recipient?.email) return;
+        const origin =
+            process.env.NEXT_PUBLIC_APP_URL ??
+            process.env.APP_URL ??
+            '';
+        const reviewUrl = `${origin}/t/${a.tenant.slug}/admin/vendor-assessment-reviews/${assessmentId}`;
+
+        await prisma.$transaction(async (tx) => {
+            await enqueueEmail(tx, {
+                tenantId: a.tenantId,
+                type: 'VENDOR_ASSESSMENT_REVIEWED',
+                toEmail: recipient.email!,
+                entityId: assessmentId,
+                payload: {
+                    recipientName: recipient.name ?? 'there',
+                    vendorName: a.vendor!.name,
+                    templateName: a.templateVersion!.name,
+                    reviewedAtIso: new Date().toISOString(),
+                    finalScore,
+                    finalRating,
+                    reviewUrl,
+                },
+            });
+        });
+    } catch (err) {
+        logger.warn('vendor-assessment-review: reviewed-notify failed', {
+            component: 'vendor-assessment-review',
+            assessmentId,
+            err: err instanceof Error ? err : new Error(String(err)),
+        });
+    }
+}
+
+/**
+ * Create an Evidence row + attach it to the vendor's "Vendor
+ * Assessments" bundle. Runs in the same outer transaction (`db`)
+ * so a failure rolls back the review itself.
+ */
+async function attachReviewedAssessmentEvidence(
+    ctx: RequestContext,
+    db: Parameters<Parameters<typeof runInTenantContext>[1]>[0],
+    assessmentId: string,
+    finalScore: number,
+    finalRating: string | null,
+): Promise<void> {
+    const a = await db.vendorAssessment.findFirst({
+        where: { id: assessmentId, tenantId: ctx.tenantId },
+        select: {
+            vendorId: true,
+            templateVersion: { select: { name: true, key: true, version: true } },
+        },
+    });
+    if (!a?.templateVersion) return;
+
+    const content = [
+        `Vendor questionnaire reviewed.`,
+        `Template: ${a.templateVersion.name} (${a.templateVersion.key} v${a.templateVersion.version})`,
+        `Final score: ${finalScore}`,
+        `Risk rating: ${finalRating ?? '—'}`,
+        `Reviewed at: ${new Date().toISOString()}`,
+    ].join('\n');
+
+    const evidence = await db.evidence.create({
+        data: {
+            tenantId: ctx.tenantId,
+            controlId: null,
+            type: 'TEXT',
+            title: `Vendor assessment: ${a.templateVersion.name}`,
+            content,
+            category: 'vendor-assessment',
+            status: 'APPROVED',
+            ownerUserId: ctx.userId,
+        },
+        select: { id: true },
+    });
+
+    // Get-or-create the vendor's "Vendor Assessments" bundle.
+    let bundle = await db.vendorEvidenceBundle.findFirst({
+        where: {
+            tenantId: ctx.tenantId,
+            vendorId: a.vendorId,
+            name: 'Vendor Assessments',
+        },
+        select: { id: true },
+    });
+    if (!bundle) {
+        bundle = await db.vendorEvidenceBundle.create({
+            data: {
+                tenantId: ctx.tenantId,
+                vendorId: a.vendorId,
+                name: 'Vendor Assessments',
+                description:
+                    'Reviewed questionnaire results — auto-attached on review completion.',
+                createdByUserId: ctx.userId,
+            },
+            select: { id: true },
+        });
+    }
+
+    await db.vendorEvidenceBundleItem.create({
+        data: {
+            tenantId: ctx.tenantId,
+            bundleId: bundle.id,
+            entityType: 'Evidence',
+            entityId: evidence.id,
+            snapshotJson: {
+                assessmentId,
+                templateName: a.templateVersion.name,
+                finalScore,
+                finalRating,
+                reviewedAt: new Date().toISOString(),
+            },
+        },
+    });
+
+    await logEvent(db, ctx, {
+        action: 'VENDOR_ASSESSMENT_EVIDENCE_ATTACHED',
+        entityType: 'Vendor',
+        entityId: a.vendorId,
+        details: `Attached reviewed assessment as evidence (score=${finalScore}, rating=${finalRating ?? 'none'})`,
+        detailsJson: {
+            category: 'entity_lifecycle',
+            entityName: 'VendorEvidenceBundleItem',
+            operation: 'created',
+            after: {
+                vendorId: a.vendorId,
+                bundleId: bundle.id,
+                evidenceId: evidence.id,
+                assessmentId,
+                finalScore,
+                finalRating,
+            },
+            summary: `Reviewed assessment attached as vendor risk evidence`,
+        },
     });
 }
 

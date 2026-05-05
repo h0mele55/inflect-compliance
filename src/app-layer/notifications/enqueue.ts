@@ -17,11 +17,17 @@ import {
     buildPolicyApprovalRequestedEmail,
     buildPolicyDecisionEmail,
     buildVendorAssessmentInvitationEmail,
+    buildVendorAssessmentReminderEmail,
+    buildVendorAssessmentSubmittedEmail,
+    buildVendorAssessmentReviewedEmail,
     type TaskAssignedPayload,
     type EvidenceExpiringPayload,
     type PolicyApprovalRequestedPayload,
     type PolicyDecisionPayload,
     type VendorAssessmentInvitationPayload,
+    type VendorAssessmentReminderPayload,
+    type VendorAssessmentSubmittedPayload,
+    type VendorAssessmentReviewedPayload,
 } from './templates';
 
 export interface EnqueueEmailInput {
@@ -34,7 +40,10 @@ export interface EnqueueEmailInput {
         | EvidenceExpiringPayload
         | PolicyApprovalRequestedPayload
         | PolicyDecisionPayload
-        | VendorAssessmentInvitationPayload;
+        | VendorAssessmentInvitationPayload
+        | VendorAssessmentReminderPayload
+        | VendorAssessmentSubmittedPayload
+        | VendorAssessmentReviewedPayload;
     sendAfter?: Date;
     requestId?: string;
 }
@@ -123,7 +132,10 @@ function buildEmailContent(
         | EvidenceExpiringPayload
         | PolicyApprovalRequestedPayload
         | PolicyDecisionPayload
-        | VendorAssessmentInvitationPayload,
+        | VendorAssessmentInvitationPayload
+        | VendorAssessmentReminderPayload
+        | VendorAssessmentSubmittedPayload
+        | VendorAssessmentReviewedPayload,
 ): { subject: string; bodyText: string; bodyHtml: string } {
     switch (type) {
         case 'TASK_ASSIGNED':
@@ -139,6 +151,18 @@ function buildEmailContent(
         case 'VENDOR_ASSESSMENT_INVITATION':
             return buildVendorAssessmentInvitationEmail(
                 payload as VendorAssessmentInvitationPayload,
+            );
+        case 'VENDOR_ASSESSMENT_REMINDER':
+            return buildVendorAssessmentReminderEmail(
+                payload as VendorAssessmentReminderPayload,
+            );
+        case 'VENDOR_ASSESSMENT_SUBMITTED':
+            return buildVendorAssessmentSubmittedEmail(
+                payload as VendorAssessmentSubmittedPayload,
+            );
+        case 'VENDOR_ASSESSMENT_REVIEWED':
+            return buildVendorAssessmentReviewedEmail(
+                payload as VendorAssessmentReviewedPayload,
             );
         default:
             throw new Error(`Unknown notification type: ${type}`);
