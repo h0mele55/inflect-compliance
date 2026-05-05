@@ -29,6 +29,8 @@
  */
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSWRConfig } from 'swr';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 import {
     useCallback,
     useEffect,
@@ -132,6 +134,11 @@ export function NewRiskModal({
 }: NewRiskModalProps) {
     const close = useCallback(() => setOpen(false), [setOpen]);
     const queryClient = useQueryClient();
+    // Epic 69 — bridge cache invalidation. RisksClient now reads
+    // from `useTenantSWR(CACHE_KEYS.risks.list())`, so the React
+    // Query invalidation alone wouldn't refresh the page. We
+    // invalidate BOTH caches.
+    const { mutate: swrMutate } = useSWRConfig();
     const titleRef = useRef<HTMLInputElement>(null);
 
     const [form, setForm] = useState({
@@ -314,6 +321,16 @@ export function NewRiskModal({
             queryClient.invalidateQueries({
                 queryKey: queryKeys.risks.all(tenantSlug),
             });
+            // Bridge to the SWR cache that RisksClient reads from.
+            const risksUrlPrefix = apiUrl(CACHE_KEYS.risks.list());
+            swrMutate(
+                (key) =>
+                    typeof key === 'string' &&
+                    (key === risksUrlPrefix ||
+                        key.startsWith(`${risksUrlPrefix}?`)),
+                undefined,
+                { revalidate: true },
+            );
             telemetry.trackSuccess({ riskId: risk.id });
             close();
         } catch (err) {
