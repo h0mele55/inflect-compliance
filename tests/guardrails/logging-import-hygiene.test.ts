@@ -137,6 +137,23 @@ describe('Dynamic require() usage is minimized', () => {
         // so the middleware module evaluates without the key-manager
         // graph, mirroring the rls-middleware pattern.
         'lib/db/encryption-middleware.ts': ['@/lib/security/tenant-key-manager'],
+        // Epic G-3 — vendor questionnaire usecases.
+        // env.APP_URL is lazy-required at the call site (not statically
+        // imported) because these usecases run from BullMQ workers and
+        // background dispatchers where the env module's eager validation
+        // would otherwise crash on missing optional vars in the worker
+        // image. Same pattern as lib/mailer.ts above.
+        'app-layer/usecases/vendor-assessment-send.ts': ['@/env'],
+        'app-layer/usecases/vendor-assessment-reminder.ts': ['@/env'],
+        'app-layer/usecases/vendor-assessment-response.ts': ['@/env'],
+        // notifyAssessmentReviewed runs as a post-commit notification
+        // helper after the review is committed; it intentionally uses
+        // the global prisma client (not the request-scoped one) because
+        // the notification fires after the request's tenant context has
+        // closed. The `@/lib/prisma` require keeps the module-level
+        // import graph clean of direct prisma (so no-direct-prisma
+        // ratchet stays green for the rest of the file).
+        'app-layer/usecases/vendor-assessment-review.ts': ['@/lib/prisma', '@/env'],
     };
 
     it('no unexpected require() in src/ files', async () => {
