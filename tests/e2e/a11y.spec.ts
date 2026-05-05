@@ -239,13 +239,15 @@ test.describe('a11y — interactive overlays', () => {
         await safeGoto(page, `/t/${tenantSlug}/controls`);
         await page.waitForSelector('table, [data-testid="controls-table"]', { timeout: 30_000 });
 
-        // Open the create-control modal. Selectors mirror those used
-        // in tests/e2e/create-control-modal.spec.ts so this stays in
-        // sync with the modal's owning suite.
-        const newControlBtn = page.locator('text=+ New Control, [data-testid="new-control-btn"], button:has-text("New Control")').first();
-        if (!(await newControlBtn.isVisible().catch(() => false))) {
-            test.skip(true, 'Create-control modal trigger not visible — surface exempt for this run');
-        }
+        // Open the create-control modal via the canonical id
+        // selector (`#new-control-btn`). The previous text-/data-
+        // testid-multi-selector chain raced the toolbar render in
+        // some seeded states, tripping the conditional `test.skip`
+        // and leaving the surface uncovered. The id is wired into
+        // ControlsClient.tsx directly and is the same selector
+        // create-control-modal.spec.ts uses.
+        const newControlBtn = page.locator('#new-control-btn');
+        await expect(newControlBtn).toBeVisible({ timeout: 30_000 });
         await newControlBtn.click();
 
         // Modal renders a dialog with role="dialog". Wait for it
