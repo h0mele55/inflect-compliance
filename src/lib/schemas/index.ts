@@ -646,3 +646,84 @@ export const ScheduleTestPlanSchema = z.object({
     // checks.
     automationConfig: z.unknown().nullable().optional(),
 }).strip();
+
+// ─── Epic G-3 — Vendor Assessment Template Authoring ──────────────
+//
+// Per-answerType cross-field validation (e.g. SCALE requires
+// scaleConfigJson, SINGLE_SELECT requires optionsJson) is enforced
+// at the usecase boundary so the error message can name the
+// answer type rather than report a generic "missing field".
+
+export const CreateVendorAssessmentTemplateSchema = z.object({
+    /// Stable template identifier shared across versions. The usecase
+    /// canonicalizes input to lowercase-kebab-case before persisting.
+    key: z.string().min(1).max(120),
+    name: z.string().min(1).max(500),
+    description: z.string().max(10000).nullable().optional(),
+    /// Tenant copies default to false. Global templates surface in
+    /// the catalog browse UI for cloning into a tenant.
+    isGlobal: z.boolean().optional().default(false),
+}).strip();
+
+export const AddVendorAssessmentTemplateSectionSchema = z.object({
+    title: z.string().min(1).max(500),
+    description: z.string().max(10000).nullable().optional(),
+    /// Per-section weight applied during scoring. Null = equal weight.
+    weight: z.number().nonnegative().optional().nullable(),
+    /// Optional explicit position. When omitted the usecase auto-
+    /// assigns max(siblings)+1.
+    sortOrder: z.number().int().nonnegative().optional(),
+}).strip();
+
+export const AddVendorAssessmentTemplateQuestionSchema = z.object({
+    prompt: z.string().min(1).max(5000),
+    answerType: z.enum([
+        'YES_NO',
+        'SINGLE_SELECT',
+        'MULTI_SELECT',
+        'TEXT',
+        'NUMBER',
+        'SCALE',
+        'FILE_UPLOAD',
+    ]),
+    required: z.boolean().optional().default(true),
+    weight: z.number().nonnegative().optional().default(1),
+    /// SINGLE_SELECT / MULTI_SELECT — required for those types
+    /// (enforced at the usecase boundary).
+    optionsJson: z
+        .array(
+            z.object({
+                label: z.string().min(1).max(500),
+                value: z.string().min(1).max(500),
+                points: z.number().optional(),
+            }),
+        )
+        .nullable()
+        .optional(),
+    /// SCALE — required for that type. min must be < max.
+    scaleConfigJson: z
+        .object({
+            min: z.number().int(),
+            max: z.number().int(),
+            labels: z.array(z.string().max(120)).max(10).optional(),
+        })
+        .nullable()
+        .optional(),
+    /// Legacy compatibility with the existing scoring service.
+    riskPointsJson: z.unknown().nullable().optional(),
+    sortOrder: z.number().int().nonnegative().optional(),
+}).strip();
+
+export const CloneVendorAssessmentTemplateSchema = z.object({
+    /// SAME_KEY_NEW_VERSION — produce a new draft revision of the
+    /// existing template family. The previous latest version
+    /// retains its data (live assessments stay pinned via
+    /// templateVersionId) but loses the isLatestVersion flag.
+    ///
+    /// NEW_KEY — fork into a separate template family. Caller
+    /// must supply a new `key`.
+    mode: z.enum(['SAME_KEY_NEW_VERSION', 'NEW_KEY']),
+    key: z.string().min(1).max(120).optional(),
+    name: z.string().min(1).max(500).optional(),
+    description: z.string().max(10000).nullable().optional(),
+}).strip();
