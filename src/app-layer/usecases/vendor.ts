@@ -224,7 +224,16 @@ export async function saveAssessmentAnswers(ctx: RequestContext, assessmentId: s
         if (!assessment) throw notFound('Assessment not found');
         if (assessment.status !== 'DRAFT') throw badRequest('Cannot edit answers on a non-draft assessment');
 
-        // Load questions for point computation
+        // Load questions for point computation. Epic G-3 made
+        // `template` (legacy QuestionnaireTemplate) nullable; the
+        // existing approval-flow path always populates it, so a
+        // null here means a G-3-instantiated assessment landed in
+        // this legacy save path — reject loudly.
+        if (!assessment.template) {
+            throw badRequest(
+                'Cannot save legacy answers on a G-3 assessment — use the response path instead.',
+            );
+        }
         const questionMap = new Map(assessment.template.questions.map(q => [q.id, q]));
 
         const enrichedAnswers = answers.map(a => {

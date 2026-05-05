@@ -235,7 +235,15 @@ export class VendorAssessmentEditableAdapter implements EditableRepository<Vendo
 
         const phase = assessmentStatusToPhase(assessment.status);
 
-        // Build the payload from current assessment state
+        // Build the payload from current assessment state. Epic G-3
+        // made the legacy template relation nullable; the lifecycle
+        // adapter only fires for the legacy approval-workflow flow,
+        // so we still expect the template to be present here.
+        if (!assessment.template) {
+            throw new Error(
+                `Lifecycle snapshot requires a legacy template — assessment ${assessment.id} carries only templateVersionId.`,
+            );
+        }
         const payload: VendorAssessmentPayload = {
             templateKey: assessment.template.key,
             templateName: assessment.template.name,

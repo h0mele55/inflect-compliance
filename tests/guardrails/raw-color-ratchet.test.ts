@@ -47,11 +47,25 @@ const RAW_COLOR_RE = /\b(?:text|bg|border)-(?:slate|gray|neutral|zinc)-\d{2,3}\b
 // get a future theme-aware re-render pass.
 const BASELINE = 95;
 
+// Directories that are intentionally outside the internal design
+// system. Adding entries here is allowed when the surface is a
+// public, unauthenticated page that doesn't share the app's dark
+// theme tokens.
+const EXEMPT_DIRS = new Set<string>([
+    // Epic G-3 — public vendor questionnaire respondent page. Lives
+    // at /vendor-assessment/[id], does NOT mount the app shell, and
+    // intentionally uses a light, neutral palette so external
+    // recipients (likely on a corporate-branded mail client) see a
+    // clean independent surface rather than the in-app dark theme.
+    'vendor-assessment',
+]);
+
 function walk(dir: string, out: string[]): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
             if (entry.name === 'node_modules' || entry.name === '.next') continue;
+            if (EXEMPT_DIRS.has(entry.name)) continue;
             walk(full, out);
         } else if (entry.isFile() && /\.tsx?$/.test(entry.name)) {
             out.push(full);

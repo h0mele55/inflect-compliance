@@ -166,10 +166,23 @@ describe('New page token discipline', () => {
         //     view toggle. Uses one `glass-card` class for the empty
         //     state — bounded follow-up to migrate alongside the
         //     other Epic 66 polish surfaces.
+        //   - 92 (+4): Epic G-3 added the vendor-questionnaire
+        //     builder admin surface — admin/vendor-templates/page.tsx,
+        //     VendorTemplatesIndexClient.tsx, [templateId]/page.tsx,
+        //     and [templateId]/VendorTemplateBuilderClient.tsx. Uses
+        //     `glass-card` + a small set of legacy `btn` / `badge`
+        //     classes that match the rest of the admin surface.
+        //     Bounded follow-up to migrate alongside the other admin
+        //     pages.
+        //   - 94 (+2): Epic G-3 prompt 7 added the reviewer page —
+        //     admin/vendor-assessment-reviews/[assessmentId]/page.tsx
+        //     + VendorAssessmentReviewClient.tsx. Same `glass-card`
+        //     + legacy `btn` / `badge` shape as the rest of the
+        //     admin surface; bounded follow-up.
         // Each increment names the epic + page + reason; promotion
         // to MIGRATED_PAGES is the path forward, never silent
         // floor-bumping.
-        expect(unmigrated.length).toBeLessThanOrEqual(88);
+        expect(unmigrated.length).toBeLessThanOrEqual(94);
     });
 
     it('migrated page count is at least 4', () => {

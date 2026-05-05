@@ -136,6 +136,10 @@ model Tenant {
   vendors                   Vendor[]
   vendorAssessments         VendorAssessment[]
   vendorAssessmentAnswers   VendorAssessmentAnswer[]
+  // Epic G-3 — normalized vendor questionnaire templates.
+  vendorAssessmentTemplates VendorAssessmentTemplate[]
+  vendorAssessmentTemplateSections  VendorAssessmentTemplateSection[]
+  vendorAssessmentTemplateQuestions VendorAssessmentTemplateQuestion[]
   vendorContacts            VendorContact[]
   vendorDocuments           VendorDocument[]
   vendorEvidenceBundles     VendorEvidenceBundle[]
@@ -481,6 +485,11 @@ model User {
   ownedVendors                  Vendor[]                     @relation("VendorOwner")
   assessmentsDecided            VendorAssessment[]           @relation("AssessmentDecider")
   assessmentsRequested          VendorAssessment[]           @relation("AssessmentRequester")
+  // Epic G-3 — assessment lifecycle actors.
+  assessmentsSent               VendorAssessment[]           @relation("AssessmentSender")
+  assessmentsReviewed           VendorAssessment[]           @relation("AssessmentReviewer")
+  assessmentsClosed             VendorAssessment[]           @relation("AssessmentCloser")
+  assessmentTemplatesCreated    VendorAssessmentTemplate[]   @relation("AssessmentTemplateCreator")
   vendorDocsUploaded            VendorDocument[]             @relation("VendorDocUploader")
   vendorBundlesCreated          VendorEvidenceBundle[]       @relation("EvidenceBundleCreator")
   apiKeysCreated                TenantApiKey[]               @relation("ApiKeyCreator")

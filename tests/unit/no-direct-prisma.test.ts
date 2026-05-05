@@ -134,6 +134,20 @@ describe('CI Guard: No direct prisma in tenant-scoped code', () => {
         // `getTenantCtx` already enforces tenant membership; framework
         // metadata leaks no business data.
         'search.ts',
+        // Epic G-3 — public token-gated vendor questionnaire response
+        // surface. Token verification (SHA-256 hash compare) precedes
+        // tenant resolution: the external respondent has no session
+        // and no tenantId until after the token matches an assessment
+        // row. `loadResponseByToken` and `submitResponse` therefore
+        // use the global prisma client to look up the assessment by
+        // hash, then continue under that row's tenantId. RLS bypass
+        // is intentional and bounded — every subsequent write goes
+        // through `runWithAuditContext` bound to the matched
+        // assessment's tenantId. See
+        // src/lib/security/external-assessment-access.ts for the
+        // verifier and src/lib/errors/route-exemptions.ts for the
+        // route-level anti-enumeration shape.
+        'vendor-assessment-response.ts',
     ];
 
     const usecases = readFilesInDir(path.join(SRC_ROOT, 'app-layer/usecases'));

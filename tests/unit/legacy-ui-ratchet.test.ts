@@ -37,8 +37,13 @@ const BASELINES = {
     // 245 → 246 when audits/readiness empty state was inlined (server
     // component can't pass forwardRef icons to <EmptyState>; the
     // inlined version uses one `btn btn-primary` for "+ New Audit
-    // Cycle"). All slot into the existing legacy-btn migration backlog.
-    btn: 246,
+    // Cycle").
+    // 246 → 251 with Epic G-3: vendor questionnaire builder (admin/
+    // vendor-templates index + builder pages) + reviewer page
+    // (admin/vendor-assessment-reviews/[id]) match the rest of the
+    // admin surface's `btn btn-*` shape. Slot into the existing
+    // legacy-btn migration backlog alongside the other admin pages.
+    btn: 251,
     badge: 78,
 } as const;
 

@@ -16,10 +16,18 @@ import {
     buildEvidenceExpiringEmail,
     buildPolicyApprovalRequestedEmail,
     buildPolicyDecisionEmail,
+    buildVendorAssessmentInvitationEmail,
+    buildVendorAssessmentReminderEmail,
+    buildVendorAssessmentSubmittedEmail,
+    buildVendorAssessmentReviewedEmail,
     type TaskAssignedPayload,
     type EvidenceExpiringPayload,
     type PolicyApprovalRequestedPayload,
     type PolicyDecisionPayload,
+    type VendorAssessmentInvitationPayload,
+    type VendorAssessmentReminderPayload,
+    type VendorAssessmentSubmittedPayload,
+    type VendorAssessmentReviewedPayload,
 } from './templates';
 
 export interface EnqueueEmailInput {
@@ -27,7 +35,15 @@ export interface EnqueueEmailInput {
     type: EmailNotificationType;
     toEmail: string;
     entityId: string;
-    payload: TaskAssignedPayload | EvidenceExpiringPayload | PolicyApprovalRequestedPayload | PolicyDecisionPayload;
+    payload:
+        | TaskAssignedPayload
+        | EvidenceExpiringPayload
+        | PolicyApprovalRequestedPayload
+        | PolicyDecisionPayload
+        | VendorAssessmentInvitationPayload
+        | VendorAssessmentReminderPayload
+        | VendorAssessmentSubmittedPayload
+        | VendorAssessmentReviewedPayload;
     sendAfter?: Date;
     requestId?: string;
 }
@@ -111,7 +127,15 @@ export async function enqueueEmail(
  */
 function buildEmailContent(
     type: EmailNotificationType,
-    payload: TaskAssignedPayload | EvidenceExpiringPayload | PolicyApprovalRequestedPayload | PolicyDecisionPayload,
+    payload:
+        | TaskAssignedPayload
+        | EvidenceExpiringPayload
+        | PolicyApprovalRequestedPayload
+        | PolicyDecisionPayload
+        | VendorAssessmentInvitationPayload
+        | VendorAssessmentReminderPayload
+        | VendorAssessmentSubmittedPayload
+        | VendorAssessmentReviewedPayload,
 ): { subject: string; bodyText: string; bodyHtml: string } {
     switch (type) {
         case 'TASK_ASSIGNED':
@@ -124,6 +148,22 @@ function buildEmailContent(
             return buildPolicyDecisionEmail({ ...(payload as PolicyDecisionPayload), decision: 'APPROVED' });
         case 'POLICY_REJECTED':
             return buildPolicyDecisionEmail({ ...(payload as PolicyDecisionPayload), decision: 'REJECTED' });
+        case 'VENDOR_ASSESSMENT_INVITATION':
+            return buildVendorAssessmentInvitationEmail(
+                payload as VendorAssessmentInvitationPayload,
+            );
+        case 'VENDOR_ASSESSMENT_REMINDER':
+            return buildVendorAssessmentReminderEmail(
+                payload as VendorAssessmentReminderPayload,
+            );
+        case 'VENDOR_ASSESSMENT_SUBMITTED':
+            return buildVendorAssessmentSubmittedEmail(
+                payload as VendorAssessmentSubmittedPayload,
+            );
+        case 'VENDOR_ASSESSMENT_REVIEWED':
+            return buildVendorAssessmentReviewedEmail(
+                payload as VendorAssessmentReviewedPayload,
+            );
         default:
             throw new Error(`Unknown notification type: ${type}`);
     }
