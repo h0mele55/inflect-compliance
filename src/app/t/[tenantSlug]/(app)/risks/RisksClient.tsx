@@ -2,9 +2,9 @@
 /* eslint-disable react-hooks/exhaustive-deps -- Various useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers/derived arrays recreated each render). The proper structural fix is wrapping parent-level callbacks in useCallback. Tracked as follow-up; existing per-line eslint-disable-next-line markers preserved. */
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { queryKeys } from '@/lib/queryKeys';
+import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 // NOTE: NewRiskModal was previously lazy-loaded via next/dynamic, but
 // the JIT race in `next dev` made the modal occasionally fail to mount
 // in serial-mode E2E runs (Playwright clicked the button before the
@@ -182,16 +182,24 @@ function RisksPageInner({
         return true;
     }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
 
-    const risksQuery = useQuery<RiskListItem[]>({
-        queryKey: queryKeys.risks.list(tenantSlug, queryKeyFilters),
-        queryFn: async () => {
-            const qs = fetchParams.toString();
-            const res = await fetch(apiUrl(`/risks${qs ? `?${qs}` : ''}`));
-            if (!res.ok) throw new Error('Failed to fetch risks');
-            return res.json();
-        },
-        initialData: filtersMatchInitial ? initialRisks : undefined,
-        initialDataUpdatedAt: 0,
+    // Epic 69 — read source is `useTenantSWR` against a filter-aware
+    // cache key. Each unique filter combination becomes its own
+    // entry, so toggling filters doesn't fight over the same cache
+    // slot. The unfiltered baseline is the registry's `list()`.
+    // Server-rendered initial data lands as `fallbackData` only when
+    // the active filters match what the server fetched — otherwise
+    // the hook fires a fresh request immediately, matching the prior
+    // React Query semantics of "skip initialData when filters
+    // diverged from the server's view".
+    const risksKey = useMemo(() => {
+        const qs = fetchParams.toString();
+        return qs
+            ? `${CACHE_KEYS.risks.list()}?${qs}`
+            : CACHE_KEYS.risks.list();
+    }, [fetchParams]);
+
+    const risksQuery = useTenantSWR<RiskListItem[]>(risksKey, {
+        fallbackData: filtersMatchInitial ? initialRisks : undefined,
     });
 
     const risks = risksQuery.data ?? [];

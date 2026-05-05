@@ -1,8 +1,10 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any -- Client component receiving server-rendered domain data; tanstack column callbacks; or library-boundary callbacks. Per-site narrowing requires generated DTOs / per-cell CellContext imports — out of scope for the lint cleanup PR. */
-import { useEffect, useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/queryKeys';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useSWRConfig } from 'swr';
+import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
+import { useTenantMutation } from '@/lib/hooks/use-tenant-mutation';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 // Both evidence modals were previously lazy-loaded via next/dynamic,
@@ -113,7 +115,7 @@ export function EvidenceClient(props: EvidenceClientProps) {
 
 function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permissions, translations: t }: EvidenceClientProps) {
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
-    const queryClient = useQueryClient();
+    const { mutate: swrMutate } = useSWRConfig();
 
     // Retention-tab + view-mode selectors — deliberately kept separate from filter state.
     // `tab`: active | expiring | archived. `view`: list | gallery.
@@ -132,24 +134,26 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
         return params;
     }, [state, search, filters.tab]);
 
-    const queryKeyFilters = useMemo(() => {
-        const obj: Record<string, string> = {};
-        for (const [k, v] of fetchParams) obj[k] = v;
-        return obj;
+    // ─── Epic 69 — SWR-first read for the evidence list ───
+    //
+    // Each filter combo gets its own cache entry via the
+    // query-string suffix on the SWR key. The unfiltered baseline
+    // is the registry's `list()`. Server-rendered initialEvidence
+    // lands as `fallbackData` only when no filters / retention tab
+    // is active — otherwise the hook fires a fresh request, mirroring
+    // the prior "skip initialData when filters diverge" semantics.
+    const anyFilterActive = hasActive || !!filters.tab;
+    const evidenceKey = useMemo(() => {
+        const qs = fetchParams.toString();
+        return qs
+            ? `${CACHE_KEYS.evidence.list()}?${qs}`
+            : CACHE_KEYS.evidence.list();
     }, [fetchParams]);
 
-    // ─── Query: evidence list (hydrated with server data) ───
-    const anyFilterActive = hasActive || !!filters.tab;
-    const evidenceQuery = useQuery({
-        queryKey: queryKeys.evidence.list(tenantSlug, queryKeyFilters),
-        queryFn: async () => {
-            const qs = fetchParams.toString();
-            const res = await fetch(apiUrl(`/evidence${qs ? `?${qs}` : ''}`));
-            if (!res.ok) throw new Error('Failed to fetch evidence');
-            return res.json();
-        },
-        initialData: anyFilterActive ? undefined : initialEvidence,
-        initialDataUpdatedAt: 0,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const evidenceQuery = useTenantSWR<any[]>(evidenceKey, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        fallbackData: anyFilterActive ? undefined : (initialEvidence as any[]),
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -168,50 +172,69 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     const [editingRetention, setEditingRetention] = useState<string | null>(null);
     const [editRetentionDate, setEditRetentionDate] = useState('');
 
-    const invalidateEvidence = () => {
-        queryClient.invalidateQueries({ queryKey: queryKeys.evidence.all(tenantSlug) });
-    };
+    // Invalidate every cached evidence-list filter variant. SWR's
+    // function-form `mutate()` matches by absolute URL prefix —
+    // every key under `/api/t/{slug}/evidence` (with or without
+    // query string) gets a background refetch.
+    const invalidateEvidence = useCallback(() => {
+        const evidenceUrlPrefix = apiUrl(CACHE_KEYS.evidence.list());
+        return swrMutate(
+            (key) =>
+                typeof key === 'string' &&
+                (key === evidenceUrlPrefix ||
+                    key.startsWith(`${evidenceUrlPrefix}?`)),
+            undefined,
+            { revalidate: true },
+        );
+    }, [apiUrl, swrMutate]);
 
-    // ─── Mutation: review workflow ───
-
-    const reviewMutation = useMutation({
-        mutationFn: async ({ id, action, comment }: { id: string; action: string; comment: string }) => {
+    // ─── Mutation: review workflow (Epic 69 — useTenantMutation) ───
+    //
+    // Migrated from React Query's `useMutation` + `onMutate` /
+    // `onError` rollback hooks. The optimistic update flips the
+    // matching row's status synchronously; SWR's `rollbackOnError`
+    // default restores the prior list on failure. After success
+    // SWR revalidates the current key, and `invalidateEvidence()`
+    // fans out to sibling filter variants.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const reviewMutation = useTenantMutation<any[], { id: string; action: string; comment: string }, unknown>({
+        key: evidenceKey,
+        mutationFn: async ({ id, action, comment }) => {
             const res = await fetch(apiUrl(`/evidence/${id}/review`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action, comment }),
             });
             if (!res.ok) throw new Error('Review action failed');
-            return { id, action };
+            return res.json().catch(() => null);
         },
-        onMutate: async ({ id, action }) => {
-            await queryClient.cancelQueries({ queryKey: queryKeys.evidence.all(tenantSlug) });
-            const listKey = queryKeys.evidence.list(tenantSlug);
+        optimisticUpdate: (current, { id, action }) => {
+            const newStatus =
+                action === 'SUBMITTED'
+                    ? 'SUBMITTED'
+                    : action === 'APPROVED'
+                        ? 'APPROVED'
+                        : 'REJECTED';
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const previousList = queryClient.getQueryData<any[]>(listKey);
-            const newStatus = action === 'SUBMITTED' ? 'SUBMITTED' : action === 'APPROVED' ? 'APPROVED' : 'REJECTED';
-            if (previousList) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                queryClient.setQueryData<any[]>(listKey, old =>
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    old?.map((ev: any) => ev.id === id ? { ...ev, status: newStatus } : ev)
-                );
-            }
-            return { previousList, listKey };
+            return (current ?? []).map((ev: any) =>
+                ev.id === id ? { ...ev, status: newStatus } : ev,
+            );
         },
-        onError: (_err, _vars, context) => {
-            if (context?.previousList) {
-                queryClient.setQueryData(context.listKey, context.previousList);
-            }
-        },
-        onSettled: () => invalidateEvidence(),
     });
 
     const submitReview = (id: string, action: string, comment = '') => {
-        reviewMutation.mutate({ id, action, comment });
+        reviewMutation.trigger({ id, action, comment }).catch(() => {
+            /* rollback already applied by the hook */
+        }).finally(() => {
+            // Fan out to sibling filter variants for completeness —
+            // status flips affect the "approved-only" / "rejected-
+            // only" filter views which the primary key revalidation
+            // doesn't cover.
+            invalidateEvidence();
+        });
     };
 
-    // ─── Retention actions ───
+    // ─── Retention actions ─────────────────────────────────────────
 
     const archiveEvidence = async (id: string) => {
         const res = await fetch(apiUrl(`/evidence/${id}/archive`), { method: 'POST' });

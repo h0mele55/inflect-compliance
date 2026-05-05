@@ -5,8 +5,8 @@ import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/queryKeys';
+import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 import {
     ColumnsDropdown,
     createColumns,
@@ -83,7 +83,6 @@ function PoliciesPageInner({
     translations: t,
 }: PoliciesClientProps) {
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
-    const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const router = useRouter();
     // Null on SSR + first client render so the "Overdue" badge doesn't
     // flip between server- and client-side `new Date()` values.
@@ -116,18 +115,22 @@ function PoliciesPageInner({
         return true;
     }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
 
-    const policiesQuery = useQuery<any[]>({
-        queryKey: queryKeys.policies.list(tenantSlug, queryKeyFilters),
-        queryFn: async () => {
-            const qs = fetchParams.toString();
-            const res = await fetch(
-                apiUrl(`/policies${qs ? `?${qs}` : ''}`),
-            );
-            if (!res.ok) throw new Error('Failed to fetch policies');
-            return res.json();
-        },
-        initialData: filtersMatchInitial ? initialPolicies : undefined,
-        initialDataUpdatedAt: 0,
+    // Epic 69 — read source is `useTenantSWR` against a filter-aware
+    // cache key. Each filter combination becomes its own cache entry
+    // (the qs-suffix on the path keeps them isolated). Server-rendered
+    // `initialPolicies` lands as `fallbackData` only when the active
+    // filters match the server view — otherwise the hook fires a
+    // fresh request immediately, mirroring the prior React Query
+    // "skip initialData when filters diverge" semantics.
+    const policiesKey = useMemo(() => {
+        const qs = fetchParams.toString();
+        return qs
+            ? `${CACHE_KEYS.policies.list()}?${qs}`
+            : CACHE_KEYS.policies.list();
+    }, [fetchParams]);
+
+    const policiesQuery = useTenantSWR<any[]>(policiesKey, {
+        fallbackData: filtersMatchInitial ? initialPolicies : undefined,
     });
 
     const policies = policiesQuery.data ?? [];

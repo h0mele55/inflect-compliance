@@ -1,8 +1,7 @@
 'use client';
 import { formatDate, formatDateTime } from '@/lib/format-date';
-import { useEffect, useState, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/queryKeys';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useSWRConfig } from 'swr';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 // Inline pencil icon to avoid lucide-react barrel import issue with Next.js 14
@@ -10,6 +9,9 @@ const PencilIcon = ({ size = 14 }: { size?: number }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
 );
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
+import { useTenantMutation } from '@/lib/hooks/use-tenant-mutation';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 import { extractMutationError } from '@/lib/mutations';
 import { useToastWithUndo } from '@/components/ui/hooks';
 import { Modal } from '@/components/ui/modal';
@@ -88,18 +90,26 @@ export default function ControlDetailPage() {
     const params = useParams();
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
-    const { permissions, tenantSlug } = useTenantContext();
+    const { permissions } = useTenantContext();
     const controlId = params?.controlId as string;
-    const queryClient = useQueryClient();
+    const { mutate: swrMutate } = useSWRConfig();
     const triggerUndoToast = useToastWithUndo();
 
-    // ─── Query: control + sync (single page-data call) ───
+    // ─── Page data — Epic 69 SWR-first read ──────────────────────────
     //
-    // Hits `/controls/:id/page-data` which collapses the previous
+    // Hits `/controls/:id/page-data` which collapses the prior
     // serial waterfall (GET /controls/:id THEN GET /controls/:id/sync)
-    // into one round-trip. The sync sub-payload is null for controls
-    // without an automationKey, or when the mapping lookup fails — the
-    // page renders the conflict badge unconditionally against it.
+    // into one round-trip. The sync sub-payload is `null` for
+    // controls without an `automationKey` or when the mapping lookup
+    // fails — the page renders the conflict badge unconditionally
+    // against it.
+    //
+    // Epic 69 migration: this read used to flow through TanStack
+    // React Query (`useQuery` + `queryKeys.controls.detail`). It's
+    // now a `useTenantSWR` against `CACHE_KEYS.controls.pageData(id)`
+    // so the status mutation below can apply optimistic updates that
+    // the rest of the UI sees immediately. Other pages on this
+    // codebase still use React Query — that migration is incremental.
     interface ControlPageDataDTO {
         control: ControlDetailDTO;
         syncStatus: {
@@ -109,19 +119,24 @@ export default function ControlDetailPage() {
             provider: string | null;
         } | null;
     }
-    const pageDataQuery = useQuery<ControlPageDataDTO>({
-        queryKey: queryKeys.controls.detail(tenantSlug, controlId),
-        queryFn: async () => {
-            const res = await fetch(apiUrl(`/controls/${controlId}/page-data`));
-            if (!res.ok) throw new Error('Control not found');
-            return res.json();
-        },
-        enabled: !!controlId,
-    });
+    const pageDataKey = controlId
+        ? CACHE_KEYS.controls.pageData(controlId)
+        : null;
+    const pageDataQuery = useTenantSWR<ControlPageDataDTO>(pageDataKey);
     const control = pageDataQuery.data?.control ?? null;
     const loading = pageDataQuery.isLoading;
-    const error = pageDataQuery.error?.message ?? '';
-    const refetch = pageDataQuery.refetch;
+    const error =
+        pageDataQuery.error
+            ? pageDataQuery.error.message || 'Control not found'
+            : '';
+    // Stable revalidation handle that mirrors the prior `refetch()`
+    // contract — `mutate(undefined)` re-runs the fetcher for this
+    // hook's key. Wrapped in `useCallback` so the call sites that
+    // pass it down to event handlers don't re-bind on every render.
+    const refetch = useCallback(
+        () => pageDataQuery.mutate(),
+        [pageDataQuery],
+    );
     const initialSyncStatus = pageDataQuery.data?.syncStatus ?? null;
     const [tab, setTab] = useState<Tab>('overview');
 
@@ -210,9 +225,22 @@ export default function ControlDetailPage() {
     };
 
 
-    // ─── Mutation: edit control ───
-    const editMutation = useMutation({
-        mutationFn: async (form: typeof editForm) => {
+    // ─── Mutation: edit control ─────────────────────────────────────
+    //
+    // Epic 69 migration — the prior React Query `useMutation` with
+    // `onMutate` / `onError` rollback hooks is now a single
+    // `useTenantMutation`. The optimistic update walks the cached
+    // page-data shape (control nested under `pageData.control`)
+    // because the SWR cache holds the whole envelope, not the bare
+    // detail. Rollback is automatic on throw via SWR's
+    // `rollbackOnError: true` default.
+    const editMutation = useTenantMutation<
+        ControlPageDataDTO,
+        typeof editForm,
+        unknown
+    >({
+        key: pageDataKey ?? '',
+        mutationFn: async (form) => {
             const res = await fetch(apiUrl(`/controls/${controlId}`), {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
@@ -225,53 +253,52 @@ export default function ControlDetailPage() {
                 }),
             });
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ error: 'Update failed' }));
+                const err = await res
+                    .json()
+                    .catch(() => ({ error: 'Update failed' }));
                 throw new Error(extractMutationError(err, 'Update failed'));
             }
             // If owner changed, call the separate owner endpoint
             const originalOwner = control?.ownerUserId || '';
             if (form.owner.trim() !== originalOwner) {
-                const ownerRes = await fetch(apiUrl(`/controls/${controlId}/owner`), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ownerUserId: form.owner.trim() || null }),
-                });
+                const ownerRes = await fetch(
+                    apiUrl(`/controls/${controlId}/owner`),
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            ownerUserId: form.owner.trim() || null,
+                        }),
+                    },
+                );
                 if (!ownerRes.ok) {
-                    const ownerErr = await ownerRes.json().catch(() => ({ error: 'Owner update failed' }));
-                    throw new Error(extractMutationError(ownerErr, 'Owner update failed'));
+                    const ownerErr = await ownerRes
+                        .json()
+                        .catch(() => ({ error: 'Owner update failed' }));
+                    throw new Error(
+                        extractMutationError(ownerErr, 'Owner update failed'),
+                    );
                 }
             }
             return form;
         },
-        onMutate: async (form) => {
-            await queryClient.cancelQueries({ queryKey: queryKeys.controls.detail(tenantSlug, controlId) });
-            const previous = queryClient.getQueryData<ControlDetailDTO>(queryKeys.controls.detail(tenantSlug, controlId));
-            if (previous) {
-                queryClient.setQueryData<ControlDetailDTO>(queryKeys.controls.detail(tenantSlug, controlId), {
-                    ...previous,
-                    name: form.name.trim(),
-                    description: form.description.trim() || null,
-                    intent: form.intent.trim() || null,
-                    category: form.category.trim() || null,
-                    frequency: form.frequency || null,
-                });
-            }
-            return { previous };
-        },
-        onError: (_err, _vars, context) => {
-            if (context?.previous) {
-                queryClient.setQueryData(queryKeys.controls.detail(tenantSlug, controlId), context.previous);
-            }
-        },
-        onSuccess: () => {
-            setShowEditModal(false);
-            setEditSuccess(true);
-            setTimeout(() => setEditSuccess(false), 3000);
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
-            setSavingEdit(false);
-        },
+        optimisticUpdate: (current, form) =>
+            current
+                ? {
+                      ...current,
+                      control: {
+                          ...current.control,
+                          name: form.name.trim(),
+                          description: form.description.trim() || null,
+                          intent: form.intent.trim() || null,
+                          category: form.category.trim() || null,
+                          frequency: form.frequency || null,
+                      },
+                  }
+                : (current as unknown as ControlPageDataDTO),
+        // Refresh the list cache too — the controls list page shows
+        // these same fields.
+        invalidate: [CACHE_KEYS.controls.list()],
     });
 
     const handleEditSave = async (e: React.FormEvent) => {
@@ -282,11 +309,16 @@ export default function ControlDetailPage() {
         }
         setSavingEdit(true);
         setEditError('');
-        editMutation.mutate(editForm, {
-            onError: (err) => {
-                setEditError(err instanceof Error ? err.message : 'Update failed');
-            },
-        });
+        try {
+            await editMutation.trigger(editForm);
+            setShowEditModal(false);
+            setEditSuccess(true);
+            setTimeout(() => setEditSuccess(false), 3000);
+        } catch (err) {
+            setEditError(err instanceof Error ? err.message : 'Update failed');
+        } finally {
+            setSavingEdit(false);
+        }
     };
 
     const handleEditCancel = () => {
@@ -373,15 +405,73 @@ export default function ControlDetailPage() {
         setEditingAutomation(false);
     };
 
+    // ─── Mutation: change control status (Epic 69 pilot #2) ────────
+    //
+    // The headline migration of this file. The previous flow was
+    // `fetch(POST /status) → await refetch() → invalidateQueries(list)`,
+    // a coarse round-trip that left the badge showing the old value
+    // for the duration of the network call.
+    //
+    // The new flow uses `useTenantMutation`:
+    //
+    //   1. `optimisticUpdate` flips `control.status` in the cached
+    //      page-data envelope synchronously — the badge re-renders
+    //      with the predicted value before the POST is sent.
+    //   2. `mutationFn` performs the POST. A non-2xx response throws.
+    //   3. On success, SWR background-revalidates the page-data key
+    //      (re-fetches `/controls/{id}/page-data`) — confirming the
+    //      server agrees with the prediction. The `invalidate`
+    //      sibling (`/controls`) refreshes the list page in parallel.
+    //   4. On failure, `rollbackOnError: true` (the default) restores
+    //      the prior `control.status` automatically — the badge
+    //      flips back to the original value with no spinner thrash.
+    //
+    // No `router.refresh()` involved. No coarse page reload. No
+    // imperative `refetch()` chained behind state setters.
+    const statusMutation = useTenantMutation<
+        ControlPageDataDTO,
+        { status: string },
+        unknown
+    >({
+        key: pageDataKey ?? '',
+        mutationFn: async ({ status }) => {
+            const res = await fetch(apiUrl(`/controls/${controlId}/status`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            });
+            if (!res.ok) {
+                const err = await res
+                    .json()
+                    .catch(() => ({ error: 'Status update failed' }));
+                throw new Error(
+                    extractMutationError(err, 'Status update failed'),
+                );
+            }
+            return res.json().catch(() => null);
+        },
+        optimisticUpdate: (current, { status }) =>
+            current
+                ? {
+                      ...current,
+                      control: { ...current.control, status },
+                  }
+                : (current as unknown as ControlPageDataDTO),
+        // List page shows status badges too — keep it in sync.
+        invalidate: [CACHE_KEYS.controls.list()],
+    });
+
     const changeStatus = async (status: string) => {
         setChangingStatus(true);
-        await fetch(apiUrl(`/controls/${controlId}/status`), {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
-        });
-        await refetch();
-        queryClient.invalidateQueries({ queryKey: queryKeys.controls.list(tenantSlug) });
-        setChangingStatus(false);
+        try {
+            await statusMutation.trigger({ status });
+        } catch {
+            // Rollback already applied by the hook; the error is
+            // available on `statusMutation.error` for any future
+            // toast surface. Status badge has reverted on its own.
+        } finally {
+            setChangingStatus(false);
+        }
     };
 
     const saveApplicability = async () => {
@@ -430,23 +520,34 @@ export default function ControlDetailPage() {
         setSavingEvidence(false);
     };
 
-    // Epic 67 — delayed-commit unlink. Optimistic remove via setQueryData
-    // so the row disappears immediately; the actual DELETE fires after
-    // the 5s undo window. Snapshot is the WHOLE pageData so undo can
-    // restore even if the user concurrently triggered another change.
+    // Epic 67 — delayed-commit unlink. Optimistic remove via SWR
+    // `mutate(key, value, { revalidate: false })` so the row
+    // disappears immediately; the actual DELETE fires after the 5 s
+    // undo window. Snapshot is the WHOLE pageData so undo can
+    // restore even if the user concurrently triggered another
+    // change.
+    //
+    // Migrated from `queryClient.setQueryData/getQueryData` to the
+    // SWR equivalent in the Epic 69 pass — semantics identical.
     const unlinkEvidence = (linkId: string) => {
-        const cacheKey = queryKeys.controls.detail(tenantSlug, controlId);
-        const previous = queryClient.getQueryData<ControlPageDataDTO>(cacheKey);
+        if (!pageDataKey) return;
+        const cacheKey = apiUrl(pageDataKey);
+        const previous = pageDataQuery.data;
         if (previous) {
-            queryClient.setQueryData<ControlPageDataDTO>(cacheKey, {
-                ...previous,
-                control: {
-                    ...previous.control,
-                    evidenceLinks: (previous.control.evidenceLinks || []).filter(
-                        (link: EvidenceLinkDTO) => link.id !== linkId,
-                    ),
+            swrMutate<ControlPageDataDTO>(
+                cacheKey,
+                {
+                    ...previous,
+                    control: {
+                        ...previous.control,
+                        evidenceLinks: (previous.control.evidenceLinks || [])
+                            .filter(
+                                (link: EvidenceLinkDTO) => link.id !== linkId,
+                            ),
+                    },
                 },
-            });
+                { revalidate: false },
+            );
         }
         triggerUndoToast({
             message: 'Evidence unlinked',
@@ -460,10 +561,18 @@ export default function ControlDetailPage() {
                 await refetch();
             },
             undoAction: () => {
-                if (previous) queryClient.setQueryData(cacheKey, previous);
+                if (previous) {
+                    swrMutate<ControlPageDataDTO>(cacheKey, previous, {
+                        revalidate: false,
+                    });
+                }
             },
             onError: () => {
-                if (previous) queryClient.setQueryData(cacheKey, previous);
+                if (previous) {
+                    swrMutate<ControlPageDataDTO>(cacheKey, previous, {
+                        revalidate: false,
+                    });
+                }
             },
         });
     };
@@ -508,41 +617,58 @@ export default function ControlDetailPage() {
         setSavingMap(false);
     };
 
-    // Epic 67 — delayed-commit unmap. Same shape as unlinkEvidence; the
-    // requirement is filtered out of the cached page-data immediately so
-    // the table updates, and the DELETE fires after the 5s undo window.
+    // Epic 67 — delayed-commit unmap. Same shape as unlinkEvidence
+    // above; migrated to SWR cache writes in the Epic 69 pass.
     const unmapRequirement = (reqId: string) => {
-        const cacheKey = queryKeys.controls.detail(tenantSlug, controlId);
-        const previous = queryClient.getQueryData<ControlPageDataDTO>(cacheKey);
+        if (!pageDataKey) return;
+        const cacheKey = apiUrl(pageDataKey);
+        const previous = pageDataQuery.data;
         if (previous) {
-            queryClient.setQueryData<ControlPageDataDTO>(cacheKey, {
-                ...previous,
-                control: {
-                    ...previous.control,
-                    frameworkMappings: (previous.control.frameworkMappings || []).filter(
-                        (m: FrameworkMappingDTO) =>
-                            m.fromRequirement?.id !== reqId && m.fromRequirementId !== reqId,
-                    ),
+            swrMutate<ControlPageDataDTO>(
+                cacheKey,
+                {
+                    ...previous,
+                    control: {
+                        ...previous.control,
+                        frameworkMappings: (previous.control.frameworkMappings || [])
+                            .filter(
+                                (m: FrameworkMappingDTO) =>
+                                    m.fromRequirement?.id !== reqId &&
+                                    m.fromRequirementId !== reqId,
+                            ),
+                    },
                 },
-            });
+                { revalidate: false },
+            );
         }
         triggerUndoToast({
             message: 'Requirement unmapped',
             undoMessage: 'Undo',
             action: async () => {
-                const res = await fetch(apiUrl(`/controls/${controlId}/requirements`), {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ requirementId: reqId }),
-                });
+                const res = await fetch(
+                    apiUrl(`/controls/${controlId}/requirements`),
+                    {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ requirementId: reqId }),
+                    },
+                );
                 if (!res.ok) throw new Error('Unmap failed');
                 await refetch();
             },
             undoAction: () => {
-                if (previous) queryClient.setQueryData(cacheKey, previous);
+                if (previous) {
+                    swrMutate<ControlPageDataDTO>(cacheKey, previous, {
+                        revalidate: false,
+                    });
+                }
             },
             onError: () => {
-                if (previous) queryClient.setQueryData(cacheKey, previous);
+                if (previous) {
+                    swrMutate<ControlPageDataDTO>(cacheKey, previous, {
+                        revalidate: false,
+                    });
+                }
             },
         });
     };

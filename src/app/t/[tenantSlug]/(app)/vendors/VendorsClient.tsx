@@ -5,8 +5,8 @@ import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/queryKeys';
+import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
@@ -63,7 +63,6 @@ export function VendorsClient(props: VendorsClientProps) {
 
 function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissions }: VendorsClientProps) {
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
-    const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const router = useRouter();
     // Null until hydrated — keeps Overdue/Due badges stable across SSR.
     const hydratedNow = useHydratedNow();
@@ -90,15 +89,19 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
         return true;
     }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
 
-    const vendorsQuery = useQuery({
-        queryKey: queryKeys.vendors.list(tenantSlug, queryKeyFilters),
-        queryFn: async () => {
-            const qs = fetchParams.toString();
-            const res = await fetch(apiUrl(`/vendors${qs ? `?${qs}` : ''}`));
-            if (!res.ok) throw new Error('Failed to fetch vendors');
-            return res.json();
-        },
-        initialData: filtersMatchInitial ? initialVendors : undefined,
+    // Epic 69 — same SWR-first read pattern as policies / risks /
+    // evidence. Filter-aware key + server-rendered fallbackData
+    // (gated against filter divergence so the hook fires fresh on
+    // any URL-driven filter change).
+    const vendorsKey = useMemo(() => {
+        const qs = fetchParams.toString();
+        return qs
+            ? `${CACHE_KEYS.vendors.list()}?${qs}`
+            : CACHE_KEYS.vendors.list();
+    }, [fetchParams]);
+
+    const vendorsQuery = useTenantSWR<any[]>(vendorsKey, {
+        fallbackData: filtersMatchInitial ? initialVendors : undefined,
     });
 
     const vendors = vendorsQuery.data ?? [];

@@ -3,6 +3,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { getQueryClient } from '@/lib/query-client';
 import { OnboardingTourProvider } from '@/components/ui/OnboardingTour';
+import SWRDevTools from '@/components/dev/swr-devtools';
 
 /**
  * Client-only providers for the tenant app.
@@ -65,6 +66,13 @@ export function ClientProviders({
                 autoTriggerOnFirstLogin={autoTrigger}
             >
                 {children}
+                {/*
+                  Epic 69 — dev-only floating SWR cache inspector.
+                  Self-gated against NODE_ENV !== 'development' AND
+                  NEXT_PUBLIC_TEST_MODE === '1'; renders nothing in
+                  prod / E2E runs. Tree-shaken from prod bundles.
+                */}
+                <SWRDevTools />
             </OnboardingTourProvider>
         </QueryClientProvider>
     );

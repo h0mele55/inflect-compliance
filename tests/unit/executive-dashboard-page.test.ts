@@ -1,11 +1,17 @@
 /**
- * Executive Dashboard Page Tests
+ * Executive Dashboard Page — structural tests.
  *
- * Verifies the dashboard page structure, widget composition,
- * server/client boundaries, and data contract compatibility.
+ * Epic 69 (SWR-First Client-Side Data Fetching) split the dashboard
+ * into a thin server shell (`page.tsx`) that fetches once + a
+ * `'use client'` component (`DashboardClient.tsx`) that owns all the
+ * card composition. The tests below now read BOTH files together so
+ * the existing composition / contract assertions still pin the right
+ * thing — the layout invariants are about "the dashboard tree" not
+ * "the page file".
  *
- * Since the codebase is SSR-first (no React Testing Library),
- * we test via structural analysis and export verification.
+ * Each section is annotated with which file is being inspected so a
+ * future cleanup that re-merges the two (or splits further) updates
+ * the right helper.
  */
 
 import * as fs from 'fs';
@@ -16,75 +22,95 @@ const DASHBOARD_DIR = path.resolve(
     '../../src/app/t/[tenantSlug]/(app)/dashboard',
 );
 const DASHBOARD_PAGE = path.join(DASHBOARD_DIR, 'page.tsx');
+const DASHBOARD_CLIENT = path.join(DASHBOARD_DIR, 'DashboardClient.tsx');
 
 function readPage(): string {
     return fs.readFileSync(DASHBOARD_PAGE, 'utf-8');
+}
+function readClient(): string {
+    return fs.readFileSync(DASHBOARD_CLIENT, 'utf-8');
+}
+/**
+ * Combined view — used by composition / contract assertions that
+ * don't care which side of the server/client boundary owns the JSX.
+ */
+function readAll(): string {
+    return `${readPage()}\n${readClient()}`;
 }
 
 // ─── Page Structure ────────────────────────────────────────────────
 
 describe('Executive Dashboard Page', () => {
-    const content = readPage();
-
-    test('page file exists and is substantial', () => {
+    test('page file exists and is the slim server shell', () => {
+        const content = readPage();
         expect(fs.existsSync(DASHBOARD_PAGE)).toBe(true);
-        expect(content.length).toBeGreaterThan(5000);
+        // The shell shouldn't accidentally inline the entire dashboard
+        // composition — that defeats the point of the split. Keep it
+        // bounded to ~120 lines.
+        expect(content.split('\n').length).toBeLessThan(120);
+    });
+
+    test('client component exists', () => {
+        expect(fs.existsSync(DASHBOARD_CLIENT)).toBe(true);
     });
 
     test('uses force-dynamic for real-time data', () => {
-        expect(content).toContain("dynamic = 'force-dynamic'");
+        expect(readPage()).toContain("dynamic = 'force-dynamic'");
     });
 
-    test('exports async default function (RSC)', () => {
-        expect(content).toContain('export default async function DashboardPage');
+    test('exports async default function (RSC shell)', () => {
+        expect(readPage()).toContain('export default async function DashboardPage');
     });
 
-    test('uses getExecutiveDashboard (not old getDashboardData for KPIs)', () => {
-        expect(content).toContain('getExecutiveDashboard');
+    test('uses getExecutiveDashboard for KPIs', () => {
+        expect(readPage()).toContain('getExecutiveDashboard');
     });
 
     test('fetches trend data via getComplianceTrends', () => {
-        expect(content).toContain('getComplianceTrends');
+        expect(readPage()).toContain('getComplianceTrends');
     });
 
     test('uses tenant context from getTenantCtx', () => {
-        expect(content).toContain('getTenantCtx');
+        expect(readPage()).toContain('getTenantCtx');
     });
 });
 
 // ─── Widget Composition ────────────────────────────────────────────
 
 describe('Dashboard Widget Composition', () => {
-    const content = readPage();
-
-    test('uses KpiCard component', () => {
+    test('uses KpiCard component (≥4 instances)', () => {
+        const content = readAll();
         expect(content).toContain("from '@/components/ui/KpiCard'");
-        // At least 4 KpiCard instances
         const kpiCount = (content.match(/<KpiCard/g) || []).length;
         expect(kpiCount).toBeGreaterThanOrEqual(4);
     });
 
     test('uses ProgressCard component', () => {
+        const content = readAll();
         expect(content).toContain("from '@/components/ui/ProgressCard'");
         expect(content).toContain('<ProgressCard');
     });
 
     test('uses DonutChart component', () => {
+        const content = readAll();
         expect(content).toContain("from '@/components/ui/DonutChart'");
         expect(content).toContain('<DonutChart');
     });
 
     test('uses TrendCard component (Epic 59 — TimeSeriesChart-backed)', () => {
+        const content = readAll();
         expect(content).toContain("from '@/components/ui/TrendCard'");
         expect(content).toContain('<TrendCard');
     });
 
     test('uses StatusBreakdown component', () => {
+        const content = readAll();
         expect(content).toContain("from '@/components/ui/StatusBreakdown'");
         expect(content).toContain('<StatusBreakdown');
     });
 
-    test('has at least 6 KPI cards for executive grid', () => {
+    test('has exactly 6 KPI cards for executive grid', () => {
+        const content = readAll();
         const kpiCount = (content.match(/<KpiCard/g) || []).length;
         expect(kpiCount).toBe(6);
     });
@@ -93,75 +119,78 @@ describe('Dashboard Widget Composition', () => {
 // ─── Layout Sections ───────────────────────────────────────────────
 
 describe('Dashboard Layout Sections', () => {
-    const content = readPage();
+    const ids = [
+        'kpi-grid',
+        'control-coverage',
+        'risk-distribution',
+        'evidence-status',
+        'compliance-alerts',
+        'trend-section',
+    ];
 
-    test('has KPI grid section', () => {
-        expect(content).toContain('id="kpi-grid"');
-    });
-
-    test('has control coverage section', () => {
-        expect(content).toContain('id="control-coverage"');
-    });
-
-    test('has risk distribution section', () => {
-        expect(content).toContain('id="risk-distribution"');
-    });
-
-    test('has evidence status section', () => {
-        expect(content).toContain('id="evidence-status"');
-    });
-
-    test('has compliance alerts section', () => {
-        expect(content).toContain('id="compliance-alerts"');
-    });
-
-    test('has trend section', () => {
-        expect(content).toContain('id="trend-section"');
+    test.each(ids)('section id="%s" present', (id) => {
+        expect(readAll()).toContain(`id="${id}"`);
     });
 
     test('uses responsive grid layout (lg:grid-cols-2)', () => {
-        expect(content).toContain('lg:grid-cols-2');
+        expect(readAll()).toContain('lg:grid-cols-2');
     });
 
     test('uses 6-col KPI grid on large screens', () => {
-        expect(content).toContain('lg:grid-cols-6');
+        expect(readAll()).toContain('lg:grid-cols-6');
     });
 });
 
 // ─── Server/Client Boundary ────────────────────────────────────────
 
-describe('Dashboard Server/Client Split', () => {
-    const content = readPage();
-
-    test('page does NOT have "use client" directive (Server Component)', () => {
-        expect(content).not.toMatch(/^'use client'/m);
-        expect(content).not.toMatch(/^"use client"/m);
+describe('Dashboard Server/Client Split (Epic 69)', () => {
+    test('page.tsx does NOT have "use client" directive (Server Component)', () => {
+        const content = readPage();
+        expect(content).not.toMatch(/^['"]use client['"]/m);
     });
 
-    test('uses Suspense for async sections (proper streaming)', () => {
-        const suspenseCount = (content.match(/<Suspense/g) || []).length;
-        expect(suspenseCount).toBeGreaterThanOrEqual(2); // trend + recent activity
+    test('DashboardClient.tsx DOES have "use client" directive', () => {
+        const content = readClient();
+        expect(content).toMatch(/^['"]use client['"]/m);
     });
 
-    test('uses Skeleton fallbacks within Suspense', () => {
-        expect(content).toContain('<Skeleton');
+    test('client component reads cache via useTenantSWR', () => {
+        const content = readClient();
+        expect(content).toContain("from '@/lib/hooks/use-tenant-swr'");
+        expect(content).toContain('useTenantSWR');
+    });
+
+    test('client component reaches into the typed CACHE_KEYS registry', () => {
+        const content = readClient();
+        expect(content).toContain("from '@/lib/swr-keys'");
+        expect(content).toContain('CACHE_KEYS.dashboard.executive()');
+    });
+
+    test('SWR hook is wired with fallbackData (no loading flash on first paint)', () => {
+        const content = readClient();
+        expect(content).toContain('fallbackData');
+    });
+
+    test('page.tsx forwards RecentActivityCard via children (server boundary preserved)', () => {
+        const content = readPage();
+        expect(content).toContain('<DashboardClient');
+        expect(content).toContain('<RecentActivityCard');
     });
 });
 
 // ─── Data Contract Compatibility ───────────────────────────────────
 
 describe('Dashboard Data Contracts', () => {
-    const content = readPage();
-
     test('consumes ExecutiveDashboardPayload type', () => {
-        expect(content).toContain('ExecutiveDashboardPayload');
+        expect(readAll()).toContain('ExecutiveDashboardPayload');
     });
 
     test('accesses controlCoverage.coveragePercent', () => {
-        expect(content).toContain('controlCoverage.coveragePercent');
+        expect(readAll()).toContain('controlCoverage.coveragePercent');
     });
 
     test('accesses riskBySeverity fields', () => {
+        const content = readAll();
         expect(content).toContain('riskBySeverity.critical');
         expect(content).toContain('riskBySeverity.high');
         expect(content).toContain('riskBySeverity.medium');
@@ -169,21 +198,24 @@ describe('Dashboard Data Contracts', () => {
     });
 
     test('accesses evidenceExpiry fields', () => {
+        const content = readAll();
         expect(content).toContain('evidenceExpiry.overdue');
         expect(content).toContain('evidenceExpiry.dueSoon7d');
         expect(content).toContain('evidenceExpiry.current');
     });
 
     test('accesses taskSummary.overdue', () => {
-        expect(content).toContain('taskSummary.overdue');
+        expect(readAll()).toContain('taskSummary.overdue');
     });
 
     test('accesses policySummary fields', () => {
+        const content = readAll();
         expect(content).toContain('policySummary.total');
         expect(content).toContain('policySummary.published');
     });
 
     test('accesses trend data points for sparklines', () => {
+        const content = readAll();
         expect(content).toContain('controlCoveragePercent');
         expect(content).toContain('risksOpen');
         expect(content).toContain('evidenceOverdue');
@@ -194,25 +226,54 @@ describe('Dashboard Data Contracts', () => {
 // ─── Empty State Handling ──────────────────────────────────────────
 
 describe('Dashboard Empty State Handling', () => {
-    const content = readPage();
-
     test('trend section handles no/insufficient data gracefully', () => {
+        const content = readAll();
         expect(content).toContain('daysAvailable < 2');
         expect(content).toContain('Trend charts will appear here');
     });
 
     test('compliance alerts handles no-alerts state', () => {
+        const content = readAll();
         expect(content).toContain('noAlerts');
         expect(content).toContain('alerts.length === 0');
     });
 
     test('notification bell only shows with unread count > 0', () => {
-        expect(content).toContain('unreadNotifications > 0');
+        expect(readAll()).toContain('unreadNotifications > 0');
     });
 
-    test('trend section catches errors gracefully', () => {
+    test('trend fetch failure degrades gracefully (catch path on the server)', () => {
+        // Server file owns the try/catch since it's the one that
+        // calls the usecase. Match catch + null fallback explicitly.
+        const content = readPage();
         expect(content).toContain('catch');
-        expect(content).toContain('return null');
+        expect(content).toMatch(/trends\s*=\s*null/);
+    });
+});
+
+// ─── Coarse-refresh prohibition (Epic 69 acceptance) ───────────────
+
+describe('Dashboard does not rely on router.refresh()', () => {
+    /**
+     * Strip block comments + line comments so prose mentions of
+     * `router.refresh()` in module docstrings (which describe what
+     * the migration moved AWAY from) don't trip the negative
+     * assertion. We only want to match real call expressions in
+     * executable code.
+     */
+    function stripComments(src: string): string {
+        return src
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/^\s*\/\/.*$/gm, '');
+    }
+
+    test('neither page.tsx nor DashboardClient.tsx invokes router.refresh()', () => {
+        // The Epic 69 acceptance criterion: dashboard freshness
+        // flows through SWR cache invalidation, not coarse Next-router
+        // refresh. A future PR that introduces `router.refresh()` on
+        // this page would defeat the migration.
+        const code = stripComments(readPage()) + stripComments(readClient());
+        expect(code).not.toMatch(/router\.refresh\s*\(/);
     });
 });
 
@@ -223,24 +284,24 @@ describe('Dashboard Backward Compatibility', () => {
         expect(fs.existsSync(path.join(DASHBOARD_DIR, 'loading.tsx'))).toBe(true);
     });
 
-    test('RecentActivityCard still exists and is used', () => {
-        expect(fs.existsSync(path.join(DASHBOARD_DIR, 'RecentActivityCard.tsx'))).toBe(true);
-        const content = readPage();
-        expect(content).toContain('RecentActivityCard');
+    test('RecentActivityCard still exists and is used by page.tsx', () => {
+        expect(
+            fs.existsSync(path.join(DASHBOARD_DIR, 'RecentActivityCard.tsx')),
+        ).toBe(true);
+        expect(readPage()).toContain('RecentActivityCard');
     });
 
-    test('OnboardingBanner is still rendered', () => {
-        const content = readPage();
-        expect(content).toContain('OnboardingBanner');
+    test('OnboardingBanner is still rendered (in client tree)', () => {
+        expect(readClient()).toContain('OnboardingBanner');
     });
 
     test('quick actions section preserved', () => {
-        const content = readPage();
-        expect(content).toContain('quickActions');
+        expect(readAll()).toContain('quickActions');
     });
 
-    test('i18n translations still used', () => {
-        const content = readPage();
-        expect(content).toContain('getTranslations');
+    test('i18n translations still used (server uses next-intl/server, client uses next-intl)', () => {
+        // Server shell no longer needs translations directly; the
+        // client owns all i18n strings now.
+        expect(readClient()).toContain('useTranslations');
     });
 });

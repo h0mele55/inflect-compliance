@@ -8,6 +8,17 @@
 export { useApi, useMutation } from './use-api';
 export type { UseApiResult, UseMutationResult } from './use-api';
 
+export { useTenantSWR } from './use-tenant-swr';
+export type { UseTenantSWROptions, UseTenantSWRResult } from './use-tenant-swr';
+
+export { useTenantMutation } from './use-tenant-mutation';
+export type {
+    OptimisticUpdater,
+    PopulateCacheFn,
+    UseTenantMutationOptions,
+    UseTenantMutationResult,
+} from './use-tenant-mutation';
+
 export {
     KeyboardShortcutProvider,
     useKeyboardShortcut,

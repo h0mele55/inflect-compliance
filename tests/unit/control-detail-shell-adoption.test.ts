@@ -103,3 +103,63 @@ describe('Controls detail page — EntityDetailLayout adoption', () => {
         expect(src).toMatch(/<EntityDetailLayout\s+empty=/);
     });
 });
+
+// ─── Epic 69 — SWR-first migration pins ──────────────────────────────
+
+describe('Controls detail page — Epic 69 SWR migration', () => {
+    /**
+     * Strip block + line comments so prose mentions of TanStack /
+     * `router.refresh()` in the migration's docstrings don't trip
+     * the negative assertions. We only want to match real call
+     * expressions in executable code.
+     */
+    function stripComments(src: string): string {
+        return src
+            .replace(/\/\*[\s\S]*?\*\//g, '')
+            .replace(/^\s*\/\/.*$/gm, '');
+    }
+
+    it('reads via useTenantSWR keyed at CACHE_KEYS.controls.pageData()', () => {
+        const src = read();
+        expect(src).toContain("from '@/lib/hooks/use-tenant-swr'");
+        expect(src).toContain('useTenantSWR');
+        expect(src).toContain('CACHE_KEYS.controls.pageData(');
+    });
+
+    it('writes status via useTenantMutation with an optimistic updater', () => {
+        const src = read();
+        expect(src).toContain("from '@/lib/hooks/use-tenant-mutation'");
+        // The status mutation MUST carry an `optimisticUpdate` —
+        // without it, the badge would still show stale state through
+        // the POST round-trip and the migration would be cosmetic.
+        expect(src).toContain('useTenantMutation');
+        // At least one mutation block on this page declares
+        // `optimisticUpdate:` (status, edit). Locks the contract.
+        expect(src.match(/optimisticUpdate:/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    });
+
+    it('invalidates the controls list cache after the status mutation', () => {
+        const src = read();
+        // The list page must refresh after the status flip — pin
+        // that the `invalidate` array references the list key.
+        expect(src).toContain('CACHE_KEYS.controls.list()');
+    });
+
+    it('does NOT use TanStack React Query (queryKeys / useQuery / useMutation / useQueryClient)', () => {
+        const code = stripComments(read());
+        // Negative pins — every React Query symbol that previously
+        // lived on this page is gone.
+        expect(code).not.toMatch(/from\s+['"]@tanstack\/react-query['"]/);
+        expect(code).not.toMatch(/\bqueryKeys\./);
+        expect(code).not.toMatch(/\buseQueryClient\b/);
+        expect(code).not.toMatch(/\.invalidateQueries\b/);
+    });
+
+    it('does not invoke router.refresh() in the status path', () => {
+        // Acceptance criterion from the Epic 69 brief: status
+        // freshness flows through SWR cache invalidation, not coarse
+        // Next-router refresh.
+        const code = stripComments(read());
+        expect(code).not.toMatch(/router\.refresh\s*\(/);
+    });
+});

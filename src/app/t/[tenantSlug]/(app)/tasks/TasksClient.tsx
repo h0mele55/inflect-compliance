@@ -1,11 +1,13 @@
 'use client';
 /* eslint-disable react-hooks/exhaustive-deps -- Various useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers/derived arrays recreated each render). The proper structural fix is wrapping parent-level callbacks in useCallback. Tracked as follow-up; existing per-line eslint-disable-next-line markers preserved. */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppIcon } from '@/components/icons/AppIcon';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/queryKeys';
+import { useSWRConfig } from 'swr';
+import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
+import { useTenantMutation } from '@/lib/hooks/use-tenant-mutation';
+import { CACHE_KEYS } from '@/lib/swr-keys';
 import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 import { DataTable, createColumns } from '@/components/ui/table';
@@ -109,7 +111,7 @@ function TasksPageInner({
 }: TasksClientProps) {
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
-    const queryClient = useQueryClient();
+    const { mutate: swrMutate } = useSWRConfig();
     const router = useRouter();
 
     // Hydration marker — signals to E2E tests that React event handlers are attached
@@ -149,18 +151,21 @@ function TasksPageInner({
         return true;
     }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
 
-    const tasksQuery = useQuery<TaskListItem[]>({
-        queryKey: queryKeys.tasks.list(tenantSlug, queryKeyFilters),
-        queryFn: async () => {
-            const qs = fetchParams.toString();
-            const res = await fetch(apiUrl(`/tasks${qs ? `?${qs}` : ''}`));
-            if (!res.ok) throw new Error('Failed to fetch tasks');
-            return res.json();
-        },
-        initialData: filtersMatchInitial ? initialTasks : undefined,
-        initialDataUpdatedAt: filtersMatchInitial ? Date.now() : 0,
-        // Prevent aggressive refetch during user interaction (SWR after 30s)
-        staleTime: 30_000,
+    // Epic 69 — same SWR-first read pattern as policies / risks /
+    // evidence / vendors. Filter-aware key + server-rendered
+    // fallbackData (gated against filter divergence). The prior
+    // `staleTime: 30_000` setting maps to SWR's
+    // `dedupingInterval` — the Epic 69 hook's default is 5 s
+    // already, so we bump it here to keep the previous behaviour
+    // (dampens revalidation thrash during bulk-select interaction).
+    const tasksKey = useMemo(() => {
+        const qs = fetchParams.toString();
+        return qs ? `${CACHE_KEYS.tasks.list()}?${qs}` : CACHE_KEYS.tasks.list();
+    }, [fetchParams]);
+
+    const tasksQuery = useTenantSWR<TaskListItem[]>(tasksKey, {
+        fallbackData: filtersMatchInitial ? initialTasks : undefined,
+        dedupingInterval: 30_000,
     });
 
     const tasks = tasksQuery.data ?? [];
@@ -184,10 +189,38 @@ function TasksPageInner({
         else setSelected(new Set(tasks.map(i => i.id)));
     };
 
-    // ─── Mutation: bulk actions ───
+    // ─── Mutation: bulk actions (Epic 69 — useTenantMutation) ────
+    //
+    // Migrated from React Query's `useMutation` + `onMutate` /
+    // `onError` rollback hooks. The hook now handles the lifecycle
+    // — `optimisticUpdate` walks the cached task list and patches
+    // every selected row with the new field; rollback is automatic
+    // on throw via `rollbackOnError: true` (the default). After
+    // success the post-mutation revalidation refreshes the
+    // current filter view, and `invalidateAllTasks()` below fans
+    // out to sibling filter variants so a different filter view
+    // doesn't show stale state.
+    const invalidateAllTasks = useCallback(() => {
+        const tasksUrlPrefix = apiUrl(CACHE_KEYS.tasks.list());
+        return swrMutate(
+            (key) =>
+                typeof key === 'string' &&
+                (key === tasksUrlPrefix ||
+                    key.startsWith(`${tasksUrlPrefix}?`)),
+            undefined,
+            { revalidate: true },
+        );
+    }, [apiUrl, swrMutate]);
 
-    const bulkMutation = useMutation({
-        mutationFn: async ({ action, value, ids }: { action: string; value: string; ids: string[] }) => {
+    interface BulkVars {
+        action: string;
+        value: string;
+        ids: string[];
+    }
+
+    const bulkMutation = useTenantMutation<TaskListItem[], BulkVars, unknown>({
+        key: tasksKey,
+        mutationFn: async ({ action, value, ids }) => {
             let url = '';
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const body: any = { taskIds: ids };
@@ -203,46 +236,49 @@ function TasksPageInner({
                 body.dueAt = value || null;
             }
 
-            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
             if (!res.ok) throw new Error('Bulk action failed');
             return res.json();
         },
-        onMutate: async ({ action, value, ids }) => {
-            await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all(tenantSlug) });
-
-            const listKey = queryKeys.tasks.list(tenantSlug, queryKeyFilters);
-            const previousList = queryClient.getQueryData<TaskListItem[]>(listKey);
-
-            if (previousList) {
-                queryClient.setQueryData<TaskListItem[]>(listKey, old =>
-                    old?.map(task => {
-                        if (!ids.includes(task.id)) return task;
-                        if (action === 'status') return { ...task, status: value };
-                        if (action === 'assign') return { ...task, assigneeUserId: value || null, assignee: value ? { name: value } : null };
-                        if (action === 'due') return { ...task, dueAt: value || null };
-                        return task;
-                    })
-                );
-            }
-
-            return { previousList, listKey };
-        },
-        onError: (_err, _vars, context) => {
-            if (context?.previousList) {
-                queryClient.setQueryData(context.listKey, context.previousList);
-            }
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all(tenantSlug) });
-            setSelected(new Set());
-            setBulkAction('');
-            setBulkValue('');
-        },
+        optimisticUpdate: (current, { action, value, ids }) =>
+            (current ?? []).map((task) => {
+                if (!ids.includes(task.id)) return task;
+                if (action === 'status') return { ...task, status: value };
+                if (action === 'assign')
+                    return {
+                        ...task,
+                        assigneeUserId: value || null,
+                        assignee: value ? { name: value } : null,
+                    };
+                if (action === 'due') return { ...task, dueAt: value || null };
+                return task;
+            }),
     });
 
     const handleBulkSubmit = () => {
         if (!bulkAction || selected.size === 0) return;
-        bulkMutation.mutate({ action: bulkAction, value: bulkValue, ids: Array.from(selected) });
+        bulkMutation
+            .trigger({
+                action: bulkAction,
+                value: bulkValue,
+                ids: Array.from(selected),
+            })
+            .catch(() => {
+                /* rollback already applied by the hook */
+            })
+            .finally(() => {
+                // Mirror the prior `onSettled` semantics — clear bulk
+                // selection state and fan out invalidation to sibling
+                // filter variants.
+                invalidateAllTasks();
+                setSelected(new Set());
+                setBulkAction('');
+                setBulkValue('');
+            });
     };
 
     // ── Column definitions ──
@@ -441,11 +477,11 @@ function TasksPageInner({
                     )}
                     <button
                         className="btn btn-primary"
-                        disabled={!bulkAction || (bulkAction === 'status' && !bulkValue) || bulkMutation.isPending}
+                        disabled={!bulkAction || (bulkAction === 'status' && !bulkValue) || bulkMutation.isMutating}
                         onClick={handleBulkSubmit}
                         id="bulk-apply-btn"
                     >
-                        {bulkMutation.isPending ? 'Applying...' : 'Apply'}
+                        {bulkMutation.isMutating ? 'Applying...' : 'Apply'}
                     </button>
                     <button className="text-xs text-content-muted hover:text-content-emphasis" onClick={() => setSelected(new Set())}>Clear</button>
                 </div>
