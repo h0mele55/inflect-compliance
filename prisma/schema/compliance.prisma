@@ -976,31 +976,43 @@ model ControlRequirementLink {
 }
 
 model ControlTestPlan {
-  id               String            @id @default(cuid())
-  tenantId         String
-  controlId        String
-  name             String
-  description      String?
-  method           TestMethod        @default(MANUAL)
-  frequency        ControlFrequency  @default(AD_HOC)
-  nextDueAt        DateTime?
-  ownerUserId      String?
-  expectedEvidence Json?
-  status           TestPlanStatus    @default(ACTIVE)
-  createdByUserId  String
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  control          Control           @relation(fields: [controlId], references: [id])
-  createdBy        User              @relation("TestPlanCreator", fields: [createdByUserId], references: [id])
-  owner            User?             @relation("TestPlanOwner", fields: [ownerUserId], references: [id])
-  tenant           Tenant            @relation(fields: [tenantId], references: [id])
-  runs             ControlTestRun[]
-  steps            ControlTestStep[]
+  id                 String            @id @default(cuid())
+  tenantId           String
+  controlId          String
+  name               String
+  description        String?
+  method             TestMethod        @default(MANUAL)
+  frequency          ControlFrequency  @default(AD_HOC)
+  nextDueAt          DateTime?
+  ownerUserId        String?
+  expectedEvidence   Json?
+  status             TestPlanStatus    @default(ACTIVE)
+  // Epic G-2 — automated scheduled execution. `nextDueAt` stays the
+  // soft due-by indicator (UI overdue badge, deadline-monitor digest);
+  // `nextRunAt` is the hard scheduler trigger. They diverge for plans
+  // where humans review monthly but the script runs daily.
+  automationType     AutomationType    @default(MANUAL)
+  schedule           String?
+  scheduleTimezone   String?
+  nextRunAt          DateTime?
+  lastScheduledRunAt DateTime?
+  automationConfig   Json?
+  createdByUserId    String
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  control            Control           @relation(fields: [controlId], references: [id])
+  createdBy          User              @relation("TestPlanCreator", fields: [createdByUserId], references: [id])
+  owner              User?             @relation("TestPlanOwner", fields: [ownerUserId], references: [id])
+  tenant             Tenant            @relation(fields: [tenantId], references: [id])
+  runs               ControlTestRun[]
+  steps              ControlTestStep[]
 
   @@index([tenantId])
   @@index([tenantId, controlId])
   @@index([tenantId, nextDueAt])
   @@index([tenantId, status])
+  @@index([tenantId, nextRunAt])
+  @@index([tenantId, automationType, status])
 }
 
 model ControlTestRun {
