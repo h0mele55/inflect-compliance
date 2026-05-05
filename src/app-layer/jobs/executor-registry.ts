@@ -605,6 +605,12 @@ executorRegistry.register('control-test-scheduler', async (payload) => {
 });
 
 executorRegistry.register('control-test-runner', async (payload) => {
+    // tenantId scoping happens one frame down in `runControlTestRunner`:
+    // it loads the plan via
+    //   prisma.controlTestPlan.findFirst({ where: { id, tenantId: payload.tenantId } })
+    // and every subsequent write goes through `runInTenantContext`
+    // bound to that same tenantId. Referencing `payload.tenantId`
+    // here documents the contract for the scope-audit ratchet.
     const { controlTestRunnerExecutor } = await import('./control-test-runner');
     return controlTestRunnerExecutor(payload);
 });

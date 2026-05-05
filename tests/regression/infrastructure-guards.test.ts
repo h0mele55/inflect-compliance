@@ -74,8 +74,8 @@ describe('Infrastructure Regression Guards', () => {
             }
         });
 
-        test('exactly 8 scheduled jobs exist', () => {
-            expect(SCHEDULED_JOBS).toHaveLength(8);
+        test('exactly 9 scheduled jobs exist', () => {
+            expect(SCHEDULED_JOBS).toHaveLength(9);
         });
 
         test('scheduled job names match expected set', () => {
@@ -84,6 +84,9 @@ describe('Infrastructure Regression Guards', () => {
                 'automation-runner',
                 'compliance-digest',
                 'compliance-snapshot',
+                // Epic G-2 — every-5-min repeatable scanning
+                // ControlTestPlan and enqueuing runner jobs.
+                'control-test-scheduler',
                 'daily-evidence-expiry',
                 'data-lifecycle',
                 'notification-dispatch',
