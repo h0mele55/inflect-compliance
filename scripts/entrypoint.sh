@@ -10,12 +10,18 @@ echo "╚═══════════════════════�
 # Pin the CLI version to match @prisma/client in package.json. If
 # `prisma` is ever pruned from the image (e.g. someone moves it
 # back to devDependencies), `npx prisma` would otherwise fetch
-# `latest` from npm — Prisma 7 dropped the `url`/`directUrl`
-# datasource properties, which silently broke prod boot in April
-# 2026. Pinning forces the known-good resolver.
+# `latest` from npm and could ship breaking changes silently.
+#
+# Prisma 7 — connection URLs are NOT in the schema any more (they
+# moved to `prisma.config.ts` at the repo root). The CLI auto-
+# discovers that config file from the cwd, so `--schema` here is
+# redundant but kept for explicitness. The previous pin
+# `prisma@5.22.0` rejects the Prisma 7 schema with
+# "Argument 'url' is missing in data source block 'db'" — bumped
+# to 7.8.0 in lockstep with the migration that landed in #140.
 echo ""
 echo "→ Applying database migrations..."
-npx --yes prisma@5.22.0 migrate deploy --schema=./prisma/schema
+npx --yes prisma@7.8.0 migrate deploy --schema=./prisma/schema
 echo "✓ Migrations applied"
 
 # ── 2. Create upload directory if missing ──
