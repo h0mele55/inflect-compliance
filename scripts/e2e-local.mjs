@@ -104,9 +104,11 @@ run('npx prisma generate', '2/6  Generate Prisma client');
 // fails with `permission denied for schema public`. Use `migrate
 // reset` so the migration history applies in order, then seed.
 //
-// `--skip-seed` because we run the seed step explicitly below — that
-// way seed errors surface in 3/6b rather than hiding inside reset.
-run('npx prisma migrate reset --force --skip-seed', '3/6a Reset test database');
+// Prisma 7 dropped the `--skip-seed` flag — the auto-seed only
+// fires when `prisma.config.ts` declares `migrations.seed`, which
+// we don't (we run the seed step explicitly below so seed errors
+// surface in 3/6b rather than hiding inside reset).
+run('npx prisma migrate reset --force', '3/6a Reset test database');
 run('npx tsx prisma/seed.ts', '3/6b Seed test data');
 
 // ── 4. Build ──
