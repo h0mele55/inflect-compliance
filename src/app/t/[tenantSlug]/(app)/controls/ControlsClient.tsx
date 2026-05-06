@@ -316,11 +316,21 @@ function ControlsPageInner({
             await queryClient.cancelQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
 
             const listKey = queryKeys.controls.list(tenantSlug, queryKeyFilters);
-            const previousList = queryClient.getQueryData<ControlListItem[]>(listKey);
+            // PR-5 — cache value is `CappedList<ControlListItem>` (the API
+            // returns `{ rows, truncated }`); preserve the `truncated` flag
+            // and only rewrite `rows`.
+            const previousList = queryClient.getQueryData<CappedList<ControlListItem>>(listKey);
 
             if (previousList) {
-                queryClient.setQueryData<ControlListItem[]>(listKey, (old) =>
-                    old?.map(c => c.id === controlId ? { ...c, status: newStatus } : c)
+                queryClient.setQueryData<CappedList<ControlListItem>>(listKey, (old) =>
+                    old
+                        ? {
+                              ...old,
+                              rows: old.rows.map(c =>
+                                  c.id === controlId ? { ...c, status: newStatus } : c,
+                              ),
+                          }
+                        : old,
                 );
             }
 
@@ -359,11 +369,19 @@ function ControlsPageInner({
             await queryClient.cancelQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
 
             const listKey = queryKeys.controls.list(tenantSlug, queryKeyFilters);
-            const previousList = queryClient.getQueryData<ControlListItem[]>(listKey);
+            // PR-5 — cache value is `CappedList<ControlListItem>`.
+            const previousList = queryClient.getQueryData<CappedList<ControlListItem>>(listKey);
 
             if (previousList) {
-                queryClient.setQueryData<ControlListItem[]>(listKey, (old) =>
-                    old?.map(c => c.id === controlId ? { ...c, applicability } : c)
+                queryClient.setQueryData<CappedList<ControlListItem>>(listKey, (old) =>
+                    old
+                        ? {
+                              ...old,
+                              rows: old.rows.map(c =>
+                                  c.id === controlId ? { ...c, applicability } : c,
+                              ),
+                          }
+                        : old,
                 );
             }
 

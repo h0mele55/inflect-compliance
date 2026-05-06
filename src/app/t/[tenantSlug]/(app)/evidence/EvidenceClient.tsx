@@ -204,8 +204,9 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     // default restores the prior list on failure. After success
     // SWR revalidates the current key, and `invalidateEvidence()`
     // fans out to sibling filter variants.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const reviewMutation = useTenantMutation<any[], { id: string; action: string; comment: string }, unknown>({
+    // PR-5 — cache value is `CappedList<any>` (the API returns
+    // `{ rows, truncated }`); preserve `truncated` and only rewrite `rows`.
+    const reviewMutation = useTenantMutation<CappedList<any>, { id: string; action: string; comment: string }, unknown>({
         key: evidenceKey,
         mutationFn: async ({ id, action, comment }) => {
             const res = await fetch(apiUrl(`/evidence/${id}/review`), {
@@ -223,10 +224,10 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                     : action === 'APPROVED'
                         ? 'APPROVED'
                         : 'REJECTED';
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return (current ?? []).map((ev: any) =>
+            const rows = (current?.rows ?? []).map((ev: any) =>
                 ev.id === id ? { ...ev, status: newStatus } : ev,
             );
+            return { rows, truncated: current?.truncated ?? false };
         },
     });
 

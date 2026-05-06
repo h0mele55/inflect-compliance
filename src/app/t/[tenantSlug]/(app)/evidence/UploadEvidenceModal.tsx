@@ -69,6 +69,7 @@ import {
     toYMD,
 } from '@/components/ui/date-picker/date-utils';
 import { useTenantMutation } from '@/lib/hooks/use-tenant-mutation';
+import type { CappedList } from '@/lib/list-backfill-cap';
 import { CACHE_KEYS } from '@/lib/swr-keys';
 import { useFormTelemetry } from '@/lib/telemetry/form-telemetry';
 import {
@@ -182,7 +183,7 @@ export function UploadEvidenceModal({
         tempId: string;
     }
 
-    const mutation = useTenantMutation<unknown[], UploadVars, { id?: string }>({
+    const mutation = useTenantMutation<CappedList<unknown>, UploadVars, { id?: string }>({
         key: evidenceListKey,
         mutationFn: async (vars) => {
             const { file, applyTitle, onProgress, signal } = vars;
@@ -242,7 +243,12 @@ export function UploadEvidenceModal({
                 deletedAt: null,
                 fileRecordId: null,
             };
-            return [pendingRow, ...(current ?? [])];
+            // PR-5 — cache value is `CappedList<unknown>`; preserve the
+            // `truncated` flag, only prepend to `rows`.
+            return {
+                rows: [pendingRow, ...(current?.rows ?? [])],
+                truncated: current?.truncated ?? false,
+            };
         },
     });
 
