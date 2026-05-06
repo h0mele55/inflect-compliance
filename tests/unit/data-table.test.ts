@@ -5,6 +5,17 @@
  * contracts. DOM-dependent tests (isClickOnInteractiveChild) are excluded because
  * jest-environment-jsdom is not installed in this project.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- this file
+ * introspects TanStack Table column-definition objects via patterns
+ * like `(col as any).accessorFn(row)` and `(col as any).cell` and
+ * `(col as any).meta`. TanStack's `ColumnDef<T>` is a discriminated
+ * union (AccessorColumnDef vs DisplayColumnDef vs GroupColumnDef);
+ * each test asserts a specific variant's runtime field. Narrowing
+ * via `'accessorFn' in col` per-site would add ~30 lines for zero
+ * type-safety benefit (the tests fail-by-runtime if the variant is
+ * wrong). The `[…] as any` row-array casts pass minimal mock rows
+ * to the helpers — typing them via TanStack's `Row<T>` would pull
+ * in 50+ unused properties. */
 
 // ─── table-utils: deepEqual tests ───────────────────────────────────
 
@@ -34,8 +45,8 @@ describe('table-utils', () => {
     });
 
     it('handles null objects', () => {
-      expect(deepEqual(null as any, { a: 1 })).toBe(false);
-      expect(deepEqual({ a: 1 }, null as any)).toBe(false);
+      expect(deepEqual(null, { a: 1 })).toBe(false);
+      expect(deepEqual({ a: 1 }, null)).toBe(false);
     });
 
     it('returns true for empty objects', () => {
@@ -48,8 +59,8 @@ describe('table-utils', () => {
     });
 
     it('handles primitives vs objects', () => {
-      expect(deepEqual(42 as any, { a: 1 })).toBe(false);
-      expect(deepEqual({ a: 1 }, 'string' as any)).toBe(false);
+      expect(deepEqual(42, { a: 1 })).toBe(false);
+      expect(deepEqual({ a: 1 }, 'string')).toBe(false);
     });
 
     it('handles deeply nested structures', () => {
