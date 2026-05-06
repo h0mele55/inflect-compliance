@@ -19,6 +19,27 @@ export interface ControlListParams {
     filters?: ControlListFilters;
 }
 
+// PR-3 — tight SELECT shape for the Controls list page. Lists exactly
+// the columns ControlsClient.tsx renders (or filters on); switches off
+// `include` so Prisma doesn't fetch the unused Control scalars
+// (long-text fields like description, frequency justifications, etc.).
+const controlListSelect = {
+    id: true,
+    code: true,
+    annexId: true,
+    name: true,
+    description: true,
+    status: true,
+    applicability: true,
+    frequency: true,
+    ownerUserId: true,
+    // `createdAt` is required by the cursor-pagination helper
+    // (`computePageInfo`) — it's not rendered in the table.
+    createdAt: true,
+    owner: { select: { id: true, name: true, email: true } },
+    _count: { select: { controlTasks: true, evidenceLinks: true } },
+} as const;
+
 export class ControlRepository {
     static async list(
         db: PrismaTx,
@@ -32,10 +53,7 @@ export class ControlRepository {
             return db.control.findMany({
                 where,
                 orderBy: [{ code: 'asc' }, { annexId: 'asc' }],
-                include: {
-                    owner: { select: { id: true, name: true, email: true } },
-                    _count: { select: { controlTasks: true, evidenceLinks: true } },
-                },
+                select: controlListSelect,
                 ...(options.take ? { take: options.take } : {}),
             });
         });
@@ -56,10 +74,7 @@ export class ControlRepository {
                 where,
                 orderBy: CURSOR_ORDER_BY,
                 take: limit + 1,
-                include: {
-                    owner: { select: { id: true, name: true, email: true } },
-                    _count: { select: { controlTasks: true, evidenceLinks: true } },
-                },
+                select: controlListSelect,
             });
 
             const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);

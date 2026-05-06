@@ -2,6 +2,19 @@ import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
 
+// PR-3 — tight SELECT shape for the Findings list page. The previous
+// `include` returned all Finding scalars (encrypted `description`,
+// `rootCause`, `correctiveAction`, etc.) plus the `audit` relation
+// the page never reads on the list view (detail loads separately).
+const findingListSelect = {
+    id: true,
+    title: true,
+    severity: true,
+    type: true,
+    owner: true,
+    status: true,
+} as const;
+
 export class FindingRepository {
     static async list(
         db: PrismaTx,
@@ -11,7 +24,7 @@ export class FindingRepository {
         return db.finding.findMany({
             where: { tenantId: ctx.tenantId },
             orderBy: { createdAt: 'desc' },
-            include: { audit: { select: { id: true, title: true } } },
+            select: findingListSelect,
             ...(options.take ? { take: options.take } : {}),
         });
     }
