@@ -24,6 +24,26 @@ const vendorIncludes = {
     _count: { select: { documents: true, assessments: true, contacts: true, links: true } },
 };
 
+// PR-3 — tight SELECT shape for the Vendors list page. The previous
+// `include: { owner }` returned every Vendor scalar (long-text
+// `description`, encrypted-at-rest `legalName`, jsonb `tags`, etc.).
+// Detail page uses the heavier `vendorIncludes` via getById.
+const vendorListSelect = {
+    id: true,
+    name: true,
+    status: true,
+    criticality: true,
+    inherentRisk: true,
+    nextReviewAt: true,
+    contractRenewalAt: true,
+    isSubprocessor: true,
+    ownerUserId: true,
+    // `createdAt` is required by the cursor-pagination helper
+    // (`computePageInfo`) — it's not rendered in the table.
+    createdAt: true,
+    owner: { select: { name: true } },
+} as const;
+
 export class VendorRepository {
     static async list(
         db: PrismaTx,
@@ -35,7 +55,7 @@ export class VendorRepository {
         return db.vendor.findMany({
             where,
             orderBy: [{ criticality: 'desc' }, { name: 'asc' }],
-            include: vendorIncludes,
+            select: vendorListSelect,
             ...(options.take ? { take: options.take } : {}),
         });
     }
@@ -57,7 +77,7 @@ export class VendorRepository {
             where,
             orderBy: CURSOR_ORDER_BY,
             take: limit + 1,
-            include: vendorIncludes,
+            select: vendorListSelect,
         });
 
         const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);

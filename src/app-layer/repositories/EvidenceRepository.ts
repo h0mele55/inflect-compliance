@@ -21,6 +21,32 @@ export interface EvidenceListParams {
     filters?: EvidenceListFilters;
 }
 
+// PR-3 — tight SELECT shape for the Evidence list page. Lists exactly
+// the columns EvidenceClient.tsx renders. The previous `include`
+// returned every Evidence scalar (encrypted-at-rest `data` blob,
+// `summary`, `transcript`, etc.) — none rendered in list view.
+const evidenceListSelect = {
+    id: true,
+    title: true,
+    fileName: true,
+    type: true,
+    status: true,
+    owner: true,
+    isArchived: true,
+    expiredAt: true,
+    deletedAt: true,
+    retentionUntil: true,
+    updatedAt: true,
+    dateCollected: true,
+    fileRecordId: true,
+    // `createdAt` is required by the cursor-pagination helper
+    // (`computePageInfo`) — it's not rendered in the table.
+    createdAt: true,
+    control: { select: { id: true, name: true, annexId: true } },
+    fileRecord: { select: { id: true, mimeType: true } },
+    reviews: { select: { id: true, createdAt: true, decision: true }, orderBy: { createdAt: 'desc' as const }, take: 1 },
+} as const;
+
 export class EvidenceRepository {
     static async list(
         db: PrismaTx,
@@ -33,10 +59,7 @@ export class EvidenceRepository {
             return db.evidence.findMany({
                 where,
                 orderBy: { createdAt: 'desc' },
-                include: {
-                    control: { select: { id: true, name: true, annexId: true } },
-                    reviews: { orderBy: { createdAt: 'desc' }, take: 1 },
-                },
+                select: evidenceListSelect,
                 ...(options.take ? { take: options.take } : {}),
             });
         });
@@ -61,10 +84,7 @@ export class EvidenceRepository {
                 where,
                 orderBy: CURSOR_ORDER_BY,
                 take: limit + 1,
-                include: {
-                    control: { select: { id: true, name: true, annexId: true } },
-                    reviews: { orderBy: { createdAt: 'desc' }, take: 1 },
-                },
+                select: evidenceListSelect,
             });
 
             const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);

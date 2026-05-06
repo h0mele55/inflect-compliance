@@ -2,6 +2,16 @@ import { PrismaTx } from '@/lib/db-context';
 import { RequestContext } from '../types';
 import { Prisma } from '@prisma/client';
 
+// PR-3 — tight SELECT shape for the Audits master/detail list. Master
+// list renders id/title/status + the two _count badges; detail pane
+// fetches the heavier shape via getById.
+const auditListSelect = {
+    id: true,
+    title: true,
+    status: true,
+    _count: { select: { checklist: true, findings: true } },
+} as const;
+
 export class AuditRepository {
     static async list(
         db: PrismaTx,
@@ -11,9 +21,7 @@ export class AuditRepository {
         return db.audit.findMany({
             where: { tenantId: ctx.tenantId },
             orderBy: { createdAt: 'desc' },
-            include: {
-                _count: { select: { checklist: true, findings: true } },
-            },
+            select: auditListSelect,
             ...(options.take ? { take: options.take } : {}),
         });
     }

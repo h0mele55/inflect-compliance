@@ -20,9 +20,35 @@ export interface RiskListParams {
     filters?: RiskFilters;
 }
 
-const riskIncludes = {
-    controls: { include: { control: { select: { id: true, name: true, annexId: true, status: true } } } },
-};
+// PR-3 — tight SELECT shape for the Risks list page. Lists exactly the
+// columns RisksClient.tsx renders. The previous `include: { controls }`
+// returned all Risk scalars (incl. long-text `description`, `mitigation`,
+// `treatmentNotes` cipher blob, etc.); the page only uses the metadata
+// + scoring fields enumerated below.
+const riskListSelect = {
+    id: true,
+    title: true,
+    threat: true,
+    likelihood: true,
+    impact: true,
+    inherentScore: true,
+    score: true,
+    status: true,
+    treatment: true,
+    treatmentOwner: true,
+    nextReviewAt: true,
+    category: true,
+    ownerUserId: true,
+    // `createdAt` is required by the cursor-pagination helper
+    // (`computePageInfo`) — it's not rendered in the table.
+    createdAt: true,
+    controls: {
+        select: {
+            id: true,
+            control: { select: { id: true, name: true, annexId: true, status: true } },
+        },
+    },
+} as const;
 
 export class RiskRepository {
     /**
@@ -39,7 +65,7 @@ export class RiskRepository {
             return db.risk.findMany({
                 where,
                 orderBy: { inherentScore: 'desc' },
-                include: riskIncludes,
+                select: riskListSelect,
                 ...(options.take ? { take: options.take } : {}),
             });
         });
@@ -59,7 +85,7 @@ export class RiskRepository {
                 where,
                 orderBy: CURSOR_ORDER_BY,
                 take: limit + 1,
-                include: riskIncludes,
+                select: riskListSelect,
             });
 
             const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);

@@ -17,11 +17,29 @@ export interface PolicyListParams {
     filters?: PolicyFilters;
 }
 
-const policyListIncludes = {
-    currentVersion: true,
+// PR-3 — tight SELECT shape for the Policies list page. Replaces the
+// previous `include: { currentVersion: true }` which dragged in the
+// (encrypted) `currentVersion.contentText` blob plus several body
+// fields the page never reads. Trimmed to exactly what
+// PoliciesClient.tsx renders.
+const policyListSelect = {
+    id: true,
+    slug: true,
+    title: true,
+    description: true,
+    status: true,
+    category: true,
+    nextReviewAt: true,
+    updatedAt: true,
+    ownerUserId: true,
+    lifecycleVersion: true,
+    // `createdAt` is required by the cursor-pagination helper
+    // (`computePageInfo`) — it's not rendered in the table.
+    createdAt: true,
     owner: { select: { id: true, name: true, email: true } },
+    currentVersion: { select: { id: true, versionNumber: true } },
     _count: { select: { versions: true, controlLinks: true, approvals: true } },
-};
+} as const;
 
 export class PolicyRepository {
     static async list(
@@ -34,7 +52,7 @@ export class PolicyRepository {
         return db.policy.findMany({
             where,
             orderBy: { updatedAt: 'desc' },
-            include: policyListIncludes,
+            select: policyListSelect,
             ...(options.take ? { take: options.take } : {}),
         });
     }
@@ -56,7 +74,7 @@ export class PolicyRepository {
             where,
             orderBy: CURSOR_ORDER_BY,
             take: limit + 1,
-            include: policyListIncludes,
+            select: policyListSelect,
         });
 
         const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);

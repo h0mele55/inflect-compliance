@@ -65,28 +65,42 @@ describe('list-page hydration shape', () => {
 describe('ControlRepository list `_count` projection', () => {
     const repo = read('src/app-layer/repositories/ControlRepository.ts');
 
-    // Both `list()` and `listPaginated()` feed the same client
-    // surface (ControlsClient renders `_count?.controlTasks` and
+    // Both `list()` and `listPaginated()` feed the same client surface
+    // (ControlsClient renders `_count?.controlTasks` and
     // `_count?.evidenceLinks` only — see ControlsClient.tsx:411,616).
     // Fetching the other four (`evidence`, `risks`, `assets`,
     // `contributors`) costs a correlated subquery per row and the
     // values are dropped. Lock the projection.
+    //
+    // PR-3 hoisted the list-shape into a shared `controlListSelect`
+    // constant referenced by both functions, so the literal now
+    // appears once at module scope rather than twice in line. The
+    // anti-bloat invariant (only the two consumed keys) is unchanged.
     const ALLOWED = /_count:\s*\{\s*select:\s*\{\s*controlTasks:\s*true,\s*evidenceLinks:\s*true\s*\}\s*\}/g;
 
-    test('list() and listPaginated() expose only the consumed _count keys', () => {
+    test('list-shape exposes only the consumed _count keys (controlTasks + evidenceLinks)', () => {
         const matches = repo.match(ALLOWED) ?? [];
-        // Two functions, one occurrence each.
-        expect(matches.length).toBe(2);
+        // One declaration in the shared `controlListSelect` constant.
+        expect(matches.length).toBeGreaterThanOrEqual(1);
+    });
+
+    test('list-shape constant is referenced by list() and listPaginated()', () => {
+        // The performance fix only sticks if both list paths actually
+        // reach the trimmed shape. PR-3 introduced a shared constant —
+        // pin its name so a future refactor can't drop one reference.
+        const listFnIndex = repo.indexOf('static async list(');
+        const detailIndex = repo.indexOf('static async getById(');
+        const listSection = repo.slice(listFnIndex, detailIndex);
+        const refs = listSection.match(/controlListSelect/g) ?? [];
+        expect(refs.length).toBe(2);
     });
 
     test('no list-shape _count includes the unused four keys', () => {
         // `getById` (detail read) intentionally keeps the wider _count
         // because the detail page renders all four. Scope this check to
-        // the two list functions by slicing between method headers.
-        const listSection = repo.slice(
-            repo.indexOf('static async list('),
-            repo.indexOf('static async getById('),
-        );
+        // the list-shape constant + the two list functions, slicing
+        // before `getById`.
+        const listSection = repo.slice(0, repo.indexOf('static async getById('));
         expect(listSection).not.toMatch(/contributors:\s*true/);
         expect(listSection).not.toMatch(/assets:\s*true/);
         // `evidence: true` and `risks: true` are also dropped — but both
