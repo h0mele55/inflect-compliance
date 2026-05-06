@@ -14,6 +14,8 @@
  */
 
 import { normalizeQ } from '@/lib/filters/query-helpers';
+import type { PrismaTx } from '@/lib/db-context';
+import type { RequestContext } from '@/app-layer/types';
 
 // ─── 1. normalizeQ ───
 
@@ -49,8 +51,8 @@ describe('ControlRepository._buildWhere', () => {
     it('builds where with q using OR on name, code, description', async () => {
         const { ControlRepository } = await import('@/app-layer/repositories/ControlRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { control: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { control: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await ControlRepository.list(mockDb, ctx, { q: 'firewall' });
 
@@ -68,8 +70,8 @@ describe('ControlRepository._buildWhere', () => {
     it('builds where with status filter', async () => {
         const { ControlRepository } = await import('@/app-layer/repositories/ControlRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { control: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { control: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await ControlRepository.list(mockDb, ctx, { status: 'IMPLEMENTED' });
 
@@ -80,8 +82,8 @@ describe('ControlRepository._buildWhere', () => {
     it('combines q + status + applicability', async () => {
         const { ControlRepository } = await import('@/app-layer/repositories/ControlRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { control: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { control: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await ControlRepository.list(mockDb, ctx, { q: 'access', status: 'IN_PROGRESS', applicability: 'APPLICABLE' });
 
@@ -94,8 +96,8 @@ describe('ControlRepository._buildWhere', () => {
     it('enforces tenant boundary', async () => {
         const { ControlRepository } = await import('@/app-layer/repositories/ControlRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { control: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { control: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await ControlRepository.list(mockDb, ctx);
 
@@ -108,8 +110,8 @@ describe('RiskRepository._buildWhere', () => {
     it('searches title + description + category with q', async () => {
         const { RiskRepository } = await import('@/app-layer/repositories/RiskRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { risk: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { risk: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await RiskRepository.list(mockDb, ctx, { q: 'phishing' });
 
@@ -126,8 +128,8 @@ describe('RiskRepository._buildWhere', () => {
     it('enforces tenant boundary', async () => {
         const { RiskRepository } = await import('@/app-layer/repositories/RiskRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { risk: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { risk: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await RiskRepository.list(mockDb, ctx);
 
@@ -140,8 +142,8 @@ describe('AssetRepository._buildWhere', () => {
     it('searches name + classification + owner with q', async () => {
         const { AssetRepository } = await import('@/app-layer/repositories/AssetRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { asset: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { asset: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await AssetRepository.list(mockDb, ctx, { q: 'database' });
 
@@ -158,8 +160,8 @@ describe('AssetRepository._buildWhere', () => {
     it('combines type + status + q', async () => {
         const { AssetRepository } = await import('@/app-layer/repositories/AssetRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { asset: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { asset: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await AssetRepository.list(mockDb, ctx, { type: 'APPLICATION', status: 'ACTIVE', q: 'prod' });
 
@@ -174,8 +176,8 @@ describe('EvidenceRepository._buildWhere', () => {
     it('searches title + content + fileName with q', async () => {
         const { EvidenceRepository } = await import('@/app-layer/repositories/EvidenceRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { evidence: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { evidence: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await EvidenceRepository.list(mockDb, ctx, { q: 'audit-report' });
 
@@ -194,8 +196,8 @@ describe('EvidenceRepository._buildWhere', () => {
     it('filters by type', async () => {
         const { EvidenceRepository } = await import('@/app-layer/repositories/EvidenceRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { evidence: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { evidence: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await EvidenceRepository.list(mockDb, ctx, { type: 'FILE' });
 
@@ -206,8 +208,8 @@ describe('EvidenceRepository._buildWhere', () => {
     it('filters by controlId', async () => {
         const { EvidenceRepository } = await import('@/app-layer/repositories/EvidenceRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { evidence: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { evidence: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await EvidenceRepository.list(mockDb, ctx, { controlId: 'ctrl-1' });
 
@@ -218,8 +220,8 @@ describe('EvidenceRepository._buildWhere', () => {
     it('enforces tenant boundary', async () => {
         const { EvidenceRepository } = await import('@/app-layer/repositories/EvidenceRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { evidence: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { evidence: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await EvidenceRepository.list(mockDb, ctx);
 
@@ -232,8 +234,8 @@ describe('WorkItemRepository._buildWhere', () => {
     it('searches title + key with q', async () => {
         const { WorkItemRepository } = await import('@/app-layer/repositories/WorkItemRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { task: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { task: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await WorkItemRepository.list(mockDb, ctx, { q: 'TSK-42' });
 
@@ -249,8 +251,8 @@ describe('WorkItemRepository._buildWhere', () => {
     it('filters by overdue due date', async () => {
         const { WorkItemRepository } = await import('@/app-layer/repositories/WorkItemRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { task: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { task: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await WorkItemRepository.list(mockDb, ctx, { due: 'overdue' });
 
@@ -263,8 +265,8 @@ describe('WorkItemRepository._buildWhere', () => {
     it('combines status + priority + assignee', async () => {
         const { WorkItemRepository } = await import('@/app-layer/repositories/WorkItemRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { task: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { task: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await WorkItemRepository.list(mockDb, ctx, { status: 'IN_PROGRESS', priority: 'P0', assigneeUserId: 'user-5' });
 
@@ -279,8 +281,8 @@ describe('VendorRepository._buildWhere', () => {
     it('searches name + legalName + domain with q', async () => {
         const { VendorRepository } = await import('@/app-layer/repositories/VendorRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { vendor: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { vendor: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await VendorRepository.list(mockDb, ctx, { q: 'aws' });
 
@@ -297,8 +299,8 @@ describe('VendorRepository._buildWhere', () => {
     it('filters by reviewDue overdue', async () => {
         const { VendorRepository } = await import('@/app-layer/repositories/VendorRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { vendor: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { vendor: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await VendorRepository.list(mockDb, ctx, { reviewDue: 'overdue' });
 
@@ -312,8 +314,8 @@ describe('PolicyRepository._buildWhere', () => {
     it('searches title + description with q', async () => {
         const { PolicyRepository } = await import('@/app-layer/repositories/PolicyRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { policy: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { policy: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await PolicyRepository.list(mockDb, ctx, { q: 'access' });
 
@@ -329,8 +331,8 @@ describe('PolicyRepository._buildWhere', () => {
     it('combines status + q', async () => {
         const { PolicyRepository } = await import('@/app-layer/repositories/PolicyRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { policy: { findMany: mockFindMany } } as any;
-        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as any;
+        const mockDb = { policy: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
 
         await PolicyRepository.list(mockDb, ctx, { status: 'PUBLISHED', q: 'remote' });
 
@@ -346,10 +348,10 @@ describe('Tenant isolation via where clause', () => {
     it('ControlRepository always includes tenant boundary', async () => {
         const { ControlRepository } = await import('@/app-layer/repositories/ControlRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { control: { findMany: mockFindMany } } as any;
+        const mockDb = { control: { findMany: mockFindMany } } as unknown as PrismaTx;
 
-        const ctxA = { tenantId: 'tenant-a', userId: 'user-1' } as any;
-        const ctxB = { tenantId: 'tenant-b', userId: 'user-2' } as any;
+        const ctxA = { tenantId: 'tenant-a', userId: 'user-1' } as unknown as RequestContext;
+        const ctxB = { tenantId: 'tenant-b', userId: 'user-2' } as unknown as RequestContext;
 
         await ControlRepository.list(mockDb, ctxA, { q: 'secret-control' });
         await ControlRepository.list(mockDb, ctxB, { q: 'secret-control' });
@@ -366,9 +368,9 @@ describe('Tenant isolation via where clause', () => {
     it('RiskRepository scopes to tenant', async () => {
         const { RiskRepository } = await import('@/app-layer/repositories/RiskRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { risk: { findMany: mockFindMany } } as any;
+        const mockDb = { risk: { findMany: mockFindMany } } as unknown as PrismaTx;
 
-        const ctxA = { tenantId: 'tenant-a', userId: 'user-1' } as any;
+        const ctxA = { tenantId: 'tenant-a', userId: 'user-1' } as unknown as RequestContext;
         await RiskRepository.list(mockDb, ctxA, { q: 'confidential' });
 
         const where = mockFindMany.mock.calls[0][0].where;
@@ -378,9 +380,9 @@ describe('Tenant isolation via where clause', () => {
     it('EvidenceRepository scopes to tenant', async () => {
         const { EvidenceRepository } = await import('@/app-layer/repositories/EvidenceRepository');
         const mockFindMany = jest.fn().mockResolvedValue([]);
-        const mockDb = { evidence: { findMany: mockFindMany } } as any;
+        const mockDb = { evidence: { findMany: mockFindMany } } as unknown as PrismaTx;
 
-        const ctxA = { tenantId: 'tenant-a', userId: 'user-1' } as any;
+        const ctxA = { tenantId: 'tenant-a', userId: 'user-1' } as unknown as RequestContext;
         await EvidenceRepository.list(mockDb, ctxA, { q: 'secret' });
 
         const where = mockFindMany.mock.calls[0][0].where;
