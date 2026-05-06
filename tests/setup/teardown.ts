@@ -3,7 +3,7 @@
 // to issue queries. Skip the local construction and just disconnect
 // any singletons the parent process has on `globalThis`.
 
-export default async () => {
+const teardown = async () => {
     type Globals = typeof globalThis & {
         prisma?: { $disconnect?: () => Promise<void> };
         __bullmq_queue?: { close?: () => Promise<void> };
@@ -16,3 +16,5 @@ export default async () => {
         await g.__bullmq_queue.close().catch(() => {});
     }
 };
+
+export default teardown;

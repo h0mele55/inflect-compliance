@@ -113,7 +113,7 @@ function pickFilter(filters, iter) {
     return filters[iter % filters.length];
 }
 
-export default function () {
+export default function listsIteration() {
     // ── Per-VU one-time login ──
     if (!loggedIn) {
         const ok = login(cfg);
