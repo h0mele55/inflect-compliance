@@ -45,12 +45,17 @@ import * as path from 'path';
 const ROOT = path.resolve(__dirname, '../..');
 
 /**
- * The seven list-page entities under the interim perf package.
+ * The eight list-page entities covered by the interim perf package.
  *
  * Each tuple: `[entity, repoFileName]`. The page directory and API
  * route directory are the entity name unchanged; the repo file is the
  * Pascal-cased model with `Repository.ts` suffix (which doesn't always
- * line up — `Audits` page → `AuditRepository`, etc.).
+ * line up — `Audits` page → `AuditRepository`, `Tasks` page →
+ * `WorkItemRepository`, etc.).
+ *
+ * PR-9 added Tasks to the set; the Tasks list page already had the
+ * SSR cap from PR #146 but was missing the SELECT trim, backfill cap,
+ * and row-count metric — the package's three later pieces.
  */
 const LIST_PAGE_ENTITIES: ReadonlyArray<{ entity: string; repo: string }> = [
     { entity: 'controls', repo: 'ControlRepository' },
@@ -60,6 +65,7 @@ const LIST_PAGE_ENTITIES: ReadonlyArray<{ entity: string; repo: string }> = [
     { entity: 'policies', repo: 'PolicyRepository' },
     { entity: 'vendors', repo: 'VendorRepository' },
     { entity: 'findings', repo: 'FindingRepository' },
+    { entity: 'tasks', repo: 'WorkItemRepository' },
 ];
 
 function readFile(rel: string): string {

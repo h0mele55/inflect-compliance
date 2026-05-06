@@ -7,6 +7,8 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
 import { jsonResponse } from '@/lib/api-response';
+import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
+import { recordListPageRowCount } from '@/lib/observability/list-page-metrics';
 
 const TaskQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -49,20 +51,35 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         return jsonResponse(result);
     }
 
-    // Backward compat: return flat array
-    const tasks = await listTasks(ctx, {
-        status: query.status,
-        type: query.type,
-        severity: query.severity,
-        priority: query.priority,
-        assigneeUserId: query.assigneeUserId,
-        controlId: query.controlId,
-        due: query.due,
-        q: query.q,
-        linkedEntityType: query.linkedEntityType,
-        linkedEntityId: query.linkedEntityId,
+    // PR-9 — backfill cap. Mirrors the seven other list-page routes.
+    // Ask for cap+1 rows; helper slices and reports `truncated`.
+    // Client renders TruncationBanner above the table when the cap
+    // fired.
+    const tasks = await listTasks(
+        ctx,
+        {
+            status: query.status,
+            type: query.type,
+            severity: query.severity,
+            priority: query.priority,
+            assigneeUserId: query.assigneeUserId,
+            controlId: query.controlId,
+            due: query.due,
+            q: query.q,
+            linkedEntityType: query.linkedEntityType,
+            linkedEntityId: query.linkedEntityId,
+        },
+        { take: LIST_BACKFILL_CAP + 1 },
+    );
+    const result = applyBackfillCap(tasks);
+    // PR-9 — row-count observability.
+    recordListPageRowCount({
+        entity: 'tasks',
+        count: result.rows.length,
+        truncated: result.truncated,
+        tenantId: ctx.tenantId,
     });
-    return jsonResponse(tasks);
+    return jsonResponse(result);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateTaskSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
