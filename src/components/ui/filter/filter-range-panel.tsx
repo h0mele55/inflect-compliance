@@ -100,6 +100,12 @@ function RangeEndControl({
 }) {
   const [draft, setDraft] = useState(() => storageToDraft(value, displayScale));
 
+  // Forwarded-ref bridge — same shape as TreeView. Setting `.current`
+  // on a forwarded ref is the documented contract for ref forwarding;
+  // the React Compiler immutability rule fires on the entire useCallback
+  // (declaration AND inner assignment AND deps array) — wrap the whole
+  // block in disable/enable to suppress all three.
+  /* eslint-disable react-hooks/immutability */
   const setInputRef = useCallback(
     (node: HTMLInputElement | null) => {
       if (!inputRef) {
@@ -113,6 +119,7 @@ function RangeEndControl({
     },
     [inputRef],
   );
+  /* eslint-enable react-hooks/immutability */
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

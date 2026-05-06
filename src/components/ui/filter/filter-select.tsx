@@ -478,6 +478,14 @@ function FilterButton({
   isChecked?: boolean;
   onSelect: () => void;
 }) {
+  // The Icon binding is a polymorphic value: either a ReactNode (used
+  // verbatim) or a component reference (rendered as `<Icon />`). The
+  // capitalised name signals "could be a component"; the static-
+  // components rule flags it because the per-render binding could be
+  // a fresh component identity. The downstream `isReactNode` branch
+  // handles the value case and the component-ref case is stable
+  // (always derived from props).
+  // eslint-disable-next-line react-hooks/static-components
   const Icon = option
     ? option.icon ??
       filter.getOptionIcon?.(option.value, { key: filter.key, option }) ??
@@ -518,6 +526,11 @@ function FilterButton({
         </div>
       )}
       <span className="shrink-0 text-content-muted">
+        {/* eslint-disable-next-line react-hooks/static-components -- Icon
+            is a polymorphic prop value: ReactNode (used verbatim in the
+            true branch) or component reference (rendered as <Icon /> in
+            the false branch). Stable across renders since it derives
+            from props. */}
         {isReactNode(Icon) ? Icon : <Icon className="h-4 w-4" />}
       </span>
       <span className="flex-1">{truncate(label, 48)}</span>

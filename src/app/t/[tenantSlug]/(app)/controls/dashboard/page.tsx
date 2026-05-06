@@ -34,31 +34,32 @@ export default function ControlsDashboard() {
     const [consistency, setConsistency] = useState<ConsistencyCheckDTO | null>(null);
     const [showConsistency, setShowConsistency] = useState(false);
 
-    // The recursive `fetchDashboard(attempt + 1)` calls inside the
-    // useCallback body close over the not-yet-finalised binding. The
-    // pattern is correct (the recursion is explicit and bounded) but
-    // the React Compiler immutability rule can't tell that.
-    // eslint-disable-next-line react-hooks/immutability
-    const fetchDashboard = useCallback(async (attempt = 0) => {
+    // Was a recursive useCallback (`fetchDashboard(attempt + 1)` in
+    // its own body) — the React Compiler immutability rule fired
+    // because the closure references its own not-yet-finalised
+    // binding. Refactored to an inline retry loop, which is also
+    // simpler to read.
+    const fetchDashboard = useCallback(async () => {
         setLoading(true);
-        try {
-            const res = await fetch(apiUrl('/controls/dashboard'));
-            if (res.ok) {
-                setData(await res.json());
-            } else if (attempt < 2) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const res = await fetch(apiUrl('/controls/dashboard'));
+                if (res.ok) {
+                    setData(await res.json());
+                    break;
+                }
+            } catch {
+                // Fall through to retry below.
+            }
+            if (attempt < 2) {
                 // Retry on server errors (e.g., dev server compilation race)
                 await new Promise(r => setTimeout(r, 2000));
-                return fetchDashboard(attempt + 1);
-            }
-        } catch {
-            if (attempt < 2) {
-                await new Promise(r => setTimeout(r, 2000));
-                return fetchDashboard(attempt + 1);
             }
         }
         setLoading(false);
     }, [apiUrl]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
 
     const fetchConsistency = async () => {
