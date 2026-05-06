@@ -28,7 +28,7 @@
 
 import { cn } from '@dub/utils';
 import { GripVertical, Loader2, Save, Undo2 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     type BuilderSection,
     deriveBuilderModel,
@@ -79,9 +79,12 @@ export function FrameworkBuilder({
     const [error, setError] = useState<string | null>(null);
 
     // Reset local state when the tree changes underneath us
-    // (e.g. parent refetched after a save).
+    // (e.g. parent refetched after a save). Was `useMemo` (a real
+    // bug — `useMemo` is for pure derived values, not state-setter
+    // side effects); `useEffect` is the correct primitive and what
+    // the React Compiler rules surfaced.
     const treeFrameworkId = tree.framework.id;
-    useMemo(() => {
+    useEffect(() => {
         setModel(originalModel);
         setError(null);
     }, [treeFrameworkId, originalModel]);

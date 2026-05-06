@@ -76,13 +76,14 @@ type Trigger = () => CelebrateInput | null;
 function MilestoneHarness({ trigger }: { trigger: Trigger }) {
     const { celebrate } = useCelebration();
     const input = trigger();
-    React.useEffect(() => {
-        if (input === null) return;
-        celebrate(input);
-        // Stable key for the dependency array — celebrate wraps
-        // the input by value, but `JSON.stringify` is enough to
-        // re-run when the trigger output materially changes.
-    }, [JSON.stringify(input), celebrate]);
+    // Stable key for the dependency array — celebrate wraps the
+    // input by value, but `JSON.stringify` of `input` is enough to
+    // re-run when the trigger output materially changes. We
+    // deliberately depend on the serialised form rather than the
+    // live `input` reference (identity changes every trigger()).
+    const inputKey = JSON.stringify(input);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    React.useEffect(() => { if (input === null) return; celebrate(input); }, [inputKey, celebrate]);
     return null;
 }
 

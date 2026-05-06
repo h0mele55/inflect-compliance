@@ -90,10 +90,15 @@ export function CalendarClient({
     );
     const [selectedDate, setSelectedDate] = React.useState<string | null>(null);
 
-    const range = React.useMemo(
-        () => rangeForView(view, monthCursor),
-        [view, monthCursor.getTime()],
-    );
+    // Pull `getTime()` into a stable primitive so the dep array is
+    // statically checkable. We deliberately depend on `monthCursorMs`
+    // rather than the live `monthCursor` Date instance — the lint
+    // rule sees the missing `monthCursor` dep but the runtime is
+    // stable because the timestamp captures the only field
+    // `rangeForView` reads off the Date.
+    const monthCursorMs = monthCursor.getTime();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const range = React.useMemo(() => rangeForView(view, monthCursor), [view, monthCursorMs]);
 
     const fromKey = range.from.toISOString();
     const toKey = range.to.toISOString();
@@ -115,7 +120,13 @@ export function CalendarClient({
         staleTime: 60_000,
     });
 
-    const events: CalendarEvent[] = calQuery.data?.events ?? [];
+    // Stabilise the array identity — the `?? []` produces a fresh
+    // empty array each render, which destabilises the useMemos
+    // below that depend on `events`.
+    const events: CalendarEvent[] = React.useMemo(
+        () => calQuery.data?.events ?? [],
+        [calQuery.data],
+    );
 
     // Filter: Gantt only shows events that have a meaningful range OR
     // are audit cycles (where `start === end` may be intentional).

@@ -155,7 +155,7 @@ export function EvidenceBulkImportModal({
         return () => {
             cancelled = true;
         };
-    }, [jobId, apiUrl, queryClient, tenantSlug]);
+    }, [jobId, apiUrl, queryClient, tenantSlug, swrMutate]);
 
     const mutation = useMutation({
         mutationFn: async (vars: {
