@@ -683,6 +683,7 @@ model Policy {
   @@index([tenantId, slug])
   @@index([tenantId])
   @@index([tenantId, createdAt])
+  @@index([tenantId, updatedAt])
   @@index([tenantId, status])
   @@index([tenantId, category])
   @@index([nextReviewAt])
@@ -798,6 +799,7 @@ model Finding {
 
   @@unique([id, tenantId])
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([tenantId, deletedAt])
 }
 

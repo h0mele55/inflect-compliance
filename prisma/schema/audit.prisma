@@ -131,6 +131,7 @@ model Audit {
 
   @@unique([id, tenantId])
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([tenantId, deletedAt])
 }
 
