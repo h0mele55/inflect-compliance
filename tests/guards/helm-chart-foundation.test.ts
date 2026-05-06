@@ -17,6 +17,15 @@
  * If one of these breaks, the diff is the design conversation. Update
  * this test in the same PR that justifies the change.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- this file
+ * exclusively reads yaml fixtures via `yaml.load(...) as ...` and walks
+ * deeply-nested helm chart values (autoscaling.behavior.scaleDown,
+ * ingress.hsts.maxAgeSeconds, networkPolicy.allowHttpsEgress, etc.).
+ * Each assertion picks one key out of a 50+-field schema; defining a
+ * complete typed `HelmValues` interface would be 200+ lines of
+ * single-use type for zero functional gain. The `any` is honest:
+ * yaml.load returns `unknown`, and the access paths are correct by
+ * test failure rather than by structural type. */
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
