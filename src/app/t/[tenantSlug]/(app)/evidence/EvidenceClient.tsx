@@ -116,7 +116,12 @@ export function EvidenceClient(props: EvidenceClientProps) {
 }
 
 function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permissions, translations: t }: EvidenceClientProps) {
-    const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
+    // Stabilise across renders so dependent useCallbacks don't get a
+    // fresh identity every cycle (was a real exhaustive-deps warning).
+    const apiUrl = useCallback(
+        (path: string) => `/api/t/${tenantSlug}${path}`,
+        [tenantSlug],
+    );
     const { mutate: swrMutate } = useSWRConfig();
 
     // Retention-tab + view-mode selectors — deliberately kept separate from filter state.
@@ -164,8 +169,16 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     });
     const truncated = evidenceQuery.data?.truncated ?? false;
 
+    // Stabilise the array identity across renders so dependent hooks
+    // (`useEffect` at line ~330 reads `evidence`) don't re-fire on
+    // every render. Without the `useMemo` the `?? []` produces a new
+    // empty array instance every cycle. eslint-disable for the inner
+    // `any[]`; tightening the type is a separate cleanup.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const evidence: any[] = evidenceQuery.data?.rows ?? [];
+    const evidence: any[] = useMemo(
+        () => evidenceQuery.data?.rows ?? [],
+        [evidenceQuery.data],
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [controls] = useState<any[]>(initialControls);
     const retentionFilter = (filters.tab || 'active') as RetentionFilter;
