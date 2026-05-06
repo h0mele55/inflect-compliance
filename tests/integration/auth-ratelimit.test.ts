@@ -1,3 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- this file
+ * mocks NextAuth (`auth: (handler: any) => …`) and casts mock
+ * NextRequest objects (`req as any, {} as any`) into the middleware
+ * boundary. NextAuth's wrapped-handler shape isn't directly exported
+ * as a TypeScript type, so the mock's `handler: any` mirrors the
+ * runtime contract; the request casts are necessary because the
+ * test constructs minimal mocks with only the fields the middleware
+ * reads. */
 import { NextRequest } from 'next/server';
 
 // Mock NextAuth to avoid ESM compilation errors and bypass the actual auth logic

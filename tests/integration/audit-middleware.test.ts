@@ -6,6 +6,16 @@
  *
  * RUN: npx jest tests/integration/audit-middleware.test.ts
  */
+/* eslint-disable @typescript-eslint/no-explicit-any -- this file
+ * mirrors the Prisma 7 `$extends({ query })` middleware shape from
+ * `src/lib/prisma.ts` to verify side effects, then introspects
+ * AuditLog rows via `(match as any).diffJson` etc. The middleware
+ * args (`args: any`, `query: (a: any) => Promise<any>`) are
+ * intentionally typed loose to mirror Prisma's runtime extension
+ * shape — narrowing them would couple the test to internal types
+ * that aren't exported. The cast-on-access patterns
+ * (`(match as any).requestId`, `(match as any).diffJson`) reflect
+ * that AuditLog rows carry untyped JSON columns. */
 
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';

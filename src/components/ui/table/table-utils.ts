@@ -14,10 +14,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /** Shallow-recursive deep equality check for plain objects. */
-export function deepEqual(
-  obj1: Record<string, any>, // eslint-disable-line @typescript-eslint/no-explicit-any
-  obj2: Record<string, any>, // eslint-disable-line @typescript-eslint/no-explicit-any
-): boolean {
+export function deepEqual(obj1: unknown, obj2: unknown): boolean {
   if (obj1 === obj2) return true;
   if (
     typeof obj1 !== "object" ||
@@ -27,12 +24,14 @@ export function deepEqual(
   )
     return false;
 
-  const keys1 = Object.keys(obj1);
-  const keys2 = Object.keys(obj2);
+  const a = obj1 as Record<string, unknown>;
+  const b = obj2 as Record<string, unknown>;
+  const keys1 = Object.keys(a);
+  const keys2 = Object.keys(b);
   if (keys1.length !== keys2.length) return false;
 
   for (const key of keys1) {
-    if (!keys2.includes(key) || !deepEqual(obj1[key], obj2[key])) return false;
+    if (!keys2.includes(key) || !deepEqual(a[key], b[key])) return false;
   }
   return true;
 }
