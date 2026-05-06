@@ -106,12 +106,15 @@ const REPO_BASELINE: readonly KnownHit[] = [
     { file: 'tests/integration/webhook.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Webhook test fixtures.' },
     { file: 'tests/unit/audit-redact.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Audit redaction test fixtures.' },
     { file: 'tests/unit/auth-brute-force.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Brute-force test fixtures.' },
-    { file: 'tests/unit/av-webhook.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'AV webhook test fixtures.' },
+    // av-webhook + refresh entries removed: PR-A.4 added explicit
+    // `// pragma: allowlist secret` carve-outs to those lines, so the
+    // scanner no longer flags them and the baseline entries became
+    // stale. The carve-out comments are the durable record of why
+    // those test fixtures are safe.
     { file: 'tests/unit/backfill-token-encryption.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Token encryption backfill test fixtures.' },
     { file: 'tests/unit/oauth-token-encryption.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'OAuth token encryption test fixtures.' },
     { file: 'tests/unit/oauth-token-encryption.test.ts', pattern: 'GitHub Token', reason: 'Synthetic GitHub-shaped token used to verify provider-specific encryption envelopes.' },
     { file: 'tests/unit/password-check.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Password-check test fixtures.' },
-    { file: 'tests/unit/refresh.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'Token refresh test fixtures.' },
     { file: 'tests/unit/totp-crypto.test.ts', pattern: 'Hardcoded Password Assignment', reason: 'TOTP crypto test fixtures.' },
 ];
 
