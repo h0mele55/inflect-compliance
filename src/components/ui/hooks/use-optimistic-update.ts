@@ -123,9 +123,15 @@ export function useOptimisticUpdate<T>(
     // Track the latest committed value + overlay in refs so functional
     // updaters and the rollback path resolve against the freshest state
     // rather than a closed-over snapshot from when `update` was built.
+    // The "ref-as-mailbox" pattern: write-during-render is intentional
+    // (we want the next async callback to see the most recent value,
+    // not what it was when the closure captured) and matches the
+    // pattern called out in React docs as the legitimate use of refs.
     const valueRef = useRef(value);
+    // eslint-disable-next-line react-hooks/refs
     valueRef.current = value;
     const overlayRef = useRef(overlay);
+    // eslint-disable-next-line react-hooks/refs
     overlayRef.current = overlay;
 
     // When the committed value reference changes, the caller's data
@@ -137,8 +143,10 @@ export function useOptimisticUpdate<T>(
     }, [value]);
 
     // Keep the latest onError in a ref so `update`'s identity stays
-    // stable even when callers pass an inline arrow.
+    // stable even when callers pass an inline arrow. Same
+    // "ref-as-mailbox" pattern as the value/overlay refs above.
     const onErrorRef = useRef(onError);
+    // eslint-disable-next-line react-hooks/refs
     onErrorRef.current = onError;
 
     const update = useCallback(

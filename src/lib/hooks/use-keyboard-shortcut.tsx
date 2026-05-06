@@ -351,12 +351,19 @@ export function useKeyboardShortcut(
     // jsdom project renders several instances per test and `useId()` can
     // collide across strict-mode double-invokes in older React builds.
     const idRef = useRef<string | null>(null);
+    // One-shot lazy initialiser — runs at most once on first render.
+    // eslint-disable-next-line react-hooks/refs
     if (idRef.current === null) {
+        // eslint-disable-next-line react-hooks/refs
         idRef.current = Math.random().toString(36).slice(2) + '-' + nextOrder();
     }
+    // eslint-disable-next-line react-hooks/refs
     const id = idRef.current;
 
     const handlerRef = useRef<ShortcutHandler>(handler);
+    // "ref-as-mailbox" — keep the global keydown dispatcher reading the latest handler
+    // without re-binding the document listener every render.
+    // eslint-disable-next-line react-hooks/refs
     handlerRef.current = handler;
 
     const keyList = useMemo(

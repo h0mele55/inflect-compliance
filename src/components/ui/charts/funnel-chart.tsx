@@ -237,6 +237,13 @@ function PersistentPercentage({
 }) {
   const textRef = useRef<SVGTextElement>(null);
 
+  // SVG text-measurement pattern: read the rendered text width from
+  // the DOM ref to size the surrounding pill. On first render the ref
+  // is null so width=0 (rect collapses); after the ref attaches
+  // React re-renders with the measured width. Acceptable double-render
+  // because the alternative useState+useEffect pattern is the same
+  // double-render with extra ceremony.
+  // eslint-disable-next-line react-hooks/refs
   const textWidth = textRef.current?.getComputedTextLength() ?? 0;
   const pillWidth = textWidth + 28;
 

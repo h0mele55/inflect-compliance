@@ -40,6 +40,8 @@ export function useApi<T>(
     const [error, setError] = useState<UseApiResult<T>['error']>(null);
     const [loading, setLoading] = useState(!!url);
     const urlRef = useRef(url);
+    // "ref-as-mailbox" — keeps fetchData reading the latest url without re-binding the listener.
+    // eslint-disable-next-line react-hooks/refs
     urlRef.current = url;
 
     const fetchData = useCallback(async () => {

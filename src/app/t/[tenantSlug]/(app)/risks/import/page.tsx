@@ -189,7 +189,13 @@ export default function RiskImportPage() {
                 </div>
             )}
 
-            {/* No valid rows warning */}
+            {/* No valid rows warning. Reading fileRef.current during
+                render is intentional: the file-input ref is the source
+                of truth for "has the user picked a file?" — moving it
+                to state would race the controlled-input onChange and
+                potentially flash the warning before/after the parser
+                catches up. */}
+            {/* eslint-disable-next-line react-hooks/refs */}
             {rows.length === 0 && fileRef.current?.files?.length ? (
                 <div className="glass-card p-4 text-sm text-amber-400">{t('noValidRows')}</div>
             ) : null}

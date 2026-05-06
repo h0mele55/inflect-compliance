@@ -313,6 +313,10 @@ export function VirtualTable<T>({
         ariaLabel,
         scrollWrapperClassName,
     });
+    // "ref-as-mailbox" — the OuterElement below is React.useMemo'd to satisfy
+    // react-window's stable-component contract; reading header state through this
+    // ref keeps the outer wrapper from needing to re-memoise on every render.
+    // eslint-disable-next-line react-hooks/refs
     headerStateRef.current = {
         table,
         gridTemplate,
@@ -330,6 +334,9 @@ export function VirtualTable<T>({
             HTMLDivElement,
             React.HTMLAttributes<HTMLDivElement>
         >(function VirtualTableOuter({ children, className, ...rest }, ref) {
+            // forwardRef mounted by react-window inside the virtualizer's
+            // effect-driven mount path, not the outer component's render.
+            // eslint-disable-next-line react-hooks/refs
             const state = headerStateRef.current;
             return (
                 <div
