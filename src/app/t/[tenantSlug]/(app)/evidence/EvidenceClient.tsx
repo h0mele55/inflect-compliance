@@ -5,6 +5,8 @@ import { useSWRConfig } from 'swr';
 import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
 import { useTenantMutation } from '@/lib/hooks/use-tenant-mutation';
 import { CACHE_KEYS } from '@/lib/swr-keys';
+import type { CappedList } from '@/lib/list-backfill-cap';
+import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 // Both evidence modals were previously lazy-loaded via next/dynamic,
@@ -151,12 +153,19 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
     }, [fetchParams]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const evidenceQuery = useTenantSWR<any[]>(evidenceKey, {
-        fallbackData: anyFilterActive ? undefined : initialEvidence,
+    // PR-5 — API returns `{ rows, truncated }`; the Client pulls
+    // `rows` for the table and `truncated` for the banner. SSR
+    // initial wraps with `truncated: false` (cap is 5000, SSR cap is
+    // 100, so the SSR slice never trips truncation by itself).
+    const evidenceQuery = useTenantSWR<CappedList<any>>(evidenceKey, {
+        fallbackData: anyFilterActive
+            ? undefined
+            : { rows: initialEvidence, truncated: false },
     });
+    const truncated = evidenceQuery.data?.truncated ?? false;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const evidence: any[] = evidenceQuery.data ?? [];
+    const evidence: any[] = evidenceQuery.data?.rows ?? [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [controls] = useState<any[]>(initialControls);
     const retentionFilter = (filters.tab || 'active') as RetentionFilter;
@@ -714,6 +723,7 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
             </ListPageShell.Filters>
 
             <ListPageShell.Body>
+                <TruncationBanner truncated={truncated} />
                 {viewMode === 'gallery' ? (
                     <EvidenceGallery
                         rows={displayEvidence}

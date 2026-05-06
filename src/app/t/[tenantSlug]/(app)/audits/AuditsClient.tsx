@@ -3,6 +3,8 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import type { CappedList } from '@/lib/list-backfill-cap';
+import { TruncationBanner } from '@/components/ui/TruncationBanner';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const STATUS_BADGE: Record<string, string> = {
@@ -49,16 +51,19 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const queryClient = useQueryClient();
 
-    const auditsQuery = useQuery({
+    // PR-5 — API returns `{ rows, truncated }`; SSR initial wraps
+    // with `truncated: false` (SSR cap < backfill cap).
+    const auditsQuery = useQuery<CappedList<any>>({
         queryKey: queryKeys.audits.list(tenantSlug),
         queryFn: async () => {
             const res = await fetch(apiUrl('/audits'));
             if (!res.ok) throw new Error('Failed to fetch audits');
             return res.json();
         },
-        initialData: initialAudits,
+        initialData: { rows: initialAudits, truncated: false },
     });
-    const audits = auditsQuery.data ?? [];
+    const audits = auditsQuery.data?.rows ?? [];
+    const truncated = auditsQuery.data?.truncated ?? false;
 
     const loadAudit = async (id: string) => {
         const res = await fetch(apiUrl(`/audits/${id}`));
@@ -122,6 +127,8 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
                 <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-content-muted text-sm">{audits.length} audits</p></div>
                 <button onClick={() => setShowForm(!showForm)} className="btn btn-primary" id="new-audit-btn">{t.newAudit}</button>
             </div>
+
+            <TruncationBanner truncated={truncated} />
 
             {showForm && (
                 <form onSubmit={createAudit} className="glass-card p-6 space-y-4 animate-fadeIn" id="audit-form">

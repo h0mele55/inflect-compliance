@@ -7,6 +7,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
 import { jsonResponse } from '@/lib/api-response';
+import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
 
 const VendorQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -39,15 +40,19 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         return jsonResponse(result);
     }
 
-    // Backward compat: return flat array
-    const vendors = await listVendors(ctx, {
-        status: query.status,
-        criticality: query.criticality,
-        riskRating: query.riskRating,
-        reviewDue: query.reviewDue,
-        q: query.q,
-    });
-    return jsonResponse(vendors);
+    // PR-5 — backfill cap.
+    const vendors = await listVendors(
+        ctx,
+        {
+            status: query.status,
+            criticality: query.criticality,
+            riskRating: query.riskRating,
+            reviewDue: query.reviewDue,
+            q: query.q,
+        },
+        { take: LIST_BACKFILL_CAP + 1 },
+    );
+    return jsonResponse(applyBackfillCap(vendors));
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateVendorSchema, async (req: NextRequest, { params }: { params: { tenantSlug: string } }, body) => {

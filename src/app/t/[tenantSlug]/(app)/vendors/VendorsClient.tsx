@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
 import { CACHE_KEYS } from '@/lib/swr-keys';
+import type { CappedList } from '@/lib/list-backfill-cap';
+import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
@@ -100,11 +102,16 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
             : CACHE_KEYS.vendors.list();
     }, [fetchParams]);
 
-    const vendorsQuery = useTenantSWR<any[]>(vendorsKey, {
-        fallbackData: filtersMatchInitial ? initialVendors : undefined,
+    // PR-5 — API returns `{ rows, truncated }`. SSR initial wraps
+    // with `truncated: false` (the SSR cap is below the backfill cap).
+    const vendorsQuery = useTenantSWR<CappedList<any>>(vendorsKey, {
+        fallbackData: filtersMatchInitial
+            ? { rows: initialVendors, truncated: false }
+            : undefined,
     });
 
-    const vendors = vendorsQuery.data ?? [];
+    const vendors = vendorsQuery.data?.rows ?? [];
+    const truncated = vendorsQuery.data?.truncated ?? false;
     const liveFilters = useMemo(() => buildVendorFilters(), []);
 
     const vendorColumns = useMemo(() => createColumns<any>([
@@ -203,6 +210,7 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
             </ListPageShell.Filters>
 
             <ListPageShell.Body>
+                <TruncationBanner truncated={truncated} />
                 {/* Outer card preserves the legacy bordered look while
                     delegating internal scroll to DataTable's fillBody. */}
                 <div className="border border-border-default rounded-lg overflow-hidden md:flex md:flex-col md:flex-1 md:min-h-0">

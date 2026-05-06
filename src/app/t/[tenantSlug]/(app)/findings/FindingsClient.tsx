@@ -7,6 +7,8 @@ import { DataTable, createColumns } from '@/components/ui/table';
 import { ListPageShell } from '@/components/layout/ListPageShell';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { DatePicker } from '@/components/ui/date-picker/date-picker';
+import type { CappedList } from '@/lib/list-backfill-cap';
+import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import {
     parseYMD,
     startOfUtcDay,
@@ -59,16 +61,19 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
     const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
     const queryClient = useQueryClient();
 
-    const findingsQuery = useQuery({
+    // PR-5 — API returns `{ rows, truncated }`; SSR initial wraps
+    // with `truncated: false` (SSR cap < backfill cap).
+    const findingsQuery = useQuery<CappedList<any>>({
         queryKey: queryKeys.findings.list(tenantSlug),
         queryFn: async () => {
             const res = await fetch(apiUrl('/findings'));
             if (!res.ok) throw new Error('Failed to fetch findings');
             return res.json();
         },
-        initialData: initialFindings,
+        initialData: { rows: initialFindings, truncated: false },
     });
-    const findings = findingsQuery.data ?? [];
+    const findings = findingsQuery.data?.rows ?? [];
+    const truncated = findingsQuery.data?.truncated ?? false;
 
     const createMutation = useMutation({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -98,11 +103,16 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onMutate: async ({ id, status }: { id: string; status: string }) => {
             await queryClient.cancelQueries({ queryKey: queryKeys.findings.list(tenantSlug) });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const prev = queryClient.getQueryData<any[]>(queryKeys.findings.list(tenantSlug));
+            // PR-5 — cache value is now `CappedList<any>` not the bare array.
+            const prev = queryClient.getQueryData<CappedList<any>>(queryKeys.findings.list(tenantSlug));
             if (prev) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                queryClient.setQueryData(queryKeys.findings.list(tenantSlug), prev.map((f: any) => f.id === id ? { ...f, status } : f));
+                queryClient.setQueryData<CappedList<any>>(
+                    queryKeys.findings.list(tenantSlug),
+                    {
+                        ...prev,
+                        rows: prev.rows.map((f: any) => (f.id === id ? { ...f, status } : f)),
+                    },
+                );
             }
             return { prev };
         },
@@ -284,6 +294,7 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
             )}
 
             <ListPageShell.Body>
+                <TruncationBanner truncated={truncated} />
                 <DataTable
                     fillBody
                     data={findings}

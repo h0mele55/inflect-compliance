@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
 import { CACHE_KEYS } from '@/lib/swr-keys';
+import type { CappedList } from '@/lib/list-backfill-cap';
+import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import {
     ColumnsDropdown,
     createColumns,
@@ -129,11 +131,16 @@ function PoliciesPageInner({
             : CACHE_KEYS.policies.list();
     }, [fetchParams]);
 
-    const policiesQuery = useTenantSWR<any[]>(policiesKey, {
-        fallbackData: filtersMatchInitial ? initialPolicies : undefined,
+    // PR-5 — API returns `{ rows, truncated }`. SSR initial wraps
+    // with `truncated: false` (the SSR cap is below the backfill cap).
+    const policiesQuery = useTenantSWR<CappedList<any>>(policiesKey, {
+        fallbackData: filtersMatchInitial
+            ? { rows: initialPolicies, truncated: false }
+            : undefined,
     });
 
-    const policies = policiesQuery.data ?? [];
+    const policies = policiesQuery.data?.rows ?? [];
+    const truncated = policiesQuery.data?.truncated ?? false;
     const loading = policiesQuery.isLoading && !policiesQuery.data;
 
     const liveFilters = useMemo(
@@ -336,6 +343,7 @@ function PoliciesPageInner({
     return (
         <EntityListPage<any>
             className="animate-fadeIn gap-6"
+            banner={<TruncationBanner truncated={truncated} />}
             header={{
                 title: t.title,
                 count: `${policies.length} polic${policies.length === 1 ? 'y' : 'ies'}`,

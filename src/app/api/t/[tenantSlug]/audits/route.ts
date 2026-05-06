@@ -5,11 +5,13 @@ import { withValidatedBody } from '@/lib/validation/route';
 import { CreateAuditSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { jsonResponse } from '@/lib/api-response';
+import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
-    const audits = await listAudits(ctx);
-    return jsonResponse(audits);
+    // PR-5 — backfill cap.
+    const audits = await listAudits(ctx, { take: LIST_BACKFILL_CAP + 1 });
+    return jsonResponse(applyBackfillCap(audits));
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateAuditSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
