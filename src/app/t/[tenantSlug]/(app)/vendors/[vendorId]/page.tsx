@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback, use } from 'react';
@@ -99,26 +104,32 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
         }
     }, [apiUrl, params.vendorId]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchVendor(); }, [fetchVendor]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { if (tab === 'documents') fetchDocs(); }, [tab, fetchDocs]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { if (tab === 'assessments') fetchAssessments(); }, [tab, fetchAssessments]);
 
     const fetchLinks = useCallback(async () => {
         const res = await fetch(apiUrl(`/vendors/${params.vendorId}/links`));
         if (res.ok) setLinks(await res.json());
     }, [apiUrl, params.vendorId]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { if (tab === 'links') fetchLinks(); }, [tab, fetchLinks]);
 
     const fetchBundles = useCallback(async () => {
         const res = await fetch(apiUrl(`/vendors/${params.vendorId}/bundles`));
         if (res.ok) setBundles(await res.json());
     }, [apiUrl, params.vendorId]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { if (tab === 'bundles') fetchBundles(); }, [tab, fetchBundles]);
 
     const fetchSubs = useCallback(async () => {
         const res = await fetch(apiUrl(`/vendors/${params.vendorId}/subprocessors`));
         if (res.ok) setSubs(await res.json());
     }, [apiUrl, params.vendorId]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { if (tab === 'subprocessors') fetchSubs(); }, [tab, fetchSubs]);
 
     const saveEdit = async () => {

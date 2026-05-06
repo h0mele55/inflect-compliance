@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -51,6 +56,7 @@ export default function InstallWizardPage() {
 
     // Fetch preview when pack selected
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (!selectedPack) { setPreview(null); return; }
         fetch(apiUrl(`/frameworks/${frameworkKey}?action=preview&packKey=${selectedPack}`))
             .then(r => r.ok ? r.json() : null)

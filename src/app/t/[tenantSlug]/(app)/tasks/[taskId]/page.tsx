@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 import { formatDate, formatDateTime } from '@/lib/format-date';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useCallback } from 'react';
@@ -135,11 +140,13 @@ export default function TaskDetailPage() {
         }
     }, [apiUrl, taskId]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchTask(); }, [fetchTask]);
 
     // Fetch links when tab opens
     useEffect(() => {
         if (tab !== 'links') return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLinksLoading(true);
         fetch(apiUrl(`/tasks/${taskId}/links`))
             .then(r => r.ok ? r.json() : [])
@@ -151,6 +158,7 @@ export default function TaskDetailPage() {
     // Fetch comments when tab opens
     useEffect(() => {
         if (tab !== 'comments') return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCommentsLoading(true);
         fetch(apiUrl(`/tasks/${taskId}/comments`))
             .then(r => r.ok ? r.json() : [])
@@ -162,6 +170,7 @@ export default function TaskDetailPage() {
     // Fetch activity when tab opens
     useEffect(() => {
         if (tab !== 'activity') return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setActivityLoading(true);
         fetch(apiUrl(`/tasks/${taskId}/activity`))
             .then(r => r.ok ? r.json() : [])

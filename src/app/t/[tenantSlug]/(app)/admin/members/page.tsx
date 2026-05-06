@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /**
  * Members & Roles admin — Epic 48 DataTable migration.
  *
@@ -151,6 +156,7 @@ export default function MembersAdminPage() {
         }
     }, [apiUrl]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
     // ─── Handlers (unchanged from pre-migration) ───

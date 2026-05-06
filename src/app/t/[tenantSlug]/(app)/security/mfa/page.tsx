@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 import { formatDate } from '@/lib/format-date';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -51,6 +56,7 @@ export default function UserMfaPage() {
         }
     }, [apiUrl]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchStatus(); }, [fetchStatus]);
 
     const startEnroll = async () => {

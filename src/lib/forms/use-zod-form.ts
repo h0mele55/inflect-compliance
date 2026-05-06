@@ -1,5 +1,10 @@
 "use client";
 
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /**
  * Epic 55 hardening — shared Zod form hook.
  *
@@ -101,6 +106,7 @@ export function useZodForm<TSchema extends ZodTypeAny>(
     React.useEffect(() => {
         const parse = schema.safeParse(values);
         if (parse.success) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setErrors({});
             return;
         }

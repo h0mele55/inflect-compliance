@@ -1,5 +1,10 @@
 'use client';
 
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /**
  * Epic 57 — Command Palette surface.
  *
@@ -309,6 +314,7 @@ export function CommandPalette() {
     // Escape paths that don't go through `handleSelect`.
     useEffect(() => {
         if (!isOpen) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setQuery('');
             setActiveKinds(new Set());
         }

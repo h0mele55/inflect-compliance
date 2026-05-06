@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 import { formatDate, formatDateTime } from '@/lib/format-date';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useSWRConfig } from 'swr';
@@ -334,6 +339,7 @@ export default function ControlDetailPage() {
 
     // Fetch requirements when framework selected
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (!selectedFramework) { setRequirements([]); return; }
         fetch(apiUrl(`/controls/frameworks/${selectedFramework}/requirements`))
             .then(r => r.ok ? r.json() : []).then(setRequirements).catch(() => { });
@@ -342,6 +348,7 @@ export default function ControlDetailPage() {
     // Fetch activity when activity tab opens
     useEffect(() => {
         if (tab !== 'activity') return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setActivityLoading(true);
         fetch(apiUrl(`/controls/${controlId}/activity`)).then(r => r.ok ? r.json() : []).then(setActivity).catch(() => { }).finally(() => setActivityLoading(false));
     }, [tab, apiUrl, controlId]);
@@ -354,6 +361,7 @@ export default function ControlDetailPage() {
     // changes the automationKey).
     useEffect(() => {
         if (!initialSyncStatus) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSyncStatus(null);
             setSyncLastAt(null);
             setSyncError(null);
