@@ -6,12 +6,21 @@ import { CreateAuditSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { jsonResponse } from '@/lib/api-response';
 import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
+import { recordListPageRowCount } from '@/lib/observability/list-page-metrics';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     // PR-5 — backfill cap.
     const audits = await listAudits(ctx, { take: LIST_BACKFILL_CAP + 1 });
-    return jsonResponse(applyBackfillCap(audits));
+    const result = applyBackfillCap(audits);
+    // PR-6 — row-count observability.
+    recordListPageRowCount({
+        entity: 'audits',
+        count: result.rows.length,
+        truncated: result.truncated,
+        tenantId: ctx.tenantId,
+    });
+    return jsonResponse(result);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateAuditSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {

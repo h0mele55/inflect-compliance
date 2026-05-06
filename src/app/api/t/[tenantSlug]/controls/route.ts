@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
 import { jsonResponse } from '@/lib/api-response';
 import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
+import { recordListPageRowCount } from '@/lib/observability/list-page-metrics';
 
 const ControlsQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -50,9 +51,16 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
 
     // PR-5 — backfill cap. Ask for cap+1 rows; the helper slices to
     // the cap and reports `truncated: true` if the sentinel was hit.
-    // The Client renders a banner above the table when truncated.
     const controls = await listControls(ctx, filters, { take: LIST_BACKFILL_CAP + 1 });
-    return jsonResponse(applyBackfillCap(controls));
+    const result = applyBackfillCap(controls);
+    // PR-6 — row-count observability.
+    recordListPageRowCount({
+        entity: 'controls',
+        count: result.rows.length,
+        truncated: result.truncated,
+        tenantId: ctx.tenantId,
+    });
+    return jsonResponse(result);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateControlSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
