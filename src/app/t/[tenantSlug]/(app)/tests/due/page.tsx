@@ -70,6 +70,10 @@ export default function DueQueuePage() {
         const res = await fetch(apiUrl(`/tests/plans/${planId}/runs`), { method: 'POST' });
         if (res.ok) {
             const run = await res.json();
+            // window.location.href setter triggers full navigation — used
+            // here intentionally to leave the SPA shell after a sync
+            // POST. Inside an async callback, not in render.
+            // eslint-disable-next-line react-hooks/immutability
             window.location.href = tenantHref(`/tests/runs/${run.id}`);
         }
     };

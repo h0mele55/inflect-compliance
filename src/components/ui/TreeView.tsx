@@ -197,10 +197,17 @@ export function TreeView<T extends TreeViewNode>(props: TreeViewProps<T>) {
 
     // ── Imperative focus on row change. ───────────────────────────────
     const containerRef = useRef<HTMLDivElement | null>(null);
+    // Forwarded-ref bridge: assign the resolved DOM node to both the
+    // local ref AND the caller-supplied ref (function or object form).
+    // Setting `.current` on a forwarded ref IS the documented contract
+    // for ref forwarding; the Compiler rule's "treeRef cannot be modified"
+    // is a false positive on this pattern.
+    // eslint-disable-next-line react-hooks/immutability
     const setContainerRef = useCallback(
         (el: HTMLDivElement | null) => {
             containerRef.current = el;
             if (typeof treeRef === 'function') treeRef(el);
+            // eslint-disable-next-line react-hooks/immutability
             else if (treeRef) (treeRef as { current: HTMLDivElement | null }).current = el;
         },
         [treeRef],

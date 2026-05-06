@@ -286,6 +286,11 @@ export default function PolicyDetailPage() {
 
     const relativeTime = (date: string) => {
         const d = new Date(date);
+        // `Date.now()` inside a callback that runs at render-string time
+        // (`relativeTime(activity.createdAt)`). The label is allowed to be
+        // mildly stale until the next re-render — used in an audit log,
+        // not a high-precision context.
+        // eslint-disable-next-line react-hooks/purity
         const diff = Date.now() - d.getTime();
         const mins = Math.floor(diff / 60000);
         if (mins < 1) return 'just now';

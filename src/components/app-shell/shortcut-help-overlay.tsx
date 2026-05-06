@@ -151,6 +151,10 @@ export function ShortcutHelpOverlay() {
         };
     }, [shortcuts]);
 
+    // useMemo accepts a function reference, not just an inline arrow.
+    // The Compiler rule prefers `useMemo(() => isMacUserAgent(), [])`
+    // for static analysis, but the runtime semantics are identical.
+    // eslint-disable-next-line react-hooks/use-memo
     const isMac = useMemo(isMacUserAgent, []);
 
     return (

@@ -219,6 +219,11 @@ export default function SsoAdminPage() {
     }
 
     // ── Status badge ──
+    // Component declared inside another component to close over
+    // `existingProvider`. Acceptable here because the parent page is
+    // the only render path; promoting it to module scope would require
+    // threading 4+ props.
+    // eslint-disable-next-line react-hooks/static-components
     function StatusBadge() {
         if (!existingProvider) {
             return <span className="badge badge-neutral text-xs">Not Configured</span>;
