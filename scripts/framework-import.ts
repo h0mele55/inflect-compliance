@@ -37,6 +37,7 @@ process.env.SKIP_ENV_VALIDATION = '1';
 
 import * as path from 'path';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import {
     loadAndValidateCatalogFile,
     CatalogParseError,
@@ -139,7 +140,10 @@ async function main(): Promise<number> {
     }
 
     // ── Phase 2: apply ──────────────────────────────────────────
-    const prisma = new PrismaClient();
+    // Prisma 7 — connections go through the adapter pattern instead
+    // of an implicit URL read; mirrors `src/lib/prisma.ts`.
+    const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL ?? '' });
+    const prisma = new PrismaClient({ adapter });
     try {
         const result = await applyCatalogFile(prisma, file, inputPath);
         const summary = {

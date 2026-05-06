@@ -5,6 +5,7 @@ import { getAuditContext } from './audit-context';
 import { redactSensitiveFields, extractChangedFields } from './audit-redact';
 import { withSoftDeleteExtension } from './soft-delete';
 import { withPiiEncryptionExtension } from './security/pii-middleware';
+import { withEncryptionExtension } from './db/encryption-middleware';
 import { withRlsTripwireExtension } from './db/rls-middleware';
 import { logger as auditMiddlewareLogger } from '@/lib/observability/logger';
 
@@ -326,10 +327,23 @@ function buildExtended() {
     // position in the chain is irrelevant; placing it outermost
     // makes the logged model/action match the caller's intent
     // before soft-delete / PII rewrite.
+    // Composition note: Epic B field-level encryption sits between
+    // soft-delete (which rewrites delete → update) and PII (GAP-21,
+    // which encrypts User/AuditorAccount email/name). Inner-to-outer:
+    //   audit → soft-delete → field-encryption → PII → RLS-tripwire
+    // Field-encryption needs to see the post-soft-delete write args
+    // (so encrypt happens on the rewritten update payload) but BEFORE
+    // PII rewrites where-clauses, since the two cover disjoint
+    // models. The Prisma 7 migration introduced field-encryption as a
+    // separate `withEncryptionExtension` but never wired it back into
+    // the chain — restoring it here restores Epic B's at-rest
+    // contract.
     return withRlsTripwireExtension(
         withPiiEncryptionExtension(
-            withSoftDeleteExtension(
-                base.$extends(buildAuditExtension()),
+            withEncryptionExtension(
+                withSoftDeleteExtension(
+                    base.$extends(buildAuditExtension()),
+                ),
             ),
         ),
     );

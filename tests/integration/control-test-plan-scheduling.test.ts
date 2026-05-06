@@ -28,14 +28,15 @@
  *
  * RUN: npx jest tests/integration/control-test-plan-scheduling.test.ts
  */
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'crypto';
-import { DB_URL, DB_AVAILABLE } from './db-helper';
+import { DB_AVAILABLE } from './db-helper';
+import { prismaTestClient } from '../helpers/db';
 
-const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: DB_URL }),
-});
+// GAP-21: route writes through the PII-encryption-enabled client
+// (`emailHash` on User is NOT NULL at the DB but populated by the
+// middleware). A bare `new PrismaClient` here would skip the
+// middleware and trip `Null constraint violation`.
+const prisma = prismaTestClient();
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 
@@ -194,7 +195,7 @@ describeFn('Epic G-2 — ControlTestPlan scheduling roundtrip', () => {
             },
             select: { id: true },
         });
-        const dueIds = due.map((p) => p.id);
+        const dueIds = due.map((p: { id: string }) => p.id);
         expect(dueIds).toContain(dueP.id);
         expect(dueIds).not.toContain(futureP.id);
     });
@@ -220,7 +221,7 @@ describeFn('Epic G-2 — ControlTestPlan scheduling roundtrip', () => {
             },
             select: { id: true },
         });
-        expect(matched.map((p) => p.id)).toContain(integ.id);
+        expect(matched.map((p: { id: string }) => p.id)).toContain(integ.id);
     });
 
     test('AutomationType enum rejects unknown values at the DB layer', async () => {

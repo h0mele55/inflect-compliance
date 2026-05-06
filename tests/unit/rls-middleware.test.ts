@@ -12,7 +12,7 @@
  */
 
 jest.mock('@/lib/prisma', () => ({
-    prisma: { $use: jest.fn() },
+    prisma: {},
 }));
 
 jest.mock('@/lib/observability/logger', () => ({
@@ -32,8 +32,7 @@ import {
     TENANT_SCOPED_MODELS,
     isTenantScopedModel,
     runWithoutRls,
-    installRlsTripwire,
-    _resetTripwireInstallState,
+    withRlsTripwireExtension,
 } from '@/lib/db/rls-middleware';
 import { getAuditContext } from '@/lib/audit-context';
 import { logger } from '@/lib/observability/logger';
@@ -133,48 +132,45 @@ describe('runWithoutRls', () => {
     });
 });
 
-// FIXME(prisma-7): the v5 `$use` middleware shape these tests pinned has
-// been removed in Prisma 7 — the tripwire now lives in
-// `withRlsTripwireExtension` (`$extends({ query: { $allModels:
-// { $allOperations } } })`). The function `installRlsTripwire` is now a
-// no-op stub kept for back-compat. Rewrite this describe block as a
-// behavioural test of `withRlsTripwireExtension`: build a real client,
-// extend it, and assert the warn/debug/passthrough matrix via spied
-// loggers. Skipping for now because the migration PR is already broad.
-describe.skip('installRlsTripwire (DEPRECATED — see FIXME)', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-        _resetTripwireInstallState();
-    });
+describe('withRlsTripwireExtension', () => {
+    // Build a fake client whose `$extends` captures the registered
+    // `$allOperations` handler so the tests can drive it directly,
+    // mirroring how the equivalent v5 tests grabbed the `$use` callback.
+    type Op = (p: {
+        model: string;
+        operation: string;
+        args?: unknown;
+        query: (a: unknown) => Promise<unknown>;
+    }) => Promise<unknown>;
 
-    function getRegisteredMiddleware() {
-        const useMock = (prisma as unknown as { $use: jest.Mock }).$use;
-        return useMock.mock.calls[0][0] as (
-            params: {
-                model?: string;
-                action: string;
-                args?: unknown;
+    function captureHandler(): { handler: Op } {
+        const captured: { handler: Op } = {
+            handler: (async ({ query, args }) => query(args)) as Op,
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fake: any = {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            $extends: (cfg: any) => {
+                captured.handler = cfg.query.$allModels.$allOperations as Op;
+                return fake;
             },
-            next: (p: unknown) => Promise<unknown>
-        ) => Promise<unknown>;
+        };
+        withRlsTripwireExtension(fake);
+        return captured;
     }
 
-    it('is idempotent — repeated installs register exactly one middleware', () => {
-        installRlsTripwire(prisma);
-        installRlsTripwire(prisma);
-        installRlsTripwire(prisma);
-        expect((prisma as unknown as { $use: jest.Mock }).$use).toHaveBeenCalledTimes(1);
+    beforeEach(() => {
+        jest.clearAllMocks();
     });
 
     it('passes through queries to non-tenant-scoped models without logging', async () => {
         (getAuditContext as jest.Mock).mockReturnValue(undefined);
-        installRlsTripwire(prisma);
-        const middleware = getRegisteredMiddleware();
-        const next = jest.fn().mockResolvedValue('result');
+        const { handler } = captureHandler();
+        const query = jest.fn().mockResolvedValue('result');
 
-        await middleware({ model: 'Framework', action: 'findMany' }, next);
+        await handler({ model: 'Framework', operation: 'findMany', args: undefined, query });
 
-        expect(next).toHaveBeenCalled();
+        expect(query).toHaveBeenCalled();
         expect(logger.warn).not.toHaveBeenCalled();
         expect(logger.debug).not.toHaveBeenCalled();
     });
@@ -184,13 +180,12 @@ describe.skip('installRlsTripwire (DEPRECATED — see FIXME)', () => {
             tenantId: 'tenant-A',
             source: 'api',
         });
-        installRlsTripwire(prisma);
-        const middleware = getRegisteredMiddleware();
-        const next = jest.fn().mockResolvedValue('result');
+        const { handler } = captureHandler();
+        const query = jest.fn().mockResolvedValue('result');
 
-        await middleware({ model: 'Risk', action: 'findMany' }, next);
+        await handler({ model: 'Risk', operation: 'findMany', args: undefined, query });
 
-        expect(next).toHaveBeenCalled();
+        expect(query).toHaveBeenCalled();
         expect(logger.warn).not.toHaveBeenCalled();
         expect(logger.debug).not.toHaveBeenCalled();
     });
@@ -199,30 +194,25 @@ describe.skip('installRlsTripwire (DEPRECATED — see FIXME)', () => {
         'passes through without logging when source=%s (bypass path)',
         async (source) => {
             (getAuditContext as jest.Mock).mockReturnValue({ source });
-            installRlsTripwire(prisma);
-            const middleware = getRegisteredMiddleware();
-            const next = jest.fn().mockResolvedValue('result');
+            const { handler } = captureHandler();
+            const query = jest.fn().mockResolvedValue('result');
 
-            await middleware({ model: 'Risk', action: 'create' }, next);
+            await handler({ model: 'Risk', operation: 'create', args: undefined, query });
 
-            expect(next).toHaveBeenCalled();
+            expect(query).toHaveBeenCalled();
             expect(logger.warn).not.toHaveBeenCalled();
         }
     );
 
     it('warns (not throws) on WRITE to tenant-scoped model without context', async () => {
         (getAuditContext as jest.Mock).mockReturnValue(undefined);
-        installRlsTripwire(prisma);
-        const middleware = getRegisteredMiddleware();
-        const next = jest.fn().mockResolvedValue('result');
+        const { handler } = captureHandler();
+        const query = jest.fn().mockResolvedValue('result');
 
-        const result = await middleware(
-            { model: 'Risk', action: 'update' },
-            next
-        );
+        const result = await handler({ model: 'Risk', operation: 'update', args: undefined, query });
 
-        expect(result).toBe('result'); // query still ran
-        expect(next).toHaveBeenCalled();
+        expect(result).toBe('result');
+        expect(query).toHaveBeenCalled();
         expect(logger.warn).toHaveBeenCalledWith(
             'rls-middleware.missing_tenant_context',
             expect.objectContaining({
@@ -234,11 +224,10 @@ describe.skip('installRlsTripwire (DEPRECATED — see FIXME)', () => {
 
     it('logs at debug (not warn) on READ to tenant-scoped model without context', async () => {
         (getAuditContext as jest.Mock).mockReturnValue(undefined);
-        installRlsTripwire(prisma);
-        const middleware = getRegisteredMiddleware();
-        const next = jest.fn().mockResolvedValue([]);
+        const { handler } = captureHandler();
+        const query = jest.fn().mockResolvedValue([]);
 
-        await middleware({ model: 'Risk', action: 'findMany' }, next);
+        await handler({ model: 'Risk', operation: 'findMany', args: undefined, query });
 
         expect(logger.debug).toHaveBeenCalledWith(
             'rls-middleware.missing_tenant_context',
@@ -249,35 +238,31 @@ describe.skip('installRlsTripwire (DEPRECATED — see FIXME)', () => {
 
     it('does not leak query args/payloads into the log', async () => {
         (getAuditContext as jest.Mock).mockReturnValue(undefined);
-        installRlsTripwire(prisma);
-        const middleware = getRegisteredMiddleware();
-        const next = jest.fn().mockResolvedValue('result');
+        const { handler } = captureHandler();
+        const query = jest.fn().mockResolvedValue('result');
 
-        await middleware(
-            {
-                model: 'Risk',
-                action: 'update',
-                args: { where: { id: 'secret-id' }, data: { title: 'PII here' } },
-            },
-            next
-        );
+        await handler({
+            model: 'Risk',
+            operation: 'update',
+            args: { where: { id: 'secret-id' }, data: { title: 'PII here' } },
+            query,
+        });
 
         const loggedFields = (logger.warn as jest.Mock).mock.calls[0][1];
         expect(JSON.stringify(loggedFields)).not.toContain('secret-id');
         expect(JSON.stringify(loggedFields)).not.toContain('PII here');
     });
 
-    it('does not throw when `next` throws — still surfaces original error', async () => {
+    it('surfaces the original error when `query` throws', async () => {
         (getAuditContext as jest.Mock).mockReturnValue({
             tenantId: 'tenant-A',
             source: 'api',
         });
-        installRlsTripwire(prisma);
-        const middleware = getRegisteredMiddleware();
-        const next = jest.fn().mockRejectedValue(new Error('db down'));
+        const { handler } = captureHandler();
+        const query = jest.fn().mockRejectedValue(new Error('db down'));
 
         await expect(
-            middleware({ model: 'Risk', action: 'findMany' }, next)
+            handler({ model: 'Risk', operation: 'findMany', args: undefined, query }),
         ).rejects.toThrow('db down');
     });
 });

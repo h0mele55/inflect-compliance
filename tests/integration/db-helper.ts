@@ -66,10 +66,15 @@ function checkDbAvailable(url: string | undefined): boolean {
     if (!url) return false;
     try {
         const { spawnSync } = require('child_process');
+        // Prisma 7 dropped the `datasources` constructor option; URLs
+        // now flow in through a driver adapter (`@prisma/adapter-pg`).
+        // Mirrors the singleton wiring in `src/lib/prisma.ts`.
         const script = [
             "const{PrismaClient}=require('@prisma/client');",
+            "const{PrismaPg}=require('@prisma/adapter-pg');",
             'const u=process.env.__DB_CHECK_URL;',
-            'const p=new PrismaClient({datasources:{db:{url:u}}});',
+            'const adapter=new PrismaPg({connectionString:u});',
+            'const p=new PrismaClient({adapter});',
             'p.$connect()',
             '.then(()=>p.$queryRawUnsafe("SELECT 1"))',
             '.then(()=>{p.$disconnect();process.exit(0)})',

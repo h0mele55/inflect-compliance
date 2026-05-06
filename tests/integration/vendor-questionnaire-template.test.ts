@@ -19,14 +19,15 @@
  *
  * RUN: npx jest tests/integration/vendor-questionnaire-template.test.ts
  */
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'crypto';
-import { DB_URL, DB_AVAILABLE } from './db-helper';
+import { DB_AVAILABLE } from './db-helper';
+import { prismaTestClient } from '../helpers/db';
 
-const prisma = new PrismaClient({
-    adapter: new PrismaPg({ connectionString: DB_URL }),
-});
+// GAP-21: route writes through the PII-encryption-enabled client
+// (`emailHash` on User/AuditorAccount/UserIdentityLink is NOT NULL
+// at the DB but populated by middleware). A bare `new PrismaClient`
+// here would skip the middleware and trip `Null constraint violation`.
+const prisma = prismaTestClient();
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 
@@ -198,13 +199,13 @@ describeFn('Epic G-3 — vendor questionnaire template', () => {
             },
         });
         expect(reread).not.toBeNull();
-        expect(reread!.sections.map((s) => s.title)).toEqual([
+        expect(reread!.sections.map((s: { title: string }) => s.title)).toEqual([
             'Information security',
             'Data privacy',
         ]);
         expect(reread!.questions).toHaveLength(3);
 
-        const types = reread!.questions.map((q) => q.answerType).sort();
+        const types = reread!.questions.map((q: { answerType: string }) => q.answerType).sort();
         expect(types).toEqual(['FILE_UPLOAD', 'SCALE', 'YES_NO']);
 
         // Cascading delete — drop the template, sections and
