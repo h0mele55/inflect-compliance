@@ -76,6 +76,14 @@ import {
 } from '@/lib/security/encrypted-fields';
 import { getAuditContext } from '@/lib/audit-context';
 import { logger } from '@/lib/observability/logger';
+// `import * as` (rather than a top-level named import) keeps the
+// circular-import escape hatch — `tenant-key-manager` imports
+// `@/lib/prisma`, which composes this module — while still exposing
+// the symbols at call time. The previous lazy `require('@/lib/...')`
+// was invisibly broken by Turbopack's production minifier (resolved
+// to `undefined`, surfacing as `"i is not a function"` runtime
+// errors). Same pattern as `db/rls-middleware.ts::prismaModule`.
+import * as tenantKeyManager from '@/lib/security/tenant-key-manager';
 
 // ─── Action buckets ───────────────────────────────────────────────────
 
@@ -164,12 +172,12 @@ async function resolveTenantDekPair(
     if (!tenantId) return NO_DEK_PAIR;
     if (ctx?.source && BYPASS_SOURCES.has(ctx.source)) return NO_DEK_PAIR;
 
-    // Lazy-require the key manager to dodge the circular-import risk
-    // pattern we use elsewhere (see `db/rls-middleware.ts`).
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getTenantDek, getTenantPreviousDek } = require(
-        '@/lib/security/tenant-key-manager',
-    ) as typeof import('@/lib/security/tenant-key-manager');
+    // Read through the namespace import. The static `import *` at the
+    // top of this file is the canonical fix for the circular cycle
+    // (`tenant-key-manager` → `@/lib/prisma` → `withEncryptionExtension`)
+    // that doesn't trip Turbopack's production minifier — see the
+    // import comment block.
+    const { getTenantDek, getTenantPreviousDek } = tenantKeyManager;
 
     let primary: Buffer | null;
     try {
