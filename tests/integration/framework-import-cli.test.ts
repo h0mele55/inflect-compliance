@@ -54,6 +54,13 @@ function runCli(args: string[]): RunResult {
     };
 }
 
+// `runCli` shells out to `npx tsx scripts/framework-import.ts`; cold
+// `npx`+`tsx` startup easily eats the default 5 s Jest test timeout
+// under parallel load, even though the inner `spawnSync` budget is
+// 60 s. Bump the per-test budget to match. The internal subprocess
+// timeout still backstops a genuinely-hung run.
+jest.setTimeout(60_000);
+
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 
 describeFn('framework:import CLI — integration', () => {
