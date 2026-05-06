@@ -8,6 +8,8 @@ import { useSWRConfig } from 'swr';
 import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
 import { useTenantMutation } from '@/lib/hooks/use-tenant-mutation';
 import { CACHE_KEYS } from '@/lib/swr-keys';
+import type { CappedList } from '@/lib/list-backfill-cap';
+import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
 import { DataTable, createColumns } from '@/components/ui/table';
@@ -163,12 +165,20 @@ function TasksPageInner({
         return qs ? `${CACHE_KEYS.tasks.list()}?${qs}` : CACHE_KEYS.tasks.list();
     }, [fetchParams]);
 
-    const tasksQuery = useTenantSWR<TaskListItem[]>(tasksKey, {
-        fallbackData: filtersMatchInitial ? initialTasks : undefined,
+    // PR-9 — API returns `{ rows, truncated }` (mirrors the seven
+    // other list-page entities). SSR initial wraps with
+    // `truncated: false` because the SSR cap (100) is well below
+    // the backfill cap (5000) — the SSR slice never trips truncation
+    // by itself.
+    const tasksQuery = useTenantSWR<CappedList<TaskListItem>>(tasksKey, {
+        fallbackData: filtersMatchInitial
+            ? { rows: initialTasks, truncated: false }
+            : undefined,
         dedupingInterval: 30_000,
     });
 
-    const tasks = tasksQuery.data ?? [];
+    const tasks = tasksQuery.data?.rows ?? [];
+    const truncated = tasksQuery.data?.truncated ?? false;
     const loading = tasksQuery.isLoading && !tasksQuery.data;
     const liveFilters = useMemo(
         () => buildTaskFilters(tasks as unknown as Parameters<typeof buildTaskFilters>[0]),
@@ -218,7 +228,10 @@ function TasksPageInner({
         ids: string[];
     }
 
-    const bulkMutation = useTenantMutation<TaskListItem[], BulkVars, unknown>({
+    // PR-9 — cache value is `CappedList<TaskListItem>`; preserve the
+    // `truncated` flag and only rewrite `rows`. Same shape change as
+    // the other six SWR-backed clients (PR-5 corrective).
+    const bulkMutation = useTenantMutation<CappedList<TaskListItem>, BulkVars, unknown>({
         key: tasksKey,
         mutationFn: async ({ action, value, ids }) => {
             let url = '';
@@ -244,8 +257,8 @@ function TasksPageInner({
             if (!res.ok) throw new Error('Bulk action failed');
             return res.json();
         },
-        optimisticUpdate: (current, { action, value, ids }) =>
-            (current ?? []).map((task) => {
+        optimisticUpdate: (current, { action, value, ids }) => {
+            const rows = (current?.rows ?? []).map((task) => {
                 if (!ids.includes(task.id)) return task;
                 if (action === 'status') return { ...task, status: value };
                 if (action === 'assign')
@@ -256,7 +269,9 @@ function TasksPageInner({
                     };
                 if (action === 'due') return { ...task, dueAt: value || null };
                 return task;
-            }),
+            });
+            return { rows, truncated: current?.truncated ?? false };
+        },
     });
 
     const handleBulkSubmit = () => {
@@ -488,6 +503,7 @@ function TasksPageInner({
             )}
 
             <ListPageShell.Body>
+                <TruncationBanner truncated={truncated} />
                 <DataTable<TaskListItem>
                     fillBody
                     data={tasks}

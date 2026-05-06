@@ -26,11 +26,27 @@ export interface TaskListParams {
     filters?: TaskFilters;
 }
 
-const taskListIncludes = {
+// PR-9 — tight SELECT shape for the Tasks list page. Mirrors the
+// per-entity trims that PR-3 landed on the other seven list-page
+// repos. The previous `include: { assignee, createdBy, _count }`
+// returned all Task scalars (incl. encrypted-at-rest `description`
+// and `metadataJson`) plus three `_count` correlated subqueries the
+// list view never reads (the TasksClient never references
+// `_count.{links,comments,watchers}`). Detail (getById) keeps the
+// wider shape on purpose.
+const taskListSelect = {
+    id: true,
+    key: true,
+    title: true,
+    type: true,
+    severity: true,
+    status: true,
+    dueAt: true,
+    createdAt: true,
+    updatedAt: true,
+    assigneeUserId: true,
     assignee: { select: { id: true, name: true, email: true } },
-    createdBy: { select: { id: true, name: true, email: true } },
-    _count: { select: { links: true, comments: true, watchers: true } },
-};
+} as const;
 
 // ─── Task Repository ───
 
@@ -45,7 +61,7 @@ export class WorkItemRepository {
         return db.task.findMany({
             where,
             orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }],
-            include: taskListIncludes,
+            select: taskListSelect,
             ...(options.take ? { take: options.take } : {}),
         });
     }
@@ -67,7 +83,7 @@ export class WorkItemRepository {
             where,
             orderBy: CURSOR_ORDER_BY,
             take: limit + 1,
-            include: taskListIncludes,
+            select: taskListSelect,
         });
 
         const { trimmedItems, nextCursor, hasNextPage } = computePageInfo(items, limit);

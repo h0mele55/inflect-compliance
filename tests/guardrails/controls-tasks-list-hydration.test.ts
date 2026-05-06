@@ -40,15 +40,15 @@ describe('list-page hydration shape', () => {
     test('TasksClient gates fallbackData on filtersMatchInitial + tunes dedupingInterval (Epic 69)', () => {
         // Epic 69 migrated TasksClient from React Query to
         // `useTenantSWR`. The prior `initialData: filtersMatchInitial
-        // ? initialTasks : undefined` + `initialDataUpdatedAt:
-        // filtersMatchInitial ? Date.now() : 0` + `staleTime: 30_000`
-        // shape becomes `fallbackData: filtersMatchInitial ?
-        // initialTasks : undefined` + `dedupingInterval: 30_000` —
-        // same intent (use SSR data as the first paint, dampen
-        // refetch thrash for the bulk-select interaction), different
-        // mechanism. Pin the SWR shape.
+        // ? initialTasks : undefined` shape became `fallbackData:
+        // filtersMatchInitial ? initialTasks : undefined`. PR-9 then
+        // wrapped the cache value as `CappedList<TaskListItem>`
+        // (mirroring the package shape change from PR-5), so the
+        // fallback now constructs `{ rows: initialTasks, truncated:
+        // false }`. Pin both halves: the gate predicate AND the
+        // wrapped-shape construction.
         expect(tasksClient).toMatch(
-            /fallbackData:\s*filtersMatchInitial\s*\?\s*initialTasks/,
+            /fallbackData:\s*filtersMatchInitial\s*\?\s*\{\s*rows:\s*initialTasks,\s*truncated:\s*false\s*\}/,
         );
         expect(tasksClient).toMatch(/dedupingInterval:\s*30_000/);
     });
