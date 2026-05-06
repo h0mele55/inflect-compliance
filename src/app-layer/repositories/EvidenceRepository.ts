@@ -44,7 +44,6 @@ const evidenceListSelect = {
     createdAt: true,
     control: { select: { id: true, name: true, annexId: true } },
     fileRecord: { select: { id: true, mimeType: true } },
-    reviews: { select: { id: true, createdAt: true, decision: true }, orderBy: { createdAt: 'desc' as const }, take: 1 },
 } as const;
 
 export class EvidenceRepository {
