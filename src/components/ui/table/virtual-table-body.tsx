@@ -328,14 +328,18 @@ export function VirtualTable<T>({
         scrollWrapperClassName,
     };
 
+    // The OuterElement closure captures `headerStateRef`, which the
+    // refs rule flags as "passing a ref to a function may read its
+    // value during render". The capture is intentional — the
+    // virtualizer mounts this forwardRef inside an effect-driven path,
+    // not in the outer component's render. Disable the entire useMemo
+    // so the closure's ref read doesn't fire either.
+    /* eslint-disable react-hooks/refs */
     const OuterElement = React.useMemo(() => {
         const Component = React.forwardRef<
             HTMLDivElement,
             React.HTMLAttributes<HTMLDivElement>
         >(function VirtualTableOuter({ children, className, ...rest }, ref) {
-            // forwardRef mounted by react-window inside the virtualizer's
-            // effect-driven mount path, not the outer component's render.
-            // eslint-disable-next-line react-hooks/refs
             const state = headerStateRef.current;
             return (
                 <div
@@ -369,6 +373,7 @@ export function VirtualTable<T>({
         // ref above which is updated on every render.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+    /* eslint-enable react-hooks/refs */
 
     const renderInner = (h: number, w: number | string) => (
         <FixedSizeList

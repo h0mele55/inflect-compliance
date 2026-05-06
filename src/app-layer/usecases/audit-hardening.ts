@@ -122,10 +122,14 @@ export async function storeExportArtifact(
 
 // ─── Pack Cloning (Retest) ───
 
+// Prisma's `auditPack.create({ include })` return is a deeply nested
+// generic shape; the call site only reads `.id` and `.name` and the
+// wider type would force a 5+ line literal at every consumer.
 export async function clonePackForRetest(
     ctx: RequestContext,
     sourcePackId: string,
     name?: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
     assertCanManageAuditPacks(ctx);
 

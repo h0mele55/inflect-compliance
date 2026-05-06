@@ -26,6 +26,22 @@ interface SsoProvider {
 
 type Tab = 'OIDC' | 'SAML';
 
+// Hoisted to module scope to satisfy react-hooks/static-components.
+// Was previously declared inside `SsoAdminPage` and closed over
+// `existingProvider`; now takes it as a prop.
+function StatusBadge({ existingProvider }: { existingProvider: SsoProvider | null | undefined }) {
+    if (!existingProvider) {
+        return <span className="badge badge-neutral text-xs">Not Configured</span>;
+    }
+    if (existingProvider.isEnforced) {
+        return <span className="badge badge-warning text-xs">Enforced</span>;
+    }
+    if (existingProvider.isEnabled) {
+        return <span className="badge badge-info text-xs">Enabled</span>;
+    }
+    return <span className="badge badge-danger text-xs">Disabled</span>;
+}
+
 export default function SsoAdminPage() {
     const apiUrl = useTenantApiUrl();
     const [providers, setProviders] = useState<SsoProvider[]>([]);
@@ -225,24 +241,7 @@ export default function SsoAdminPage() {
         }
     }
 
-    // ── Status badge ──
-    // Component declared inside another component to close over
-    // `existingProvider`. Acceptable here because the parent page is
-    // the only render path; promoting it to module scope would require
-    // threading 4+ props.
-    // eslint-disable-next-line react-hooks/static-components
-    function StatusBadge() {
-        if (!existingProvider) {
-            return <span className="badge badge-neutral text-xs">Not Configured</span>;
-        }
-        if (existingProvider.isEnforced) {
-            return <span className="badge badge-warning text-xs">Enforced</span>;
-        }
-        if (existingProvider.isEnabled) {
-            return <span className="badge badge-info text-xs">Enabled</span>;
-        }
-        return <span className="badge badge-danger text-xs">Disabled</span>;
-    }
+    // StatusBadge hoisted to module scope (above) — see comment there.
 
     function testLoginUrl() {
         if (!existingProvider) return null;
@@ -291,7 +290,7 @@ export default function SsoAdminPage() {
                     selectAction={(v) => setTab(v as 'OIDC' | 'SAML')}
                 />
                 <div className="ml-auto">
-                    <StatusBadge />
+                    <StatusBadge existingProvider={existingProvider} />
                 </div>
             </div>
 

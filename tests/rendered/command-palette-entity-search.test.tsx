@@ -190,6 +190,11 @@ async function openPaletteAndType(value: string) {
 }
 
 function Shell({ children }: { children?: React.ReactNode }) {
+    // Test-only inner component: opens the palette imperatively after
+    // the provider mounts. Defined inline because it needs to
+    // useCommandPalette() under the just-mounted provider; hoisting
+    // it would force a context-passing dance for one assertion.
+    // eslint-disable-next-line react-hooks/static-components
     function OpenOnMount() {
         const { open } = useCommandPalette();
         React.useEffect(() => {
@@ -200,6 +205,7 @@ function Shell({ children }: { children?: React.ReactNode }) {
     return (
         <KeyboardShortcutProvider>
             <CommandPaletteProvider>
+                {/* eslint-disable-next-line react-hooks/static-components */}
                 <OpenOnMount />
                 {children}
                 <CommandPalette />

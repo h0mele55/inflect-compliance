@@ -72,6 +72,10 @@ import {
 
 // Render an auto-opened palette for each test.
 function Shell({ children }: { children?: React.ReactNode }) {
+    // Test-only inner component: opens the palette imperatively
+    // after the provider mounts. Defined inline so it can call
+    // useCommandPalette() under the just-mounted provider.
+    // eslint-disable-next-line react-hooks/static-components
     function OpenOnMount() {
         const { open } = useCommandPalette();
         React.useEffect(() => {
@@ -82,6 +86,7 @@ function Shell({ children }: { children?: React.ReactNode }) {
     return (
         <KeyboardShortcutProvider>
             <CommandPaletteProvider>
+                {/* eslint-disable-next-line react-hooks/static-components */}
                 <OpenOnMount />
                 {children}
                 <CommandPalette />
