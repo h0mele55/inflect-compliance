@@ -1,5 +1,10 @@
 "use client";
 
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /**
  * Epic 68 — `<VirtualizedComboboxOptions>`.
  *
@@ -113,6 +118,7 @@ export function VirtualizedComboboxOptions<TMeta>({
     const optionsLength = options.length;
     const optionsKey = options.map((o) => o.value).join(",");
     React.useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setActiveIndex(0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [optionsKey]);

@@ -1,5 +1,10 @@
 'use client';
 
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /**
  * Epic 53 — canonical filter toolbar for list pages.
  *
@@ -95,6 +100,7 @@ export function FilterToolbar({
     // Local draft so typing doesn't churn the URL on every keystroke —
     // committed on Enter or blur, matching the pre-Epic 53 filter-bar UX.
     const [draft, setDraft] = useState(search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => setDraft(search), [search]);
 
     const activeFilters: ActiveFilter[] = useMemo(

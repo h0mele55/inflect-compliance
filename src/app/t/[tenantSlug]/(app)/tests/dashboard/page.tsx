@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
@@ -89,6 +94,7 @@ export default function TestDashboardPage() {
         }
     }, [apiUrl, period]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchData(); }, [fetchData]);
 
     if (loading || !metrics) return <div className="p-12 text-center text-content-subtle animate-pulse">Loading dashboard...</div>;

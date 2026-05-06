@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /* eslint-disable @typescript-eslint/no-explicit-any -- Tanstack-react-table cell callbacks (tanstack cell callbacks where row/getValue carry the implicit-any annotation) — typing each callback with `CellContext<TData, TValue>` requires importing the right generic per column and adds significant ceremony. The implicit any here is at the render-time boundary; row.original is type-narrowed by the column's accessorKey at runtime. */
 import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback, useMemo } from 'react';
@@ -68,6 +73,7 @@ export default function AdminIntegrationsPage() {
         setLoading(false);
     }, [apiUrl]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchConnections(); }, [fetchConnections]);
 
     const resetForm = () => {

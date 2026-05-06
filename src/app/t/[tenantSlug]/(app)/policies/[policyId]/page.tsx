@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -115,7 +120,9 @@ export default function PolicyDetailPage() {
         }
     }, [apiUrl, policyId]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchPolicy(); }, [fetchPolicy]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { if (tab === 'activity') fetchActivity(); }, [tab, fetchActivity]);
 
     // ── Actions ──

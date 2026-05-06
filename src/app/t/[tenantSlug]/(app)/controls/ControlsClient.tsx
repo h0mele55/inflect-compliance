@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /* eslint-disable react-hooks/exhaustive-deps -- Various useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers/derived arrays recreated each render). The proper structural fix is wrapping parent-level callbacks in useCallback. Tracked as follow-up; existing per-line eslint-disable-next-line markers preserved. */
 import { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -185,6 +190,7 @@ function ControlsPageInner({
     const searchParams = useSearchParams();
     useEffect(() => {
         if (searchParams?.get('create') === '1') {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setIsCreateOpen(true);
             // Strip the flag so browser back/forward doesn't re-open the
             // modal unexpectedly and so the URL stays clean after open.

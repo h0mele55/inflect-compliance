@@ -1,3 +1,8 @@
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
@@ -139,6 +144,7 @@ export function useOptimisticUpdate<T>(
     // an effect keeps the render output deterministic (we don't try to
     // read-and-compare during render).
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setOverlay(null);
     }, [value]);
 

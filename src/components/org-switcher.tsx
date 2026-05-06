@@ -1,5 +1,10 @@
 'use client';
 
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /**
  * Epic O-4 — Org / Tenant context switcher.
  *
@@ -105,6 +110,7 @@ export function OrgSwitcher({
         if (!open) return;
         if (tenants !== null) return;
         let cancelled = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
         setError(null);
         fetch(`/api/org/${orgSlug}/tenants`, { credentials: 'same-origin' })

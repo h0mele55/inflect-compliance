@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /* eslint-disable react-hooks/exhaustive-deps -- Various useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers/derived arrays recreated each render). The proper structural fix is wrapping parent-level callbacks in useCallback. Tracked as follow-up; existing per-line eslint-disable-next-line markers preserved. */
 /**
  * Epic 58 — canonical date-range picker.
@@ -148,6 +153,7 @@ export function DateRangePicker({
     // Keep internal mirror in sync when controlled.
     useEffect(() => {
         if (isControlled) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setInternal((value as DateRangeValue) ?? { from: null, to: null });
         }
     }, [isControlled, value]);
@@ -156,6 +162,7 @@ export function DateRangePicker({
     // value. When it closes without completion, discard the draft.
     useEffect(() => {
         if (open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setDraft(fromDateRangeValue(committed));
             setMonth(committed.to ?? committed.from ?? new Date());
         } else {

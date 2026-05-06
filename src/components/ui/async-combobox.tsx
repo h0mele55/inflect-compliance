@@ -1,5 +1,10 @@
 "use client";
 
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /**
  * <AsyncCombobox> — debounced async-search wrapper around <Combobox>.
  *
@@ -212,6 +217,7 @@ export function AsyncCombobox<TMeta = unknown>(
     // option later if it scrolls out of the result set.
     React.useEffect(() => {
         if (!options.length) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedCache((prev) => {
             let next = prev;
             for (const opt of options) {

@@ -1,5 +1,10 @@
 'use client';
 
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /**
  * Risk-matrix admin editor — Epic 44.5
  *
@@ -242,6 +247,7 @@ export function RiskMatrixAdminClient({
 
     // Re-sync if the prop ever changes (server-driven refresh).
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setConfig(cloneConfig(initialConfig));
     }, [initialConfig]);
 

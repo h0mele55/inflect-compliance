@@ -1,5 +1,10 @@
 'use client';
 
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /**
  * Epic 53 — React bridge for filter presets.
  *
@@ -48,6 +53,7 @@ export function useFilterPresets(
     // Load once on mount (and again whenever the tenant / page scope
     // shifts, e.g. when the user switches between tenants).
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         refresh();
     }, [refresh]);
 

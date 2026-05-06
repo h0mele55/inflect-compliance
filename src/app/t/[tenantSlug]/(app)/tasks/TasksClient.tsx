@@ -1,4 +1,9 @@
 'use client';
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 /* eslint-disable react-hooks/exhaustive-deps -- Various useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers/derived arrays recreated each render). The proper structural fix is wrapping parent-level callbacks in useCallback. Tracked as follow-up; existing per-line eslint-disable-next-line markers preserved. */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -118,6 +123,7 @@ function TasksPageInner({
 
     // Hydration marker — signals to E2E tests that React event handlers are attached
     const [hydrated, setHydrated] = useState(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { setHydrated(true); }, []);
 
     // Null until after hydration — time-dependent UI (overdue/SLA

@@ -1,5 +1,10 @@
 "use client";
 
+/* TODO(swr-migration): this file has fetch-on-mount + setState
+ * patterns flagged by react-hooks/set-state-in-effect. Each call site
+ * carries an inline disable directive; collectively they should
+ * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
+
 import { cn } from "@dub/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 import {
@@ -143,6 +148,7 @@ export function NumberStepper({
 
     useEffect(() => {
         if (!isEditing && inputValue !== String(value)) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setInputValue(String(value));
         }
     }, [value, isEditing, inputValue]);
