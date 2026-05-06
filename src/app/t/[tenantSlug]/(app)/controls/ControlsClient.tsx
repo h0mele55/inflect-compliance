@@ -243,6 +243,11 @@ function ControlsPageInner({
         initialData: filtersMatchInitial
             ? { rows: initialControls, truncated: false }
             : undefined,
+        // `initialDataUpdatedAt: Date.now()` tells React Query the SSR
+        // payload is "fresh as of now" so it doesn't immediately
+        // refetch on hydration. The exact ms doesn't matter — only the
+        // relative ordering against staleTime — so the impurity is benign.
+        // eslint-disable-next-line react-hooks/purity
         initialDataUpdatedAt: filtersMatchInitial ? Date.now() : 0,
         staleTime: 30_000,
     });

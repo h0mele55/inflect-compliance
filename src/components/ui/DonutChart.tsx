@@ -171,6 +171,12 @@ export default function DonutChart({
                     const dashGap = circumference - dashLength;
                     const offset = circumference * accumulatedOffset;
 
+                    // Accumulator pattern inside `.map()` to position
+                    // each donut segment relative to the previous. The
+                    // mutation is deterministic per render (no closure
+                    // leak across renders) but the Compiler rule sees
+                    // any `let`-reassignment in render as a violation.
+                    // eslint-disable-next-line react-hooks/immutability
                     accumulatedOffset += segPercent;
 
                     return (

@@ -150,6 +150,11 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
         mode: 'onTouched',
     });
 
+    // react-hook-form's `watch` triggers a re-subscription on every call;
+    // the React Compiler rule flags it as incompatible-library because
+    // it's not designed for the new strict reactivity model. Working as
+    // intended in production.
+    // eslint-disable-next-line react-hooks/incompatible-library
     const applicability = watch('applicability');
     // Watch name so the submit button can mirror the legacy disabled
     // gate (`disabled until name is non-empty`). RHF's `formState.isValid`

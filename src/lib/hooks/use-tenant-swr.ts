@@ -152,15 +152,14 @@ export function useTenantSWR<T>(
         [schema],
     );
 
-    const config = useMemo<SWRConfiguration<T, ApiClientError | Error>>(
-        () => ({ ...DEFAULT_SWR_CONFIG, ...swrOverrides }),
-        // The override object is consumer-provided; deps follow its
-        // identity. Consumers that pass a fresh literal each render
-        // accept the cost of re-merging — they almost never matter
-        // for SWR (the merged object is read once per call).
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [JSON.stringify(swrOverrides)],
-    );
+    // The override object is consumer-provided; deps follow its
+    // identity. Consumers that pass a fresh literal each render accept
+    // the cost of re-merging — they almost never matter for SWR (the
+    // merged object is read once per call). Extract the JSON key into
+    // a const so the deps array is "simple expressions" only.
+    const swrOverridesKey = JSON.stringify(swrOverrides);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const config = useMemo<SWRConfiguration<T, ApiClientError | Error>>(() => ({ ...DEFAULT_SWR_CONFIG, ...swrOverrides }), [swrOverridesKey]);
 
     return useSWR<T, ApiClientError | Error>(key, fetcher, config);
 }

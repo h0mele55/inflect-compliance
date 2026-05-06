@@ -34,6 +34,11 @@ export default function ControlsDashboard() {
     const [consistency, setConsistency] = useState<ConsistencyCheckDTO | null>(null);
     const [showConsistency, setShowConsistency] = useState(false);
 
+    // The recursive `fetchDashboard(attempt + 1)` calls inside the
+    // useCallback body close over the not-yet-finalised binding. The
+    // pattern is correct (the recursion is explicit and bounded) but
+    // the React Compiler immutability rule can't tell that.
+    // eslint-disable-next-line react-hooks/immutability
     const fetchDashboard = useCallback(async (attempt = 0) => {
         setLoading(true);
         try {

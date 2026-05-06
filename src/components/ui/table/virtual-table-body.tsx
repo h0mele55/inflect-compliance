@@ -274,14 +274,13 @@ export function VirtualTable<T>({
         return set;
     }, [visibleColumns]);
 
-    const gridTemplate = React.useMemo(
-        () => buildGridTemplate(table),
-        // visibleColumns identity changes when columns add/remove or
-        // visibility flips — those are the inputs the template depends
-        // on. `table` is stable across renders.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [visibleColumns.map((c) => c.id).join(","), table],
-    );
+    // visibleColumns identity changes when columns add/remove or
+    // visibility flips — those are the inputs the template depends on.
+    // `table` is stable across renders. Extract the column-id key into
+    // a const so the deps array is "simple expressions" only.
+    const visibleColumnsKey = visibleColumns.map((c) => c.id).join(",");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const gridTemplate = React.useMemo(() => buildGridTemplate(table), [visibleColumnsKey, table]);
 
     // Stable `itemData` keeps react-window from re-rendering rows when
     // the row click handler is the same reference between renders.

@@ -336,6 +336,9 @@ function SWRDevToolsImpl() {
 }
 
 function DevToolsRow({ entry }: { entry: KeyState }) {
+    // Dev-only devtools row — Date.now() shows live age in seconds; the
+    // mild render-cycle staleness is the intended behaviour for this UI.
+    // eslint-disable-next-line react-hooks/purity
     const ageSec = Math.max(0, Math.round((Date.now() - entry.lastSeenAt) / 1000));
     const ageLabel = ageSec === 0 ? 'now' : `${ageSec}s`;
     return (

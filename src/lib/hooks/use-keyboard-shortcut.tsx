@@ -354,7 +354,10 @@ export function useKeyboardShortcut(
     // One-shot lazy initialiser — runs at most once on first render.
     // eslint-disable-next-line react-hooks/refs
     if (idRef.current === null) {
-        // eslint-disable-next-line react-hooks/refs
+        // One-shot lazy init: Math.random() runs once per hook instance, not per render.
+        // Stored in a ref so the value survives. Both rules fire on this line:
+        // /refs (writing ref.current during render), /purity (Math.random()).
+        // eslint-disable-next-line react-hooks/refs, react-hooks/purity
         idRef.current = Math.random().toString(36).slice(2) + '-' + nextOrder();
     }
     // eslint-disable-next-line react-hooks/refs

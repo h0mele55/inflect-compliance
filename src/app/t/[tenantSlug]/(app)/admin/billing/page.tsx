@@ -46,6 +46,9 @@ export default async function BillingPage({
     // Compute trial days remaining
     let trialDaysRemaining: number | null = null;
     if (isTrialing && trialEnd) {
+        // Server component — Date.now() runs once per request server-side,
+        // not in a React render cycle. Lint can't distinguish server from client.
+        // eslint-disable-next-line react-hooks/purity
         const diffMs = new Date(trialEnd).getTime() - Date.now();
         trialDaysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
     }
