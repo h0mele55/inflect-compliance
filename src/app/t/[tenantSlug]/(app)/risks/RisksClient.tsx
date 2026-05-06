@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
 import { CACHE_KEYS } from '@/lib/swr-keys';
+import type { CappedList } from '@/lib/list-backfill-cap';
+import { TruncationBanner } from '@/components/ui/TruncationBanner';
 // NOTE: NewRiskModal was previously lazy-loaded via next/dynamic, but
 // the JIT race in `next dev` made the modal occasionally fail to mount
 // in serial-mode E2E runs (Playwright clicked the button before the
@@ -198,11 +200,20 @@ function RisksPageInner({
             : CACHE_KEYS.risks.list();
     }, [fetchParams]);
 
-    const risksQuery = useTenantSWR<RiskListItem[]>(risksKey, {
-        fallbackData: filtersMatchInitial ? initialRisks : undefined,
+    // PR-5 — API returns `{ rows, truncated }` so the Client knows
+    // when the backfill cap fired and can render the truncation
+    // banner. SSR initial is wrapped at the page layer with
+    // `truncated: false` because the SSR cap (100) is well below the
+    // backfill cap (5000) — the banner only fires when SWR brings
+    // back the cap+1 sentinel.
+    const risksQuery = useTenantSWR<CappedList<RiskListItem>>(risksKey, {
+        fallbackData: filtersMatchInitial
+            ? { rows: initialRisks, truncated: false }
+            : undefined,
     });
 
-    const risks = risksQuery.data ?? [];
+    const risks = risksQuery.data?.rows ?? [];
+    const truncated = risksQuery.data?.truncated ?? false;
     const loading = risksQuery.isLoading && !risksQuery.data;
 
     // ─── Column visibility (Epic 52) ───
@@ -523,6 +534,7 @@ function RisksPageInner({
             </ListPageShell.Filters>
 
             <ListPageShell.Body>
+                <TruncationBanner truncated={truncated} />
                 {view === 'heatmap' ? (
                     <RiskMatrix
                         config={matrixConfig}

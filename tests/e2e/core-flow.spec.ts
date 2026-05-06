@@ -215,12 +215,16 @@ test.describe('Core Certification Flow', () => {
                 }
                 const riskData = await riskRes.json();
                 const ctrlData = await ctrlRes.json();
+                // PR-5 — list endpoints return `{ rows, truncated }`.
+                // Keep the legacy paths (`Array.isArray`, `data.risks`)
+                // so the matcher tolerates older builds + new shape
+                // simultaneously during rollout.
                 const risks = Array.isArray(riskData)
                     ? riskData
-                    : riskData.risks || [];
+                    : riskData.rows || riskData.risks || [];
                 const controls = Array.isArray(ctrlData)
                     ? ctrlData
-                    : ctrlData.controls || [];
+                    : ctrlData.rows || ctrlData.controls || [];
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const risk = risks.find((r: any) => r.title === riskTitle);
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -305,7 +309,8 @@ test.describe('Core Certification Flow', () => {
             });
             if (!res.ok) return { controlId: null };
             const data = await res.json();
-            const arr = Array.isArray(data) ? data : (data.controls || []);
+            // PR-5 — list endpoint returns `{ rows, truncated }`.
+            const arr = Array.isArray(data) ? data : (data.rows || data.controls || []);
             const found = arr.find((c: any) => c.name === controlName); // eslint-disable-line @typescript-eslint/no-explicit-any
             return { controlId: found?.id };
         }, CONTROL_NAME);

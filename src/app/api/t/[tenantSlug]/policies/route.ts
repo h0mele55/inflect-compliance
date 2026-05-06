@@ -7,6 +7,7 @@ import * as policyUsecases from '@/app-layer/usecases/policy';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
 import { jsonResponse } from '@/lib/api-response';
+import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
 
 const PolicyQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -44,14 +45,18 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     return jsonResponse(result);
   }
 
-  // Backward compat: return flat array
-  const policies = await policyUsecases.listPolicies(ctx, {
-    status: query.status,
-    category: query.category,
-    language: query.language,
-    q: query.q,
-  });
-  return jsonResponse(policies);
+  // PR-5 — backfill cap.
+  const policies = await policyUsecases.listPolicies(
+    ctx,
+    {
+      status: query.status,
+      category: query.category,
+      language: query.language,
+      q: query.q,
+    },
+    { take: LIST_BACKFILL_CAP + 1 },
+  );
+  return jsonResponse(applyBackfillCap(policies));
 });
 
 // POST /api/t/[tenantSlug]/policies — create (blank or from template)

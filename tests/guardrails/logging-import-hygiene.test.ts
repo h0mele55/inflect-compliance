@@ -132,11 +132,6 @@ describe('Dynamic require() usage is minimized', () => {
         'app/api/readyz/route.ts': ['@/lib/redis'],
         // GAP-13 — same conditional Redis check pattern as readyz.
         'app/api/health/route.ts': ['@/lib/redis'],
-        // Epic B.2 — the encryption middleware resolves a per-tenant
-        // DEK on every query; the key-manager module is lazy-required
-        // so the middleware module evaluates without the key-manager
-        // graph, mirroring the rls-middleware pattern.
-        'lib/db/encryption-middleware.ts': ['@/lib/security/tenant-key-manager'],
         // Epic G-3 — vendor questionnaire usecases.
         // env.APP_URL is lazy-required at the call site (not statically
         // imported) because these usecases run from BullMQ workers and

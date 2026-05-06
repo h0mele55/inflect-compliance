@@ -7,6 +7,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
 import { jsonResponse } from '@/lib/api-response';
+import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
 
 const EvidenceQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -49,9 +50,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         return jsonResponse(result);
     }
 
-    // Backward compatibility: flat array
-    const evidence = await listEvidence(ctx, filters);
-    return jsonResponse(evidence);
+    // PR-5 — backfill cap. Ask for cap+1 rows; helper slices and
+    // reports `truncated`. Client renders TruncationBanner above the
+    // table when the cap fired.
+    const evidence = await listEvidence(ctx, filters, { take: LIST_BACKFILL_CAP + 1 });
+    return jsonResponse(applyBackfillCap(evidence));
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateEvidenceSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {

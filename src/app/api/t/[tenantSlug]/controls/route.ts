@@ -7,6 +7,7 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
 import { jsonResponse } from '@/lib/api-response';
+import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
 
 const ControlsQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -47,9 +48,11 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         return jsonResponse(result);
     }
 
-    // Backward compatibility: flat array
-    const controls = await listControls(ctx, filters);
-    return jsonResponse(controls);
+    // PR-5 — backfill cap. Ask for cap+1 rows; the helper slices to
+    // the cap and reports `truncated: true` if the sentinel was hit.
+    // The Client renders a banner above the table when truncated.
+    const controls = await listControls(ctx, filters, { take: LIST_BACKFILL_CAP + 1 });
+    return jsonResponse(applyBackfillCap(controls));
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateControlSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {

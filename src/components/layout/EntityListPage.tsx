@@ -149,6 +149,13 @@ export interface EntityListPageProps<TRow> {
     filters?: EntityListPageFilters;
     table: EntityListPageTable<TRow>;
     /**
+     * PR-5 — optional render slot above the table, below the filters.
+     * Used by the SWR-backed pages to surface
+     * `<TruncationBanner truncated={...} />` when the backfill cap
+     * fired. Renders nothing when omitted.
+     */
+    banner?: ReactNode;
+    /**
      * Children render below the body inside the same `<ListPageShell>`
      * — typically modals / sheets that sit at the page-state level.
      * They're a render-time concern of the page, not the shell, so
@@ -162,7 +169,7 @@ export interface EntityListPageProps<TRow> {
 // ─── Component ──────────────────────────────────────────────────
 
 export function EntityListPage<TRow>(props: EntityListPageProps<TRow>) {
-    const { header, filters, table, children, className } = props;
+    const { header, filters, table, banner, children, className } = props;
 
     return (
         <ListPageShell
@@ -221,6 +228,7 @@ export function EntityListPage<TRow>(props: EntityListPageProps<TRow>) {
             )}
 
             <ListPageShell.Body>
+                {banner}
                 <DataTable<TRow>
                     fillBody={table.fillBody ?? true}
                     {...table}

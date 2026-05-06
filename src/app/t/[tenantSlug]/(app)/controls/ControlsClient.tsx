@@ -35,6 +35,8 @@ import {
     type FilterType,
 } from '@/components/ui/filter';
 import { EntityListPage } from '@/components/layout/EntityListPage';
+import type { CappedList } from '@/lib/list-backfill-cap';
+import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import {
     buildControlFilters,
     CONTROL_FILTER_KEYS,
@@ -226,7 +228,11 @@ function ControlsPageInner({
         return true;
     }, [queryKeyFilters, initialFilters, serverHadFilters, hasActive]);
 
-    const controlsQuery = useQuery<ControlListItem[]>({
+    // PR-5 — API returns `{ rows, truncated }`; SSR initial wraps
+    // with `truncated: false` because the SSR cap (100) is well below
+    // the backfill cap (5000), so the SSR slice never trips truncation
+    // by itself.
+    const controlsQuery = useQuery<CappedList<ControlListItem>>({
         queryKey: queryKeys.controls.list(tenantSlug, queryKeyFilters),
         queryFn: async () => {
             const qs = filtersForQuery.toString();
@@ -234,12 +240,15 @@ function ControlsPageInner({
             if (!res.ok) throw new Error('Failed to fetch controls');
             return res.json();
         },
-        initialData: filtersMatchInitial ? initialControls : undefined,
+        initialData: filtersMatchInitial
+            ? { rows: initialControls, truncated: false }
+            : undefined,
         initialDataUpdatedAt: filtersMatchInitial ? Date.now() : 0,
         staleTime: 30_000,
     });
 
-    const controls = controlsQuery.data ?? [];
+    const controls = controlsQuery.data?.rows ?? [];
+    const truncated = controlsQuery.data?.truncated ?? false;
     const loading = controlsQuery.isLoading && !controlsQuery.data;
 
     // ─── Filter defs with runtime-derived owner/category options ───
@@ -307,11 +316,21 @@ function ControlsPageInner({
             await queryClient.cancelQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
 
             const listKey = queryKeys.controls.list(tenantSlug, queryKeyFilters);
-            const previousList = queryClient.getQueryData<ControlListItem[]>(listKey);
+            // PR-5 — cache value is `CappedList<ControlListItem>` (the API
+            // returns `{ rows, truncated }`); preserve the `truncated` flag
+            // and only rewrite `rows`.
+            const previousList = queryClient.getQueryData<CappedList<ControlListItem>>(listKey);
 
             if (previousList) {
-                queryClient.setQueryData<ControlListItem[]>(listKey, (old) =>
-                    old?.map(c => c.id === controlId ? { ...c, status: newStatus } : c)
+                queryClient.setQueryData<CappedList<ControlListItem>>(listKey, (old) =>
+                    old
+                        ? {
+                              ...old,
+                              rows: old.rows.map(c =>
+                                  c.id === controlId ? { ...c, status: newStatus } : c,
+                              ),
+                          }
+                        : old,
                 );
             }
 
@@ -350,11 +369,19 @@ function ControlsPageInner({
             await queryClient.cancelQueries({ queryKey: queryKeys.controls.all(tenantSlug) });
 
             const listKey = queryKeys.controls.list(tenantSlug, queryKeyFilters);
-            const previousList = queryClient.getQueryData<ControlListItem[]>(listKey);
+            // PR-5 — cache value is `CappedList<ControlListItem>`.
+            const previousList = queryClient.getQueryData<CappedList<ControlListItem>>(listKey);
 
             if (previousList) {
-                queryClient.setQueryData<ControlListItem[]>(listKey, (old) =>
-                    old?.map(c => c.id === controlId ? { ...c, applicability } : c)
+                queryClient.setQueryData<CappedList<ControlListItem>>(listKey, (old) =>
+                    old
+                        ? {
+                              ...old,
+                              rows: old.rows.map(c =>
+                                  c.id === controlId ? { ...c, applicability } : c,
+                              ),
+                          }
+                        : old,
                 );
             }
 
@@ -657,6 +684,7 @@ function ControlsPageInner({
     return (
         <EntityListPage<ControlListItem>
             className="animate-fadeIn gap-6"
+            banner={<TruncationBanner truncated={truncated} />}
             header={{
                 breadcrumbs: [
                     // Was `tenantHref('/')` — that resolves to `/t/<slug>/`
