@@ -6,12 +6,21 @@ import { CreateFindingSchema } from '@/lib/schemas';
 import { withApiErrorHandling } from '@/lib/errors/api';
 import { jsonResponse } from '@/lib/api-response';
 import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
+import { recordListPageRowCount } from '@/lib/observability/list-page-metrics';
 
 export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { params: { tenantSlug: string } }) => {
     const ctx = await getTenantCtx(params, req);
     // PR-5 — backfill cap.
     const findings = await listFindings(ctx, { take: LIST_BACKFILL_CAP + 1 });
-    return jsonResponse(applyBackfillCap(findings));
+    const result = applyBackfillCap(findings);
+    // PR-6 — row-count observability.
+    recordListPageRowCount({
+        entity: 'findings',
+        count: result.rows.length,
+        truncated: result.truncated,
+        tenantId: ctx.tenantId,
+    });
+    return jsonResponse(result);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateFindingSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {

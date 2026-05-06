@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { normalizeQ } from '@/lib/filters/query-helpers';
 import { jsonResponse } from '@/lib/api-response';
 import { LIST_BACKFILL_CAP, applyBackfillCap } from '@/lib/list-backfill-cap';
+import { recordListPageRowCount } from '@/lib/observability/list-page-metrics';
 
 const RiskQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -49,8 +50,7 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
     }
 
     // PR-5 — backfill cap. Ask for cap+1 rows; helper slices and
-    // reports `truncated`. Client renders TruncationBanner above the
-    // table when the cap fired.
+    // reports `truncated`.
     const risks = await listRisks(
         ctx,
         {
@@ -63,7 +63,15 @@ export const GET = withApiErrorHandling(async (req: NextRequest, { params }: { p
         },
         { take: LIST_BACKFILL_CAP + 1 },
     );
-    return jsonResponse(applyBackfillCap(risks));
+    const result = applyBackfillCap(risks);
+    // PR-6 — row-count observability.
+    recordListPageRowCount({
+        entity: 'risks',
+        count: result.rows.length,
+        truncated: result.truncated,
+        tenantId: ctx.tenantId,
+    });
+    return jsonResponse(result);
 });
 
 export const POST = withApiErrorHandling(withValidatedBody(CreateRiskSchema, async (req, { params }: { params: { tenantSlug: string } }, body) => {
