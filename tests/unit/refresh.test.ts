@@ -1,3 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test
+ * mocks, fixtures, and adapter shims that mirror runtime contracts
+ * (Prisma extensions, NextRequest mocks, JSON-loaded fixtures,
+ * spy harnesses). Per-line typing has poor cost/benefit ratio in
+ * test files; the file-level disable is the codebase's standard
+ * pattern for these surfaces (see also
+ * tests/guards/helm-chart-foundation.test.ts and
+ * tests/integration/audit-middleware.test.ts). */
 /**
  * Unit tests for OAuth token refresh logic.
  */
@@ -15,7 +23,7 @@ global.fetch = mockFetch as any;
 beforeEach(() => {
     mockFetch.mockReset();
     process.env.GOOGLE_CLIENT_ID = 'test-google-id';
-    process.env.GOOGLE_CLIENT_SECRET = 'test-google-secret';
+    process.env.GOOGLE_CLIENT_SECRET = 'test-google-secret'; // pragma: allowlist secret -- test fixture for OAuth refresh flow
     process.env.MICROSOFT_CLIENT_ID = 'test-ms-id';
     process.env.MICROSOFT_CLIENT_SECRET = 'test-ms-secret';
     process.env.MICROSOFT_TENANT_ID = 'test-tenant';
@@ -43,7 +51,7 @@ describe('refreshGoogleToken', () => {
         mockFetch.mockResolvedValueOnce({
             ok: true,
             json: async () => ({
-                access_token: 'new-google-access-token',
+                access_token: 'new-google-access-token', // pragma: allowlist secret -- mock OAuth response
                 expires_in: 3600,
             }),
         });
@@ -95,7 +103,7 @@ describe('refreshMicrosoftToken', () => {
         mockFetch.mockResolvedValueOnce({
             ok: true,
             json: async () => ({
-                access_token: 'new-ms-access-token',
+                access_token: 'new-ms-access-token', // pragma: allowlist secret -- mock OAuth response
                 expires_in: 3600,
             }),
         });

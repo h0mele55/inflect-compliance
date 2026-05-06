@@ -1,3 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test
+ * mocks, fixtures, and adapter shims that mirror runtime contracts
+ * (Prisma extensions, NextRequest mocks, JSON-loaded fixtures,
+ * spy harnesses). Per-line typing has poor cost/benefit ratio in
+ * test files; the file-level disable is the codebase's standard
+ * pattern for these surfaces (see also
+ * tests/guards/helm-chart-foundation.test.ts and
+ * tests/integration/audit-middleware.test.ts). */
 /**
  * Issue Management - Zod Schema Validation Tests
  */

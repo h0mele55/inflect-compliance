@@ -1,3 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test
+ * mocks, fixtures, and adapter shims that mirror runtime contracts
+ * (Prisma extensions, NextRequest mocks, JSON-loaded fixtures,
+ * spy harnesses). Per-line typing has poor cost/benefit ratio in
+ * test files; the file-level disable is the codebase's standard
+ * pattern for these surfaces (see also
+ * tests/guards/helm-chart-foundation.test.ts and
+ * tests/integration/audit-middleware.test.ts). */
 /**
  * AV Webhook & Scan Lifecycle Tests
  *
@@ -11,7 +19,7 @@ import crypto from 'crypto';
 // ═══════════════════════════════════════════════════════════════
 
 describe('Webhook HMAC-SHA256 Signature', () => {
-    const SECRET = 'test-webhook-secret-key-32chars!!';
+    const SECRET = 'test-webhook-secret-key-32chars!!'; // pragma: allowlist secret -- HMAC test fixture, not a real credential
 
     function createSignature(payload: string, secret: string): string {
         return crypto.createHmac('sha256', secret).update(payload).digest('hex');
