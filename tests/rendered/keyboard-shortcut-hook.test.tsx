@@ -387,6 +387,8 @@ describe('useRegisteredShortcuts', () => {
                     {showGlobal && (
                         <Binding
                             keys="mod+k"
+                            // test fixture: the test mutates ref.current between renders to verify the registry tracks the latest handler.
+                            // eslint-disable-next-line react-hooks/refs
                             onHit={ref.current}
                             options={{ description: 'Open palette' }}
                         />

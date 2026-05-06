@@ -351,6 +351,8 @@ export function FilterSelect({
                         <Command.Loading>
                           <div
                             className="-m-1 flex items-center justify-center"
+                            // dimensions ref is cached width/height for the loading state to avoid layout shift; the value was set by the virtualizer's resize-observer effect.
+                            // eslint-disable-next-line react-hooks/refs
                             style={listDimensions.current}
                           >
                             <LoadingSpinner />
