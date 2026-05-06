@@ -33,8 +33,7 @@ import {
 } from '@/lib/security/encrypted-fields';
 import {
     _internals,
-    registerEncryptionMiddleware,
-    _resetEncryptionMiddlewareForTests,
+    withEncryptionExtension,
 } from '@/lib/db/encryption-middleware';
 import { logger } from '@/lib/observability/logger';
 
@@ -386,82 +385,58 @@ describe('walkReadResult — end-to-end decrypt', () => {
     });
 });
 
-// FIXME(prisma-7): the v5 `$use` middleware shape these tests pinned has
-// been removed in Prisma 7 — the field-level encryption now lives in
-// `withEncryptionExtension` (`$extends({ query: { $allModels:
-// { $allOperations } } })`). The function `registerEncryptionMiddleware`
-// is now a no-op stub kept for back-compat, and
-// `_resetEncryptionMiddlewareForTests` no longer has install-state to
-// clear. Rewrite this describe block as a behavioural test of
-// `withEncryptionExtension`: build a fake client whose `$extends`
-// captures the operation handler, then exercise the same write/read
-// matrix. Skipping for now because the migration PR is already broad
-// and the underlying `_internals` (encryptDataNode / decryptResultNode
-// / walkWriteArgument / walkReadResult) — which are the load-bearing
-// helpers — remain pinned by the describe blocks above.
-describe.skip('registerEncryptionMiddleware — integration via $use (DEPRECATED — see FIXME)', () => {
-    beforeEach(() => {
-        _resetEncryptionMiddlewareForTests();
-    });
+describe('withEncryptionExtension', () => {
+    // Build a fake client whose `$extends` captures the registered
+    // `$allOperations` handler so the tests can drive it directly,
+    // mirroring how the equivalent v5 tests grabbed the `$use` callback.
+    type Op = (p: {
+        model: string;
+        operation: string;
+        args?: unknown;
+        query: (a: unknown) => Promise<unknown>;
+    }) => Promise<unknown>;
 
-    function fakeClient(): {
-        $use: jest.Mock;
-        middleware?: (
-            params: { model?: string; action: string; args?: unknown },
-            next: (p: unknown) => Promise<unknown>,
-        ) => Promise<unknown>;
-    } {
-        const client = {
-            $use: jest.fn(),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any;
+    function captureHandler(): { handler: Op } {
+        const captured: { handler: Op } = {
+            handler: (async ({ query, args }) => query(args)) as Op,
+        };
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        client.$use.mockImplementation((fn: any) => {
-            client.middleware = fn;
-        });
-        return client;
+        const fake: any = {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            $extends: (cfg: any) => {
+                captured.handler = cfg.query.$allModels.$allOperations as Op;
+                return fake;
+            },
+        };
+        withEncryptionExtension(fake);
+        return captured;
     }
 
-    it('is idempotent — repeated registration installs one handler', () => {
-        const c = fakeClient();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        registerEncryptionMiddleware(c as any);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        registerEncryptionMiddleware(c as any);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        registerEncryptionMiddleware(c as any);
-        expect(c.$use).toHaveBeenCalledTimes(1);
-    });
-
     it('encrypts write args then decrypts read result — full round trip', async () => {
-        const c = fakeClient();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        registerEncryptionMiddleware(c as any);
+        const { handler } = captureHandler();
 
-        // Capture the args observed by `next` (what Prisma would
+        // Capture the args observed by `query` (what Prisma would
         // have sent to the DB). Clone eagerly — real Prisma returns
         // a fresh row from the DB, NOT the same object the caller
         // passed in; without the clone, the middleware's subsequent
         // result-decrypt pass would mutate our captured snapshot.
         let seenDbArgs: unknown;
-        const next = jest.fn(async (p: { args: unknown }) => {
-            seenDbArgs = JSON.parse(JSON.stringify(p.args));
+        const query = jest.fn(async (args: unknown) => {
+            seenDbArgs = JSON.parse(JSON.stringify(args));
             // Simulate DB returning the written row, still ciphertext.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return JSON.parse(JSON.stringify((p.args as any).data));
+            return JSON.parse(JSON.stringify((args as any).data));
         });
 
         const plaintext = 'mitigation strategy details';
-        const result = (await c.middleware!(
-            {
-                model: 'Risk',
-                action: 'create',
-                args: {
-                    data: { title: 'X', treatmentNotes: plaintext, status: 'OPEN' },
-                },
+        const result = (await handler({
+            model: 'Risk',
+            operation: 'create',
+            args: {
+                data: { title: 'X', treatmentNotes: plaintext, status: 'OPEN' },
             },
-            next as unknown as (p: unknown) => Promise<unknown>,
-        )) as { title: string; treatmentNotes: string; status: string };
+            query,
+        })) as { title: string; treatmentNotes: string; status: string };
 
         // What the DB saw: ciphertext.
         expect(
@@ -477,22 +452,22 @@ describe.skip('registerEncryptionMiddleware — integration via $use (DEPRECATED
     });
 
     it('does not touch non-encrypted models', async () => {
-        const c = fakeClient();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        registerEncryptionMiddleware(c as any);
+        const { handler } = captureHandler();
 
         let seen: unknown;
-        const next = jest.fn(async (p: { args: unknown }) => {
-            seen = p.args;
+        const query = jest.fn(async (args: unknown) => {
+            seen = args;
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return (p.args as any).data;
+            return (args as any).data;
         });
 
         const data = { key: 'ISO27001', name: 'ISO 27001' };
-        await c.middleware!(
-            { model: 'Framework', action: 'create', args: { data } },
-            next as unknown as (p: unknown) => Promise<unknown>,
-        );
+        await handler({
+            model: 'Framework',
+            operation: 'create',
+            args: { data },
+            query,
+        });
         expect((seen as { data: Record<string, unknown> }).data).toEqual(data);
     });
 });

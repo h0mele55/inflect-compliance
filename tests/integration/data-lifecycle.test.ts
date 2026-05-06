@@ -12,7 +12,7 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { registerSoftDeleteMiddleware, withDeleted } from '@/lib/soft-delete';
+import { withDeleted, withSoftDeleteExtension } from '@/lib/soft-delete';
 import {
     purgeSoftDeletedOlderThan,
     purgeExpiredEvidenceOlderThan,
@@ -21,10 +21,15 @@ import {
 import { DB_URL, DB_AVAILABLE } from './db-helper';
 import { withPiiEncryptionExtension } from '@/lib/security/pii-middleware';
 
-const prisma = withPiiEncryptionExtension(new PrismaClient({
-    adapter: new PrismaPg({ connectionString: DB_URL }),
-}));
-registerSoftDeleteMiddleware(prisma);
+// Prisma 7 — soft-delete moved from `$use` to `$extends`. Wrap inline
+// to mirror the production `src/lib/prisma.ts` composition.
+const prisma = withPiiEncryptionExtension(
+    withSoftDeleteExtension(
+        new PrismaClient({
+            adapter: new PrismaPg({ connectionString: DB_URL }),
+        }),
+    ),
+);
 
 const describeFn = DB_AVAILABLE ? describe : describe.skip;
 
