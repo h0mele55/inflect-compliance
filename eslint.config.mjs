@@ -15,7 +15,7 @@
 import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 
-export default [
+const config = [
     ...nextCoreWebVitals,
     {
         ignores: [
@@ -125,3 +125,5 @@ export default [
         },
     },
 ];
+
+export default config;

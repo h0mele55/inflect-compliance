@@ -88,7 +88,7 @@ export const options = {
     discardResponseBodies: false,
 };
 
-export default function () {
+export default function authIteration() {
     // Per-iteration jar — guarantees no carry-over from a previous
     // iteration's session cookie. This is what makes the run a real
     // login-throughput test rather than a session-reuse test.

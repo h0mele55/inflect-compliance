@@ -132,7 +132,7 @@ export function setup() {
     return { tokenName, tokenValue: tokenArr[0], runId: RUN_ID };
 }
 
-export default function (data) {
+export default function mutationsIteration(data) {
     const t0 = Date.now();
     const params = {
         cookies: { [data.tokenName]: data.tokenValue },
