@@ -1,0 +1,380 @@
+'use client';
+
+/**
+ * Epic G-4 — Access Reviews list client island.
+ *
+ * Renders the campaign roster with status badges, deadline,
+ * reviewer, and a progress bar (% decided). Admin actions:
+ *   • New campaign — modal that submits to POST /access-reviews
+ *   • Row click → /t/:slug/access-reviews/:id (detail page)
+ */
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
+import { ProgressBar } from '@/components/ui/progress-bar';
+import { Modal } from '@/components/ui/modal';
+import { FormField } from '@/components/ui/form-field';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import type { CappedList } from '@/lib/list-backfill-cap';
+import { TruncationBanner } from '@/components/ui/TruncationBanner';
+import { formatDate } from '@/lib/format-date';
+
+/// SSR returns Prisma rows with native Date instances; the SWR
+/// fetcher returns the same shape but the dates round-trip through
+/// JSON as ISO strings. The client widens to accept both.
+interface AccessReviewSummary {
+    id: string;
+    name: string;
+    scope: 'ALL_USERS' | 'ADMIN_ONLY' | 'CUSTOM';
+    status: 'OPEN' | 'IN_REVIEW' | 'CLOSED';
+    periodStartAt: string | Date | null;
+    periodEndAt: string | Date | null;
+    dueAt: string | Date | null;
+    closedAt: string | Date | null;
+    createdAt: string | Date;
+    reviewerUserId: string;
+    createdByUserId: string;
+    _count: { decisions: number };
+    /** Filled by the detail-page hydration; the list endpoint keeps
+     *  the response small. */
+    decidedCount?: number;
+}
+
+const STATUS_VARIANT: Record<
+    AccessReviewSummary['status'],
+    'pending' | 'info' | 'success'
+> = {
+    OPEN: 'pending',
+    IN_REVIEW: 'info',
+    CLOSED: 'success',
+};
+
+interface Props {
+    tenantSlug: string;
+    initialReviews: AccessReviewSummary[];
+}
+
+export function AccessReviewsClient({ tenantSlug, initialReviews }: Props) {
+    const apiUrl = (path: string) =>
+        `/api/t/${tenantSlug}/access-reviews${path}`;
+    const queryClient = useQueryClient();
+    const router = useRouter();
+
+    const reviewsQuery = useQuery<CappedList<AccessReviewSummary>>({
+        queryKey: ['access-reviews', tenantSlug, 'list'],
+        queryFn: async () => {
+            const res = await fetch(apiUrl(''));
+            if (!res.ok) throw new Error('Failed to fetch access reviews');
+            return res.json();
+        },
+        initialData: { rows: initialReviews, truncated: false },
+    });
+
+    const reviews = reviewsQuery.data?.rows ?? [];
+    const truncated = reviewsQuery.data?.truncated ?? false;
+
+    return (
+        <div className="space-y-6">
+            <header className="flex items-center justify-between">
+                <div>
+                    <h1
+                        className="text-2xl font-semibold text-content-default"
+                        data-testid="access-reviews-title"
+                    >
+                        Access Reviews
+                    </h1>
+                    <p className="text-sm text-content-muted">
+                        {reviews.length} campaign{reviews.length === 1 ? '' : 's'}
+                    </p>
+                </div>
+                <CreateCampaignButton
+                    tenantSlug={tenantSlug}
+                    onCreated={(reviewId) => {
+                        queryClient.invalidateQueries({
+                            queryKey: ['access-reviews', tenantSlug],
+                        });
+                        router.push(
+                            `/t/${tenantSlug}/access-reviews/${reviewId}`,
+                        );
+                    }}
+                />
+            </header>
+
+            {truncated ? <TruncationBanner truncated /> : null}
+
+            {reviews.length === 0 ? (
+                <div
+                    className="rounded border border-border-subtle bg-bg-subtle p-12 text-center"
+                    data-testid="access-reviews-empty"
+                >
+                    <p className="text-content-muted">
+                        No access reviews yet. Click <strong>New campaign</strong> to start one.
+                    </p>
+                </div>
+            ) : (
+                <div
+                    className="overflow-hidden rounded border border-border-subtle"
+                    data-testid="access-reviews-table"
+                >
+                    <table className="w-full">
+                        <thead className="bg-bg-subtle text-left text-xs uppercase text-content-muted">
+                            <tr>
+                                <th className="px-4 py-2">Campaign</th>
+                                <th className="px-4 py-2">Status</th>
+                                <th className="px-4 py-2">Scope</th>
+                                <th className="px-4 py-2">Period</th>
+                                <th className="px-4 py-2">Due</th>
+                                <th className="px-4 py-2 w-48">Progress</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {reviews.map((r) => (
+                                <CampaignRow
+                                    key={r.id}
+                                    review={r}
+                                    href={`/t/${tenantSlug}/access-reviews/${r.id}`}
+                                />
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function CampaignRow({
+    review,
+    href,
+}: {
+    review: AccessReviewSummary;
+    href: string;
+}) {
+    const total = review._count.decisions;
+    const decided = review.decidedCount ?? 0;
+    const pct = total === 0 ? 0 : Math.round((decided / total) * 100);
+    const variant =
+        review.status === 'CLOSED'
+            ? 'success'
+            : pct >= 80
+                ? 'info'
+                : pct > 0
+                    ? 'brand'
+                    : 'neutral';
+
+    return (
+        <tr
+            className="border-t border-border-subtle hover:bg-bg-subtle"
+            data-testid={`access-review-row-${review.id}`}
+        >
+            <td className="px-4 py-3">
+                <Link
+                    href={href}
+                    className="font-medium text-content-default hover:text-brand-emphasis"
+                >
+                    {review.name}
+                </Link>
+            </td>
+            <td className="px-4 py-3">
+                <StatusBadge variant={STATUS_VARIANT[review.status]}>
+                    {review.status}
+                </StatusBadge>
+            </td>
+            <td className="px-4 py-3 text-sm text-content-muted">
+                {review.scope.replace('_', ' ').toLowerCase()}
+            </td>
+            <td className="px-4 py-3 text-sm text-content-muted">
+                {review.periodStartAt && review.periodEndAt
+                    ? `${formatDate(review.periodStartAt)} → ${formatDate(review.periodEndAt)}`
+                    : '—'}
+            </td>
+            <td className="px-4 py-3 text-sm text-content-muted">
+                {review.dueAt ? formatDate(review.dueAt) : '—'}
+            </td>
+            <td className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                    <ProgressBar
+                        value={pct}
+                        variant={variant}
+                        size="sm"
+                        aria-label={`${decided} of ${total} decisions made`}
+                    />
+                    <span className="text-xs text-content-muted whitespace-nowrap">
+                        {decided}/{total}
+                    </span>
+                </div>
+            </td>
+        </tr>
+    );
+}
+
+// ─── Create campaign modal ─────────────────────────────────────────
+
+interface CreateCampaignButtonProps {
+    tenantSlug: string;
+    onCreated: (reviewId: string) => void;
+}
+
+function CreateCampaignButton({
+    tenantSlug,
+    onCreated,
+}: CreateCampaignButtonProps) {
+    const [open, setOpen] = useState(false);
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [scope, setScope] = useState<'ALL_USERS' | 'ADMIN_ONLY'>('ALL_USERS');
+    const [reviewerUserId, setReviewerUserId] = useState('');
+    const [dueAt, setDueAt] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
+    const apiUrl = `/api/t/${tenantSlug}/access-reviews`;
+
+    const createMutation = useMutation({
+        mutationFn: async () => {
+            setError(null);
+            const body = {
+                name,
+                description: description || undefined,
+                scope,
+                reviewerUserId,
+                dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+            };
+            const res = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || 'Failed to create campaign');
+            }
+            return (await res.json()) as { accessReviewId: string };
+        },
+        onSuccess: (data) => {
+            setOpen(false);
+            setName('');
+            setDescription('');
+            setReviewerUserId('');
+            setDueAt('');
+            onCreated(data.accessReviewId);
+        },
+        onError: (err) => {
+            setError(err instanceof Error ? err.message : 'Unknown error');
+        },
+    });
+
+    const submit = () => {
+        if (!name.trim() || !reviewerUserId.trim()) {
+            setError('Name and reviewer are required.');
+            return;
+        }
+        createMutation.mutate();
+    };
+
+    return (
+        <>
+            <Button
+                onClick={() => setOpen(true)}
+                data-testid="access-review-new-campaign-button"
+            >
+                New campaign
+            </Button>
+            {open ? (
+                <Modal showModal={open} setShowModal={setOpen}>
+                    <Modal.Header title="New access review campaign" />
+                    <Modal.Body>
+                        <div className="space-y-4">
+                            <FormField label="Name" required>
+                                <input
+                                    className="input"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="Q1 2026 access review"
+                                    data-testid="access-review-new-name"
+                                />
+                            </FormField>
+                            <FormField label="Description (optional)">
+                                <textarea
+                                    className="input"
+                                    rows={3}
+                                    value={description}
+                                    onChange={(e) =>
+                                        setDescription(e.target.value)
+                                    }
+                                    placeholder="Focus and rationale for this campaign"
+                                />
+                            </FormField>
+                            <FormField label="Scope">
+                                <RadioGroup
+                                    value={scope}
+                                    onValueChange={(v) =>
+                                        setScope(
+                                            v as 'ALL_USERS' | 'ADMIN_ONLY',
+                                        )
+                                    }
+                                    className="flex flex-col gap-2"
+                                >
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <RadioGroupItem value="ALL_USERS" />
+                                        All users
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <RadioGroupItem value="ADMIN_ONLY" />
+                                        Owners + admins only
+                                    </label>
+                                </RadioGroup>
+                            </FormField>
+                            <FormField label="Reviewer user ID" required>
+                                <input
+                                    className="input"
+                                    value={reviewerUserId}
+                                    onChange={(e) =>
+                                        setReviewerUserId(e.target.value)
+                                    }
+                                    placeholder="usr_..."
+                                    data-testid="access-review-new-reviewer"
+                                />
+                            </FormField>
+                            <FormField label="Due date (optional)">
+                                <input
+                                    type="date"
+                                    className="input"
+                                    value={dueAt}
+                                    onChange={(e) => setDueAt(e.target.value)}
+                                />
+                            </FormField>
+                            {error ? (
+                                <p
+                                    className="text-sm text-content-error"
+                                    data-testid="access-review-new-error"
+                                >
+                                    {error}
+                                </p>
+                            ) : null}
+                        </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={submit}
+                            disabled={createMutation.isPending}
+                            data-testid="access-review-new-submit"
+                        >
+                            {createMutation.isPending
+                                ? 'Creating…'
+                                : 'Create campaign'}
+                        </Button>
+                    </Modal.Footer>
+                </Modal>
+            ) : null}
+        </>
+    );
+}

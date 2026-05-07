@@ -137,6 +137,12 @@ export interface DataLifecyclePayload {
 }
 
 /** Policy review reminder */
+export interface AccessReviewReminderPayload {
+    /** Optional: scope the scan to a single tenant. Omit for the
+     *  system-wide nightly scan. */
+    tenantId?: string;
+}
+
 export interface PolicyReviewReminderPayload {
     tenantId?: string;
 }
@@ -410,6 +416,7 @@ export interface JobPayloadMap {
     'evidence-import': EvidenceImportPayload;
     'control-test-scheduler': ControlTestSchedulerPayload;
     'control-test-runner': ControlTestRunnerPayload;
+    'access-review-reminder': AccessReviewReminderPayload;
 }
 
 /** Union of all valid job names */
@@ -452,6 +459,12 @@ export const JOB_DEFAULTS: Record<JobName, {
         removeOnFail: 500,
     },
     'policy-review-reminder': {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 200,
+        removeOnFail: 500,
+    },
+    'access-review-reminder': {
         attempts: 2,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: 200,

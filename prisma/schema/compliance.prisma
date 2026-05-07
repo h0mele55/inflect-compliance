@@ -618,6 +618,8 @@ model FileRecord {
   evidence         Evidence[]
   tenant           Tenant           @relation(fields: [tenantId], references: [id])
   uploadedBy       User             @relation("FileUploader", fields: [uploadedByUserId], references: [id])
+  // Epic G-4 — campaigns whose evidence PDF this row carries.
+  accessReviews    AccessReview[]   @relation("AccessReviewEvidence")
 
   @@index([tenantId])
   @@index([tenantId, status])

@@ -85,10 +85,10 @@ enum MembershipStatus {
 ///   3. A renderer registered in the frontend dispatcher (out of
 ///      scope for the backend foundation prompt)
 enum OrgDashboardWidgetType {
-  KPI            // Stat-card tile — single metric with optional delta
-  DONUT          // Donut breakdown — RAG distribution and similar
-  TREND          // Time-series sparkline / area chart
-  TENANT_LIST    // Per-tenant coverage list with drill-down
+  KPI // Stat-card tile — single metric with optional delta
+  DONUT // Donut breakdown — RAG distribution and similar
+  TREND // Time-series sparkline / area chart
+  TENANT_LIST // Per-tenant coverage list with drill-down
   DRILLDOWN_CTAS // Drill-down navigation cards (controls / risks / evidence)
 }
 
@@ -425,6 +425,11 @@ enum EmailNotificationType {
   // Auto-fired from reviewAssessment → notifies the vendor owner
   // (or requester) that internal review is complete.
   VENDOR_ASSESSMENT_REVIEWED
+  // Epic G-4 — daily reminder to the campaign reviewer when the
+  // campaign is approaching its dueAt with pending decisions.
+  // Deduped per-day per-(tenant, type, email, campaign) by the
+  // outbox unique constraint.
+  ACCESS_REVIEW_REMINDER
 }
 
 enum EmailOutboxStatus {
@@ -675,4 +680,37 @@ enum AutomationActionType {
   CREATE_TASK
   UPDATE_STATUS
   WEBHOOK
+}
+
+/// Epic G-4 — Access Review Campaigns (SOC 2 CC6.2).
+///
+/// `scope` decides which TenantMemberships get snapshotted into
+/// AccessReviewDecision rows at campaign creation. CUSTOM lets the
+/// creator hand-pick the subject list at creation time; the
+/// authoritative scope record is always the set of decision rows.
+enum AccessReviewScope {
+  ALL_USERS
+  ADMIN_ONLY
+  CUSTOM
+}
+
+/// Lifecycle for an access review campaign.
+///   OPEN      — created + snapshotted, awaiting reviewer
+///   IN_REVIEW — at least one decision recorded, not all complete
+///   CLOSED    — finalized; decisions are immutable from here on
+enum AccessReviewStatus {
+  OPEN
+  IN_REVIEW
+  CLOSED
+}
+
+/// Per-user reviewer decision.
+///   CONFIRM — keep access as-is
+///   REVOKE  — deactivate the membership
+///   MODIFY  — change role/customRole (target captured on the
+///             AccessReviewDecision row)
+enum AccessReviewDecisionType {
+  CONFIRM
+  REVOKE
+  MODIFY
 }

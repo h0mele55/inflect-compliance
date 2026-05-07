@@ -166,25 +166,25 @@ model QuestionnaireQuestion {
 //     answer row (see VendorAssessmentAnswer.evidenceId below).
 
 model VendorAssessmentTemplate {
-  id              String                            @id @default(cuid())
-  tenantId        String
+  id                String                             @id @default(cuid())
+  tenantId          String
   /// Stable template identifier shared across versions of the
   /// same template. (key, version) together form the unique
   /// identity tuple — see @@unique below.
-  key             String
+  key               String
   /// Monotonically increasing version counter. Edits to a
   /// published template create a new (key, version+1) row; the
   /// previous row stays so live assessments remain valid.
-  version         Int                               @default(1)
+  version           Int                                @default(1)
   /// True for the latest version of a key — covers the dashboard's
   /// "show latest" filter without requiring per-tenant aggregation.
-  isLatestVersion Boolean                           @default(true)
+  isLatestVersion   Boolean                            @default(true)
   /// Templates start unpublished; only published templates can be
   /// sent to vendors.
-  isPublished     Boolean                           @default(false)
-  isGlobal        Boolean                           @default(false)
-  name            String
-  description     String?
+  isPublished       Boolean                            @default(false)
+  isGlobal          Boolean                            @default(false)
+  name              String
+  description       String?
   /// Epic G-3 prompt 5 — scoring configuration. Shape:
   ///   { mode: 'SIMPLE_SUM' | 'WEIGHTED_AVERAGE' | 'PASS_FAIL_THRESHOLD',
   ///     threshold?: number,        // PASS_FAIL_THRESHOLD only
@@ -192,14 +192,14 @@ model VendorAssessmentTemplate {
   ///                                 minScore?: number, maxScore?: number }> }
   /// Null = SIMPLE_SUM with no rating mapping (legacy default).
   scoringConfigJson Json?
-  createdByUserId String?
-  createdAt       DateTime                          @default(now())
-  updatedAt       DateTime                          @updatedAt
-  tenant          Tenant                            @relation(fields: [tenantId], references: [id])
-  createdBy       User?                             @relation("AssessmentTemplateCreator", fields: [createdByUserId], references: [id])
-  sections        VendorAssessmentTemplateSection[]
-  questions       VendorAssessmentTemplateQuestion[]
-  assessments     VendorAssessment[]                @relation("AssessmentByTemplateVersion")
+  createdByUserId   String?
+  createdAt         DateTime                           @default(now())
+  updatedAt         DateTime                           @updatedAt
+  tenant            Tenant                             @relation(fields: [tenantId], references: [id])
+  createdBy         User?                              @relation("AssessmentTemplateCreator", fields: [createdByUserId], references: [id])
+  sections          VendorAssessmentTemplateSection[]
+  questions         VendorAssessmentTemplateQuestion[]
+  assessments       VendorAssessment[]                 @relation("AssessmentByTemplateVersion")
 
   @@unique([tenantId, key, version])
   @@index([tenantId])
@@ -208,20 +208,20 @@ model VendorAssessmentTemplate {
 }
 
 model VendorAssessmentTemplateSection {
-  id          String                            @id @default(cuid())
+  id          String                             @id @default(cuid())
   tenantId    String
   templateId  String
   /// Ordering within the template; lower values render first.
-  sortOrder   Int                               @default(0)
+  sortOrder   Int                                @default(0)
   title       String
   description String?
   /// Per-section weight applied to the section's question scores
   /// during aggregation. Null means equal weighting.
   weight      Float?
-  createdAt   DateTime                          @default(now())
-  updatedAt   DateTime                          @updatedAt
-  tenant      Tenant                            @relation(fields: [tenantId], references: [id])
-  template    VendorAssessmentTemplate          @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  createdAt   DateTime                           @default(now())
+  updatedAt   DateTime                           @updatedAt
+  tenant      Tenant                             @relation(fields: [tenantId], references: [id])
+  template    VendorAssessmentTemplate           @relation(fields: [templateId], references: [id], onDelete: Cascade)
   questions   VendorAssessmentTemplateQuestion[]
 
   @@index([tenantId, templateId, sortOrder])
@@ -259,68 +259,68 @@ model VendorAssessmentTemplateQuestion {
 }
 
 model VendorAssessment {
-  id                            String                    @id @default(cuid())
-  tenantId                      String
-  vendorId                      String
+  id                           String                    @id @default(cuid())
+  tenantId                     String
+  vendorId                     String
   /// Legacy templateId — points at QuestionnaireTemplate. Existing
   /// approval-flow rows keep using this; new G-3 sends leave it
   /// null and populate `templateVersionId` instead. The column is
   /// nullable so the FK doesn't force every G-3 send to also
   /// allocate a stub QuestionnaireTemplate row.
-  templateId                    String?
+  templateId                   String?
   /// Epic G-3 — pin the assessment to a specific template version
   /// so subsequent template edits don't mutate live questionnaires.
   /// Nullable for legacy rows that only carry templateId.
-  templateVersionId             String?
-  status                        AssessmentStatus          @default(DRAFT)
-  startedAt                     DateTime                  @default(now())
-  submittedAt                   DateTime?
-  decidedAt                     DateTime?
-  requestedByUserId             String
-  decidedByUserId               String?
-  score                         Float?
-  riskRating                    VendorCriticality?
-  notes                         String?
-  nextReviewAt                  DateTime?
+  templateVersionId            String?
+  status                       AssessmentStatus          @default(DRAFT)
+  startedAt                    DateTime                  @default(now())
+  submittedAt                  DateTime?
+  decidedAt                    DateTime?
+  requestedByUserId            String
+  decidedByUserId              String?
+  score                        Float?
+  riskRating                   VendorCriticality?
+  notes                        String?
+  nextReviewAt                 DateTime?
   /// Lifecycle version counter (matches CISO-Assistant editing_version).
   /// 1 = initial, 2+ = approved. Incremented on each approval cycle.
-  lifecycleVersion              Int                       @default(1)
+  lifecycleVersion             Int                       @default(1)
   /// Persisted history of prior assessment snapshots as JSON array.
   /// Matches CISO-Assistant editing_history.
-  lifecycleHistoryJson          Json?
+  lifecycleHistoryJson         Json?
   // ─── Epic G-3 send-and-collect lifecycle fields ──────────────
   /// Set when the questionnaire transitions DRAFT → SENT.
-  sentAt                        DateTime?
-  sentByUserId                  String?
+  sentAt                       DateTime?
+  sentByUserId                 String?
   /// Email address the questionnaire was sent to. Stored separately
   /// from VendorContact so a one-off recipient doesn't pollute the
   /// vendor contact list.
-  respondentEmail               String?
+  respondentEmail              String?
   /// External shareable response link uses an opaque token in the
   /// URL; only its hash is stored here. Verifying the link
   /// computes the same hash and looks up the assessment.
-  externalAccessTokenHash       String?
-  externalAccessTokenExpiresAt  DateTime?
+  externalAccessTokenHash      String?
+  externalAccessTokenExpiresAt DateTime?
   /// Set when the questionnaire transitions SUBMITTED → REVIEWED.
-  reviewedAt                    DateTime?
-  reviewedByUserId              String?
-  reviewerNotes                 String?
+  reviewedAt                   DateTime?
+  reviewedByUserId             String?
+  reviewerNotes                String?
   /// Set when the assessment is archived (REVIEWED → CLOSED).
-  closedAt                      DateTime?
-  closedByUserId                String?
+  closedAt                     DateTime?
+  closedByUserId               String?
   // ─── End G-3 fields ──────────────────────────────────────────
-  createdAt                     DateTime                  @default(now())
-  updatedAt                     DateTime                  @updatedAt
-  decidedBy                     User?                     @relation("AssessmentDecider", fields: [decidedByUserId], references: [id])
-  requestedBy                   User                      @relation("AssessmentRequester", fields: [requestedByUserId], references: [id])
-  sentBy                        User?                     @relation("AssessmentSender", fields: [sentByUserId], references: [id])
-  reviewedBy                    User?                     @relation("AssessmentReviewer", fields: [reviewedByUserId], references: [id])
-  closedBy                      User?                     @relation("AssessmentCloser", fields: [closedByUserId], references: [id])
-  template                      QuestionnaireTemplate?    @relation(fields: [templateId], references: [id])
-  templateVersion               VendorAssessmentTemplate? @relation("AssessmentByTemplateVersion", fields: [templateVersionId], references: [id])
-  tenant                        Tenant                    @relation(fields: [tenantId], references: [id])
-  vendor                        Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  answers                       VendorAssessmentAnswer[]
+  createdAt                    DateTime                  @default(now())
+  updatedAt                    DateTime                  @updatedAt
+  decidedBy                    User?                     @relation("AssessmentDecider", fields: [decidedByUserId], references: [id])
+  requestedBy                  User                      @relation("AssessmentRequester", fields: [requestedByUserId], references: [id])
+  sentBy                       User?                     @relation("AssessmentSender", fields: [sentByUserId], references: [id])
+  reviewedBy                   User?                     @relation("AssessmentReviewer", fields: [reviewedByUserId], references: [id])
+  closedBy                     User?                     @relation("AssessmentCloser", fields: [closedByUserId], references: [id])
+  template                     QuestionnaireTemplate?    @relation(fields: [templateId], references: [id])
+  templateVersion              VendorAssessmentTemplate? @relation("AssessmentByTemplateVersion", fields: [templateVersionId], references: [id])
+  tenant                       Tenant                    @relation(fields: [tenantId], references: [id])
+  vendor                       Vendor                    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  answers                      VendorAssessmentAnswer[]
 
   @@index([tenantId, vendorId])
   @@index([tenantId, status])

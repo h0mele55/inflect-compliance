@@ -422,6 +422,75 @@ export function buildVendorAssessmentReviewedEmail(
     };
 }
 
+// ─── Access Review Reminder (Epic G-4) ───
+
+export interface AccessReviewReminderPayload {
+    reviewerName: string;
+    campaignName: string;
+    /// "tomorrow", "in 5 days", "today", "overdue by 2 days", …
+    daysUntilDue: number;
+    pendingDecisions: number;
+    totalDecisions: number;
+    tenantSlug: string;
+    accessReviewId: string;
+}
+
+export function buildAccessReviewReminderEmail(
+    payload: AccessReviewReminderPayload,
+): EmailTemplateResult {
+    const {
+        reviewerName,
+        campaignName,
+        daysUntilDue,
+        pendingDecisions,
+        totalDecisions,
+        tenantSlug,
+        accessReviewId,
+    } = payload;
+
+    const link = `/t/${tenantSlug}/access-reviews/${accessReviewId}`;
+    const dueLabel =
+        daysUntilDue < 0
+            ? `overdue by ${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) === 1 ? '' : 's'}`
+            : daysUntilDue === 0
+                ? 'due today'
+                : daysUntilDue === 1
+                    ? 'due tomorrow'
+                    : `due in ${daysUntilDue} days`;
+    const urgencyTag = daysUntilDue <= 1 ? '⏰ ' : '';
+
+    return {
+        subject: `${urgencyTag}Access review ${dueLabel}: ${campaignName}`,
+        bodyText: [
+            `Hi ${reviewerName},`,
+            '',
+            `You have an access review campaign that is ${dueLabel}.`,
+            '',
+            `  Campaign: ${campaignName}`,
+            `  Pending decisions: ${pendingDecisions} of ${totalDecisions}`,
+            '',
+            `Open the campaign: ${link}`,
+            '',
+            'Until every subject has a CONFIRM, REVOKE, or MODIFY verdict the campaign cannot be closed and the closeout PDF cannot be generated. Auditors will look for this artifact in the next SOC 2 cycle.',
+            '',
+            '— Inflect Compliance',
+        ].join('\n'),
+        bodyHtml: `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #1a1a2e; font-size: 18px; margin-bottom: 16px;">Access review ${escapeHtml(dueLabel)}</h2>
+  <p style="color: #444; line-height: 1.5;">Hi ${escapeHtml(reviewerName)},</p>
+  <p style="color: #444; line-height: 1.5;">You have an access review campaign that is <strong>${escapeHtml(dueLabel)}</strong>.</p>
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr><td style="color: #888; padding: 4px 0; width: 160px;">Campaign</td><td style="color: #444;"><strong>${escapeHtml(campaignName)}</strong></td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Pending decisions</td><td style="color: #444;"><strong>${pendingDecisions}</strong> of ${totalDecisions}</td></tr>
+  </table>
+  <a href="${escapeHtml(link)}" style="display: inline-block; background: #4f46e5; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">Open campaign</a>
+  <p style="color: #999; font-size: 12px; margin-top: 24px;">Auditors will look for the closeout PDF in the next SOC 2 cycle. Closing the campaign requires every subject to have a CONFIRM, REVOKE, or MODIFY verdict.</p>
+  <p style="color: #999; font-size: 12px; margin-top: 8px;">— Inflect Compliance</p>
+</div>`.trim(),
+    };
+}
+
 // ─── Helpers ───
 
 function formatIsoDate(iso: string): string {

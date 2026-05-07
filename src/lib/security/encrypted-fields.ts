@@ -155,6 +155,22 @@ export const ENCRYPTED_FIELDS: Readonly<Record<string, readonly string[]>> = {
 
     // ─── Control test runs ─────────────────────────────
     ControlTestRun: ['notes', 'findingSummary'],
+
+    // ─── Epic G-4 access review campaigns ──────────────
+    //  Both columns can carry sensitive reviewer rationale that
+    //  should be encrypted at rest:
+    //  - AccessReview.description: campaign narrative ("Q1 2026
+    //    SOC 2 access review — focus on engineering admin access").
+    //  - AccessReviewDecision.notes: per-user justification for
+    //    REVOKE / MODIFY ("Removed because user left engineering
+    //    on 2026-04-15").
+    //  Adding these to the manifest is also necessary because the
+    //  fan-out write path encrypts any field NAMED `notes` (it
+    //  appears on four other models). Without an explicit entry
+    //  the read path wouldn't know to decrypt, returning the v2:
+    //  ciphertext to callers.
+    AccessReview: ['description'],
+    AccessReviewDecision: ['notes'],
 } as const;
 
 /** Set of model names with at least one encrypted field. Fast-path check. */

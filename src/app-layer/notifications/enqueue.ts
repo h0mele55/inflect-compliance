@@ -20,6 +20,7 @@ import {
     buildVendorAssessmentReminderEmail,
     buildVendorAssessmentSubmittedEmail,
     buildVendorAssessmentReviewedEmail,
+    buildAccessReviewReminderEmail,
     type TaskAssignedPayload,
     type EvidenceExpiringPayload,
     type PolicyApprovalRequestedPayload,
@@ -28,6 +29,7 @@ import {
     type VendorAssessmentReminderPayload,
     type VendorAssessmentSubmittedPayload,
     type VendorAssessmentReviewedPayload,
+    type AccessReviewReminderPayload,
 } from './templates';
 
 export interface EnqueueEmailInput {
@@ -43,7 +45,8 @@ export interface EnqueueEmailInput {
         | VendorAssessmentInvitationPayload
         | VendorAssessmentReminderPayload
         | VendorAssessmentSubmittedPayload
-        | VendorAssessmentReviewedPayload;
+        | VendorAssessmentReviewedPayload
+        | AccessReviewReminderPayload;
     sendAfter?: Date;
     requestId?: string;
 }
@@ -135,7 +138,8 @@ function buildEmailContent(
         | VendorAssessmentInvitationPayload
         | VendorAssessmentReminderPayload
         | VendorAssessmentSubmittedPayload
-        | VendorAssessmentReviewedPayload,
+        | VendorAssessmentReviewedPayload
+        | AccessReviewReminderPayload,
 ): { subject: string; bodyText: string; bodyHtml: string } {
     switch (type) {
         case 'TASK_ASSIGNED':
@@ -163,6 +167,10 @@ function buildEmailContent(
         case 'VENDOR_ASSESSMENT_REVIEWED':
             return buildVendorAssessmentReviewedEmail(
                 payload as VendorAssessmentReviewedPayload,
+            );
+        case 'ACCESS_REVIEW_REMINDER':
+            return buildAccessReviewReminderEmail(
+                payload as AccessReviewReminderPayload,
             );
         default:
             throw new Error(`Unknown notification type: ${type}`);
