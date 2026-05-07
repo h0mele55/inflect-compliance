@@ -424,3 +424,4 @@ describeFn('Epic G-5 — ControlException RLS + FK + CHECK constraints', () => {
         expect(renewed.renewedFrom?.justification).toBe('original');
     });
 });
+// Epic G-5 ci-retrigger marker
