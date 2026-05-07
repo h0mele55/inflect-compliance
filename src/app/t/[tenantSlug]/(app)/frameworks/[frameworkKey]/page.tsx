@@ -273,11 +273,6 @@ export default function FrameworkDetailPage() {
                         </div>
                     )}
 
-                    <div className="flex justify-end">
-                        <Link href={tenantHref(`/frameworks/${frameworkKey}/coverage`)} className="btn btn-secondary">
-                            Full Coverage Report →
-                        </Link>
-                    </div>
                 </div>
             )}
 
