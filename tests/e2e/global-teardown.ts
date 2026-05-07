@@ -149,17 +149,44 @@ async function deleteTenant(
 ): Promise<{ ok: boolean; reason?: string }> {
     try {
         await prisma.$transaction(async (tx) => {
-            await tx.$executeRawUnsafe(
+            // SAVEPOINT-per-statement, otherwise Postgres poisons the
+            // whole transaction on the first failed statement and every
+            // subsequent DELETE returns `25P02 in_failed_sql_transaction`.
+            // A bare `.catch(...)` suppresses the JS error but not the
+            // server-side aborted-transaction state — we'd have observed
+            // exactly that as the trailing 25P02 spam. Each statement now
+            // runs inside its own savepoint and rolls back on failure,
+            // leaving the outer tx free to keep deleting.
+            const tryStmt = async (sql: string, ...params: unknown[]) => {
+                await tx.$executeRawUnsafe(`SAVEPOINT s`);
+                try {
+                    await tx.$executeRawUnsafe(sql, ...params);
+                    await tx.$executeRawUnsafe(`RELEASE SAVEPOINT s`);
+                } catch {
+                    await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT s`);
+                }
+            };
+            // The SET LOCAL needs superuser; on a non-superuser role it
+            // fails and would poison the transaction without the savepoint.
+            // If suppressed, the AuditLog immutability trigger still fires
+            // and the AuditLog DELETE rolls back to its savepoint — the
+            // remaining deletes still succeed, leaving AuditLog rows as
+            // orphans (acceptable per the file-level docstring).
+            await tryStmt(
                 `SET LOCAL session_replication_role = 'replica'`,
             );
             for (const table of TENANT_CHILD_TABLES) {
-                await tx
-                    .$executeRawUnsafe(
-                        `DELETE FROM "${table}" WHERE "tenantId" = $1`,
-                        entry.tenantId,
-                    )
-                    .catch(() => undefined); // table may not exist or schema may have changed
+                await tryStmt(
+                    `DELETE FROM "${table}" WHERE "tenantId" = $1`,
+                    entry.tenantId,
+                );
             }
+            // Tenant DELETE is intentionally NOT inside a savepoint —
+            // a failure here means an unlisted child table still has
+            // FK references. That's a real operational signal (the
+            // TENANT_CHILD_TABLES list has drifted from the schema)
+            // and should bubble up so the tracker file is kept and
+            // the operator sees the failure.
             await tx.$executeRawUnsafe(
                 `DELETE FROM "Tenant" WHERE id = $1`,
                 entry.tenantId,
