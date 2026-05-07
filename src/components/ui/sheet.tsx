@@ -94,9 +94,7 @@ function SheetRoot({
     const fallbackTitle = (
         <VisuallyHidden.Root>
             <Drawer.Title>{title ?? "Sheet"}</Drawer.Title>
-            {description ? (
-                <Drawer.Description>{description}</Drawer.Description>
-            ) : null}
+            <Drawer.Description>{description ?? ""}</Drawer.Description>
         </VisuallyHidden.Root>
     );
 

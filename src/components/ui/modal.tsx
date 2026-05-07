@@ -160,17 +160,13 @@ function ModalRoot({
     const fallbackDialogTitle = (
         <VisuallyHidden.Root>
             <Dialog.Title>{title ?? "Dialog"}</Dialog.Title>
-            {description ? (
-                <Dialog.Description>{description}</Dialog.Description>
-            ) : null}
+            <Dialog.Description>{description ?? ""}</Dialog.Description>
         </VisuallyHidden.Root>
     );
     const fallbackDrawerTitle = (
         <VisuallyHidden.Root>
             <Drawer.Title>{title ?? "Dialog"}</Drawer.Title>
-            {description ? (
-                <Drawer.Description>{description}</Drawer.Description>
-            ) : null}
+            <Drawer.Description>{description ?? ""}</Drawer.Description>
         </VisuallyHidden.Root>
     );
 
