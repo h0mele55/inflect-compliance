@@ -67,6 +67,9 @@ interface TenantTrackerEntry {
 const TENANT_CHILD_TABLES: readonly string[] = [
     // Audit + identity
     'AuditLog',
+    // Epic G-4 — children must come before TenantMembership (FK target).
+    'AccessReviewDecision',
+    'AccessReview',
     'TenantOnboarding',
     'TenantMembership',
     'TenantSecuritySettings',

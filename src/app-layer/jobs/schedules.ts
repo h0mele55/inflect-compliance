@@ -72,6 +72,18 @@ export const SCHEDULED_JOBS: ScheduleDefinition[] = [
         defaultPayload: {},
     },
     {
+        name: 'access-review-reminder',
+        // Daily at 04:00 UTC — chosen so reminders land at the start
+        // of the European workday and a few hours before
+        // policy-review-reminder so the dedupe outbox isn't competing
+        // for the per-tenant rate-limit token bucket. Idempotent
+        // by-day, so re-running this is safe.
+        pattern: '0 4 * * *',
+        description:
+            'Nudge access-review reviewers when their campaign deadline is approaching and decisions are still pending.',
+        defaultPayload: {},
+    },
+    {
         name: 'retention-sweep',
         pattern: '0 4 * * *',     // daily at 04:00 UTC
         description: 'Archive evidence with elapsed retention periods',

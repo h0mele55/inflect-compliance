@@ -74,13 +74,16 @@ describe('Infrastructure Regression Guards', () => {
             }
         });
 
-        test('exactly 9 scheduled jobs exist', () => {
-            expect(SCHEDULED_JOBS).toHaveLength(9);
+        test('exactly 10 scheduled jobs exist', () => {
+            expect(SCHEDULED_JOBS).toHaveLength(10);
         });
 
         test('scheduled job names match expected set', () => {
             const names = SCHEDULED_JOBS.map(s => s.name).sort();
             expect(names).toEqual([
+                // Epic G-4 — daily reviewer reminder for access review
+                // campaigns approaching their dueAt.
+                'access-review-reminder',
                 'automation-runner',
                 'compliance-digest',
                 'compliance-snapshot',

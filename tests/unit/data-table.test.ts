@@ -1627,7 +1627,15 @@ describe('Architecture compliance — no ad-hoc tables on list pages', () => {
   // Pages that are intentionally excluded from DataTable migration
   // SoAClient: expandable row sub-components, not a flat list
   // AuditsClient: master/detail panel UX, not a list page
-  const EXCLUDED_PAGES = ['SoAClient.tsx', 'AuditsClient.tsx'];
+  // AccessReviewDetailClient: list-of-decisions inside a campaign
+  // detail page; per-row inline decision dropdown + decision dialog
+  // sit on the row itself. Same architectural shape as
+  // AuditsClient — list inside a parent record, not a list page.
+  const EXCLUDED_PAGES = [
+    'SoAClient.tsx',
+    'AuditsClient.tsx',
+    'AccessReviewDetailClient.tsx',
+  ];
 
   // Discover all *Client.tsx files in the app directory
   function findClientFiles(dir: string): string[] {

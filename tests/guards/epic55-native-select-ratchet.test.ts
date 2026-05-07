@@ -44,7 +44,16 @@ const APP_PAGES_ROOT = path.resolve(__dirname, '../../src/app/t');
 // Future work: a `<TableInlineSelect>` primitive could carry the same
 // affordances on top of cmdk; until then this baseline reflects the
 // real shape of the page.
-const BASELINE_NATIVE_SELECTS = 4;
+//
+// 4 → 6: Epic G-4 access review detail page mounts two native
+// `<select>`s — one per-row decision picker and one MODIFY target-role
+// select inside the decision dialog. Both follow the same pattern as
+// the ControlsClient inline-edit selects (above): native `<select>` is
+// the dense-table-cell + simple-modal-form choice; a Combobox per row
+// would be heavier than the affordance demands. Bounded follow-up:
+// the same `<TableInlineSelect>` primitive that supersedes the
+// existing 4 would land here too.
+const BASELINE_NATIVE_SELECTS = 6;
 
 function walk(dir: string, out: string[]): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

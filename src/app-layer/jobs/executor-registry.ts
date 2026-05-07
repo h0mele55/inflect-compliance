@@ -377,6 +377,33 @@ executorRegistry.register('policy-review-reminder', async (payload) => {
     );
 });
 
+// ── access-review-reminder (Epic G-4) ───────────────────────────────
+
+executorRegistry.register('access-review-reminder', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { processAccessReviewReminders } = await import(
+        './access-review-reminder'
+    );
+    const { prisma } = await import('@/lib/prisma');
+    const r = await processAccessReviewReminders(prisma, {
+        tenantId: payload.tenantId,
+    });
+    return makeResult(
+        'access-review-reminder',
+        startedAt,
+        startMs,
+        r.scanned,
+        r.enqueued,
+        0,
+        {
+            skippedDuplicate: r.skippedDuplicate,
+            skippedNoEmail: r.skippedNoEmail,
+            skippedComplete: r.skippedComplete,
+        },
+    );
+});
+
 // ── retention-sweep ──────────────────────────────────────────────────
 
 executorRegistry.register('retention-sweep', async (payload) => {

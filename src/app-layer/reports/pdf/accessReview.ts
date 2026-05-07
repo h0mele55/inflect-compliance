@@ -1,0 +1,220 @@
+/**
+ * Epic G-4 — Access Review evidence PDF generator.
+ *
+ * Produces the canonical SOC 2 CC6.2 evidence artifact for one
+ * closed access review campaign. Sections, in order:
+ *
+ *   1. Cover page (title + tenant + period + reviewer)
+ *   2. Metadata (creator, closer, scope, decision counts, content
+ *      SHA-256 hash for integrity)
+ *   3. Summary metrics — decision distribution + execution counts
+ *   4. Per-user decision table — the auditor's main asset
+ *
+ * The data hash on the metadata page makes the artifact tamper-
+ * evident: re-generating the PDF over the same closed campaign
+ * yields the same hash. A mismatch on later inspection means
+ * either (a) the data drifted post-close, or (b) a different
+ * campaign's PDF was substituted.
+ *
+ * No external system calls — every input is a snapshot of rows
+ * already committed to the DB. Safe to invoke synchronously
+ * inside the closeout transaction.
+ */
+import crypto from 'crypto';
+import type {
+    AccessReviewDecisionType,
+    MembershipStatus,
+    Role,
+} from '@prisma/client';
+import { createPdfDocument } from '@/lib/pdf/pdfKitFactory';
+import {
+    addCoverPage,
+    addMetadataPage,
+    applyHeadersAndFooters,
+} from '@/lib/pdf/layout';
+import {
+    addSectionTitle,
+    addSummaryMetrics,
+    addParagraph,
+    addSpacer,
+} from '@/lib/pdf/sections';
+import { renderTable, autoColumnWidths } from '@/lib/pdf/table';
+import type {
+    ReportMeta,
+    TableColumn,
+    DataSourceNote,
+    WatermarkMode,
+} from '@/lib/pdf/types';
+
+export interface AccessReviewPdfDecisionRow {
+    subjectUserEmail: string;
+    subjectUserName: string | null;
+    snapshotRole: Role;
+    snapshotMembershipStatus: MembershipStatus;
+    decision: AccessReviewDecisionType | null;
+    decidedAtIso: string | null;
+    notes: string | null;
+    modifiedToRole: Role | null;
+    /// Outcome string the closeout executor wrote per row:
+    ///   EXECUTED | NO_CHANGE | SKIPPED_STALE | SKIPPED_LAST_OWNER | …
+    executionOutcome: string;
+}
+
+export interface AccessReviewPdfInput {
+    tenantName: string;
+    /** Campaign metadata. */
+    campaignName: string;
+    campaignDescription: string | null;
+    scope: string;
+    periodStartIso: string | null;
+    periodEndIso: string | null;
+    /** Reviewer + creator + closer email — surfaced in metadata. */
+    reviewerEmail: string;
+    createdByEmail: string;
+    closedByEmail: string;
+    closedAtIso: string;
+    decisions: readonly AccessReviewPdfDecisionRow[];
+    watermark?: WatermarkMode;
+}
+
+/**
+ * Compute a deterministic SHA-256 hash over the rendered evidence
+ * data. Surfaces on the metadata page; auditors can use it to
+ * verify the PDF hasn't been swapped post-close.
+ */
+function computeContentHash(input: AccessReviewPdfInput): string {
+    const canonical = JSON.stringify({
+        tenantName: input.tenantName,
+        campaignName: input.campaignName,
+        scope: input.scope,
+        periodStartIso: input.periodStartIso,
+        periodEndIso: input.periodEndIso,
+        reviewerEmail: input.reviewerEmail,
+        closedAtIso: input.closedAtIso,
+        decisions: [...input.decisions]
+            .sort((a, b) => a.subjectUserEmail.localeCompare(b.subjectUserEmail))
+            .map((d) => ({
+                email: d.subjectUserEmail,
+                snapshotRole: d.snapshotRole,
+                snapshotMembershipStatus: d.snapshotMembershipStatus,
+                decision: d.decision,
+                modifiedToRole: d.modifiedToRole,
+                executionOutcome: d.executionOutcome,
+            })),
+    });
+    return crypto.createHash('sha256').update(canonical).digest('hex');
+}
+
+export function generateAccessReviewPdf(
+    input: AccessReviewPdfInput,
+): PDFKit.PDFDocument {
+    const contentHash = computeContentHash(input);
+    const periodLabel =
+        input.periodStartIso && input.periodEndIso
+            ? `${input.periodStartIso.slice(0, 10)} → ${input.periodEndIso.slice(0, 10)}`
+            : input.periodEndIso
+                ? `as of ${input.periodEndIso.slice(0, 10)}`
+                : 'no period specified';
+
+    const meta: ReportMeta = {
+        tenantName: input.tenantName,
+        reportTitle: 'Access Review Evidence',
+        reportSubtitle: `${input.campaignName} — ${periodLabel}`,
+        generatedAt: new Date().toISOString(),
+        watermark: input.watermark ?? 'FINAL',
+        contentHash,
+    };
+
+    const dataSources: DataSourceNote[] = [
+        {
+            source: 'Access Review Campaign',
+            description:
+                'Snapshot of tenant memberships at campaign creation, with reviewer verdict per user.',
+        },
+        {
+            source: 'Decision Execution',
+            description:
+                'Per-user outcome of REVOKE/MODIFY application against live TenantMembership at closeout.',
+        },
+        {
+            source: 'Audit Log',
+            description:
+                'Hash-chained per-decision audit entries are persisted alongside this artifact.',
+        },
+    ];
+
+    const doc = createPdfDocument(meta);
+    addCoverPage(doc, meta);
+    addMetadataPage(doc, meta, dataSources);
+
+    // ─── Content page ─────────────────────────────────────────────
+    doc.addPage();
+    addSectionTitle(doc, 'Campaign metadata');
+    addParagraph(
+        doc,
+        `Campaign: ${input.campaignName}` +
+            (input.campaignDescription
+                ? `\n${input.campaignDescription}`
+                : ''),
+    );
+    addParagraph(
+        doc,
+        `Scope: ${input.scope} • Reviewer: ${input.reviewerEmail} • ` +
+            `Created by: ${input.createdByEmail} • ` +
+            `Closed by: ${input.closedByEmail} on ${input.closedAtIso.slice(0, 19).replace('T', ' ')} UTC`,
+    );
+
+    // ─── Summary metrics ─────────────────────────────────────────
+    const counts = {
+        total: input.decisions.length,
+        confirm: input.decisions.filter((d) => d.decision === 'CONFIRM').length,
+        revoke: input.decisions.filter((d) => d.decision === 'REVOKE').length,
+        modify: input.decisions.filter((d) => d.decision === 'MODIFY').length,
+        pending: input.decisions.filter((d) => d.decision === null).length,
+        executed: input.decisions.filter((d) =>
+            ['EXECUTED', 'NO_CHANGE'].includes(d.executionOutcome),
+        ).length,
+    };
+    addSpacer(doc);
+    addSectionTitle(doc, 'Summary');
+    addSummaryMetrics(doc, [
+        { label: 'Subjects', value: counts.total },
+        { label: 'Confirmed', value: counts.confirm },
+        { label: 'Revoked', value: counts.revoke },
+        { label: 'Modified', value: counts.modify },
+        { label: 'Pending', value: counts.pending },
+        { label: 'Executed', value: counts.executed },
+    ]);
+    addSpacer(doc);
+
+    // ─── Per-user decision table ─────────────────────────────────
+    addSectionTitle(doc, 'Per-user decisions');
+
+    const widths = autoColumnWidths([2.6, 1.0, 1.1, 1.1, 1.0, 2.0]);
+    const columns: TableColumn[] = [
+        { key: 'subject', header: 'Subject', width: widths[0] },
+        { key: 'snapshotRole', header: 'Snapshot Role', width: widths[1], align: 'center' },
+        { key: 'decision', header: 'Decision', width: widths[2], align: 'center' },
+        { key: 'targetRole', header: 'Target Role', width: widths[3], align: 'center' },
+        { key: 'outcome', header: 'Outcome', width: widths[4], align: 'center' },
+        { key: 'notes', header: 'Notes', width: widths[5] },
+    ];
+
+    const rows = [...input.decisions]
+        .sort((a, b) => a.subjectUserEmail.localeCompare(b.subjectUserEmail))
+        .map((d) => ({
+            subject: d.subjectUserName
+                ? `${d.subjectUserName} <${d.subjectUserEmail}>`
+                : d.subjectUserEmail,
+            snapshotRole: d.snapshotRole,
+            decision: d.decision ?? 'PENDING',
+            targetRole: d.modifiedToRole ?? '—',
+            outcome: d.executionOutcome,
+            notes: d.notes ?? '—',
+        }));
+
+    renderTable(doc, columns, rows);
+
+    applyHeadersAndFooters(doc, meta);
+    return doc;
+}
