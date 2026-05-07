@@ -352,6 +352,11 @@ describe('Dashboard — Executive Payload', () => {
         mockTx.controlException = {
             count: jest.fn(async () => 0),
         };
+        // Epic G-7 — five COUNTs against RiskTreatmentPlan for the
+        // treatment-plan-summary card.
+        mockTx.riskTreatmentPlan = {
+            count: jest.fn(async () => 0),
+        };
     }
 
     it('returns complete payload with all sections', async () => {

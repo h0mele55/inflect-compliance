@@ -148,6 +148,14 @@ function buildExec(overrides: Partial<ExecutiveDashboardPayload> = {}): Executiv
             expiringWithin7: 0,
             expired: 0,
         },
+        // Epic G-7 — treatment plans card. Same zero-baseline shape.
+        treatmentPlans: {
+            activeOnTrack: 0,
+            overdue: 0,
+            dueWithin30: 0,
+            dueWithin7: 0,
+            completed: 0,
+        },
         computedAt: new Date('2026-05-04T00:00:00Z').toISOString(),
         ...overrides,
     };

@@ -738,3 +738,38 @@ enum ControlExceptionStatus {
   REJECTED
   EXPIRED
 }
+
+/// Epic G-7 — Risk Treatment Plans (ISO 27001 6.1.3).
+///
+/// Strategy chosen for the risk. Distinct from the legacy
+/// `TreatmentDecision` enum on `Risk.treatment` — that field is the
+/// quick free-text decision; this enum drives the structured plan
+/// shape (milestones, deadlines, tracking).
+///
+///   MITIGATE — implement controls to reduce likelihood/impact
+///   ACCEPT   — formally accept the residual risk (paired with
+///              the Epic G-5 ControlException flow when relevant)
+///   TRANSFER — shift the risk to a third party (insurance, vendor)
+///   AVOID    — eliminate the activity that creates the risk
+enum TreatmentStrategy {
+  MITIGATE
+  ACCEPT
+  TRANSFER
+  AVOID
+}
+
+/// Lifecycle for a structured treatment plan.
+///
+///   DRAFT     — plan created, not yet activated; milestones
+///               can still be reordered/edited freely
+///   ACTIVE    — plan is being executed; milestones gated
+///   COMPLETED — every milestone is done OR plan was closed
+///               with a closing remark; terminal
+///   OVERDUE   — `targetDate` elapsed without COMPLETED status;
+///               set by the daily monitor job, not the user paths
+enum TreatmentPlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  OVERDUE
+}

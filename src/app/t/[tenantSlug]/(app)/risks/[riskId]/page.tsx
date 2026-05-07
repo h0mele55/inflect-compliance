@@ -12,6 +12,20 @@ import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantContext, useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
+// Epic G-7 — treatment plan card. Dynamic-imported so the modal +
+// react-query machinery only loads on risks the user actually opens.
+const RiskTreatmentPlanCard = dynamic(
+    () =>
+        import('@/components/RiskTreatmentPlanCard').then(
+            (m) => m.RiskTreatmentPlanCard,
+        ),
+    {
+        loading: () => (
+            <div className="glass-card p-6 animate-pulse h-32" aria-busy="true" />
+        ),
+        ssr: false,
+    },
+);
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -478,6 +492,21 @@ export default function RiskDetailPage() {
                     entityId={riskId}
                     canWrite={canWrite}
                     tenantHref={href}
+                />
+            </div>
+
+            {/* Epic G-7 — Risk Treatment Plan card. Owner-choices left
+              * empty here (panel falls back to the current user as
+              * the typed-in owner via the Combobox); the eventual
+              * tenant-roster fetch is a bounded follow-up that will
+              * wire admin/editor members through. */}
+            <div className="glass-card p-6">
+                <RiskTreatmentPlanCard
+                    tenantSlug={tenant.tenantSlug}
+                    riskId={riskId}
+                    ownerChoices={[]}
+                    canWrite={canWrite}
+                    canAdmin={tenant.permissions.canAdmin}
                 />
             </div>
         </div>

@@ -69,7 +69,12 @@ export type MonitoredEntityType =
     | 'VENDOR'
     | 'TASK'
     | 'RISK'
-    | 'TEST_PLAN';
+    | 'TEST_PLAN'
+    // Epic G-7 — treatment-plan target dates + milestone due dates
+    // both flow through the deadline monitor so the digest pipeline
+    // groups them by owner alongside other deadlines.
+    | 'TREATMENT_PLAN'
+    | 'TREATMENT_MILESTONE';
 
 /**
  * Urgency classification for due items.
