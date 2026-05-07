@@ -12,19 +12,19 @@ function read(rel: string): string {
 
 describe('Epic G-7 — treatment-plan API + UI wiring', () => {
     const listRoute = read(
-        'src/app/api/t/[tenantSlug]/risks/[riskId]/treatment-plans/route.ts',
+        'src/app/api/t/[tenantSlug]/risks/[id]/treatment-plans/route.ts',
     );
     const detailRoute = read(
-        'src/app/api/t/[tenantSlug]/risks/[riskId]/treatment-plans/[planId]/route.ts',
+        'src/app/api/t/[tenantSlug]/risks/[id]/treatment-plans/[planId]/route.ts',
     );
     const milestonesRoute = read(
-        'src/app/api/t/[tenantSlug]/risks/[riskId]/treatment-plans/[planId]/milestones/route.ts',
+        'src/app/api/t/[tenantSlug]/risks/[id]/treatment-plans/[planId]/milestones/route.ts',
     );
     const completeMilestoneRoute = read(
-        'src/app/api/t/[tenantSlug]/risks/[riskId]/treatment-plans/[planId]/milestones/[milestoneId]/complete/route.ts',
+        'src/app/api/t/[tenantSlug]/risks/[id]/treatment-plans/[planId]/milestones/[milestoneId]/complete/route.ts',
     );
     const completePlanRoute = read(
-        'src/app/api/t/[tenantSlug]/risks/[riskId]/treatment-plans/[planId]/complete/route.ts',
+        'src/app/api/t/[tenantSlug]/risks/[id]/treatment-plans/[planId]/complete/route.ts',
     );
     const card = read('src/components/RiskTreatmentPlanCard.tsx');
     const detailPage = read(
@@ -44,7 +44,7 @@ describe('Epic G-7 — treatment-plan API + UI wiring', () => {
 
     it('detail route verifies risk-vs-plan hierarchy', () => {
         expect(detailRoute).toContain('getTreatmentPlan');
-        expect(detailRoute).toContain('plan.riskId !== params.riskId');
+        expect(detailRoute).toContain('plan.riskId !== params.id');
     });
 
     it('milestone routes are typed + validated', () => {
@@ -75,8 +75,8 @@ describe('Epic G-7 — treatment-plan API + UI wiring', () => {
         }
     });
 
-    it('list POST rejects body riskId / URL riskId mismatch', () => {
-        expect(listRoute).toContain('body.riskId !== params.riskId');
+    it('list POST rejects body riskId / URL id mismatch', () => {
+        expect(listRoute).toContain('body.riskId !== params.id');
     });
 
     // ── Card surfaces canonical workflow buttons ────────────────────

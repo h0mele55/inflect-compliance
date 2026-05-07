@@ -18,10 +18,10 @@ import { jsonResponse } from '@/lib/api-response';
 export const GET = withApiErrorHandling(
     async (
         req: NextRequest,
-        { params }: { params: { tenantSlug: string; riskId: string } },
+        { params }: { params: { tenantSlug: string; id: string } },
     ) => {
         const ctx = await getTenantCtx(params, req);
-        const rows = await listTreatmentPlans(ctx, { riskId: params.riskId });
+        const rows = await listTreatmentPlans(ctx, { riskId: params.id });
         return jsonResponse({ rows });
     },
 );
@@ -31,13 +31,13 @@ export const POST = withApiErrorHandling(
         CreateTreatmentPlanSchema,
         async (
             req: NextRequest,
-            { params }: { params: { tenantSlug: string; riskId: string } },
+            { params }: { params: { tenantSlug: string; id: string } },
             body,
         ) => {
             const ctx = await getTenantCtx(params, req);
             // Body's riskId MUST match the URL — a stale or malicious
             // post can't silently re-route to a different risk.
-            if (body.riskId !== params.riskId) {
+            if (body.riskId !== params.id) {
                 return jsonResponse(
                     { error: 'Body riskId must match the URL riskId.' },
                     { status: 400 },

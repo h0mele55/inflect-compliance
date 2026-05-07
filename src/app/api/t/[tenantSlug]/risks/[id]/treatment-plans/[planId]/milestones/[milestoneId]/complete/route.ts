@@ -22,7 +22,7 @@ export const POST = withApiErrorHandling(
             }: {
                 params: {
                     tenantSlug: string;
-                    riskId: string;
+                    id: string;
                     planId: string;
                     milestoneId: string;
                 };

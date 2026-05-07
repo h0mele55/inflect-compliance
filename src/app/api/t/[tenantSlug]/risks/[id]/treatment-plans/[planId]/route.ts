@@ -16,12 +16,12 @@ export const GET = withApiErrorHandling(
         {
             params,
         }: {
-            params: { tenantSlug: string; riskId: string; planId: string };
+            params: { tenantSlug: string; id: string; planId: string };
         },
     ) => {
         const ctx = await getTenantCtx(params, req);
         const plan = await getTreatmentPlan(ctx, params.planId);
-        if (plan.riskId !== params.riskId) {
+        if (plan.riskId !== params.id) {
             throw notFound('Treatment plan not found');
         }
         return jsonResponse(plan);

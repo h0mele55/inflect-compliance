@@ -20,7 +20,7 @@ export const POST = withApiErrorHandling(
             {
                 params,
             }: {
-                params: { tenantSlug: string; riskId: string; planId: string };
+                params: { tenantSlug: string; id: string; planId: string };
             },
             body,
         ) => {
