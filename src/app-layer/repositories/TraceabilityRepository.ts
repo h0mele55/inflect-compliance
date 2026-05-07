@@ -79,9 +79,21 @@ export class AssetRiskRepository {
     }
 
     static async link(db: PrismaTx, tenantId: string, assetId: string, riskId: string, exposureLevel: string | null, rationale: string | null, userId: string) {
-        return db.assetRiskLink.create({
+        // Idempotent re-link: a user clicking "Add risk" on an
+        // already-linked pair previously got a P2002 → 409 from the
+        // unique constraint. Upsert keeps the operation a no-op when
+        // nothing changed and lets the user revise `exposureLevel` /
+        // `rationale` on the existing edge in one step. createdBy +
+        // tenantId stay frozen on the original link.
+        return db.assetRiskLink.upsert({
+            where: { tenantId_assetId_riskId: { tenantId, assetId, riskId } },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            data: { tenantId, assetId, riskId, exposureLevel: (exposureLevel as any) || 'MEDIUM', rationale, createdByUserId: userId },
+            create: { tenantId, assetId, riskId, exposureLevel: (exposureLevel as any) || 'MEDIUM', rationale, createdByUserId: userId },
+            update: {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ...(exposureLevel ? { exposureLevel: exposureLevel as any } : {}),
+                ...(rationale !== null ? { rationale } : {}),
+            },
         });
     }
 
