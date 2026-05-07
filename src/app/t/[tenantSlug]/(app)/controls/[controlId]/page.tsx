@@ -37,6 +37,21 @@ const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel')
     loading: () => <div className="glass-card p-6 animate-pulse h-48" aria-busy="true" />,
     ssr: false,
 });
+// Epic G-5 — exceptions panel + header badge. The badge alone is
+// loaded eagerly via a tiny named import so the control header can
+// surface "Exception: APPROVED" without waiting for the modal
+// machinery in the panel chunk.
+const ControlExceptionsPanel = dynamic(
+    () => import('@/components/ControlExceptionsPanel').then((m) => m.ControlExceptionsPanel),
+    {
+        loading: () => <div className="glass-card p-6 animate-pulse h-48" aria-busy="true" />,
+        ssr: false,
+    },
+);
+const ControlExceptionHeaderBadge = dynamic(
+    () => import('@/components/ControlExceptionsPanel').then((m) => m.ControlExceptionHeaderBadge),
+    { ssr: false },
+);
 const TestPlansPanel = dynamic(() => import('@/components/TestPlansPanel'), {
     loading: () => <div className="glass-card p-6 animate-pulse h-48" aria-busy="true" />,
     ssr: false,
@@ -95,7 +110,7 @@ export default function ControlDetailPage() {
     const params = useParams();
     const apiUrl = useTenantApiUrl();
     const tenantHref = useTenantHref();
-    const { permissions } = useTenantContext();
+    const { permissions, tenantSlug } = useTenantContext();
     const controlId = params?.controlId as string;
     const { mutate: swrMutate } = useSWRConfig();
     const triggerUndoToast = useToastWithUndo();
@@ -743,6 +758,10 @@ export default function ControlDetailPage() {
             <span className={`badge ${control.applicability === 'NOT_APPLICABLE' ? 'badge-warning' : 'badge-success'}`} id="control-applicability">
                 {control.applicability === 'NOT_APPLICABLE' ? 'Not Applicable' : 'Applicable'}
             </span>
+            <ControlExceptionHeaderBadge
+                tenantSlug={tenantSlug}
+                controlId={control.id}
+            />
             {syncStatus === 'CONFLICT' && (
                 <Tooltip
                     title="Sync conflict"
@@ -1470,6 +1489,20 @@ export default function ControlDetailPage() {
                     <TestPlansPanel controlId={controlId} />
                 </div>
             )}
+
+            {/* Epic G-5 — Control exceptions section. Renders below
+              * the active tab on every tab so the workflow is always
+              * one scroll away from the control. */}
+            <div className="glass-card mt-6 p-4">
+                <ControlExceptionsPanel
+                    tenantSlug={tenantSlug}
+                    controlId={controlId}
+                    compensatingControlChoices={[]}
+                    defaultRiskAcceptedByUserId={control.ownerUserId ?? ''}
+                    canWrite={permissions.canWrite}
+                    canAdmin={permissions.canAdmin}
+                />
+            </div>
         </EntityDetailLayout>
     );
 }

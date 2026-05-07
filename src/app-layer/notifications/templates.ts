@@ -491,6 +491,79 @@ export function buildAccessReviewReminderEmail(
     };
 }
 
+// ─── Exception expiring (Epic G-5) ───
+
+export interface ExceptionExpiringPayload {
+    recipientName: string;
+    /// Control identity surfaces in the subject + body so the
+    /// recipient can identify which exception without opening.
+    controlName: string;
+    controlCode?: string | null;
+    daysRemaining: 30 | 14 | 7;
+    expiresAtIso: string;
+    tenantSlug: string;
+    /// Linked exception id — drops the recipient straight into the
+    /// review surface on the control detail page.
+    exceptionId: string;
+    controlId: string;
+}
+
+export function buildExceptionExpiringEmail(
+    payload: ExceptionExpiringPayload,
+): EmailTemplateResult {
+    const {
+        recipientName,
+        controlName,
+        controlCode,
+        daysRemaining,
+        expiresAtIso,
+        tenantSlug,
+        exceptionId,
+        controlId,
+    } = payload;
+    const link = `/t/${tenantSlug}/controls/${controlId}#exceptions`;
+    const controlLabel = controlCode
+        ? `${controlCode} — ${controlName}`
+        : controlName;
+    const dueLabel = formatIsoDate(expiresAtIso);
+    const urgencyTag = daysRemaining <= 7 ? '⏰ ' : '';
+
+    return {
+        subject: `${urgencyTag}Control exception expires in ${daysRemaining} days: ${controlLabel}`,
+        bodyText: [
+            `Hi ${recipientName},`,
+            '',
+            `A control exception is approaching its review deadline.`,
+            '',
+            `  Control: ${controlLabel}`,
+            `  Expires: ${dueLabel} (${daysRemaining} days)`,
+            '',
+            `Open the exception: ${link}`,
+            '',
+            'Renew the exception or accept that the control becomes',
+            'in-effect again on the expiry date. Auditors expect every',
+            'expired exception to either have a renewal record or a',
+            'closing remediation note.',
+            '',
+            '— Inflect Compliance',
+        ].join('\n'),
+        bodyHtml: `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #1a1a2e; font-size: 18px; margin-bottom: 16px;">Control exception expires in ${daysRemaining} days</h2>
+  <p style="color: #444; line-height: 1.5;">Hi ${escapeHtml(recipientName)},</p>
+  <p style="color: #444; line-height: 1.5;">A control exception is approaching its review deadline.</p>
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr><td style="color: #888; padding: 4px 0; width: 100px;">Control</td><td style="color: #444;"><strong>${escapeHtml(controlLabel)}</strong></td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Expires</td><td style="color: #444;"><strong>${escapeHtml(dueLabel)}</strong> (${daysRemaining} days)</td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Exception</td><td style="color: #444;">${escapeHtml(exceptionId)}</td></tr>
+  </table>
+  <a href="${escapeHtml(link)}" style="display: inline-block; background: #4f46e5; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">Open exception</a>
+  <p style="color: #999; font-size: 12px; margin-top: 24px;">Renew the exception or let it lapse — auditors expect every expired exception to have a renewal record or a closing remediation note.</p>
+  <p style="color: #999; font-size: 12px; margin-top: 8px;">— Inflect Compliance</p>
+</div>`.trim(),
+    };
+}
+
 // ─── Helpers ───
 
 function formatIsoDate(iso: string): string {

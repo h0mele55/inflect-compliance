@@ -404,6 +404,33 @@ executorRegistry.register('access-review-reminder', async (payload) => {
     );
 });
 
+// ── exception-expiry-monitor (Epic G-5) ─────────────────────────────
+
+executorRegistry.register('exception-expiry-monitor', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { runExceptionExpiryMonitor } = await import(
+        './exception-expiry-monitor'
+    );
+    const { prisma } = await import('@/lib/prisma');
+    const r = await runExceptionExpiryMonitor(prisma, {
+        tenantId: payload.tenantId,
+    });
+    return makeResult(
+        'exception-expiry-monitor',
+        startedAt,
+        startMs,
+        r.scanned,
+        r.enqueued,
+        0,
+        {
+            skippedDuplicate: r.skippedDuplicate,
+            skippedNoEmail: r.skippedNoEmail,
+            skippedNoRecipient: r.skippedNoRecipient,
+        },
+    );
+});
+
 // ── retention-sweep ──────────────────────────────────────────────────
 
 executorRegistry.register('retention-sweep', async (payload) => {

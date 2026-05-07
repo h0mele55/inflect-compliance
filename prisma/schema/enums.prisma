@@ -430,6 +430,11 @@ enum EmailNotificationType {
   // Deduped per-day per-(tenant, type, email, campaign) by the
   // outbox unique constraint.
   ACCESS_REVIEW_REMINDER
+  // Epic G-5 — control exception approaching expiry. Fires at the
+  // 30 / 14 / 7 day calendar windows before `expiresAt`. Per-day
+  // dedupe at the outbox layer prevents double-fires; the
+  // calendar-day trigger condition is the spam guard.
+  EXCEPTION_EXPIRING
 }
 
 enum EmailOutboxStatus {
@@ -713,4 +718,23 @@ enum AccessReviewDecisionType {
   CONFIRM
   REVOKE
   MODIFY
+}
+
+/// Epic G-5 — Control Exception Register lifecycle.
+///
+///   REQUESTED — submitted by a control owner or risk admin; awaits
+///               approver action. Default state at creation.
+///   APPROVED  — risk-accepted with an explicit approver and an
+///               expiry deadline (`expiresAt` non-null).
+///   REJECTED  — approver declined; the original control remains
+///               applicable. Terminal — a fresh REQUESTED row is
+///               the path forward.
+///   EXPIRED   — APPROVED row whose `expiresAt` has elapsed without
+///               a renewal landing. Terminal — a renewal points to
+///               this row via `renewedFromId`.
+enum ControlExceptionStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  EXPIRED
 }

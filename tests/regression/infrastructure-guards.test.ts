@@ -74,8 +74,8 @@ describe('Infrastructure Regression Guards', () => {
             }
         });
 
-        test('exactly 10 scheduled jobs exist', () => {
-            expect(SCHEDULED_JOBS).toHaveLength(10);
+        test('exactly 11 scheduled jobs exist', () => {
+            expect(SCHEDULED_JOBS).toHaveLength(11);
         });
 
         test('scheduled job names match expected set', () => {
@@ -92,6 +92,9 @@ describe('Infrastructure Regression Guards', () => {
                 'control-test-scheduler',
                 'daily-evidence-expiry',
                 'data-lifecycle',
+                // Epic G-5 — daily 30/14/7-day expiry reminder for
+                // control exceptions.
+                'exception-expiry-monitor',
                 'notification-dispatch',
                 'policy-review-reminder',
                 'retention-sweep',

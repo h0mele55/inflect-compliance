@@ -139,6 +139,15 @@ function buildExec(overrides: Partial<ExecutiveDashboardPayload> = {}): Executiv
         vendorSummary: { total: 0, overdueReview: 0 },
         riskHeatmap: [],
         upcomingExpirations: [],
+        // Epic G-5 — exceptions card. All zeros in the baseline so
+        // the existing assertions don't have to learn this surface.
+        exceptions: {
+            activeApproved: 0,
+            pendingRequest: 0,
+            expiringWithin30: 0,
+            expiringWithin7: 0,
+            expired: 0,
+        },
         computedAt: new Date('2026-05-04T00:00:00Z').toISOString(),
         ...overrides,
     };
