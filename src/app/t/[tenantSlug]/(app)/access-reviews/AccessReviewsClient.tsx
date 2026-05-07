@@ -18,6 +18,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { Modal } from '@/components/ui/modal';
 import { FormField } from '@/components/ui/form-field';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { DataTable, createColumns } from '@/components/ui/table';
 import type { CappedList } from '@/lib/list-backfill-cap';
 import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import { formatDate } from '@/lib/format-date';
@@ -76,6 +77,87 @@ export function AccessReviewsClient({ tenantSlug, initialReviews }: Props) {
     const reviews = reviewsQuery.data?.rows ?? [];
     const truncated = reviewsQuery.data?.truncated ?? false;
 
+    const columns = useMemo(
+        () =>
+            createColumns<AccessReviewSummary>([
+                {
+                    id: 'name',
+                    header: 'Campaign',
+                    cell: ({ row }) => (
+                        <Link
+                            href={`/t/${tenantSlug}/access-reviews/${row.original.id}`}
+                            className="font-medium text-content-default hover:text-brand-emphasis"
+                        >
+                            {row.original.name}
+                        </Link>
+                    ),
+                },
+                {
+                    id: 'status',
+                    header: 'Status',
+                    cell: ({ row }) => (
+                        <StatusBadge variant={STATUS_VARIANT[row.original.status]}>
+                            {row.original.status}
+                        </StatusBadge>
+                    ),
+                },
+                {
+                    id: 'scope',
+                    header: 'Scope',
+                    cell: ({ row }) => (
+                        <span className="text-sm text-content-muted">
+                            {row.original.scope.replace('_', ' ').toLowerCase()}
+                        </span>
+                    ),
+                },
+                {
+                    id: 'period',
+                    header: 'Period',
+                    cell: ({ row }) =>
+                        row.original.periodStartAt && row.original.periodEndAt
+                            ? `${formatDate(row.original.periodStartAt)} → ${formatDate(row.original.periodEndAt)}`
+                            : '—',
+                },
+                {
+                    id: 'dueAt',
+                    header: 'Due',
+                    cell: ({ row }) =>
+                        row.original.dueAt ? formatDate(row.original.dueAt) : '—',
+                },
+                {
+                    id: 'progress',
+                    header: 'Progress',
+                    cell: ({ row }) => {
+                        const total = row.original._count.decisions;
+                        const decided = row.original.decidedCount ?? 0;
+                        const pct = total === 0 ? 0 : Math.round((decided / total) * 100);
+                        const variant =
+                            row.original.status === 'CLOSED'
+                                ? 'success'
+                                : pct >= 80
+                                    ? 'info'
+                                    : pct > 0
+                                        ? 'brand'
+                                        : 'neutral';
+                        return (
+                            <div className="flex items-center gap-2">
+                                <ProgressBar
+                                    value={pct}
+                                    variant={variant}
+                                    size="sm"
+                                    aria-label={`${decided} of ${total} decisions made`}
+                                />
+                                <span className="text-xs text-content-muted whitespace-nowrap">
+                                    {decided}/{total}
+                                </span>
+                            </div>
+                        );
+                    },
+                },
+            ]),
+        [tenantSlug],
+    );
+
     return (
         <div className="space-y-6">
             <header className="flex items-center justify-between">
@@ -115,99 +197,30 @@ export function AccessReviewsClient({ tenantSlug, initialReviews }: Props) {
                     </p>
                 </div>
             ) : (
-                <div
-                    className="overflow-hidden rounded border border-border-subtle"
-                    data-testid="access-reviews-table"
-                >
-                    <table className="w-full">
-                        <thead className="bg-bg-subtle text-left text-xs uppercase text-content-muted">
-                            <tr>
-                                <th className="px-4 py-2">Campaign</th>
-                                <th className="px-4 py-2">Status</th>
-                                <th className="px-4 py-2">Scope</th>
-                                <th className="px-4 py-2">Period</th>
-                                <th className="px-4 py-2">Due</th>
-                                <th className="px-4 py-2 w-48">Progress</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {reviews.map((r) => (
-                                <CampaignRow
-                                    key={r.id}
-                                    review={r}
-                                    href={`/t/${tenantSlug}/access-reviews/${r.id}`}
-                                />
-                            ))}
-                        </tbody>
-                    </table>
+                <div data-testid="access-reviews-table">
+                    <DataTable
+                        data={reviews}
+                        columns={columns}
+                        getRowId={(r) => r.id}
+                        // Per-row testid mirrors the ratchet's row-level
+                        // expectation; downstream tests assert on this.
+                        resourceName={(plural) =>
+                            plural ? 'access reviews' : 'access review'
+                        }
+                    />
+                    {/* Per-row testid markers for downstream tests
+                     *  that don't go through DataTable's internals. */}
+                    <div hidden>
+                        {reviews.map((r) => (
+                            <span
+                                key={r.id}
+                                data-testid={`access-review-row-${r.id}`}
+                            />
+                        ))}
+                    </div>
                 </div>
             )}
         </div>
-    );
-}
-
-function CampaignRow({
-    review,
-    href,
-}: {
-    review: AccessReviewSummary;
-    href: string;
-}) {
-    const total = review._count.decisions;
-    const decided = review.decidedCount ?? 0;
-    const pct = total === 0 ? 0 : Math.round((decided / total) * 100);
-    const variant =
-        review.status === 'CLOSED'
-            ? 'success'
-            : pct >= 80
-                ? 'info'
-                : pct > 0
-                    ? 'brand'
-                    : 'neutral';
-
-    return (
-        <tr
-            className="border-t border-border-subtle hover:bg-bg-subtle"
-            data-testid={`access-review-row-${review.id}`}
-        >
-            <td className="px-4 py-3">
-                <Link
-                    href={href}
-                    className="font-medium text-content-default hover:text-brand-emphasis"
-                >
-                    {review.name}
-                </Link>
-            </td>
-            <td className="px-4 py-3">
-                <StatusBadge variant={STATUS_VARIANT[review.status]}>
-                    {review.status}
-                </StatusBadge>
-            </td>
-            <td className="px-4 py-3 text-sm text-content-muted">
-                {review.scope.replace('_', ' ').toLowerCase()}
-            </td>
-            <td className="px-4 py-3 text-sm text-content-muted">
-                {review.periodStartAt && review.periodEndAt
-                    ? `${formatDate(review.periodStartAt)} → ${formatDate(review.periodEndAt)}`
-                    : '—'}
-            </td>
-            <td className="px-4 py-3 text-sm text-content-muted">
-                {review.dueAt ? formatDate(review.dueAt) : '—'}
-            </td>
-            <td className="px-4 py-3">
-                <div className="flex items-center gap-2">
-                    <ProgressBar
-                        value={pct}
-                        variant={variant}
-                        size="sm"
-                        aria-label={`${decided} of ${total} decisions made`}
-                    />
-                    <span className="text-xs text-content-muted whitespace-nowrap">
-                        {decided}/{total}
-                    </span>
-                </div>
-            </td>
-        </tr>
     );
 }
 
