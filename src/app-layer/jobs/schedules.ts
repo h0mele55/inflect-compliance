@@ -84,6 +84,17 @@ export const SCHEDULED_JOBS: ScheduleDefinition[] = [
         defaultPayload: {},
     },
     {
+        name: 'exception-expiry-monitor',
+        // Daily at 04:30 UTC — chosen to land between the 04:00
+        // access-review reminder (G-4) and the 05:00 compliance-
+        // snapshot, with idle DB capacity. Calendar-day-based
+        // trigger means time-of-day drift doesn't move the window.
+        pattern: '30 4 * * *',
+        description:
+            'Flag control exceptions approaching their `expiresAt` deadline at 30 / 14 / 7 day windows + emit reminder notifications.',
+        defaultPayload: {},
+    },
+    {
         name: 'retention-sweep',
         pattern: '0 4 * * *',     // daily at 04:00 UTC
         description: 'Archive evidence with elapsed retention periods',

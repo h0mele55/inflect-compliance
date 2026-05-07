@@ -171,6 +171,14 @@ export const ENCRYPTED_FIELDS: Readonly<Record<string, readonly string[]>> = {
     //  ciphertext to callers.
     AccessReview: ['description'],
     AccessReviewDecision: ['notes'],
+
+    // ─── Epic G-5 control exception register ───────────
+    //  `justification` carries the rationale for accepting risk;
+    //  surfaces in audit packs alongside the approver. The
+    //  `rejectionReason` field is the parallel free-text capture
+    //  on REJECTED rows. Both contain narrative that may name
+    //  internal users / systems, so they're encrypted at rest.
+    ControlException: ['justification', 'rejectionReason'],
 } as const;
 
 /** Set of model names with at least one encrypted field. Fast-path check. */

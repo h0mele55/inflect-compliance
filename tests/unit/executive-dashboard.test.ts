@@ -347,6 +347,11 @@ describe('Dashboard — Executive Payload', () => {
         mockTx.vendor = {
             count: jest.fn(async () => 4),
         };
+        // Epic G-5 — five COUNTs against ControlException for the
+        // exception-summary card.
+        mockTx.controlException = {
+            count: jest.fn(async () => 0),
+        };
     }
 
     it('returns complete payload with all sections', async () => {

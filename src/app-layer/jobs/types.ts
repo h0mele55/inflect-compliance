@@ -147,6 +147,13 @@ export interface PolicyReviewReminderPayload {
     tenantId?: string;
 }
 
+/** Epic G-5 — exception expiry monitor */
+export interface ExceptionExpiryMonitorPayload {
+    /** Optional: scope the scan to a single tenant. Omit for the
+     *  system-wide nightly scan. */
+    tenantId?: string;
+}
+
 /** Evidence retention sweep */
 export interface RetentionSweepPayload {
     tenantId?: string;
@@ -402,6 +409,7 @@ export interface JobPayloadMap {
     'daily-evidence-expiry': DailyEvidenceExpiryPayload;
     'data-lifecycle': DataLifecyclePayload;
     'policy-review-reminder': PolicyReviewReminderPayload;
+    'exception-expiry-monitor': ExceptionExpiryMonitorPayload;
     'retention-sweep': RetentionSweepPayload;
     'vendor-renewal-check': VendorRenewalCheckPayload;
     'deadline-monitor': DeadlineMonitorPayload;
@@ -465,6 +473,12 @@ export const JOB_DEFAULTS: Record<JobName, {
         removeOnFail: 500,
     },
     'access-review-reminder': {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 200,
+        removeOnFail: 500,
+    },
+    'exception-expiry-monitor': {
         attempts: 2,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: 200,

@@ -162,6 +162,8 @@ model Tenant {
   // Epic G-4 — Access Review Campaigns.
   accessReviews                     AccessReview[]
   accessReviewDecisions             AccessReviewDecision[]
+  // Epic G-5 — control exception register.
+  controlExceptions                 ControlException[]
   // Hub-and-spoke (Epic O-1).
   organization                      Organization?                      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
@@ -664,6 +666,14 @@ model User {
   accessReviewDecisionsSubject  AccessReviewDecision[]       @relation("AccessReviewDecisionSubject")
   accessReviewDecisionsDecided  AccessReviewDecision[]       @relation("AccessReviewDecisionDecider")
   accessReviewDecisionsExecuted AccessReviewDecision[]       @relation("AccessReviewDecisionExecutor")
+  // Epic G-5 — control exceptions involve up to five distinct
+  // user-roles per row (creator, risk-acceptor, approver, rejecter,
+  // deleter). Distinct relation names so Prisma can disambiguate.
+  controlExceptionsCreated      ControlException[]           @relation("ControlExceptionCreatedBy")
+  controlExceptionsRiskAccepted ControlException[]           @relation("ControlExceptionRiskAcceptedBy")
+  controlExceptionsApproved     ControlException[]           @relation("ControlExceptionApprovedBy")
+  controlExceptionsRejected     ControlException[]           @relation("ControlExceptionRejectedBy")
+  controlExceptionsDeleted      ControlException[]           @relation("ControlExceptionDeletedBy")
 }
 
 model Account {
