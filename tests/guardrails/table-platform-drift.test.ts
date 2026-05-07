@@ -24,6 +24,11 @@ const CLIENT_DIR = path.resolve(__dirname, '../../src/app/t/[tenantSlug]/(app)')
 const EXCLUDED_PAGES: Record<string, string> = {
     'SoAClient.tsx': 'Expandable row sub-components, not a flat list',
     'AuditsClient.tsx': 'Master/detail panel UX, not a list page',
+    // Epic G-4 — list-of-decisions inside a campaign detail page.
+    // Per-row inline dropdown + decision dialog sit on the row;
+    // same architectural shape as AuditsClient.
+    'AccessReviewDetailClient.tsx':
+        'Master/detail with inline decision controls — list inside a parent record, not a list page.',
 };
 
 /**
@@ -269,7 +274,12 @@ const RATCHET_ALLOWLIST = new Set<string>([
 //                                       in EXCLUDED_PAGES because of
 //                                       expandable-row UX)
 //   1  tasks/[taskId]/page.tsx          activity log table
-const RAW_TABLE_BASELINE = 14;
+//   1  access-reviews/[reviewId]/AccessReviewDetailClient.tsx
+//                                       per-decision roster — same
+//                                       master/detail shape as
+//                                       AuditsClient (also listed in
+//                                       EXCLUDED_PAGES above).
+const RAW_TABLE_BASELINE = 15;
 const RAW_TABLE_RE = /<table\b/g;
 
 function countAdHocTables(): { total: number; byFile: Record<string, number> } {

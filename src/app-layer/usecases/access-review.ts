@@ -48,7 +48,7 @@ import {
 import type { Role, MembershipStatus } from '@prisma/client';
 import { generateAccessReviewPdf } from '../reports/pdf/accessReview';
 import { getStorageProvider, buildTenantObjectKey } from '@/lib/storage';
-import prisma from '@/lib/prisma';
+import { Readable } from 'node:stream';
 import { logger } from '@/lib/observability/logger';
 
 // ─── Read paths ───────────────────────────────────────────────────────
@@ -648,7 +648,29 @@ export async function closeAccessReview(
             },
         });
 
-        return { review, decisions, executions, closedAt: now };
+        // PDF metadata fetched here so phase 2 can stay outside the
+        // tenant context (PDF write hits external storage; failures
+        // mustn't roll back the close). The tenant + closer rows are
+        // tenant-scoped reads — pulling them through `db` keeps the
+        // RLS-bound contract intact and avoids importing the global
+        // prisma client (CI guardrail forbids it in tenant code).
+        const tenantRow = await db.tenant.findUnique({
+            where: { id: ctx.tenantId },
+            select: { name: true },
+        });
+        const closerRow = await db.user.findUnique({
+            where: { id: ctx.userId },
+            select: { email: true },
+        });
+
+        return {
+            review,
+            decisions,
+            executions,
+            closedAt: now,
+            tenantName: tenantRow?.name ?? 'Tenant',
+            closerEmail: closerRow?.email ?? '(unknown)',
+        };
     });
 
     // Phase 2 — generate + store PDF, link to campaign. Out of the
@@ -672,20 +694,8 @@ export async function closeAccessReview(
             };
         });
 
-        const tenant = await prisma.tenant.findUnique({
-            where: { id: ctx.tenantId },
-            select: { name: true },
-        });
-
-        // Look up actor email to surface in the PDF header without
-        // re-running the campaign query.
-        const closer = await prisma.user.findUnique({
-            where: { id: ctx.userId },
-            select: { email: true },
-        });
-
         const pdfDoc = generateAccessReviewPdf({
-            tenantName: tenant?.name ?? 'Tenant',
+            tenantName: phase1.tenantName,
             campaignName: phase1.review.name,
             campaignDescription: phase1.review.description ?? null,
             scope: phase1.review.scope,
@@ -694,7 +704,7 @@ export async function closeAccessReview(
             periodEndIso: phase1.review.periodEndAt?.toISOString() ?? null,
             reviewerEmail: phase1.review.reviewer.email,
             createdByEmail: phase1.review.createdBy.email,
-            closedByEmail: closer?.email ?? '(unknown)',
+            closedByEmail: phase1.closerEmail,
             closedAtIso: phase1.closedAt.toISOString(),
             decisions: decisionsForPdf,
             watermark: 'FINAL',
@@ -708,7 +718,7 @@ export async function closeAccessReview(
             'evidence',
             fileName,
         );
-        const { Readable } = await import('node:stream');
+        // Readable already imported at the module top.
         const writeResult = await storage.write(
             pathKey,
             Readable.from(pdfBuffer),

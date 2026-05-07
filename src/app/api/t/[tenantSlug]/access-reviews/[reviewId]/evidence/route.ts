@@ -10,6 +10,7 @@
  * regenerate path hasn't run).
  */
 import { NextRequest } from 'next/server';
+import { Readable } from 'node:stream';
 import { getTenantCtx } from '@/app-layer/context';
 import { runInTenantContext } from '@/lib/db-context';
 import { getStorageProvider } from '@/lib/storage';
@@ -59,8 +60,6 @@ export const GET = withApiErrorHandling(
         const stream = storage.readStream(fileRecord.pathKey);
 
         // Convert Node Readable → Web ReadableStream for Next.js Response.
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { Readable } = require('node:stream') as typeof import('node:stream');
         const webStream = Readable.toWeb(stream) as unknown as ReadableStream;
 
         return new Response(webStream, {

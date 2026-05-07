@@ -179,10 +179,20 @@ describe('New page token discipline', () => {
         //     + VendorAssessmentReviewClient.tsx. Same `glass-card`
         //     + legacy `btn` / `badge` shape as the rest of the
         //     admin surface; bounded follow-up.
+        //   - 98 (+4): Epic G-4 added the access-reviews surface —
+        //     access-reviews/page.tsx + AccessReviewsClient.tsx +
+        //     access-reviews/[reviewId]/page.tsx +
+        //     AccessReviewDetailClient.tsx. The pages already use
+        //     token classes (text-content-*, bg-bg-*, ProgressBar,
+        //     StatusBadge) so they don't actually trip the
+        //     raw-color/btn/badge checks — they're listed in the
+        //     unmigrated tally only because they aren't yet in
+        //     `MIGRATED_PAGES` (promotion is a separate landing).
+        //     Bounded follow-up promotes them.
         // Each increment names the epic + page + reason; promotion
         // to MIGRATED_PAGES is the path forward, never silent
         // floor-bumping.
-        expect(unmigrated.length).toBeLessThanOrEqual(94);
+        expect(unmigrated.length).toBeLessThanOrEqual(98);
     });
 
     it('migrated page count is at least 4', () => {

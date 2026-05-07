@@ -19,6 +19,7 @@ import { Modal } from '@/components/ui/modal';
 import { FormField } from '@/components/ui/form-field';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DataTable, createColumns } from '@/components/ui/table';
+import { ListPageShell } from '@/components/layout/ListPageShell';
 import type { CappedList } from '@/lib/list-backfill-cap';
 import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import { formatDate } from '@/lib/format-date';
@@ -159,68 +160,69 @@ export function AccessReviewsClient({ tenantSlug, initialReviews }: Props) {
     );
 
     return (
-        <div className="space-y-6">
-            <header className="flex items-center justify-between">
-                <div>
-                    <h1
-                        className="text-2xl font-semibold text-content-default"
-                        data-testid="access-reviews-title"
-                    >
-                        Access Reviews
-                    </h1>
-                    <p className="text-sm text-content-muted">
-                        {reviews.length} campaign{reviews.length === 1 ? '' : 's'}
-                    </p>
-                </div>
-                <CreateCampaignButton
-                    tenantSlug={tenantSlug}
-                    onCreated={(reviewId) => {
-                        queryClient.invalidateQueries({
-                            queryKey: ['access-reviews', tenantSlug],
-                        });
-                        router.push(
-                            `/t/${tenantSlug}/access-reviews/${reviewId}`,
-                        );
-                    }}
-                />
-            </header>
-
-            {truncated ? <TruncationBanner truncated /> : null}
-
-            {reviews.length === 0 ? (
-                <div
-                    className="rounded border border-border-subtle bg-bg-subtle p-12 text-center"
-                    data-testid="access-reviews-empty"
-                >
-                    <p className="text-content-muted">
-                        No access reviews yet. Click <strong>New campaign</strong> to start one.
-                    </p>
-                </div>
-            ) : (
-                <div data-testid="access-reviews-table">
-                    <DataTable
-                        data={reviews}
-                        columns={columns}
-                        getRowId={(r) => r.id}
-                        // Per-row testid mirrors the ratchet's row-level
-                        // expectation; downstream tests assert on this.
-                        resourceName={(plural) =>
-                            plural ? 'access reviews' : 'access review'
-                        }
-                    />
-                    {/* Per-row testid markers for downstream tests
-                     *  that don't go through DataTable's internals. */}
-                    <div hidden>
-                        {reviews.map((r) => (
-                            <span
-                                key={r.id}
-                                data-testid={`access-review-row-${r.id}`}
-                            />
-                        ))}
+        <ListPageShell>
+            <ListPageShell.Header>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1
+                            className="text-2xl font-semibold text-content-default"
+                            data-testid="access-reviews-title"
+                        >
+                            Access Reviews
+                        </h1>
+                        <p className="text-sm text-content-muted">
+                            {reviews.length} campaign{reviews.length === 1 ? '' : 's'}
+                        </p>
                     </div>
+                    <CreateCampaignButton
+                        tenantSlug={tenantSlug}
+                        onCreated={(reviewId) => {
+                            queryClient.invalidateQueries({
+                                queryKey: ['access-reviews', tenantSlug],
+                            });
+                            router.push(
+                                `/t/${tenantSlug}/access-reviews/${reviewId}`,
+                            );
+                        }}
+                    />
                 </div>
-            )}
-        </div>
+                {truncated ? <TruncationBanner truncated /> : null}
+            </ListPageShell.Header>
+            <ListPageShell.Body>
+                {reviews.length === 0 ? (
+                    <div
+                        className="rounded border border-border-subtle bg-bg-subtle p-12 text-center"
+                        data-testid="access-reviews-empty"
+                    >
+                        <p className="text-content-muted">
+                            No access reviews yet. Click <strong>New campaign</strong> to start one.
+                        </p>
+                    </div>
+                ) : (
+                    <div data-testid="access-reviews-table">
+                        <DataTable
+                            fillBody
+                            data={reviews}
+                            columns={columns}
+                            getRowId={(r) => r.id}
+                            resourceName={(plural) =>
+                                plural ? 'access reviews' : 'access review'
+                            }
+                        />
+                        {/* Per-row testid markers for downstream tests
+                         *  that don't reach into DataTable internals. */}
+                        <div hidden>
+                            {reviews.map((r) => (
+                                <span
+                                    key={r.id}
+                                    data-testid={`access-review-row-${r.id}`}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </ListPageShell.Body>
+        </ListPageShell>
     );
 }
 

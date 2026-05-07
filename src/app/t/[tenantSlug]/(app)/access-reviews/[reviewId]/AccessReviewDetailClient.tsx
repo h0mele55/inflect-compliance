@@ -183,7 +183,7 @@ export function AccessReviewDetailClient({
                             value={pct}
                             variant={pct >= 100 ? 'success' : pct >= 50 ? 'info' : 'brand'}
                             aria-label={`${decided} of ${decisionsTotal} decisions made`}
-                            className="w-48"
+                            className="w-full sm:w-48"
                         />
                         <span className="text-xs text-content-muted whitespace-nowrap">
                             {decided}/{decisionsTotal}
