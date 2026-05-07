@@ -20,6 +20,7 @@ import { FormField } from '@/components/ui/form-field';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { ListPageShell } from '@/components/layout/ListPageShell';
+import { DatePicker } from '@/components/ui/date-picker';
 import type { CappedList } from '@/lib/list-backfill-cap';
 import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import { formatDate } from '@/lib/format-date';
@@ -242,7 +243,7 @@ function CreateCampaignButton({
     const [description, setDescription] = useState('');
     const [scope, setScope] = useState<'ALL_USERS' | 'ADMIN_ONLY'>('ALL_USERS');
     const [reviewerUserId, setReviewerUserId] = useState('');
-    const [dueAt, setDueAt] = useState('');
+    const [dueAt, setDueAt] = useState<Date | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const apiUrl = `/api/t/${tenantSlug}/access-reviews`;
@@ -255,7 +256,7 @@ function CreateCampaignButton({
                 description: description || undefined,
                 scope,
                 reviewerUserId,
-                dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,
+                dueAt: dueAt ? dueAt.toISOString() : undefined,
             };
             const res = await fetch(apiUrl, {
                 method: 'POST',
@@ -273,7 +274,7 @@ function CreateCampaignButton({
             setName('');
             setDescription('');
             setReviewerUserId('');
-            setDueAt('');
+            setDueAt(null);
             onCreated(data.accessReviewId);
         },
         onError: (err) => {
@@ -354,11 +355,10 @@ function CreateCampaignButton({
                                 />
                             </FormField>
                             <FormField label="Due date (optional)">
-                                <input
-                                    type="date"
-                                    className="input"
+                                <DatePicker
                                     value={dueAt}
-                                    onChange={(e) => setDueAt(e.target.value)}
+                                    onChange={setDueAt}
+                                    clearable
                                 />
                             </FormField>
                             {error ? (

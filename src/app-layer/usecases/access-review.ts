@@ -127,7 +127,7 @@ export async function createAccessReview(
     const parsed: CreateAccessReviewInput = CreateAccessReviewSchema.parse(input);
 
     return runInTenantContext(ctx, async (db) => {
-        const memberships = await AccessReviewRepository.resolveScopeMemberships(
+        const memberships = await AccessReviewRepository.resolveMembershipsForScope(
             db,
             ctx,
             parsed.scope,

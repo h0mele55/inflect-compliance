@@ -348,7 +348,7 @@ export class AccessReviewRepository {
      * memberships so a campaign doesn't accidentally include rows
      * the tenant has already retired.
      */
-    static async resolveScopeMemberships(
+    static async resolveMembershipsForScope(
         db: PrismaTx,
         ctx: RequestContext,
         scope: Prisma.AccessReviewUncheckedCreateInput['scope'],
