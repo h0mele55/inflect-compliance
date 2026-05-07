@@ -253,7 +253,15 @@ describe('getUpcomingTests', () => {
     });
 
     test('builds DTOs with daysUntilRun arithmetic', async () => {
-        const now = Date.now();
+        // The fixture and production code each call Date.now()
+        // independently. With `Math.floor(diff / 86_400_000)`, even
+        // 1ms of elapsed time between the two calls collapses
+        // `daysUntilRun` from 3 to 2 — a known flake on slow CI.
+        // Freeze the clock here so both calls observe the same
+        // reference point.
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+        const now = new Date('2026-05-07T00:00:00Z').getTime();
+        jest.setSystemTime(now);
         mockTx.controlTestPlan.findMany.mockResolvedValueOnce([
             {
                 id: 'p-1',
@@ -293,6 +301,8 @@ describe('getUpcomingTests', () => {
             daysUntilRun: 3,
         });
         expect(result.items[1].daysUntilRun).toBe(-1); // overdue → negative
+
+        jest.useRealTimers();
     });
 
     test('controlId option scopes the query', async () => {

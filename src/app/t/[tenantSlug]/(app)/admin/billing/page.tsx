@@ -5,6 +5,7 @@ import { resolveTenantContext } from '@/lib/tenant-context';
 import prisma from '@/lib/prisma';
 import { BillingActions } from './BillingActions';
 import { BillingEventLog } from './BillingEventLog';
+import { getBillingMode } from '@/lib/billing/entitlements';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,7 @@ export default async function BillingPage({
         where: { tenantId: tenantCtx.tenant.id },
     });
 
+    const billingMode = getBillingMode();
     const plan = billingAccount?.plan ?? 'FREE';
     const status = billingAccount?.status ?? 'ACTIVE';
     const periodEnd = billingAccount?.currentPeriodEnd;
@@ -92,7 +94,9 @@ export default async function BillingPage({
                                 Trial ends on {formatDate(trialEnd)}. Upgrade to keep access to premium features.
                             </p>
                         </div>
-                        <BillingActions plan="PRO" tenantSlug={tenantSlug} />
+                        {billingMode === 'SAAS' && (
+                            <BillingActions plan="PRO" tenantSlug={tenantSlug} />
+                        )}
                     </div>
                 </div>
             )}
@@ -156,8 +160,29 @@ export default async function BillingPage({
                 )}
             </section>
 
+            {/* Self-hosted banner — billing UI is decorative in this mode.
+                Stripe is not configured (STRIPE_SECRET_KEY unset), so plan
+                limits resolve to ENTERPRISE for every tenant and the
+                Stripe-backed buttons would 403 with "billing_unavailable". */}
+            {billingMode === 'SELFHOSTED' && (
+                <div
+                    className="glass-card p-4 border border-amber-500/40 bg-amber-500/5"
+                    id="billing-self-hosted-banner"
+                >
+                    <p className="text-sm font-semibold text-amber-400">
+                        Self-hosted deployment
+                    </p>
+                    <p className="text-xs text-content-muted mt-1">
+                        This instance runs without a Stripe integration —
+                        plan limits resolve to ENTERPRISE for every tenant
+                        and the in-app upgrade / portal buttons are disabled.
+                        Subscription changes are managed by your operator.
+                    </p>
+                </div>
+            )}
+
             {/* Upgrade Options */}
-            {(plan === 'FREE' || plan === 'TRIAL') && (
+            {billingMode === 'SAAS' && (plan === 'FREE' || plan === 'TRIAL') && (
                 <section>
                     <h2 className="text-lg font-semibold mb-4">Upgrade</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -192,7 +217,7 @@ export default async function BillingPage({
             )}
 
             {/* Manage Subscription */}
-            {hasSubscription && (
+            {billingMode === 'SAAS' && hasSubscription && (
                 <section>
                     <h2 className="text-lg font-semibold mb-4">Manage Subscription</h2>
                     <div className="glass-card p-6">
