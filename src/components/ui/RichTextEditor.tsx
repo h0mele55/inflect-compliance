@@ -97,6 +97,13 @@ function buildExtensions(placeholder: string) {
             // CodeBlock is overkill for policy authoring; use inline
             // code from StarterKit (Code mark) instead.
             codeBlock: false,
+            // Disable the bundled Link mark — we register a tightened
+            // standalone `Link.configure(...)` below with stricter
+            // protocol validation. Without this, both register under
+            // the same name and TipTap warns about duplicate
+            // extensions, which can cause non-deterministic behavior
+            // for paste handling and link auto-detection.
+            link: false,
         }),
         Link.configure({
             openOnClick: false,
