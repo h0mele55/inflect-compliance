@@ -51,6 +51,12 @@ beforeEach(() => {
             auditCycle: { findMany: jest.fn().mockResolvedValue([]) },
             vendorDocument: { findMany: jest.fn().mockResolvedValue([]) },
             finding: { findMany: jest.fn().mockResolvedValue([]) },
+            // Epic G-7
+            riskTreatmentPlan: {
+                findMany: jest.fn().mockResolvedValue([]),
+                updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+            },
+            treatmentMilestone: { findMany: jest.fn().mockResolvedValue([]) },
             user: { findMany: jest.fn().mockResolvedValue([]) },
             tenantMembership: { findMany: jest.fn().mockResolvedValue([]) },
             tenant: { findUnique: jest.fn().mockResolvedValue({ slug: 'test' }) },
@@ -69,6 +75,12 @@ beforeEach(() => {
             auditCycle: { findMany: jest.fn().mockResolvedValue([]) },
             vendorDocument: { findMany: jest.fn().mockResolvedValue([]) },
             finding: { findMany: jest.fn().mockResolvedValue([]) },
+            // Epic G-7
+            riskTreatmentPlan: {
+                findMany: jest.fn().mockResolvedValue([]),
+                updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+            },
+            treatmentMilestone: { findMany: jest.fn().mockResolvedValue([]) },
             user: { findMany: jest.fn().mockResolvedValue([]) },
             tenantMembership: { findMany: jest.fn().mockResolvedValue([]) },
             tenant: { findUnique: jest.fn().mockResolvedValue({ slug: 'test' }) },

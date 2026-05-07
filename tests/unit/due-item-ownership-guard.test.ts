@@ -95,6 +95,7 @@ describe('OWNERSHIP_RULES — completeness', () => {
     // This is the authoritative list from types.ts
     const ALL_ENTITY_TYPES: MonitoredEntityType[] = [
         'CONTROL', 'EVIDENCE', 'POLICY', 'VENDOR', 'TASK', 'RISK', 'TEST_PLAN',
+        'TREATMENT_PLAN', 'TREATMENT_MILESTONE',
     ];
 
     test('every MonitoredEntityType has an ownership rule', () => {

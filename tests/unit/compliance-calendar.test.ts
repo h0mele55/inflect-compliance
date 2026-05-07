@@ -33,6 +33,9 @@ const mockTaskFindMany = jest.fn();
 const mockRiskFindMany = jest.fn();
 const mockFindingFindMany = jest.fn();
 
+const mockTreatmentMilestoneFindMany = jest.fn();
+const mockTreatmentPlanFindMany = jest.fn();
+
 const mockTaskCount = jest.fn().mockResolvedValue(0);
 const mockControlCount = jest.fn().mockResolvedValue(0);
 const mockEvidenceCount = jest.fn().mockResolvedValue(0);
@@ -53,6 +56,8 @@ beforeEach(() => {
         mockTaskFindMany,
         mockRiskFindMany,
         mockFindingFindMany,
+        mockTreatmentMilestoneFindMany,
+        mockTreatmentPlanFindMany,
     ].forEach((m) => m.mockReset().mockResolvedValue([]));
     [
         mockTaskCount,
@@ -101,6 +106,13 @@ beforeEach(() => {
         },
         finding: {
             findMany: (...a: unknown[]) => mockFindingFindMany(...a),
+        },
+        // Epic G-7
+        treatmentMilestone: {
+            findMany: (...a: unknown[]) => mockTreatmentMilestoneFindMany(...a),
+        },
+        riskTreatmentPlan: {
+            findMany: (...a: unknown[]) => mockTreatmentPlanFindMany(...a),
         },
     };
     jest.mock('@/lib/db-context', () => ({
@@ -172,6 +184,8 @@ describe('getComplianceCalendarEvents — aggregation', () => {
             mockTaskFindMany,
             mockRiskFindMany,
             mockFindingFindMany,
+            mockTreatmentMilestoneFindMany,
+            mockTreatmentPlanFindMany,
         ]) {
             expect(m).toHaveBeenCalled();
             const call = m.mock.calls[0][0] as { where: { tenantId: string } };

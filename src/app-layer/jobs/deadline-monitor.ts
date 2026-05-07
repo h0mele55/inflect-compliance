@@ -492,7 +492,19 @@ async function transitionPlansToOverdue(
 
     const candidates = await prisma.riskTreatmentPlan.findMany({
         where,
-        select: { id: true, tenantId: true, riskId: true, targetDate: true },
+        // ownerUserId is included for parity with the scanner SELECTs —
+        // the due-item-ownership ratchet asserts every SELECT in this
+        // file carries an owner field. The transition itself doesn't
+        // use it, but pulling it in costs nothing and keeps the shape
+        // uniform for future "notify the owner of an overdue plan"
+        // callers that build off this list.
+        select: {
+            id: true,
+            tenantId: true,
+            riskId: true,
+            ownerUserId: true,
+            targetDate: true,
+        },
     });
 
     let transitioned = 0;
