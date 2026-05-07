@@ -31,9 +31,19 @@ export default function LinkedTasksPanel({ apiBase, entityType, entityId, tenant
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true);
+        // PR #158 changed `/tasks` to return `{ rows, truncated }` from
+        // the prior raw-array shape. Accept both — older deploys still
+        // emit arrays, and this is the only LinkedTasksPanel touch
+        // point so a defensive read is cheaper than a coordinated
+        // schema flip.
         fetch(`${apiBase}/tasks?linkedEntityType=${encodeURIComponent(entityType)}&linkedEntityId=${encodeURIComponent(entityId)}`)
-            .then(r => r.ok ? r.json() : [])
-            .then(setTasks)
+            .then(r => r.ok ? r.json() : { rows: [] })
+            .then((data: unknown) => {
+                if (Array.isArray(data)) setTasks(data);
+                else if (data && typeof data === 'object' && Array.isArray((data as { rows?: unknown }).rows)) {
+                    setTasks((data as { rows: unknown[] }).rows);
+                } else setTasks([]);
+            })
             .catch(() => setTasks([]))
             .finally(() => setLoading(false));
     }, [apiBase, entityType, entityId]);
