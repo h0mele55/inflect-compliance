@@ -40,6 +40,12 @@ const mockPrisma = {
     risk: { findMany: jest.fn().mockResolvedValue([]) },
     controlTestPlan: { findMany: jest.fn().mockResolvedValue([]) },
     evidence: { findMany: jest.fn().mockResolvedValue([]) },
+    // Epic G-7: Phase 0 transition + scanners.
+    riskTreatmentPlan: {
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+    treatmentMilestone: { findMany: jest.fn().mockResolvedValue([]) },
 };
 
 jest.mock('@/lib/prisma', () => ({

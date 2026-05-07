@@ -121,6 +121,12 @@ describe('Deadline Monitor — TRIAGED tasks', () => {
                 task: { findMany: (...args: unknown[]) => mockTaskFindMany(...args) },
                 risk: { findMany: jest.fn().mockResolvedValue([]) },
                 controlTestPlan: { findMany: jest.fn().mockResolvedValue([]) },
+                // Epic G-7
+                riskTreatmentPlan: {
+                    findMany: jest.fn().mockResolvedValue([]),
+                    updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+                },
+                treatmentMilestone: { findMany: jest.fn().mockResolvedValue([]) },
             },
         }));
     });

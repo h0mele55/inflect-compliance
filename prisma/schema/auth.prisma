@@ -164,6 +164,9 @@ model Tenant {
   accessReviewDecisions             AccessReviewDecision[]
   // Epic G-5 — control exception register.
   controlExceptions                 ControlException[]
+  // Epic G-7 — risk treatment plans.
+  riskTreatmentPlans                RiskTreatmentPlan[]
+  treatmentMilestones               TreatmentMilestone[]
   // Hub-and-spoke (Epic O-1).
   organization                      Organization?                      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
@@ -674,6 +677,15 @@ model User {
   controlExceptionsApproved     ControlException[]           @relation("ControlExceptionApprovedBy")
   controlExceptionsRejected     ControlException[]           @relation("ControlExceptionRejectedBy")
   controlExceptionsDeleted      ControlException[]           @relation("ControlExceptionDeletedBy")
+  // Epic G-7 — risk treatment plans. Up to four distinct user-roles
+  // per plan (owner, creator, completer, deleter) plus the
+  // milestone completer. Distinct relation names so Prisma can
+  // disambiguate.
+  riskTreatmentPlansOwned       RiskTreatmentPlan[]          @relation("RiskTreatmentPlanOwner")
+  riskTreatmentPlansCreated     RiskTreatmentPlan[]          @relation("RiskTreatmentPlanCreator")
+  riskTreatmentPlansCompleted   RiskTreatmentPlan[]          @relation("RiskTreatmentPlanCompleter")
+  riskTreatmentPlansDeleted     RiskTreatmentPlan[]          @relation("RiskTreatmentPlanDeleter")
+  treatmentMilestonesCompleted  TreatmentMilestone[]         @relation("TreatmentMilestoneCompleter")
 }
 
 model Account {

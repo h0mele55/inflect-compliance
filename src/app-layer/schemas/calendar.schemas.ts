@@ -70,6 +70,11 @@ export const CALENDAR_EVENT_TYPES = [
     // risk
     'risk-review',
     'risk-target',
+    // Epic G-7 — treatment plans + milestones live under the risk
+    // category but get their own type so the tooltip + colour can
+    // distinguish them from review/target events on the parent risk.
+    'treatment-milestone-due',
+    'treatment-plan-target',
     // finding
     'finding-due',
 ] as const;
@@ -125,6 +130,8 @@ export interface CalendarEvent {
         | 'CONTROL_TEST_PLAN'
         | 'TASK'
         | 'RISK'
+        | 'RISK_TREATMENT_PLAN'
+        | 'TREATMENT_MILESTONE'
         | 'FINDING';
     entityId: string;
     /**

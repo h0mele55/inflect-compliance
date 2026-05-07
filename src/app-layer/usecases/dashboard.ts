@@ -72,6 +72,7 @@ export async function getExecutiveDashboard(ctx: RequestContext): Promise<Execut
             riskHeatmap,
             upcomingExpirations,
             exceptions,
+            treatmentPlans,
         ] = await Promise.all([
             DashboardRepository.getStats(db, ctx),
             DashboardRepository.getControlCoverage(db, ctx),
@@ -85,6 +86,7 @@ export async function getExecutiveDashboard(ctx: RequestContext): Promise<Execut
             DashboardRepository.getRiskHeatmap(db, ctx),
             DashboardRepository.getUpcomingExpirations(db, ctx),
             DashboardRepository.getExceptionSummary(db, ctx),
+            DashboardRepository.getTreatmentPlanSummary(db, ctx),
         ]);
 
         return {
@@ -100,6 +102,7 @@ export async function getExecutiveDashboard(ctx: RequestContext): Promise<Execut
             riskHeatmap,
             upcomingExpirations,
             exceptions,
+            treatmentPlans,
             computedAt: new Date().toISOString(),
         };
     });

@@ -57,6 +57,8 @@ const ENTITY_LABEL: Record<MonitoredEntityType, string> = {
     TASK: 'Task',
     RISK: 'Risk',
     TEST_PLAN: 'Test Plan',
+    TREATMENT_PLAN: 'Treatment Plan',
+    TREATMENT_MILESTONE: 'Treatment Milestone',
 };
 
 const ENTITY_PATH: Record<MonitoredEntityType, string> = {
@@ -67,6 +69,10 @@ const ENTITY_PATH: Record<MonitoredEntityType, string> = {
     TASK: 'tasks',
     RISK: 'risks',
     TEST_PLAN: 'controls', // test plans live under controls
+    // Both treatment-plan + milestone deep-link to the parent risk's
+    // detail page where the treatment-plan card surfaces them.
+    TREATMENT_PLAN: 'risks',
+    TREATMENT_MILESTONE: 'risks',
 };
 
 // ─── Text Rendering Helpers ─────────────────────────────────────────

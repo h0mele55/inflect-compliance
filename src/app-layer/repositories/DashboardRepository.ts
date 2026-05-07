@@ -180,6 +180,24 @@ export interface ExceptionSummary {
 }
 
 /**
+ * Epic G-7 — risk treatment plan inventory + overdue counts for the
+ * dashboard. Five COUNTs against the `(tenantId, status)` and
+ * `(tenantId, targetDate)` indexes from prompt 1.
+ */
+export interface TreatmentPlanSummary {
+    /** DRAFT or ACTIVE plans whose targetDate is still in the future. */
+    activeOnTrack: number;
+    /** Plans whose targetDate has elapsed but status isn't COMPLETED. */
+    overdue: number;
+    /** Approved plans with targetDate within the next 30 days. */
+    dueWithin30: number;
+    /** Subset of dueWithin30 — within next 7 days. */
+    dueWithin7: number;
+    /** COMPLETED plans (audit-trail visibility). */
+    completed: number;
+}
+
+/**
  * Complete executive dashboard payload.
  * Returned as a single aggregated response to minimize round trips.
  */
@@ -197,6 +215,8 @@ export interface ExecutiveDashboardPayload {
     upcomingExpirations: EvidenceExpiryItem[];
     /** Epic G-5 — control exception health card. */
     exceptions: ExceptionSummary;
+    /** Epic G-7 — risk treatment plan health card. */
+    treatmentPlans: TreatmentPlanSummary;
     /** ISO 8601 timestamp of when the payload was computed */
     computedAt: string;
 }
@@ -674,6 +694,72 @@ export class DashboardRepository {
             expiringWithin30,
             expiringWithin7,
             expired,
+        };
+    }
+
+    /**
+     * Epic G-7 — risk treatment plan inventory + overdue counts for
+     * the dashboard card. Five parallel COUNTs against the
+     * `(tenantId, status)` + `(tenantId, targetDate)` indexes.
+     */
+    static async getTreatmentPlanSummary(
+        db: PrismaTx,
+        ctx: RequestContext,
+    ): Promise<TreatmentPlanSummary> {
+        const tenantId = ctx.tenantId;
+        const now = new Date();
+        const in30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+        const in7 = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+        const [
+            activeOnTrack,
+            overdue,
+            dueWithin30,
+            dueWithin7,
+            completed,
+        ] = await Promise.all([
+            db.riskTreatmentPlan.count({
+                where: {
+                    tenantId,
+                    deletedAt: null,
+                    status: { in: ['DRAFT', 'ACTIVE'] },
+                    targetDate: { gte: now },
+                },
+            }),
+            db.riskTreatmentPlan.count({
+                where: {
+                    tenantId,
+                    deletedAt: null,
+                    status: { in: ['DRAFT', 'ACTIVE', 'OVERDUE'] },
+                    targetDate: { lt: now },
+                },
+            }),
+            db.riskTreatmentPlan.count({
+                where: {
+                    tenantId,
+                    deletedAt: null,
+                    status: { in: ['DRAFT', 'ACTIVE'] },
+                    targetDate: { gte: now, lte: in30 },
+                },
+            }),
+            db.riskTreatmentPlan.count({
+                where: {
+                    tenantId,
+                    deletedAt: null,
+                    status: { in: ['DRAFT', 'ACTIVE'] },
+                    targetDate: { gte: now, lte: in7 },
+                },
+            }),
+            db.riskTreatmentPlan.count({
+                where: { tenantId, deletedAt: null, status: 'COMPLETED' },
+            }),
+        ]);
+        return {
+            activeOnTrack,
+            overdue,
+            dueWithin30,
+            dueWithin7,
+            completed,
         };
     }
 }

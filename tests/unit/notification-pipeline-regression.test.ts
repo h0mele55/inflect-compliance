@@ -54,6 +54,11 @@ const spies = {
     auditCycle:      jest.fn().mockResolvedValue([]),
     vendorDocument:  jest.fn().mockResolvedValue([]),
     finding:         jest.fn().mockResolvedValue([]),
+    // Epic G-7 — risk-treatment-plan scanner + Phase 0 transition,
+    // plus the milestone scanner. updateMany returns a row-count.
+    riskTreatmentPlan:           jest.fn().mockResolvedValue([]),
+    riskTreatmentPlanUpdateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    treatmentMilestone:          jest.fn().mockResolvedValue([]),
     // Notification infra — NOT source entities
     user:            jest.fn().mockResolvedValue([]),
     membership:      jest.fn().mockResolvedValue([]),
@@ -77,6 +82,9 @@ beforeEach(() => {
     spies.auditCycle.mockResolvedValue([]);
     spies.vendorDocument.mockResolvedValue([]);
     spies.finding.mockResolvedValue([]);
+    spies.riskTreatmentPlan.mockResolvedValue([]);
+    spies.riskTreatmentPlanUpdateMany.mockResolvedValue({ count: 0 });
+    spies.treatmentMilestone.mockResolvedValue([]);
     spies.user.mockResolvedValue([]);
     spies.membership.mockResolvedValue([]);
     spies.tenant.mockResolvedValue({ slug: 'test' });
@@ -99,6 +107,11 @@ beforeEach(() => {
         auditCycle:       { findMany: (...a: unknown[]) => spies.auditCycle(...a) },
         vendorDocument:   { findMany: (...a: unknown[]) => spies.vendorDocument(...a) },
         finding:          { findMany: (...a: unknown[]) => spies.finding(...a) },
+        riskTreatmentPlan: {
+            findMany:   (...a: unknown[]) => spies.riskTreatmentPlan(...a),
+            updateMany: (...a: unknown[]) => spies.riskTreatmentPlanUpdateMany(...a),
+        },
+        treatmentMilestone: { findMany: (...a: unknown[]) => spies.treatmentMilestone(...a) },
         user:             { findMany: (...a: unknown[]) => spies.user(...a) },
         tenantMembership: { findMany: (...a: unknown[]) => spies.membership(...a) },
         tenant:           { findUnique: (...a: unknown[]) => spies.tenant(...a) },

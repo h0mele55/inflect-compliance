@@ -179,6 +179,16 @@ export const ENCRYPTED_FIELDS: Readonly<Record<string, readonly string[]>> = {
     //  on REJECTED rows. Both contain narrative that may name
     //  internal users / systems, so they're encrypted at rest.
     ControlException: ['justification', 'rejectionReason'],
+
+    // ─── Epic G-7 risk treatment plans ─────────────────
+    //  Both columns can name internal systems / vendors / users:
+    //    - RiskTreatmentPlan.closingRemark — narrative rationale
+    //      written when a plan is marked COMPLETED.
+    //    - TreatmentMilestone.description — milestone detail; may
+    //      reference vendors, internal teams, or sensitive
+    //      infrastructure.
+    RiskTreatmentPlan: ['closingRemark'],
+    TreatmentMilestone: ['description'],
 } as const;
 
 /** Set of model names with at least one encrypted field. Fast-path check. */
