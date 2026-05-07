@@ -92,6 +92,7 @@ export class WorkItemRepository {
 
     private static _buildWhere(ctx: RequestContext, filters: TaskFilters = {}): Prisma.TaskWhereInput {
         const where: Prisma.TaskWhereInput = { tenantId: ctx.tenantId };
+        const and: Prisma.TaskWhereInput[] = [];
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if (filters.status) where.status = filters.status as any;
@@ -105,18 +106,20 @@ export class WorkItemRepository {
         if (filters.controlId) where.controlId = filters.controlId;
         if (filters.due === 'overdue') {
             where.dueAt = { lt: new Date() };
-            where.status = { notIn: [...TERMINAL_WORK_ITEM_STATUSES] };
+            if (!filters.status) where.status = { notIn: [...TERMINAL_WORK_ITEM_STATUSES] } as any;
         } else if (filters.due === 'next7d') {
             const now = new Date();
             const in7 = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
             where.dueAt = { gte: now, lte: in7 };
-            where.status = { notIn: [...TERMINAL_WORK_ITEM_STATUSES] };
+            if (!filters.status) where.status = { notIn: [...TERMINAL_WORK_ITEM_STATUSES] } as any;
         }
         if (filters.q) {
-            where.OR = [
-                { title: { contains: filters.q, mode: 'insensitive' } },
-                { key: { contains: filters.q, mode: 'insensitive' } },
-            ];
+            and.push({
+                OR: [
+                    { title: { contains: filters.q, mode: 'insensitive' } },
+                    { key: { contains: filters.q, mode: 'insensitive' } },
+                ],
+            });
         }
         if (filters.linkedEntityType && filters.linkedEntityId) {
             where.links = {
@@ -128,6 +131,7 @@ export class WorkItemRepository {
             };
         }
 
+        if (and.length) where.AND = and;
         return where;
     }
 

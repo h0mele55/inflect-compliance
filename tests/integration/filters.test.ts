@@ -240,12 +240,12 @@ describe('WorkItemRepository._buildWhere', () => {
         await WorkItemRepository.list(mockDb, ctx, { q: 'TSK-42' });
 
         const where = mockFindMany.mock.calls[0][0].where;
-        expect(where.OR).toEqual(
-            expect.arrayContaining([
+        expect(where.AND).toEqual([{
+            OR: expect.arrayContaining([
                 expect.objectContaining({ title: { contains: 'TSK-42', mode: 'insensitive' } }),
                 expect.objectContaining({ key: { contains: 'TSK-42', mode: 'insensitive' } }),
-            ])
-        );
+            ]),
+        }]);
     });
 
     it('filters by overdue due date', async () => {
@@ -274,6 +274,38 @@ describe('WorkItemRepository._buildWhere', () => {
         expect(where.status).toBe('IN_PROGRESS');
         expect(where.priority).toBe('P0');
         expect(where.assigneeUserId).toBe('user-5');
+    });
+
+    it('preserves explicit status when combined with due filter', async () => {
+        const { WorkItemRepository } = await import('@/app-layer/repositories/WorkItemRepository');
+        const mockFindMany = jest.fn().mockResolvedValue([]);
+        const mockDb = { task: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
+
+        await WorkItemRepository.list(mockDb, ctx, { status: 'OPEN', due: 'overdue' });
+
+        const where = mockFindMany.mock.calls[0][0].where;
+        expect(where.status).toBe('OPEN');
+        expect(where.dueAt).toBeDefined();
+        expect(where.dueAt.lt).toBeInstanceOf(Date);
+    });
+
+    it('combines status + due:next7d + search query', async () => {
+        const { WorkItemRepository } = await import('@/app-layer/repositories/WorkItemRepository');
+        const mockFindMany = jest.fn().mockResolvedValue([]);
+        const mockDb = { task: { findMany: mockFindMany } } as unknown as PrismaTx;
+        const ctx = { tenantId: 'tenant-1', userId: 'user-1' } as unknown as RequestContext;
+
+        await WorkItemRepository.list(mockDb, ctx, { status: 'IN_PROGRESS', due: 'next7d', q: 'urgent' });
+
+        const where = mockFindMany.mock.calls[0][0].where;
+        expect(where.status).toBe('IN_PROGRESS');
+        expect(where.dueAt).toBeDefined();
+        expect(where.AND).toEqual([{
+            OR: expect.arrayContaining([
+                expect.objectContaining({ title: { contains: 'urgent', mode: 'insensitive' } }),
+            ]),
+        }]);
     });
 });
 
