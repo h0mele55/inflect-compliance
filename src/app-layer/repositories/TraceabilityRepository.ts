@@ -78,13 +78,13 @@ export class AssetRiskRepository {
         });
     }
 
+    static async findLink(db: PrismaTx, tenantId: string, assetId: string, riskId: string) {
+        return db.assetRiskLink.findUnique({
+            where: { tenantId_assetId_riskId: { tenantId, assetId, riskId } },
+        });
+    }
+
     static async link(db: PrismaTx, tenantId: string, assetId: string, riskId: string, exposureLevel: string | null, rationale: string | null, userId: string) {
-        // Idempotent re-link: a user clicking "Add risk" on an
-        // already-linked pair previously got a P2002 → 409 from the
-        // unique constraint. Upsert keeps the operation a no-op when
-        // nothing changed and lets the user revise `exposureLevel` /
-        // `rationale` on the existing edge in one step. createdBy +
-        // tenantId stay frozen on the original link.
         return db.assetRiskLink.upsert({
             where: { tenantId_assetId_riskId: { tenantId, assetId, riskId } },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any

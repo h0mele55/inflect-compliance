@@ -157,11 +157,6 @@ function ModalRoot({
 
     const presentation = resolveModalPresentation({ isMobile, desktopOnly });
 
-    // Radix logs a console warning when `Dialog.Content` has no
-    // `aria-describedby` target. We always render a visually-hidden
-    // `Dialog.Description` so the warning never fires, even when the
-    // caller didn't supply prose — screen readers get an empty (but
-    // valid) description rather than a "missing" complaint.
     const fallbackDialogTitle = (
         <VisuallyHidden.Root>
             <Dialog.Title>{title ?? "Dialog"}</Dialog.Title>

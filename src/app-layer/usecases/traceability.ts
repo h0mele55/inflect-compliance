@@ -88,8 +88,13 @@ export async function listRiskAssets(ctx: RequestContext, riskId: string) {
 export async function mapAssetToRisk(ctx: RequestContext, assetId: string, riskId: string, exposureLevel?: string, rationale?: string) {
     assertCanManage(ctx);
     return runInTenantContext(ctx, async (db) => {
+        const existing = await AssetRiskRepository.findLink(db, ctx.tenantId, assetId, riskId);
         const link = await AssetRiskRepository.link(db, ctx.tenantId, assetId, riskId, exposureLevel || null, rationale || null, ctx.userId);
-        await logEvent(db, ctx, { action: 'ASSET_RISK_LINKED', entityType: 'Asset', entityId: assetId, details: `Linked to risk ${riskId}`, detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Asset', sourceId: assetId, targetEntity: 'Risk', targetId: riskId, relation: exposureLevel || 'DIRECT' }, metadata: { riskId, exposureLevel } });
+        if (!existing) {
+            await logEvent(db, ctx, { action: 'ASSET_RISK_LINKED', entityType: 'Asset', entityId: assetId, details: `Linked to risk ${riskId}`, detailsJson: { category: 'relationship', operation: 'linked', sourceEntity: 'Asset', sourceId: assetId, targetEntity: 'Risk', targetId: riskId, relation: exposureLevel || 'DIRECT' }, metadata: { riskId, exposureLevel } });
+        } else if (link.exposureLevel !== existing.exposureLevel || link.rationale !== existing.rationale) {
+            await logEvent(db, ctx, { action: 'ASSET_RISK_UPDATED', entityType: 'Asset', entityId: assetId, details: `Updated link to risk ${riskId}`, detailsJson: { category: 'relationship', operation: 'updated', sourceEntity: 'Asset', sourceId: assetId, targetEntity: 'Risk', targetId: riskId }, metadata: { riskId, exposureLevel } });
+        }
         return link;
     });
 }

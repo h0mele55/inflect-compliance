@@ -91,9 +91,6 @@ function SheetRoot({
 
     const isSide = effectiveDirection === "right";
 
-    // Always render a Drawer.Description so Radix never logs the
-    // "Missing aria-describedby" warning, even when the caller didn't
-    // supply prose. Same fallback used by `<Modal>`.
     const fallbackTitle = (
         <VisuallyHidden.Root>
             <Drawer.Title>{title ?? "Sheet"}</Drawer.Title>
