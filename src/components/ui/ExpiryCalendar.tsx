@@ -54,11 +54,17 @@ function getUrgency(daysUntil: number): Urgency {
     return 'normal';
 }
 
+// EXEMPT from PR-1 status-color migration: this widget uses a 3-tier
+// urgency gradient (red → amber → yellow) for at-a-glance scanning of
+// expiry urgency. The token system has only one warning tier (amber),
+// so collapsing urgent + upcoming to `bg-warning` would erase the
+// yellow vs amber visual distinction. Listed in EXEMPT_FILES of
+// `tests/guards/raw-color-eradication.test.ts`.
 function urgencyConfig(u: Urgency) {
     switch (u) {
-        case 'overdue':  return { color: 'text-content-error', bg: 'bg-bg-error', badge: 'bg-bg-error text-content-error', label: 'Overdue' };
-        case 'urgent':   return { color: 'text-content-warning', bg: 'bg-bg-warning', badge: 'bg-bg-warning text-content-warning', label: 'This Week' };
-        case 'upcoming': return { color: 'text-content-warning', bg: 'bg-bg-warning', badge: 'bg-bg-warning text-content-warning', label: 'Next Week' };
+        case 'overdue':  return { color: 'text-red-400', bg: 'bg-red-500/20', badge: 'bg-red-500/30 text-red-300', label: 'Overdue' };
+        case 'urgent':   return { color: 'text-amber-400', bg: 'bg-amber-500/20', badge: 'bg-amber-500/30 text-amber-300', label: 'This Week' };
+        case 'upcoming': return { color: 'text-yellow-400', bg: 'bg-yellow-500/20', badge: 'bg-yellow-500/30 text-yellow-300', label: 'Next Week' };
         case 'normal':   return { color: 'text-content-muted', bg: 'bg-bg-subtle', badge: 'bg-bg-subtle text-content-default', label: 'This Month' };
     }
 }

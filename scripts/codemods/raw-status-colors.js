@@ -54,6 +54,7 @@ const EXCLUDE_FILE_PATTERNS = [
 const EXCLUDE_VISUALIZATION_FILES = new Set([
   "src/components/ui/RiskHeatmap.tsx",     // 3-tier alpha gradient (/80, /60, /50)
   "src/components/ui/GraphExplorer.tsx",   // sky/rose/emerald/amber as 4-color category palette
+  "src/components/ui/ExpiryCalendar.tsx",  // 3-tier urgency gradient (red/amber/yellow) — token system has only one warning tier
 ]);
 
 const COLOR_TO_STATUS = {
