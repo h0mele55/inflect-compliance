@@ -34,6 +34,7 @@
 import { cn } from '@dub/utils';
 import { GripVertical, Loader2, Save, Undo2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import {
     type BuilderSection,
     deriveBuilderModel,
@@ -200,21 +201,21 @@ export function FrameworkBuilder({
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        type="button"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={handleDiscard}
                         disabled={!dirty || saving}
-                        className="btn btn-secondary btn-sm"
                         id="framework-builder-discard"
                     >
                         <Undo2 className="w-3.5 h-3.5" aria-hidden="true" />
                         Discard
-                    </button>
-                    <button
-                        type="button"
+                    </Button>
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={handleSave}
                         disabled={!dirty || saving}
-                        className="btn btn-primary btn-sm"
                         id="framework-builder-save"
                     >
                         {saving ? (
@@ -223,7 +224,7 @@ export function FrameworkBuilder({
                             <Save className="w-3.5 h-3.5" aria-hidden="true" />
                         )}
                         Save reorder
-                    </button>
+                    </Button>
                 </div>
             </div>
 

@@ -3,6 +3,7 @@ import { formatDateTime } from '@/lib/format-date';
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useOptimisticUpdate } from '@/components/ui/hooks';
 
@@ -75,7 +76,7 @@ export default function NotificationsPage() {
                             <p className="text-sm text-content-emphasis">{n.message}</p>
                             <p className="text-xs text-content-subtle mt-1">{formatDateTime(n.createdAt)}</p>
                         </div>
-                        {!n.read && <button onClick={() => markRead(n.id)} className="btn btn-ghost btn-sm text-xs">{t('markRead')}</button>}
+                        {!n.read && <Button variant="ghost" size="sm" className="text-xs" onClick={() => markRead(n.id)}>{t('markRead')}</Button>}
                     </div>
                 ))}
                 {optimisticList.length === 0 && <div className="glass-card p-12 text-center text-content-subtle">{t('noNotifications')}</div>}

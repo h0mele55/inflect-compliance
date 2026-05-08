@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useOrgContext, useOrgHref, useOrgPermissions } from '@/lib/org-context-provider';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { Button } from '@/components/ui/button';
 import { OrgSwitcher } from '@/components/org-switcher';
 
 // ─── Nav configuration ───────────────────────────────────────────────
@@ -227,14 +228,16 @@ export function OrgSidebarContent({ user, onLogout, onNavClick }: OrgSidebarCont
                     </div>
                     <ThemeToggle id="org-theme-toggle-desktop" />
                 </div>
-                <button
+                <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={onLogout}
-                    className="btn btn-ghost btn-sm w-full text-xs"
+                    className="w-full text-xs"
                     data-testid="org-nav-logout"
                 >
                     <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
                     Sign out
-                </button>
+                </Button>
             </div>
         </div>
     );

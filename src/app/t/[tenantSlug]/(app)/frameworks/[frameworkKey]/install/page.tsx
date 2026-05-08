@@ -7,6 +7,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function InstallWizardPage() {
@@ -190,13 +192,14 @@ export default function InstallWizardPage() {
                     )}
 
                     <div className="flex gap-3">
-                        <button onClick={() => { setStep('select'); setSelectedPack(''); }} className="btn btn-secondary">
+                        <Button variant="secondary" onClick={() => { setStep('select'); setSelectedPack(''); }}>
                             ← Back
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="primary"
+                            className="flex-1"
                             onClick={handleInstall}
                             disabled={installing || preview.newControls === 0}
-                            className="btn btn-primary flex-1"
                             id="confirm-install-btn"
                         >
                             {installing ? (
@@ -208,7 +211,7 @@ export default function InstallWizardPage() {
                             ) : (
                                 `Install ${preview.newControls} Controls`
                             )}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}
@@ -233,10 +236,10 @@ export default function InstallWizardPage() {
                         </div>
                     </div>
                     <div className="flex gap-3 justify-center">
-                        <Link href={tenantHref('/controls')} className="btn btn-primary" id="go-to-controls">
+                        <Link href={tenantHref('/controls')} className={buttonVariants({ variant: 'primary' })} id="go-to-controls">
                             View Controls →
                         </Link>
-                        <Link href={tenantHref(`/frameworks/${frameworkKey}`)} className="btn btn-secondary">
+                        <Link href={tenantHref(`/frameworks/${frameworkKey}`)} className={buttonVariants({ variant: 'secondary' })}>
                             Back to Framework
                         </Link>
                     </div>

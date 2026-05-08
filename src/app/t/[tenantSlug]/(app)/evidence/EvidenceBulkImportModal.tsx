@@ -37,6 +37,7 @@ import {
     type SetStateAction,
 } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import {
     FileDropzone,
@@ -325,17 +326,18 @@ export function EvidenceBulkImportModal({
                 </Modal.Body>
 
                 <Modal.Actions>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         id="bulk-import-cancel-btn"
                         onClick={cancel}
                     >
                         {isTerminal ? 'Close' : 'Cancel'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="submit"
-                        className="btn btn-primary btn-sm"
+                        variant="primary"
+                        size="sm"
                         id="bulk-import-submit-btn"
                         disabled={
                             queuedCount === 0 || busy || jobId !== null
@@ -346,7 +348,7 @@ export function EvidenceBulkImportModal({
                             : busy
                               ? 'Uploading…'
                               : 'Start import'}
-                    </button>
+                    </Button>
                 </Modal.Actions>
             </Modal.Form>
         </Modal>

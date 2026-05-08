@@ -10,6 +10,8 @@ import dynamic from 'next/dynamic';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import type { PolicyDetailDTO, PolicyVersionDTO, AuditLogEntry } from '@/lib/dto';
 import { DatePicker } from '@/components/ui/date-picker/date-picker';
 import {
@@ -316,7 +318,7 @@ export default function PolicyDetailPage() {
     if (error && !policy) return (
         <div className="glass-card p-12 text-center text-red-400 animate-fadeIn">
             <p className="text-lg">{error}</p>
-            <Link href={tenantHref('/policies')} className="btn btn-secondary mt-4">← Back to Policies</Link>
+            <Link href={tenantHref('/policies')} className={buttonVariants({ variant: 'secondary', className: 'mt-4' })}>← Back to Policies</Link>
         </div>
     );
     if (!policy) return null;
@@ -472,10 +474,10 @@ export default function PolicyDetailPage() {
                                         aria-label="Next review date"
                                     />
                                 </div>
-                                <button onClick={saveReview} disabled={savingReview} className="btn btn-xs btn-primary">
+                                <Button variant="primary" size="xs" onClick={saveReview} disabled={savingReview}>
                                     {savingReview ? '...' : 'Save'}
-                                </button>
-                                <button onClick={() => setEditingReview(false)} className="btn btn-xs btn-ghost">Cancel</button>
+                                </Button>
+                                <Button variant="ghost" size="xs" onClick={() => setEditingReview(false)}>Cancel</Button>
                             </div>
                         )}
                     </div>
@@ -495,13 +497,12 @@ export default function PolicyDetailPage() {
                                         : 'MARKDOWN',
                                 );
                             }}
-                                className="btn btn-primary btn-sm" id="new-version-btn">New Version</button>
+                                className={buttonVariants({ variant: 'primary', size: 'sm' })} id="new-version-btn">New Version</button>
                         )}
                         {canAdmin && policy.status !== 'ARCHIVED' && (
-                            <button onClick={archivePolicy} disabled={actionLoading === 'archive'}
-                                className="btn btn-ghost btn-sm text-content-muted hover:text-red-400" id="archive-btn">
+                            <Button variant="ghost" size="sm" className="text-content-muted hover:text-red-400" onClick={archivePolicy} disabled={actionLoading === 'archive'} id="archive-btn">
                                 {actionLoading === 'archive' ? '...' : 'Archive'}
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>
@@ -584,16 +585,14 @@ export default function PolicyDetailPage() {
                                     </div>
                                     <div className="flex gap-2">
                                         {canWrite && !hasPending && !isCurrentPublished && (
-                                            <button onClick={() => requestApproval(v.id)} disabled={!!actionLoading}
-                                                className="btn btn-sm btn-secondary" id={`request-approval-${v.versionNumber}`}>
+                                            <Button variant="secondary" size="sm" onClick={() => requestApproval(v.id)} disabled={!!actionLoading} id={`request-approval-${v.versionNumber}`}>
                                                 {actionLoading === 'approve-' + v.id ? '...' : 'Request Approval'}
-                                            </button>
+                                            </Button>
                                         )}
                                         {canAdmin && hasApproved && !isCurrentPublished && (
-                                            <button onClick={() => publishVersion(v.id)} disabled={!!actionLoading}
-                                                className="btn btn-sm btn-success" id={`publish-version-${v.versionNumber}`}>
+                                            <Button variant="success" size="sm" onClick={() => publishVersion(v.id)} disabled={!!actionLoading} id={`publish-version-${v.versionNumber}`}>
                                                 {actionLoading === 'publish-' + v.id ? '...' : 'Publish'}
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
                                 </div>
@@ -616,12 +615,10 @@ export default function PolicyDetailPage() {
                                                 </div>
                                                 {canAdmin && a.status === 'PENDING' && (
                                                     <div className="flex gap-1">
-                                                        <button onClick={() => decideApproval(a.id, 'APPROVED')} disabled={!!actionLoading}
-                                                            className="btn btn-xs btn-success" id={`approve-${a.id}`}>
+                                                        <Button variant="success" size="xs" onClick={() => decideApproval(a.id, 'APPROVED')} disabled={!!actionLoading} id={`approve-${a.id}`}>
                                                             {actionLoading === 'decide-' + a.id ? '...' : 'Approve'}
-                                                        </button>
-                                                        <button onClick={() => decideApproval(a.id, 'REJECTED')} disabled={!!actionLoading}
-                                                            className="btn btn-xs btn-danger">Reject</button>
+                                                        </Button>
+                                                        <Button variant="danger" size="xs" onClick={() => decideApproval(a.id, 'REJECTED')} disabled={!!actionLoading}>Reject</Button>
                                                     </div>
                                                 )}
                                             </div>
@@ -700,9 +697,9 @@ export default function PolicyDetailPage() {
                             placeholder="What changed in this version?" id="change-summary-input" />
                     </div>
 
-                    <button onClick={createVersion} disabled={saving} className="btn btn-primary" id="save-version-btn">
+                    <Button variant="primary" onClick={createVersion} disabled={saving} id="save-version-btn">
                         {saving ? 'Saving...' : 'Save as New Version'}
-                    </button>
+                    </Button>
                 </div>
             )}
 

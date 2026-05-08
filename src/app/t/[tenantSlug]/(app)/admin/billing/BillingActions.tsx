@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { CreditCard, ExternalLink, Loader2 } from 'lucide-react';
+import { CreditCard, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 /**
  * Client component for billing actions.
@@ -64,19 +65,16 @@ export function BillingActions({
     if (portal) {
         return (
             <div>
-                <button
+                <Button
+                    variant="primary"
                     onClick={handlePortal}
                     disabled={loading}
-                    className="btn btn-primary"
+                    loading={loading}
                     id="billing-portal-btn"
                 >
-                    {loading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                        <ExternalLink className="w-4 h-4" />
-                    )}
+                    {!loading && <ExternalLink className="w-4 h-4" />}
                     Manage Billing
-                </button>
+                </Button>
                 {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
             </div>
         );
@@ -84,19 +82,16 @@ export function BillingActions({
 
     return (
         <div>
-            <button
+            <Button
+                variant={plan === 'ENTERPRISE' ? 'secondary' : 'primary'}
                 onClick={handleCheckout}
                 disabled={loading}
-                className={`btn ${plan === 'ENTERPRISE' ? 'btn-secondary' : 'btn-primary'}`}
+                loading={loading}
                 id={`billing-upgrade-${plan?.toLowerCase()}-btn`}
             >
-                {loading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                    <CreditCard className="w-4 h-4" />
-                )}
+                {!loading && <CreditCard className="w-4 h-4" />}
                 Upgrade to {plan}
-            </button>
+            </Button>
             {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
         </div>
     );

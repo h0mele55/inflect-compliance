@@ -8,6 +8,7 @@ import { ListPageShell } from '@/components/layout/ListPageShell';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { TableEmptyState } from '@/components/ui/table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Button } from '@/components/ui/button';
 import { useCursorPagination } from '@/components/ui/hooks';
 import { formatDate } from '@/lib/format-date';
 import type { CriticalRiskRow } from '@/app-layer/schemas/portfolio';
@@ -156,9 +157,10 @@ export function RisksTable({ rows: initialRows, nextCursor: initialNextCursor, o
                 />
                 {pagination.hasMore && orgSlug && (
                     <div className="flex flex-col items-center gap-2 pt-3">
-                        <button
+                        <Button
                             type="button"
-                            className="btn btn-secondary btn-sm"
+                            variant="secondary"
+                            size="sm"
                             data-testid="org-risks-load-more"
                             onClick={() => {
                                 void pagination.loadMore();
@@ -166,7 +168,7 @@ export function RisksTable({ rows: initialRows, nextCursor: initialNextCursor, o
                             disabled={pagination.loading}
                         >
                             {pagination.loading ? 'Loading…' : 'Load more risks'}
-                        </button>
+                        </Button>
                         {pagination.error && (
                             <span
                                 className="text-content-error text-sm"

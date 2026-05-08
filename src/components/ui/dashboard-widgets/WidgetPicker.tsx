@@ -44,6 +44,7 @@
 import { useMemo, useState } from 'react';
 
 import { Modal } from '@/components/ui/modal';
+import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -489,26 +490,26 @@ export function WidgetPicker({
                 </div>
             </Modal.Body>
             <Modal.Actions>
-                <button
-                    type="button"
+                <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => onOpenChange(false)}
-                    className="btn btn-secondary btn-sm"
                     data-testid="widget-picker-cancel"
                     disabled={submitting}
                 >
                     Cancel
-                </button>
-                <button
-                    type="button"
+                </Button>
+                <Button
+                    variant="primary"
+                    size="sm"
                     onClick={() => {
                         void handleSubmit();
                     }}
-                    className="btn btn-primary btn-sm"
                     data-testid="widget-picker-submit"
                     disabled={submitting}
                 >
                     {submitting ? 'Adding…' : 'Add widget'}
-                </button>
+                </Button>
             </Modal.Actions>
         </Modal>
     );

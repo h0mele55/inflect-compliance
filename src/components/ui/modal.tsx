@@ -47,6 +47,7 @@ import {
     type HTMLAttributes,
 } from "react";
 import { Drawer } from "vaul";
+import { Button } from "./button";
 import { useMediaQuery } from "./hooks";
 import { ProgressiveBlur } from "./progressive-blur";
 import { Tooltip } from "./tooltip";
@@ -467,10 +468,10 @@ const toneIcon: Record<ConfirmTone, React.JSX.Element> = {
     info: <Info className="size-5 text-content-info" aria-hidden="true" />,
 };
 
-const tonePrimaryClass: Record<ConfirmTone, string> = {
-    danger: "btn btn-danger",
-    warning: "btn btn-primary",
-    info: "btn btn-primary",
+const tonePrimaryVariant: Record<ConfirmTone, "danger" | "primary"> = {
+    danger: "danger",
+    warning: "primary",
+    info: "primary",
 };
 
 /**
@@ -536,22 +537,24 @@ function Confirm({
                 </div>
             </Header>
             <Actions>
-                <button
+                <Button
                     type="button"
-                    className="btn btn-secondary btn-sm"
+                    variant="secondary"
+                    size="sm"
                     data-modal-cancel
                     onClick={handleCancel}
                 >
                     {cancelLabel}
-                </button>
-                <button
+                </Button>
+                <Button
                     type="button"
-                    className={cn(tonePrimaryClass[tone], "btn-sm")}
+                    variant={tonePrimaryVariant[tone]}
+                    size="sm"
                     data-modal-confirm
                     onClick={handleConfirm}
                 >
                     {confirmLabel}
-                </button>
+                </Button>
             </Actions>
         </ModalRoot>
     );

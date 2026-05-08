@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Button } from '@/components/ui/button';
 import type { CappedList } from '@/lib/list-backfill-cap';
 import { TruncationBanner } from '@/components/ui/TruncationBanner';
 
@@ -125,7 +126,7 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
         <>
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-content-muted text-sm">{audits.length} audits</p></div>
-                <button onClick={() => setShowForm(!showForm)} className="btn btn-primary" id="new-audit-btn">{t.newAudit}</button>
+                <Button variant="primary" onClick={() => setShowForm(!showForm)} id="new-audit-btn">{t.newAudit}</Button>
             </div>
 
             <TruncationBanner truncated={truncated} />
@@ -137,7 +138,7 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
                         <div><label className="input-label">{t.auditors}</label><input className="input" value={form.auditors} onChange={e => setForm(f => ({ ...f, auditors: e.target.value }))} /></div>
                         <div className="sm:col-span-2"><label className="input-label">{t.scope}</label><textarea className="input" value={form.scope} onChange={e => setForm(f => ({ ...f, scope: e.target.value }))} id="audit-scope-input" /></div>
                     </div>
-                    <div className="flex flex-wrap gap-2"><button type="submit" className="btn btn-primary" id="create-audit-btn">{t.createAudit}</button><button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary">{t.cancel}</button></div>
+                    <div className="flex flex-wrap gap-2"><Button type="submit" variant="primary" id="create-audit-btn">{t.createAudit}</Button><Button type="button" variant="secondary" onClick={() => setShowForm(false)}>{t.cancel}</Button></div>
                 </form>
             )}
 
@@ -161,8 +162,8 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                 <h2 className="text-lg font-bold">{selected.title}</h2>
                                 <div className="flex flex-wrap gap-2">
-                                    {selected.status === 'PLANNED' && <button onClick={() => updateAuditStatus('IN_PROGRESS')} className="btn btn-sm btn-primary">{t.inProgress}</button>}
-                                    {selected.status === 'IN_PROGRESS' && <button onClick={() => updateAuditStatus('COMPLETED')} className="btn btn-sm btn-success">{t.completed}</button>}
+                                    {selected.status === 'PLANNED' && <Button variant="primary" size="sm" onClick={() => updateAuditStatus('IN_PROGRESS')}>{t.inProgress}</Button>}
+                                    {selected.status === 'IN_PROGRESS' && <Button variant="success" size="sm" onClick={() => updateAuditStatus('COMPLETED')}>{t.completed}</Button>}
                                 </div>
                             </div>
                             {selected.scope && <p className="text-sm text-content-muted">{selected.scope}</p>}

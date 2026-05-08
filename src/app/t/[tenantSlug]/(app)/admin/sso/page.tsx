@@ -8,6 +8,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { Shield, CheckCircle, XCircle, AlertTriangle, ExternalLink, Trash2, Save, Eye, EyeOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { InfoTooltip } from '@/components/ui/tooltip';
 import { ToggleGroup } from '@/components/ui/toggle-group';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -501,22 +503,23 @@ export default function SsoAdminPage() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 mt-6">
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={handleSave}
                         disabled={saving}
-                        className="btn btn-primary"
+                        loading={saving}
                         id="sso-save-btn"
                     >
                         <Save className="w-3.5 h-3.5" />
                         {saving ? 'Saving...' : 'Save Configuration'}
-                    </button>
+                    </Button>
 
                     {existingProvider && existingProvider.isEnabled && (
                         <a
                             href={testLoginUrl() || '#'}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="btn btn-secondary"
+                            className={buttonVariants({ variant: 'secondary' })}
                             id="sso-test-btn"
                         >
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -525,14 +528,15 @@ export default function SsoAdminPage() {
                     )}
 
                     {existingProvider && (
-                        <button
+                        <Button
+                            variant="danger-outline"
                             onClick={handleDelete}
-                            className="btn btn-secondary text-red-400 hover:text-red-300 ml-auto"
+                            className="ml-auto"
                             id="sso-delete-btn"
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                             Delete
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

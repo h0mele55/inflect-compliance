@@ -25,6 +25,8 @@ import {
 } from '@/components/ui/filter';
 import { FilterToolbar } from '@/components/filters/FilterToolbar';
 import { ListPageShell } from '@/components/layout/ListPageShell';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildTaskFilters, TASK_FILTER_KEYS } from './filter-defs';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
@@ -428,9 +430,9 @@ function TasksPageInner({
                         <p className="text-content-muted text-sm">{tasks.length} tasks in register</p>
                     </div>
                     <div className="flex gap-2">
-                        <Link href={tenantHref('/tasks/dashboard')} className="btn btn-secondary inline-flex items-center gap-2" id="dashboard-btn"><AppIcon name="dashboard" size={16} /> Dashboard</Link>
+                        <Link href={tenantHref('/tasks/dashboard')} className={buttonVariants({ variant: 'secondary', className: 'inline-flex items-center gap-2' })} id="dashboard-btn"><AppIcon name="dashboard" size={16} /> Dashboard</Link>
                         {appPermissions.tasks.create && (
-                            <Link href={tenantHref('/tasks/new')} className="btn btn-primary" id="new-task-btn">
+                            <Link href={tenantHref('/tasks/new')} className={buttonVariants({ variant: 'primary' })} id="new-task-btn">
                                 + New Task
                             </Link>
                         )}
@@ -496,14 +498,14 @@ function TasksPageInner({
                             aria-label="Bulk due date"
                         />
                     )}
-                    <button
-                        className="btn btn-primary"
+                    <Button
+                        variant="primary"
                         disabled={!bulkAction || (bulkAction === 'status' && !bulkValue) || bulkMutation.isMutating}
                         onClick={handleBulkSubmit}
                         id="bulk-apply-btn"
                     >
                         {bulkMutation.isMutating ? 'Applying...' : 'Apply'}
-                    </button>
+                    </Button>
                     <button className="text-xs text-content-muted hover:text-content-emphasis" onClick={() => setSelected(new Set())}>Clear</button>
                 </div>
             )}

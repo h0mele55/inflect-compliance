@@ -3,6 +3,7 @@ import { getTenantCtx } from '@/app-layer/context';
 import { listAuditLogs } from '@/app-layer/usecases/auditLog';
 import { Shield, CreditCard, KeyRound, ShieldCheck, ShieldPlus, Users, CloudCog, Plug, Palette, Grid3x3 } from 'lucide-react';
 import Link from 'next/link';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { AdminClient } from './AdminClient';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
@@ -67,7 +68,7 @@ export default async function AdminPage({
             <div className="flex gap-2 flex-wrap">
                 <Link
                     href={tenantHref('/admin/members')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="members-pill-btn"
                 >
                     <Users className="w-3.5 h-3.5" />
@@ -75,7 +76,7 @@ export default async function AdminPage({
                 </Link>
                 <Link
                     href={tenantHref('/admin/rbac')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="rbac-pill-btn"
                 >
                     <Shield className="w-3.5 h-3.5" />
@@ -83,7 +84,7 @@ export default async function AdminPage({
                 </Link>
                 <Link
                     href={tenantHref('/admin/roles')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="custom-roles-pill-btn"
                 >
                     <ShieldPlus className="w-3.5 h-3.5" />
@@ -91,7 +92,7 @@ export default async function AdminPage({
                 </Link>
                 <Link
                     href={tenantHref('/admin/api-keys')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="api-keys-pill-btn"
                 >
                     <KeyRound className="w-3.5 h-3.5" />
@@ -99,7 +100,7 @@ export default async function AdminPage({
                 </Link>
                 <Link
                     href={tenantHref('/admin/billing')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="billing-pill-btn"
                 >
                     <CreditCard className="w-3.5 h-3.5" />
@@ -107,7 +108,7 @@ export default async function AdminPage({
                 </Link>
                 <Link
                     href={tenantHref('/admin/sso')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="sso-pill-btn"
                 >
                     <KeyRound className="w-3.5 h-3.5" />
@@ -115,7 +116,7 @@ export default async function AdminPage({
                 </Link>
                 <Link
                     href={tenantHref('/admin/scim')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="scim-pill-btn"
                 >
                     <CloudCog className="w-3.5 h-3.5" />
@@ -123,7 +124,7 @@ export default async function AdminPage({
                 </Link>
                 <Link
                     href={tenantHref('/admin/integrations')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="integrations-pill-btn"
                 >
                     <Plug className="w-3.5 h-3.5" />
@@ -131,7 +132,7 @@ export default async function AdminPage({
                 </Link>
                 <Link
                     href={tenantHref('/admin/security')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="security-pill-btn"
                 >
                     <ShieldCheck className="w-3.5 h-3.5" />
@@ -139,7 +140,7 @@ export default async function AdminPage({
                 </Link>
                 <Link
                     href={tenantHref('/admin/risk-matrix')}
-                    className="btn btn-secondary"
+                    className={buttonVariants({ variant: 'secondary' })}
                     id="risk-matrix-pill-btn"
                 >
                     <Grid3x3 className="w-3.5 h-3.5" />

@@ -14,6 +14,7 @@ const PencilIcon = ({ size = 14 }: { size?: number }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
 );
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
 import { useTenantMutation } from '@/lib/hooks/use-tenant-mutation';
 import { CACHE_KEYS } from '@/lib/swr-keys';
@@ -815,13 +816,13 @@ export default function ControlDetailPage() {
                 matchTriggerWidth
                 buttonProps={{ className: 'w-40 text-sm' }}
             />
-            <button className="btn btn-secondary" onClick={() => { setAppChoice(control.applicability); setAppJustification(control.applicabilityJustification || ''); setShowApplicability(!showApplicability); }} id="toggle-applicability-btn">
+            <Button variant="secondary" onClick={() => { setAppChoice(control.applicability); setAppJustification(control.applicabilityJustification || ''); setShowApplicability(!showApplicability); }} id="toggle-applicability-btn">
                 Applicability
-            </button>
+            </Button>
             {control.applicability !== 'NOT_APPLICABLE' && (
-                <button className="btn btn-primary" onClick={handleMarkTestCompleted} disabled={markingTest} id="mark-test-completed-btn">
+                <Button variant="primary" onClick={handleMarkTestCompleted} disabled={markingTest} id="mark-test-completed-btn">
                     {markingTest ? '...' : 'Mark Test Completed'}
-                </button>
+                </Button>
             )}
         </>
     ) : null;
@@ -858,9 +859,9 @@ export default function ControlDetailPage() {
                     {appChoice === 'NOT_APPLICABLE' && (
                         <textarea className="input w-full" rows={2} placeholder="Justification required..." value={appJustification} onChange={e => setAppJustification(e.target.value)} id="applicability-justification" />
                     )}
-                    <button onClick={saveApplicability} disabled={savingApp || (appChoice === 'NOT_APPLICABLE' && !appJustification.trim())} className="btn btn-primary" id="save-applicability-btn">
+                    <Button variant="primary" onClick={saveApplicability} disabled={savingApp || (appChoice === 'NOT_APPLICABLE' && !appJustification.trim())} id="save-applicability-btn">
                         {savingApp ? 'Saving...' : 'Save'}
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -870,16 +871,15 @@ export default function ControlDetailPage() {
                     {/* Overview header with Edit button */}
                     {permissions.canWrite && (
                         <div className="flex justify-end -mt-1 -mb-2">
-                            <button
-                                type="button"
-                                className="btn btn-secondary"
+                            <Button
+                                variant="secondary"
                                 onClick={openEditModal}
                                 data-testid="control-edit-button"
                                 id="control-edit-button"
                             >
                                 <PencilIcon size={14} />
                                 Edit
-                            </button>
+                            </Button>
                         </div>
                     )}
                     <div className="grid grid-cols-2 gap-6">
@@ -938,8 +938,10 @@ export default function ControlDetailPage() {
                                 {/* Sync Now button — only when automationKey is set */}
                                 {control.automationKey && permissions.canWrite && !editingAutomation && (
                                     <Tooltip content="Manually trigger a sync check against the source system.">
-                                        <button
-                                            className="btn btn-secondary btn-xs flex items-center gap-1 disabled:opacity-50"
+                                        <Button
+                                            variant="secondary"
+                                            size="xs"
+                                            className="flex items-center gap-1 disabled:opacity-50"
                                             onClick={handleSyncNow}
                                             disabled={syncing}
                                             id="sync-now-btn"
@@ -950,7 +952,7 @@ export default function ControlDetailPage() {
                                                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
                                             )}
                                             {syncing ? 'Syncing…' : 'Sync Now'}
-                                        </button>
+                                        </Button>
                                     </Tooltip>
                                 )}
                                 {permissions.canWrite && (
@@ -987,9 +989,9 @@ export default function ControlDetailPage() {
                                 {autoEvidenceSource === 'INTEGRATION' && (
                                     <input type="text" className="input w-full" placeholder="Automation key (e.g. aws-cis-1.2)" value={autoKey} onChange={e => setAutoKey(e.target.value)} id="automation-key-input" />
                                 )}
-                                <button onClick={saveAutomation} disabled={savingAutomation} className="btn btn-primary" id="save-automation-btn">
+                                <Button variant="primary" onClick={saveAutomation} disabled={savingAutomation} id="save-automation-btn">
                                     {savingAutomation ? 'Saving...' : 'Save'}
-                                </button>
+                                </Button>
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 gap-4">
@@ -1145,23 +1147,24 @@ export default function ControlDetailPage() {
                         </fieldset>
                     </Modal.Body>
                     <Modal.Actions>
-                        <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
+                        <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={handleEditCancel}
                             disabled={savingEdit}
                             data-testid="edit-cancel-button"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
-                            className="btn btn-primary btn-sm"
+                            variant="primary"
+                            size="sm"
                             disabled={savingEdit || editForm.name.trim().length < 3}
                             data-testid="edit-save-button"
                         >
                             {savingEdit ? 'Saving...' : 'Save'}
-                        </button>
+                        </Button>
                     </Modal.Actions>
                 </Modal.Form>
             </Modal>
@@ -1177,9 +1180,9 @@ export default function ControlDetailPage() {
                 <div className="space-y-4">
                     {permissions.canWrite && (
                         <div className="flex justify-end">
-                            <button className="btn btn-primary" onClick={() => setShowTaskForm(!showTaskForm)} id="create-task-btn">
+                            <Button variant="primary" onClick={() => setShowTaskForm(!showTaskForm)} id="create-task-btn">
                                 + Create Task
-                            </button>
+                            </Button>
                         </div>
                     )}
                     {showTaskForm && permissions.canWrite && (
@@ -1201,9 +1204,9 @@ export default function ControlDetailPage() {
                                 }}
                                 aria-label="Task due date"
                             />
-                            <button type="submit" disabled={savingTask} className="btn btn-primary" id="submit-task-btn">
+                            <Button type="submit" variant="primary" disabled={savingTask} id="submit-task-btn">
                                 {savingTask ? 'Creating...' : 'Create'}
-                            </button>
+                            </Button>
                         </form>
                     )}
                     <div className="glass-card overflow-hidden">
@@ -1224,9 +1227,9 @@ export default function ControlDetailPage() {
                                             {permissions.canWrite && (
                                                 <td>
                                                     {t.status !== 'DONE' && (
-                                                        <button className="btn btn-sm btn-secondary" onClick={() => updateTaskStatus(t.id, 'DONE')} id={`mark-done-${t.id}`}>
+                                                        <Button variant="secondary" size="sm" onClick={() => updateTaskStatus(t.id, 'DONE')} id={`mark-done-${t.id}`}>
                                                             Done
-                                                        </button>
+                                                        </Button>
                                                     )}
                                                 </td>
                                             )}
@@ -1253,12 +1256,12 @@ export default function ControlDetailPage() {
                 <div className="space-y-4">
                     {permissions.canWrite && (
                         <div className="flex justify-end gap-2">
-                            <button className="btn btn-primary" onClick={() => { setShowFileUpload(!showFileUpload); setShowEvidenceForm(false); }} id="upload-evidence-btn">
+                            <Button variant="primary" onClick={() => { setShowFileUpload(!showFileUpload); setShowEvidenceForm(false); }} id="upload-evidence-btn">
                                 Upload Evidence
-                            </button>
-                            <button className="btn btn-secondary" onClick={() => { setShowEvidenceForm(!showEvidenceForm); setShowFileUpload(false); }} id="link-evidence-btn">
+                            </Button>
+                            <Button variant="secondary" onClick={() => { setShowEvidenceForm(!showEvidenceForm); setShowFileUpload(false); }} id="link-evidence-btn">
                                 + Link Evidence
-                            </button>
+                            </Button>
                         </div>
                     )}
                     {/* File upload form for this control */}
@@ -1300,18 +1303,18 @@ export default function ControlDetailPage() {
                                     aria-label="Uploading evidence file"
                                 />
                             )}
-                            <button type="submit" disabled={fileUploading || !fileToUpload} className="btn btn-primary" id="submit-control-upload">
+                            <Button type="submit" variant="primary" disabled={fileUploading || !fileToUpload} id="submit-control-upload">
                                 {fileUploading ? 'Uploading...' : 'Upload'}
-                            </button>
+                            </Button>
                         </form>
                     )}
                     {showEvidenceForm && permissions.canWrite && (
                         <form onSubmit={linkEvidence} className="glass-card p-4 space-y-3">
                             <input type="url" className="input w-full" placeholder="Evidence URL *" value={evidenceUrl} onChange={e => setEvidenceUrl(e.target.value)} required id="evidence-url-input" />
                             <textarea className="input w-full" rows={2} placeholder="Note (optional)" value={evidenceNote} onChange={e => setEvidenceNote(e.target.value)} id="evidence-note-input" />
-                            <button type="submit" disabled={savingEvidence} className="btn btn-primary" id="submit-evidence-btn">
+                            <Button type="submit" variant="primary" disabled={savingEvidence} id="submit-evidence-btn">
                                 {savingEvidence ? 'Linking...' : 'Link Evidence'}
-                            </button>
+                            </Button>
                         </form>
                     )}
                     <div className="glass-card overflow-hidden">
@@ -1375,9 +1378,9 @@ export default function ControlDetailPage() {
                 <div className="space-y-4">
                     {permissions.canWrite && (
                         <div className="flex justify-end">
-                            <button className="btn btn-primary" onClick={() => setShowMapForm(!showMapForm)} id="map-requirement-btn">
+                            <Button variant="primary" onClick={() => setShowMapForm(!showMapForm)} id="map-requirement-btn">
                                 + Map Requirement
-                            </button>
+                            </Button>
                         </div>
                     )}
                     {showMapForm && permissions.canWrite && (
@@ -1400,9 +1403,9 @@ export default function ControlDetailPage() {
                                         placeholder="Select Requirement..."
                                         matchTriggerWidth
                                     />
-                                    <button onClick={mapRequirement} disabled={!selectedReq || savingMap} className="btn btn-primary" id="submit-mapping-btn">
+                                    <Button variant="primary" onClick={mapRequirement} disabled={!selectedReq || savingMap} id="submit-mapping-btn">
                                         {savingMap ? 'Mapping...' : 'Map'}
-                                    </button>
+                                    </Button>
                                 </>
                             )}
                         </div>

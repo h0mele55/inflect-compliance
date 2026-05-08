@@ -12,6 +12,8 @@ import { Paperclip } from 'lucide-react';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 
 const EV_KIND_OPTIONS: ComboboxOption[] = [
     { value: 'FILE_UPLOAD', label: 'Upload File' },
@@ -245,10 +247,7 @@ export default function TestRunPage() {
                             {(['PASS', 'FAIL', 'INCONCLUSIVE'] as const).map(r => (
                                 <button
                                     key={r}
-                                    className={`btn btn-sm ${result === r
-                                        ? r === 'PASS' ? 'bg-green-600 text-content-emphasis' : r === 'FAIL' ? 'bg-red-600 text-content-emphasis' : 'bg-yellow-600 text-content-emphasis'
-                                        : 'btn-ghost'
-                                    }`}
+                                    className={buttonVariants({ variant: result === r ? (r === 'FAIL' ? 'danger' : r === 'PASS' ? 'success' : 'primary') : 'ghost', size: 'sm', className: result === r ? (r === 'PASS' ? 'bg-green-600 text-content-emphasis' : r === 'FAIL' ? 'bg-red-600 text-content-emphasis' : 'bg-yellow-600 text-content-emphasis') : '' })}
                                     onClick={() => setResult(r)}
                                     id={`result-btn-${r}`}
                                 >
@@ -282,14 +281,15 @@ export default function TestRunPage() {
                         </div>
                     )}
 
-                    <button
-                        className="btn btn-primary btn-sm"
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={completeRun}
                         disabled={completing}
                         id="complete-test-run-btn"
                     >
                         {completing ? 'Completing...' : `Complete as ${result}`}
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -317,14 +317,15 @@ export default function TestRunPage() {
                     {/* Retest button for FAIL/INCONCLUSIVE */}
                     {permissions.canWrite && (run.result === 'FAIL' || run.result === 'INCONCLUSIVE') && (
                         <div className="mt-3 pt-3 border-t border-border-default/50">
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={handleRetest}
                                 disabled={retesting}
-                                className="btn btn-sm btn-secondary"
                                 id="retest-btn"
                             >
                                 {retesting ? 'Creating...' : 'Retest'}
-                            </button>
+                            </Button>
                             <span className="text-xs text-content-subtle ml-2">Create a new run for this test plan</span>
                         </div>
                     )}
@@ -336,13 +337,14 @@ export default function TestRunPage() {
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-content-default">Evidence ({run.evidence?.length ?? 0})</h3>
                     {permissions.canWrite && (
-                        <button
-                            className="btn btn-secondary btn-xs"
+                        <Button
+                            variant="secondary"
+                            size="xs"
                             onClick={() => setShowEvForm(!showEvForm)}
                             id="link-evidence-btn"
                         >
                             {showEvForm ? 'Cancel' : '+ Link Evidence'}
-                        </button>
+                        </Button>
                     )}
                 </div>
 
@@ -410,14 +412,15 @@ export default function TestRunPage() {
                             <label className="text-xs text-content-muted block mb-1">Note</label>
                             <input className="input w-full" value={evNote} onChange={e => setEvNote(e.target.value)} placeholder="Optional note..." id="evidence-note-input" />
                         </div>
-                        <button
-                            className="btn btn-primary btn-xs"
+                        <Button
+                            variant="primary"
+                            size="xs"
                             onClick={linkEvidence}
                             disabled={linkingEv || !canSubmitEvidence}
                             id="save-evidence-link-btn"
                         >
                             {linkingEv ? (evKind === 'FILE_UPLOAD' ? 'Uploading...' : 'Linking...') : (evKind === 'FILE_UPLOAD' ? 'Upload & Link' : 'Link')}
-                        </button>
+                        </Button>
                     </div>
                 )}
 
@@ -446,14 +449,16 @@ export default function TestRunPage() {
                                 </div>
                                 {permissions.canWrite && (
                                     <Tooltip content="Unlink evidence from this test">
-                                        <button
-                                            className="btn btn-ghost btn-xs text-red-400 opacity-0 group-hover:opacity-100 transition"
+                                        <Button
+                                            variant="ghost"
+                                            size="xs"
+                                            className="text-red-400 opacity-0 group-hover:opacity-100 transition"
                                             onClick={() => unlinkEvidence(ev.id)}
                                             disabled={unlinkingId === ev.id}
                                             aria-label="Unlink evidence"
                                         >
                                             {unlinkingId === ev.id ? '...' : <span aria-hidden="true">×</span>}
-                                        </button>
+                                        </Button>
                                     </Tooltip>
                                 )}
                             </div>

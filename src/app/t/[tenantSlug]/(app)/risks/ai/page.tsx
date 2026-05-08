@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { RequirePermission } from '@/components/require-permission';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 
@@ -286,13 +288,15 @@ export default function AIRiskAssessmentPage() {
                     {/* Asset Selection */}
                     <div>
                         <label className="input-label">Assets to Assess</label>
-                        <button
+                        <Button
+                            variant="secondary"
+                            size="xs"
+                            className="ml-2"
                             onClick={loadAssets}
-                            className="btn btn-secondary text-xs ml-2"
                             id="load-assets-btn"
                         >
                             {assetsLoaded ? `${assets.length} assets loaded` : 'Load Assets'}
-                        </button>
+                        </Button>
                         {assetsLoaded && (
                             <div className="mt-2 max-h-48 overflow-y-auto space-y-1" id="ai-asset-list">
                                 {assets.length === 0 && <p className="text-sm text-content-subtle">No assets found. Suggestions will be general.</p>}
@@ -329,13 +333,14 @@ export default function AIRiskAssessmentPage() {
 
                     {/* Generate Button */}
                     <RequirePermission resource="risks" action="create">
-                        <button
+                        <Button
+                            variant="primary"
+                            className="w-full text-center py-3"
                             onClick={handleGenerate}
-                            className="btn btn-primary w-full text-center py-3"
                             id="ai-generate-btn"
                         >
                             Generate Risk Suggestions
-                        </button>
+                        </Button>
                     </RequirePermission>
                 </div>
             )}
@@ -370,8 +375,8 @@ export default function AIRiskAssessmentPage() {
                             )}
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={acceptAll} className="btn btn-secondary text-xs" id="accept-all-btn">Accept All</button>
-                            <button onClick={rejectAll} className="btn btn-secondary text-xs" id="reject-all-btn">Reject All</button>
+                            <Button variant="secondary" size="xs" onClick={acceptAll} id="accept-all-btn">Accept All</Button>
+                            <Button variant="secondary" size="xs" onClick={rejectAll} id="reject-all-btn">Reject All</Button>
                         </div>
                     </div>
 
@@ -529,39 +534,45 @@ export default function AIRiskAssessmentPage() {
                                     <div className="flex flex-col gap-2 shrink-0">
                                         {isEditing ? (
                                             <>
-                                                <button
+                                                <Button
+                                                    variant="primary"
+                                                    size="xs"
                                                     onClick={() => { cancelEdit(); setDecision(item.id, 'accept'); }}
-                                                    className="btn btn-primary text-xs"
                                                     id={`save-edit-${idx}`}
                                                 >
                                                     Save & Accept
-                                                </button>
-                                                <button onClick={cancelEdit} className="btn btn-secondary text-xs">Cancel</button>
+                                                </Button>
+                                                <Button variant="secondary" size="xs" onClick={cancelEdit}>Cancel</Button>
                                             </>
                                         ) : (
                                             <>
-                                                <button
+                                                <Button
+                                                    variant={dec === 'accept' ? 'primary' : 'secondary'}
+                                                    size="xs"
+                                                    className={dec === 'accept' ? 'bg-emerald-700 text-content-emphasis' : ''}
                                                     onClick={() => setDecision(item.id, 'accept')}
-                                                    className={`btn text-xs ${dec === 'accept' ? 'bg-emerald-700 text-content-emphasis' : 'btn-secondary'}`}
                                                     id={`accept-${idx}`}
                                                 >
                                                     [+] Accept
-                                                </button>
-                                                <button
+                                                </Button>
+                                                <Button
+                                                    variant={dec === 'reject' ? 'danger' : 'secondary'}
+                                                    size="xs"
+                                                    className={dec === 'reject' ? 'bg-red-700 text-content-emphasis' : ''}
                                                     onClick={() => setDecision(item.id, 'reject')}
-                                                    className={`btn text-xs ${dec === 'reject' ? 'bg-red-700 text-content-emphasis' : 'btn-secondary'}`}
                                                     id={`reject-${idx}`}
                                                 >
                                                     [-] Reject
-                                                </button>
+                                                </Button>
                                                 {permissions.canWrite && (
-                                                    <button
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="xs"
                                                         onClick={() => startEdit(item)}
-                                                        className="btn btn-secondary text-xs"
                                                         id={`edit-${idx}`}
                                                     >
                                                         Edit
-                                                    </button>
+                                                    </Button>
                                                 )}
                                             </>
                                         )}
@@ -573,16 +584,16 @@ export default function AIRiskAssessmentPage() {
 
                     {/* Action bar */}
                     <div className="glass-card p-4 flex items-center justify-between" id="ai-action-bar">
-                        <button onClick={handleDismiss} className="btn btn-secondary" id="dismiss-btn">Dismiss All</button>
+                        <Button variant="secondary" onClick={handleDismiss} id="dismiss-btn">Dismiss All</Button>
                         <RequirePermission resource="risks" action="create">
-                            <button
+                            <Button
+                                variant="primary"
                                 onClick={handleApply}
                                 disabled={acceptedCount === 0}
-                                className="btn btn-primary"
                                 id="apply-btn"
                             >
                                 Apply {acceptedCount} Accepted Suggestions →
-                            </button>
+                            </Button>
                         </RequirePermission>
                     </div>
                 </div>
@@ -608,12 +619,12 @@ export default function AIRiskAssessmentPage() {
                         AI suggestions have been applied. You can review and refine them in the Risk Register.
                     </p>
                     <div className="flex gap-3 justify-center pt-2">
-                        <Link href={tenantHref('/risks')} className="btn btn-primary" id="view-risks-btn">
+                        <Link href={tenantHref('/risks')} className={buttonVariants({ variant: 'primary' })} id="view-risks-btn">
                             View Risk Register →
                         </Link>
-                        <button onClick={() => { setPhase('form'); setSession(null); }} className="btn btn-secondary" id="new-assessment-btn">
+                        <Button variant="secondary" onClick={() => { setPhase('form'); setSession(null); }} id="new-assessment-btn">
                             New Assessment
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}

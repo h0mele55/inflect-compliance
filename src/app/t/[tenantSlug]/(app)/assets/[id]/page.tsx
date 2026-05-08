@@ -15,6 +15,8 @@ import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 import { CopyText } from '@/components/ui/copy-text';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 
 const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
     loading: () => <div className="animate-pulse h-48" aria-busy="true" />,
@@ -90,7 +92,7 @@ export default function AssetDetailPage() {
     };
 
     if (loading) return <div className="p-12 text-center text-content-subtle animate-pulse">Loading asset…</div>;
-    if (error && !asset) return <div className="glass-card p-8 text-center text-red-400">{error}<div className="mt-4"><Link href={tenantHref('/assets')} className="btn btn-secondary">← Back</Link></div></div>;
+    if (error && !asset) return <div className="glass-card p-8 text-center text-red-400">{error}<div className="mt-4"><Link href={tenantHref('/assets')} className={buttonVariants({ variant: 'secondary' })}>← Back</Link></div></div>;
     if (!asset) return null;
 
     const TYPES = ['INFORMATION', 'APPLICATION', 'SYSTEM', 'SERVICE', 'DATA_STORE', 'INFRASTRUCTURE', 'VENDOR', 'PROCESS', 'PEOPLE_PROCESS', 'OTHER'];
@@ -117,8 +119,8 @@ export default function AssetDetailPage() {
                 </div>
                 {permissions.canWrite && !editing && (
                     <div className="flex gap-2">
-                        <Link href={tenantHref(`/risks/ai?assetId=${assetId}`)} className="btn btn-secondary" id="suggest-risks-btn">Suggest Risks</Link>
-                        <button onClick={startEdit} className="btn btn-secondary" id="edit-asset-btn">Edit</button>
+                        <Link href={tenantHref(`/risks/ai?assetId=${assetId}`)} className={buttonVariants({ variant: 'secondary' })} id="suggest-risks-btn">Suggest Risks</Link>
+                        <Button variant="secondary" onClick={startEdit} id="edit-asset-btn">Edit</Button>
                     </div>
                 )}
             </div>
@@ -140,8 +142,8 @@ export default function AssetDetailPage() {
                             <div><label className="input-label">Location</label><input className="input" value={form.location} onChange={e => setForm((f: any) => ({ ...f, location: e.target.value }))} /></div>
                         </div>
                         <div className="flex gap-3 pt-2">
-                            <button onClick={handleSave} disabled={saving} className="btn btn-primary" id="save-asset-btn">{saving ? 'Saving…' : 'Save'}</button>
-                            <button onClick={() => setEditing(false)} className="btn btn-secondary">Cancel</button>
+                            <Button variant="primary" onClick={handleSave} disabled={saving} id="save-asset-btn">{saving ? 'Saving…' : 'Save'}</Button>
+                            <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
                         </div>
                     </>
                 ) : (

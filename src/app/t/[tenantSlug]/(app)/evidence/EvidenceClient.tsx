@@ -17,6 +17,8 @@ import { useHydratedNow } from '@/lib/hooks/use-hydrated-now';
 import { UploadEvidenceModal } from './UploadEvidenceModal';
 import { NewEvidenceTextModal } from './NewEvidenceTextModal';
 import { EvidenceBulkImportModal } from './EvidenceBulkImportModal';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { DatePicker } from '@/components/ui/date-picker/date-picker';
 import {
     parseYMD,
@@ -494,9 +496,9 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                                     }}
                                     aria-label="Retention date"
                                 />
-                                <button onClick={() => saveRetention(ev.id)} className="btn btn-sm btn-primary text-xs py-0.5 px-1.5">Save</button>
+                                <Button variant="primary" size="sm" className="text-xs py-0.5 px-1.5" onClick={() => saveRetention(ev.id)}>Save</Button>
                                 <Tooltip content="Cancel edit" shortcut="Esc">
-                                    <button onClick={() => setEditingRetention(null)} className="btn btn-sm btn-secondary text-xs py-0.5 px-1.5" aria-label="Cancel">×</button>
+                                    <Button variant="secondary" size="sm" className="text-xs py-0.5 px-1.5" onClick={() => setEditingRetention(null)} aria-label="Cancel">×</Button>
                                 </Tooltip>
                             </div>
                         )}
@@ -558,36 +560,37 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                 return (
                     <div className="flex gap-1 flex-wrap" onClick={e => e.stopPropagation()}>
                         {ev.type === 'FILE' && ev.fileRecordId && (
-                            <a href={apiUrl(`/evidence/files/${ev.fileRecordId}/download`)} className="btn btn-sm btn-secondary" download id={`download-${ev.id}`}>⬇</a>
+                            <a href={apiUrl(`/evidence/files/${ev.fileRecordId}/download`)} download className={buttonVariants({ variant: 'secondary', size: 'sm' })} id={`download-${ev.id}`}>⬇</a>
                         )}
                         {permissions.canWrite && !ev.isArchived && (
                             <Tooltip content="Edit retention date">
-                                <button
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
                                     onClick={() => { setEditingRetention(ev.id); setEditRetentionDate(ev.retentionUntil ? ev.retentionUntil.split('T')[0] : ''); }}
-                                    className="btn btn-sm btn-secondary"
                                     id={`edit-retention-${ev.id}`}
                                 >
                                     Edit
-                                </button>
+                                </Button>
                             </Tooltip>
                         )}
                         {permissions.canWrite && !ev.isArchived && (
-                            <button onClick={() => archiveEvidence(ev.id)} className="btn btn-sm btn-secondary" id={`archive-${ev.id}`}>Archive</button>
+                            <Button variant="secondary" size="sm" onClick={() => archiveEvidence(ev.id)} id={`archive-${ev.id}`}>Archive</Button>
                         )}
                         {permissions.canWrite && ev.isArchived && (
-                            <button onClick={() => unarchiveEvidence(ev.id)} className="btn btn-sm btn-primary" id={`unarchive-${ev.id}`}>Unarchive</button>
+                            <Button variant="primary" size="sm" onClick={() => unarchiveEvidence(ev.id)} id={`unarchive-${ev.id}`}>Unarchive</Button>
                         )}
                         {permissions.canWrite && ev.status === 'DRAFT' && (
-                            <button onClick={() => submitReview(ev.id, 'SUBMITTED')} className="btn btn-sm btn-secondary">{t.submitForReview}</button>
+                            <Button variant="secondary" size="sm" onClick={() => submitReview(ev.id, 'SUBMITTED')}>{t.submitForReview}</Button>
                         )}
                         {permissions.canWrite && ev.status === 'SUBMITTED' && (
                             <>
-                                <button onClick={() => submitReview(ev.id, 'APPROVED')} className="btn btn-sm btn-success">{t.approveEvidence}</button>
-                                <button onClick={() => submitReview(ev.id, 'REJECTED', 'Needs improvement')} className="btn btn-sm btn-danger">{t.rejectEvidence}</button>
+                                <Button variant="success" size="sm" onClick={() => submitReview(ev.id, 'APPROVED')}>{t.approveEvidence}</Button>
+                                <Button variant="danger" size="sm" onClick={() => submitReview(ev.id, 'REJECTED', 'Needs improvement')}>{t.rejectEvidence}</Button>
                             </>
                         )}
                         {permissions.canWrite && ev.status === 'REJECTED' && (
-                            <button onClick={() => submitReview(ev.id, 'SUBMITTED')} className="btn btn-sm btn-secondary">{t.submitForReview}</button>
+                            <Button variant="secondary" size="sm" onClick={() => submitReview(ev.id, 'SUBMITTED')}>{t.submitForReview}</Button>
                         )}
                     </div>
                 );
@@ -607,30 +610,27 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                     </div>
                     {permissions.canWrite && (
                         <div className="flex gap-2">
-                            <button
-                                type="button"
+                            <Button
+                                variant="primary"
                                 onClick={() => setShowUpload(true)}
-                                className="btn btn-primary"
                                 id="upload-evidence-btn"
                             >
                                 Upload File
-                            </button>
-                            <button
-                                type="button"
+                            </Button>
+                            <Button
+                                variant="secondary"
                                 onClick={() => setShowBulkImport(true)}
-                                className="btn btn-secondary"
                                 id="bulk-import-evidence-btn"
                             >
                                 Import ZIP
-                            </button>
-                            <button
-                                type="button"
+                            </Button>
+                            <Button
+                                variant="secondary"
                                 onClick={() => setShowTextForm(true)}
-                                className="btn btn-secondary"
                                 id="add-text-evidence-btn"
                             >
                                 {t.addEvidence}
-                            </button>
+                            </Button>
                         </div>
                     )}
                 </div>
@@ -665,27 +665,27 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                 {/* Retention filter tabs + Control filter */}
                 <div className="flex items-center justify-between flex-wrap gap-3">
                     <div className="flex items-center gap-1" id="retention-tabs">
-                        <button
+                        <Button
+                            variant={retentionFilter === 'active' ? 'primary' : 'ghost'}
                             onClick={() => setFilter('tab', 'active')}
-                            className={`btn ${retentionFilter === 'active' ? 'btn-primary' : 'btn-ghost'}`}
                             id="tab-active"
                         >
                             Active ({activeEvidence.length})
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant={retentionFilter === 'expiring' ? 'danger' : 'ghost'}
                             onClick={() => setFilter('tab', 'expiring')}
-                            className={`btn ${retentionFilter === 'expiring' ? 'btn-danger' : 'btn-ghost'}`}
                             id="tab-expiring"
                         >
                             Expiring ({expiringEvidence.length})
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant={retentionFilter === 'archived' ? 'secondary' : 'ghost'}
                             onClick={() => setFilter('tab', 'archived')}
-                            className={`btn ${retentionFilter === 'archived' ? 'btn-secondary' : 'btn-ghost'}`}
                             id="tab-archived"
                         >
                             Archived ({archivedEvidence.length})
-                        </button>
+                        </Button>
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">

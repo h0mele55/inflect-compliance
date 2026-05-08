@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -220,12 +221,12 @@ export default function NewPolicyPage() {
                 )}
 
                 <div className="flex gap-2 pt-2">
-                    <button type="submit" disabled={loading} className="btn btn-primary" id="create-policy-btn">
+                    <Button type="submit" variant="primary" disabled={loading} id="create-policy-btn">
                         {loading ? 'Creating...' : 'Create Policy'}
-                    </button>
-                    <button type="button" onClick={() => router.back()} className="btn btn-secondary">
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => router.back()}>
                         Cancel
-                    </button>
+                    </Button>
                 </div>
             </form>
         </div>

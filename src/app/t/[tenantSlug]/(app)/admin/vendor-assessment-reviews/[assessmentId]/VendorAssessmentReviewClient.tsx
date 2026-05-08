@@ -25,6 +25,7 @@ import {
     useTenantHref,
     useTenantContext,
 } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
 import { formatDate } from '@/lib/format-date';
@@ -587,24 +588,28 @@ export function VendorAssessmentReviewClient({
 
                     <div className="flex justify-end gap-2 pt-2 border-t border-border-default/30">
                         {editable && (
-                            <button
-                                className="btn btn-primary btn-sm"
+                            <Button
+                                variant="primary"
+                                size="sm"
                                 onClick={saveReview}
                                 disabled={saving}
+                                loading={saving}
                                 id="save-review-btn"
                             >
                                 {saving ? 'Saving…' : 'Save review'}
-                            </button>
+                            </Button>
                         )}
                         {closable && (
-                            <button
-                                className="btn btn-secondary btn-sm"
+                            <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={closeOut}
                                 disabled={saving}
+                                loading={saving}
                                 id="close-assessment-btn"
                             >
                                 {saving ? 'Closing…' : 'Close assessment'}
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>

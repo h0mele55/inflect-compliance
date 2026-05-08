@@ -11,6 +11,8 @@ import Link from 'next/link';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { ListPageShell } from '@/components/layout/ListPageShell';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 
 interface DuePlan {
     id: string;
@@ -98,17 +100,18 @@ export default function DueQueuePage() {
                         <p className="text-sm text-content-muted mt-1">Test plans due or overdue for execution</p>
                     </div>
                     <div className="flex gap-3">
-                        <Link href={tenantHref('/tests')} className="btn btn-ghost btn-sm">← Tests</Link>
-                        <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">Dashboard</Link>
+                        <Link href={tenantHref('/tests')} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>← Tests</Link>
+                        <Link href={tenantHref('/tests/dashboard')} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>Dashboard</Link>
                         {permissions.canWrite && (
-                            <button
+                            <Button
+                                variant="primary"
+                                size="sm"
                                 onClick={handleRunDuePlanning}
                                 disabled={planning}
-                                className="btn btn-primary btn-sm"
                                 id="run-due-planning-btn"
                             >
                                 {planning ? 'Running...' : 'Run Due Planning'}
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>
@@ -185,7 +188,7 @@ export default function DueQueuePage() {
                     {
                         id: 'actions', header: '',
                         cell: ({ row }) => !row.original.hasPendingRun && permissions.canWrite ? (
-                            <button onClick={() => handleQuickRun(row.original.id)} className="btn btn-xs btn-primary">Run Now</button>
+                            <Button variant="primary" size="xs" onClick={() => handleQuickRun(row.original.id)}>Run Now</Button>
                         ) : null,
                     },
                 ]);

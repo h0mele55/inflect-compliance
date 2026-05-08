@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/format-date';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { ShieldCheck, QrCode, Copy, CheckCircle, XCircle, Trash2, AlertTriangle, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCopyToClipboard } from '@/components/ui/hooks';
@@ -219,26 +220,26 @@ export default function UserMfaPage() {
 
                     <div className="flex gap-2 pt-2">
                         {!status.isVerified && (
-                            <button
+                            <Button
+                                variant="primary"
                                 onClick={startEnroll}
                                 disabled={submitting}
-                                className="btn btn-primary"
                                 id="mfa-enroll-btn"
+                                icon={<QrCode className="w-4 h-4" />}
                             >
-                                <QrCode className="w-4 h-4" />
                                 {submitting ? 'Starting...' : 'Set Up MFA'}
-                            </button>
+                            </Button>
                         )}
                         {status.isVerified && status.tenantMfaPolicy !== 'REQUIRED' && (
-                            <button
+                            <Button
+                                variant="danger-outline"
                                 onClick={removeMfa}
                                 disabled={submitting}
-                                className="btn btn-secondary text-red-400 hover:text-red-300"
                                 id="mfa-remove-btn"
+                                icon={<Trash2 className="w-4 h-4" />}
                             >
-                                <Trash2 className="w-4 h-4" />
                                 Remove MFA
-                            </button>
+                            </Button>
                         )}
                     </div>
                 </div>
@@ -277,13 +278,15 @@ export default function UserMfaPage() {
                             <code className="text-sm font-mono text-[var(--brand-muted)] tracking-wider break-all flex-1">
                                 {enrollment.secret}
                             </code>
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="xs"
+                                className="shrink-0"
                                 onClick={copySecret}
-                                className="btn btn-secondary text-xs shrink-0"
+                                icon={copied ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                             >
-                                {copied ? <CheckCircle className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                                 {copied ? 'Copied!' : 'Copy'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
 
@@ -304,14 +307,14 @@ export default function UserMfaPage() {
                                 id="mfa-code-input"
                                 autoFocus
                             />
-                            <button
+                            <Button
+                                variant="primary"
                                 onClick={verifyCode}
                                 disabled={submitting || code.length !== 6}
-                                className="btn btn-primary"
                                 id="mfa-verify-btn"
                             >
                                 {submitting ? 'Verifying...' : 'Verify & Enable'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
 

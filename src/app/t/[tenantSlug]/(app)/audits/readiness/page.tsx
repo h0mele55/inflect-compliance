@@ -24,6 +24,7 @@
  *     UI matches the previous client-side behaviour.
  */
 import Link from 'next/link';
+import { buttonVariants } from '@/components/ui/button-variants';
 import {
     ShieldCheck,
     Flag,
@@ -109,7 +110,7 @@ export default async function ReadinessOverviewPage({
                         Framework readiness scores across all audit cycles
                     </p>
                 </div>
-                <Link href={`/t/${tenantSlug}/audits/cycles`} className="btn btn-secondary">
+                <Link href={`/t/${tenantSlug}/audits/cycles`} className={buttonVariants({ variant: 'secondary' })}>
                     View Cycles →
                 </Link>
             </div>
@@ -137,7 +138,7 @@ export default async function ReadinessOverviewPage({
                     </p>
                     <Link
                         href={`/t/${tenantSlug}/audits/cycles`}
-                        className="btn btn-primary"
+                        className={buttonVariants({ variant: 'primary' })}
                     >
                         + New Audit Cycle
                     </Link>

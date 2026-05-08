@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { AppIcon } from '@/components/icons/AppIcon';
+import { Button } from '@/components/ui/button';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 
 interface TestPlan {
@@ -114,13 +115,14 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
             <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-content-default">Test Plans</h3>
                 {permissions.canWrite && (
-                    <button
-                        className="btn btn-primary btn-sm"
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => setShowForm(!showForm)}
                         id="create-test-plan-btn"
                     >
                         {showForm ? 'Cancel' : '+ New Test Plan'}
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -153,9 +155,9 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                             </select>
                         </div>
                     </div>
-                    <button className="btn btn-primary btn-sm" onClick={createPlan} disabled={saving || !name.trim()} id="save-test-plan-btn">
+                    <Button variant="primary" size="sm" onClick={createPlan} disabled={saving || !name.trim()} id="save-test-plan-btn">
                         {saving ? 'Creating...' : <><AppIcon name="save" size={14} className="inline-block mr-1" /> Create Plan</>}
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -210,14 +212,16 @@ export default function TestPlansPanel({ controlId }: { controlId: string }) {
                                         {plan._count?.runs ?? 0} runs
                                     </span>
                                     {permissions.canWrite && plan.status === 'ACTIVE' && (
-                                        <button
-                                            className="btn btn-ghost btn-xs opacity-0 group-hover:opacity-100 transition"
+                                        <Button
+                                            variant="ghost"
+                                            size="xs"
+                                            className="opacity-0 group-hover:opacity-100 transition"
                                             onClick={() => createRun(plan.id)}
                                             disabled={creatingRunFor === plan.id}
                                             id={`run-test-btn-${plan.id}`}
                                         >
                                             {creatingRunFor === plan.id ? '...' : <><AppIcon name="run" size={14} className="inline-block mr-1" /> Run</>}
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
                             </div>

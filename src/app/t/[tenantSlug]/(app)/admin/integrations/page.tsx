@@ -10,6 +10,8 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { ArrowLeft, Plus, Trash2, CheckCircle, XCircle, Loader2, Link2, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { Combobox } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
 import { DataTable, createColumns } from '@/components/ui/table';
@@ -178,7 +180,7 @@ export default function AdminIntegrationsPage() {
     return (
             <div className="space-y-6 animate-fadeIn">
                 <div className="flex items-center gap-3">
-                    <Link href={tenantHref('/admin')} className="btn btn-secondary btn-sm">
+                    <Link href={tenantHref('/admin')} className={buttonVariants({ variant: 'secondary', size: 'sm' })}>
                         <ArrowLeft className="w-3.5 h-3.5" /> Back
                     </Link>
                     <h1 className="text-2xl font-bold">Integrations</h1>
@@ -208,13 +210,14 @@ export default function AdminIntegrationsPage() {
                 <div className="glass-card overflow-hidden">
                     <div className="flex justify-between items-center p-4 border-b border-border-default">
                         <h2 className="text-lg font-semibold">Configured Connections</h2>
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={() => { resetForm(); setShowForm(true); }}
-                            className="btn btn-primary btn-sm"
                             id="add-integration-btn"
                         >
                             <Plus className="w-3.5 h-3.5" /> Add Integration
-                        </button>
+                        </Button>
                     </div>
 
                     {loading ? (
@@ -251,14 +254,14 @@ export default function AdminIntegrationsPage() {
                                     cell: ({ row }: any) => (
                                         <div className="flex gap-1">
                                             <Tooltip content="Test connection">
-                                                <button onClick={() => handleTest(row.original)} className="btn btn-secondary btn-xs" disabled={testing === row.original.id} aria-label="Test connection">
+                                                <Button variant="secondary" size="xs" onClick={() => handleTest(row.original)} disabled={testing === row.original.id} aria-label="Test connection">
                                                     {testing === row.original.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
-                                                </button>
+                                                </Button>
                                             </Tooltip>
                                             <Tooltip content="Disable integration">
-                                                <button onClick={() => handleDisable(row.original.id)} className="btn btn-secondary btn-xs text-red-400" aria-label="Disable integration">
+                                                <Button variant="danger-outline" size="xs" onClick={() => handleDisable(row.original.id)} aria-label="Disable integration">
                                                     <Trash2 className="w-3 h-3" />
-                                                </button>
+                                                </Button>
                                             </Tooltip>
                                         </div>
                                     ),
@@ -344,13 +347,14 @@ export default function AdminIntegrationsPage() {
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <h4 className="text-sm font-medium text-content-default">Secrets</h4>
-                                    <button
+                                    <Button
+                                        variant="secondary"
+                                        size="xs"
                                         onClick={() => setShowSecrets(!showSecrets)}
-                                        className="btn btn-secondary btn-xs"
                                     >
                                         {showSecrets ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                                         {showSecrets ? 'Hide' : 'Show'}
-                                    </button>
+                                    </Button>
                                 </div>
                                 <div className="p-3 rounded border border-amber-500/20 bg-amber-500/5">
                                     <p className="text-xs text-amber-400">
@@ -391,16 +395,16 @@ export default function AdminIntegrationsPage() {
 
                         {/* Actions */}
                         <div className="flex gap-2 pt-2">
-                            <button
+                            <Button
+                                variant="primary"
                                 onClick={handleSave}
-                                className="btn btn-primary"
                                 disabled={saving || !formProvider || !formName}
+                                loading={saving}
                                 id="save-integration-btn"
                             >
-                                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                                 {editingId ? 'Update' : 'Create'} Connection
-                            </button>
-                            <button onClick={resetForm} className="btn btn-secondary">Cancel</button>
+                            </Button>
+                            <Button variant="secondary" onClick={resetForm}>Cancel</Button>
                         </div>
                     </div>
                 )}

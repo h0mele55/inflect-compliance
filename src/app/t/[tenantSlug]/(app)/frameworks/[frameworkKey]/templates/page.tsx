@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Button } from '@/components/ui/button';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function TemplateLibraryPage() {
@@ -132,14 +133,14 @@ export default function TemplateLibraryPage() {
                     </div>
                 </div>
                 {selected.size > 0 && (
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={bulkInstall}
                         disabled={bulkInstalling}
-                        className="btn btn-primary"
                         id="bulk-install-btn"
                     >
                         {bulkInstalling ? 'Installing...' : `Install ${selected.size} Selected`}
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -175,7 +176,7 @@ export default function TemplateLibraryPage() {
                     buttonProps={{ className: 'w-48' }}
                     caret
                 />
-                <button onClick={selectAll} className="btn btn-secondary text-xs" id="select-all-btn">Select All Uninstalled</button>
+                <Button variant="secondary" size="xs" onClick={selectAll} id="select-all-btn">Select All Uninstalled</Button>
             </div>
 
             {/* Template cards */}
@@ -215,13 +216,15 @@ export default function TemplateLibraryPage() {
                                             </div>
                                         </button>
                                         {!t.installed && (
-                                            <button
+                                            <Button
+                                                variant="primary"
+                                                size="xs"
                                                 onClick={() => installTemplate(t.code)}
                                                 disabled={installing === t.code}
-                                                className="btn btn-primary text-xs px-3 py-1 flex-shrink-0"
+                                                className="flex-shrink-0"
                                             >
                                                 {installing === t.code ? '...' : 'Install'}
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
 

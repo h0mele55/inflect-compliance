@@ -4,6 +4,8 @@ import { useState, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { DataTable, createColumns } from '@/components/ui/table';
 
 type ParsedRow = {
@@ -116,7 +118,9 @@ export default function RiskImportPage() {
             <div className="space-y-6 animate-fadeIn">
                 <div className="glass-card p-8 text-center">
                     <p className="text-content-muted">{t('noImportPermission')}</p>
-                    <Link href={href('/risks')} className="btn btn-secondary mt-4">{t('backToRisks')}</Link>
+                    <Link href={href('/risks')} className={buttonVariants({ variant: 'secondary', className: 'mt-4' })}>
+                        {t('backToRisks')}
+                    </Link>
                 </div>
             </div>
         );
@@ -146,9 +150,9 @@ export default function RiskImportPage() {
             {!result && (
                 <>
                     <input type="file" accept=".csv" ref={fileRef} onChange={handleFileChange} className="hidden" id="csv-file-input" />
-                    <button onClick={() => fileRef.current?.click()} className="btn btn-secondary w-full py-4 text-center" id="choose-csv">
+                    <Button variant="secondary" className="w-full py-4 text-center" onClick={() => fileRef.current?.click()} id="choose-csv">
                         {t('chooseFile')}
-                    </button>
+                    </Button>
                 </>
             )}
 
@@ -157,9 +161,9 @@ export default function RiskImportPage() {
                 <div className="glass-card overflow-hidden">
                     <div className="p-3 border-b border-border-default/50 flex justify-between items-center">
                         <span className="text-sm font-medium">{t('risksToImport', { count: rows.length })}</span>
-                        <button onClick={doImport} disabled={importing} className="btn btn-primary btn-sm" id="import-btn">
+                        <Button variant="primary" size="sm" onClick={doImport} disabled={importing} id="import-btn">
                             {importing ? t('importing', { count: rows.length }) : t('confirmImport', { count: rows.length })}
-                        </button>
+                        </Button>
                     </div>
                     {(() => {
                         const previewCols = createColumns<ParsedRow & { _idx: number }>([
@@ -215,10 +219,12 @@ export default function RiskImportPage() {
                         </div>
                     )}
                     <div className="flex gap-3">
-                        <Link href={href('/risks')} className="btn btn-primary">{t('viewRegister')}</Link>
-                        <button onClick={() => { setResult(null); setRows([]); if (fileRef.current) fileRef.current.value = ''; }} className="btn btn-secondary">
+                        <Link href={href('/risks')} className={buttonVariants({ variant: 'primary' })}>
+                            {t('viewRegister')}
+                        </Link>
+                        <Button variant="secondary" onClick={() => { setResult(null); setRows([]); if (fileRef.current) fileRef.current.value = ''; }}>
                             {t('importMore')}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}

@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { ShieldCheck, Save, AlertTriangle, CheckCircle, LogOut, Users, UserX } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { InfoTooltip } from '@/components/ui/tooltip';
 
 type MfaPolicy = 'DISABLED' | 'OPTIONAL' | 'REQUIRED';
@@ -295,15 +296,16 @@ export default function AdminSecurityPage() {
 
             {/* Save Button */}
             <div className="flex justify-end">
-                <button
+                <Button
+                    variant="primary"
                     onClick={handleSave}
                     disabled={saving}
-                    className="btn btn-primary"
+                    loading={saving}
                     id="security-save-btn"
                 >
                     <Save className="w-4 h-4" />
                     {saving ? 'Saving...' : 'Save Settings'}
-                </button>
+                </Button>
             </div>
 
             {/* ──── Session Management ──── */}
@@ -357,15 +359,15 @@ export default function AdminSecurityPage() {
                             className="input flex-1"
                             id="revoke-user-id-input"
                         />
-                        <button
+                        <Button
+                            variant="danger-outline"
                             onClick={handleRevokeUser}
                             disabled={revoking || !revokeUserId.trim()}
-                            className="btn btn-secondary text-red-400 hover:text-red-300"
                             id="revoke-user-btn"
                         >
                             <UserX className="w-4 h-4" />
                             Revoke
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>

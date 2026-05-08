@@ -27,6 +27,7 @@
  */
 import { useMemo, useState } from 'react';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Button } from '@/components/ui/button';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { formatDate } from '@/lib/format-date';
 
@@ -334,15 +335,15 @@ export function TestPlanScheduleSection({
                             Click save to apply the new schedule.
                         </span>
                     )}
-                    <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={save}
                         disabled={saving}
                         id="save-test-plan-schedule-btn"
                     >
                         {saving ? 'Saving…' : 'Save schedule'}
-                    </button>
+                    </Button>
                 </div>
             )}
 

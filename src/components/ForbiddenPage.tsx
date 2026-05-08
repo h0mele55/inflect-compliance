@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ShieldX } from 'lucide-react';
 import { useTenantHref } from '@/lib/tenant-context-provider';
+import { buttonVariants } from '@/components/ui/button';
 
 /**
  * Shared forbidden/access-denied page for tenant routes.
@@ -29,7 +30,7 @@ export function ForbiddenPage({
             <p className="text-content-muted text-sm max-w-md mb-8">{message}</p>
             <Link
                 href={tenantHref('/dashboard')}
-                className="btn btn-primary"
+                className={buttonVariants({ variant: 'primary' })}
                 id="forbidden-back-btn"
             >
                 ← Back to Dashboard
@@ -60,7 +61,7 @@ export function ServerForbiddenPage({
             <p className="text-content-muted text-sm max-w-md mb-8">{message}</p>
             <a
                 href={`/t/${tenantSlug}/dashboard`}
-                className="btn btn-primary"
+                className={buttonVariants({ variant: 'primary' })}
                 id="forbidden-back-btn"
             >
                 ← Back to Dashboard

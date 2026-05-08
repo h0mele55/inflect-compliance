@@ -19,6 +19,8 @@ import { TruncationBanner } from '@/components/ui/TruncationBanner';
 // import — modal is small, the page bundle cost is negligible, and the
 // E2E suite becomes deterministic.
 import { NewRiskModal } from './NewRiskModal';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import {
     ColumnsDropdown,
     DataTable,
@@ -474,25 +476,24 @@ function RisksPageInner({
                         <p className="text-content-muted text-sm">{t.risksIdentified}</p>
                     </div>
                     <div className="flex gap-2">
-                        <button onClick={() => setView(view === 'register' ? 'heatmap' : 'register')} className="btn btn-secondary">
+                        <Button variant="secondary" onClick={() => setView(view === 'register' ? 'heatmap' : 'register')}>
                             {view === 'register' ? t.heatmap : t.register}
-                        </button>
+                        </Button>
                         {permissions.canWrite && (
                             <>
-                                <Link href={tenantHref('/risks/ai')} className="btn btn-secondary" id="ai-risk-btn">
+                                <Link href={tenantHref('/risks/ai')} className={buttonVariants({ variant: 'secondary' })} id="ai-risk-btn">
                                     AI Assessment
                                 </Link>
-                                <Link href={tenantHref('/risks/import')} className="btn btn-secondary" id="risk-import-btn">
+                                <Link href={tenantHref('/risks/import')} className={buttonVariants({ variant: 'secondary' })} id="risk-import-btn">
                                     Import
                                 </Link>
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="primary"
                                     onClick={() => setIsCreateOpen(true)}
-                                    className="btn btn-primary"
                                     id="new-risk-btn"
                                 >
                                     {t.addRisk}
-                                </button>
+                                </Button>
                             </>
                         )}
                     </div>

@@ -19,6 +19,7 @@ import * as React from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalIcon } from 'lucide-react';
 import Link from 'next/link';
 
+import { buttonVariants } from '@/components/ui/button-variants';
 import { CalendarHeatmap } from '@/components/ui/CalendarHeatmap';
 import { CalendarMonth } from '@/components/ui/CalendarMonth';
 import { GanttTimeline } from '@/components/ui/GanttTimeline';
@@ -196,7 +197,7 @@ export function CalendarClient({
                     <button
                         type="button"
                         onClick={handlePrev}
-                        className="btn btn-ghost btn-sm"
+                        className={buttonVariants({ variant: 'ghost', size: 'sm' })}
                         aria-label="Previous month"
                     >
                         <ChevronLeft className="size-4" />
@@ -211,7 +212,7 @@ export function CalendarClient({
                     <button
                         type="button"
                         onClick={handleNext}
-                        className="btn btn-ghost btn-sm"
+                        className={buttonVariants({ variant: 'ghost', size: 'sm' })}
                         aria-label="Next month"
                     >
                         <ChevronRight className="size-4" />

@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/format-date';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { User, Link2, AlertOctagon } from 'lucide-react';
@@ -111,7 +112,7 @@ export default function TaskDashboardPage() {
                     <h1 className="text-2xl font-bold"><AppIcon name="dashboard" className="inline-block mr-2 align-text-bottom" /> Task Dashboard</h1>
                     <p className="text-content-muted text-sm">{metrics.total} total tasks</p>
                 </div>
-                <Link href={tenantHref('/tasks')} className="btn btn-secondary">← Task Register</Link>
+                <Link href={tenantHref('/tasks')} className={buttonVariants({ variant: 'secondary' })}>← Task Register</Link>
             </div>
 
             {/* KPI Cards */}

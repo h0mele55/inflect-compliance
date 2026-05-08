@@ -2,6 +2,7 @@
 
 import { useUrlFilters } from '@/lib/hooks/useUrlFilters';
 import { Combobox } from '@/components/ui/combobox';
+import { Button } from '@/components/ui/button';
 
 export interface FilterSelectConfig {
     key: string;
@@ -81,28 +82,29 @@ export function FilterBar({
                     const activeVal = t.activeValue || 'true';
                     const isActive = filters[t.key] === activeVal;
                     return (
-                        <button
+                        <Button
                             key={t.key}
-                            type="button"
-                            className={`btn btn-sm ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                            variant={isActive ? 'primary' : 'secondary'}
+                            size="sm"
                             onClick={() => setFilter(t.key, isActive ? '' : activeVal)}
                             id={`filter-toggle-${t.key}`}
                         >
                             {t.label}
-                        </button>
+                        </Button>
                     );
                 })}
 
                 {/* Clear filters */}
                 {hasActiveFilters && (
-                    <button
-                        type="button"
-                        className="btn btn-sm btn-secondary text-xs"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={clearFilters}
+                        className="text-xs"
                         id="filter-clear"
                     >
                         × Clear filters
-                    </button>
+                    </Button>
                 )}
             </div>
         </div>

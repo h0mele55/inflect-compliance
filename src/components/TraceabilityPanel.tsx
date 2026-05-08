@@ -5,6 +5,7 @@ import { AppIcon } from '@/components/icons/AppIcon';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { Combobox } from '@/components/ui/combobox';
+import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { useToastWithUndo } from '@/components/ui/hooks';
 
@@ -255,7 +256,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-semibold text-white inline-flex items-center gap-2">{entityType === 'control' ? <><AppIcon name="shield" size={16} /> Mitigates Risks</> : <><AppIcon name="warning" size={16} /> Associated Risks</>} ({risks.length})</h3>
                         {canWrite && (
-                            <button className="btn btn-primary text-xs" onClick={() => { setShowAddRisk(!showAddRisk); setAddId(''); }} id="add-risk-link-btn">+ Link Risk</button>
+                            <Button variant="primary" size="xs" onClick={() => { setShowAddRisk(!showAddRisk); setAddId(''); }} id="add-risk-link-btn">+ Link Risk</Button>
                         )}
                     </div>
                     {showAddRisk && canWrite && (
@@ -269,9 +270,9 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                 matchTriggerWidth
                             />
                             <input type="text" className="input w-full text-sm" placeholder="Rationale (optional)" value={addRationale} onChange={e => setAddRationale(e.target.value)} />
-                            <button className="btn btn-primary text-xs" disabled={!addId || linkMutation.isPending} onClick={() => handleLink('risk')} id="confirm-risk-link">
+                            <Button variant="primary" size="xs" disabled={!addId || linkMutation.isPending} onClick={() => handleLink('risk')} id="confirm-risk-link">
                                 {linkMutation.isPending ? 'Linking...' : 'Link'}
-                            </button>
+                            </Button>
                         </div>
                     )}
                     <div className="glass-card overflow-hidden">
@@ -313,7 +314,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-semibold text-white inline-flex items-center gap-2">{entityType === 'risk' ? <><AppIcon name="shield" size={16} /> Mitigated by Controls</> : <><AppIcon name="controls" size={16} /> Covered by Controls</>} ({controls.length})</h3>
                         {canWrite && (
-                            <button className="btn btn-primary text-xs" onClick={() => { setShowAddControl(!showAddControl); setAddId(''); }} id="add-control-link-btn">+ Link Control</button>
+                            <Button variant="primary" size="xs" onClick={() => { setShowAddControl(!showAddControl); setAddId(''); }} id="add-control-link-btn">+ Link Control</Button>
                         )}
                     </div>
                     {showAddControl && canWrite && (
@@ -327,9 +328,9 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                 matchTriggerWidth
                             />
                             <input type="text" className="input w-full text-sm" placeholder="Rationale (optional)" value={addRationale} onChange={e => setAddRationale(e.target.value)} />
-                            <button className="btn btn-primary text-xs" disabled={!addId || linkMutation.isPending} onClick={() => handleLink('control')} id="confirm-control-link">
+                            <Button variant="primary" size="xs" disabled={!addId || linkMutation.isPending} onClick={() => handleLink('control')} id="confirm-control-link">
                                 {linkMutation.isPending ? 'Linking...' : 'Link'}
-                            </button>
+                            </Button>
                         </div>
                     )}
                     <div className="glass-card overflow-hidden">
@@ -371,7 +372,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-semibold text-white inline-flex items-center gap-2"><AppIcon name="package" size={16} /> {entityType === 'control' ? 'Covers Assets' : 'Affects Assets'} ({assets.length})</h3>
                         {canWrite && (
-                            <button className="btn btn-primary text-xs" onClick={() => { setShowAddAsset(!showAddAsset); setAddId(''); }} id="add-asset-link-btn">+ Link Asset</button>
+                            <Button variant="primary" size="xs" onClick={() => { setShowAddAsset(!showAddAsset); setAddId(''); }} id="add-asset-link-btn">+ Link Asset</Button>
                         )}
                     </div>
                     {showAddAsset && canWrite && (
@@ -385,9 +386,9 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                 matchTriggerWidth
                             />
                             <input type="text" className="input w-full text-sm" placeholder="Rationale (optional)" value={addRationale} onChange={e => setAddRationale(e.target.value)} />
-                            <button className="btn btn-primary text-xs" disabled={!addId || linkMutation.isPending} onClick={() => handleLink('asset')} id="confirm-asset-link">
+                            <Button variant="primary" size="xs" disabled={!addId || linkMutation.isPending} onClick={() => handleLink('asset')} id="confirm-asset-link">
                                 {linkMutation.isPending ? 'Linking...' : 'Link'}
-                            </button>
+                            </Button>
                         </div>
                     )}
                     <div className="glass-card overflow-hidden">

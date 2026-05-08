@@ -26,6 +26,7 @@ import {
     useTenantHref,
     useTenantContext,
 } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
 
@@ -347,14 +348,16 @@ export function VendorTemplateBuilderClient({
                     </div>
                 </div>
                 {dirty && editable && (
-                    <button
-                        className="btn btn-primary btn-sm"
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={saveOrder}
                         disabled={saving}
+                        loading={saving}
                         id="save-order-btn"
                     >
                         {saving ? 'Saving…' : 'Save order'}
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -373,13 +376,15 @@ export function VendorTemplateBuilderClient({
                         new draft revision to continue editing.
                     </p>
                     {permissions.canWrite && (
-                        <button
-                            className="btn btn-primary btn-sm mt-3"
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            className="mt-3"
                             onClick={clonePublished}
                             id="clone-template-btn"
                         >
                             Clone to new draft
-                        </button>
+                        </Button>
                     )}
                 </div>
             )}
@@ -565,13 +570,14 @@ function AddSectionForm({ onSubmit }: { onSubmit: (title: string) => void }) {
                 onChange={(e) => setTitle(e.target.value)}
                 aria-label="New section title"
             />
-            <button
-                className="btn btn-secondary btn-sm"
+            <Button
+                variant="secondary"
+                size="sm"
                 type="submit"
                 disabled={!title.trim()}
             >
                 + Add section
-            </button>
+            </Button>
         </form>
     );
 }
@@ -667,13 +673,16 @@ function AddQuestionForm({
                 </label>
             </div>
             <div className="md:col-span-2">
-                <button
-                    className="btn btn-primary btn-sm w-full"
+                <Button
+                    variant="primary"
+                    size="sm"
+                    className="w-full"
                     type="submit"
                     disabled={busy || !prompt.trim()}
+                    loading={busy}
                 >
                     {busy ? 'Adding…' : '+ Add question'}
-                </button>
+                </Button>
             </div>
         </form>
     );

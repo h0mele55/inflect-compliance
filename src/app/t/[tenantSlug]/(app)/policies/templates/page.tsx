@@ -2,6 +2,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import Link from 'next/link';
 import { Combobox } from '@/components/ui/combobox';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -71,7 +73,7 @@ export default function TemplatesPage() {
                     <h1 className="text-2xl font-bold">Policy Templates</h1>
                     <p className="text-content-muted text-sm">{templates.length} templates available</p>
                 </div>
-                <Link href={tenantHref('/policies')} className="btn btn-secondary">← Back to Policies</Link>
+                <Link href={tenantHref('/policies')} className={buttonVariants({ variant: 'secondary' })}>← Back to Policies</Link>
             </div>
 
             {/* Filters */}
@@ -137,14 +139,16 @@ export default function TemplatesPage() {
                                 </p>
                             </div>
                             {tenant.permissions.canWrite && (
-                                <button
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    className="mt-4 w-full"
                                     onClick={() => handleUseTemplate(tpl)}
                                     disabled={!!creating}
-                                    className="btn btn-primary btn-sm mt-4 w-full"
                                     id={`use-template-${tpl.id}`}
                                 >
                                     {creating === tpl.id ? 'Creating...' : 'Use Template'}
-                                </button>
+                                </Button>
                             )}
                         </div>
                     ))}

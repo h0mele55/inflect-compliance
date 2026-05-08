@@ -13,6 +13,7 @@ import {
     KeyRound, Plus, Trash2, XCircle, CheckCircle, Copy, Check,
     Clock, AlertTriangle, Eye, EyeOff,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { InfoTooltip, Tooltip } from '@/components/ui/tooltip';
@@ -195,23 +196,25 @@ export function KeyDisplay({ plaintext }: { plaintext: string }) {
                     {visible ? plaintext : plaintext.slice(0, 13) + '•'.repeat(40)}
                 </code>
                 <Tooltip content={visible ? 'Hide key' : 'Show key'}>
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setVisible(!visible)}
-                        className="btn btn-secondary text-xs py-2 px-2"
                         aria-label={visible ? 'Hide key' : 'Show key'}
                         id="key-toggle-visibility"
                     >
                         {visible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
+                    </Button>
                 </Tooltip>
-                <button
+                <Button
+                    variant="primary"
+                    size="sm"
                     onClick={handleCopy}
-                    className="btn btn-primary text-xs py-2 px-3"
                     id="key-copy-btn"
                 >
                     {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                     {copied ? 'Copied!' : 'Copy'}
-                </button>
+                </Button>
             </div>
         </div>
     );
@@ -402,14 +405,15 @@ export default function ApiKeysPage() {
                     cell: ({ row }) => (
                         <div className="text-right">
                             <Tooltip content="Revoke key">
-                                <button
+                                <Button
+                                    variant="danger-outline"
+                                    size="xs"
                                     onClick={() => handleRevoke(row.original)}
-                                    className="btn btn-secondary text-xs py-1 px-2 text-red-400 hover:bg-red-500/10"
                                     aria-label="Revoke key"
                                     id={`revoke-key-${row.original.id}`}
                                 >
                                     <Trash2 className="w-3 h-3" />
-                                </button>
+                                </Button>
                             </Tooltip>
                         </div>
                     ),
@@ -498,10 +502,10 @@ export default function ApiKeysPage() {
                     </p>
                 </div>
                 {!showCreate && !createdKey && (
-                    <button onClick={() => setShowCreate(true)} className="btn btn-primary" id="create-api-key-btn">
+                    <Button variant="primary" onClick={() => setShowCreate(true)} id="create-api-key-btn">
                         <Plus className="w-3.5 h-3.5" />
                         Create API Key
-                    </button>
+                    </Button>
                 )}
             </div>
 
@@ -525,13 +529,14 @@ export default function ApiKeysPage() {
             {createdKey && (
                 <div className="space-y-2">
                     <KeyDisplay plaintext={createdKey.plaintext} />
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setCreatedKey(null)}
-                        className="btn btn-secondary text-xs"
                         id="dismiss-key-display"
                     >
                         I&apos;ve copied the key — dismiss
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -576,14 +581,16 @@ export default function ApiKeysPage() {
                     </div>
 
                     <div className="flex gap-2 pt-2">
-                        <button
+                        <Button
+                            variant="primary"
                             onClick={handleCreate}
                             disabled={creating || !createName.trim() || createScopes.length === 0}
-                            className="btn btn-primary" id="key-submit-btn"
+                            loading={creating}
+                            id="key-submit-btn"
                         >
                             {creating ? 'Creating...' : 'Create Key'}
-                        </button>
-                        <button onClick={() => setShowCreate(false)} className="btn btn-secondary">Cancel</button>
+                        </Button>
+                        <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
                     </div>
                 </div>
             )}

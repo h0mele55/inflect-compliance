@@ -7,6 +7,7 @@ import { RequirePermission } from '@/components/require-permission';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { FrameworkExplorer } from '@/components/frameworks/FrameworkExplorer';
 import { FrameworkBuilder } from '@/components/ui/FrameworkBuilder';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { useCelebration } from '@/components/ui/hooks';
 import { MILESTONES, scopedMilestone } from '@/lib/celebrations';
 import type { FrameworkTreePayload } from '@/lib/framework-tree/types';
@@ -119,11 +120,11 @@ export default function FrameworkDetailPage() {
                     {framework.description && <p className="text-sm text-content-muted mt-2">{framework.description}</p>}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <Link href={tenantHref(`/frameworks/${frameworkKey}/templates`)} className="btn btn-secondary" id="browse-templates-cta">
+                    <Link href={tenantHref(`/frameworks/${frameworkKey}/templates`)} className={buttonVariants({ variant: 'secondary' })} id="browse-templates-cta">
                         Browse Templates
                     </Link>
                     <RequirePermission resource="frameworks" action="install">
-                        <Link href={tenantHref(`/frameworks/${frameworkKey}/install`)} className="btn btn-primary" id="install-pack-cta">
+                        <Link href={tenantHref(`/frameworks/${frameworkKey}/install`)} className={buttonVariants({ variant: 'primary' })} id="install-pack-cta">
                             Install Pack
                         </Link>
                     </RequirePermission>
@@ -176,7 +177,7 @@ export default function FrameworkDetailPage() {
                                 <RequirePermission resource="frameworks" action="install">
                                     <Link
                                         href={tenantHref(`/frameworks/${frameworkKey}/install?pack=${p.key}`)}
-                                        className="btn btn-primary"
+                                        className={buttonVariants({ variant: 'primary' })}
                                         id={`install-pack-${p.key}`}
                                     >
                                         Install Pack

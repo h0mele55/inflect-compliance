@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { StatusBreakdown } from '@/components/ui/status-breakdown';
 
 type Risk = {
@@ -73,7 +75,7 @@ export default function RiskDashboardPage() {
                     <h1 className="text-2xl font-bold">{t('dashboardTitle')}</h1>
                     <p className="text-content-muted text-sm">{tenant.tenantName} — {t('riskCount', { count: total })}</p>
                 </div>
-                <Link href={href('/risks')} className="btn btn-secondary" id="back-to-register">
+                <Link href={href('/risks')} className={buttonVariants({ variant: 'secondary' })} id="back-to-register">
                     {t('riskRegister')}
                 </Link>
             </div>

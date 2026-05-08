@@ -18,6 +18,7 @@ import {
     useTenantHref,
     useTenantContext,
 } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/format-date';
 import { SkeletonCard } from '@/components/ui/skeleton';
 
@@ -137,14 +138,16 @@ export function VendorTemplatesIndexClient() {
                             />
                         </div>
                         <div>
-                            <button
-                                className="btn btn-primary btn-sm"
+                            <Button
+                                variant="primary"
+                                size="sm"
                                 onClick={handleCreate}
                                 disabled={creating}
+                                loading={creating}
                                 id="create-template-btn"
                             >
                                 {creating ? 'Creating…' : 'Create draft'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                     {createError && (

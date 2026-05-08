@@ -117,16 +117,17 @@ export function MembersTable({ orgSlug, currentUserId, rows, invites }: Props) {
                                             : `Change role for ${row.original.user.email}`
                                     }
                                 >
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="ghost"
+                                        size="sm"
                                         disabled={isSelf}
                                         onClick={() => setRoleTarget(row.original)}
-                                        className="btn btn-ghost btn-sm"
                                         data-testid={`org-member-role-${row.original.userId}`}
                                     >
                                         <Shield className="size-3.5" aria-hidden="true" />
                                         Change role
-                                    </button>
+                                    </Button>
                                 </Tooltip>
                                 <Tooltip
                                     content={
@@ -135,11 +136,13 @@ export function MembersTable({ orgSlug, currentUserId, rows, invites }: Props) {
                                             : `Remove ${row.original.user.email}`
                                     }
                                 >
-                                    <button
+                                    <Button
                                         type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-content-error"
                                         disabled={isSelf}
                                         onClick={() => setRemoveTarget(row.original)}
-                                        className="btn btn-ghost btn-sm text-content-error"
                                         data-testid={`org-member-remove-${row.original.userId}`}
                                     >
                                         <UserMinus
@@ -147,7 +150,7 @@ export function MembersTable({ orgSlug, currentUserId, rows, invites }: Props) {
                                             aria-hidden="true"
                                         />
                                         Remove
-                                    </button>
+                                    </Button>
                                 </Tooltip>
                             </div>
                         );
@@ -173,24 +176,26 @@ export function MembersTable({ orgSlug, currentUserId, rows, invites }: Props) {
                         </p>
                     </div>
                     <div className="flex gap-2">
-                        <button
+                        <Button
                             type="button"
+                            variant="secondary"
+                            size="sm"
                             onClick={() => setInviteOpen(true)}
-                            className="btn btn-secondary btn-sm"
                             data-testid="org-members-invite-button"
                         >
                             <Mail className="size-4" aria-hidden="true" />
                             Invite by email
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="button"
+                            variant="primary"
+                            size="sm"
                             onClick={() => setAddOpen(true)}
-                            className="btn btn-primary btn-sm"
                             data-testid="org-members-add-button"
                         >
                             <Plus className="size-4" aria-hidden="true" />
                             Add member
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </ListPageShell.Header>
@@ -418,14 +423,15 @@ function AddMemberModal({ orgSlug, open, onClose, onSuccess }: AddMemberModalPro
             </Modal.Body>
             <Modal.Footer>
                 <Modal.Actions>
-                    <button
+                    <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={close}
-                        className="btn btn-ghost btn-sm"
                         data-testid="org-add-member-cancel"
                     >
                         Cancel
-                    </button>
+                    </Button>
                     <Button
                         type="submit"
                         form="org-add-member-form"
@@ -550,14 +556,15 @@ function RemoveMemberModal({
             </Modal.Body>
             <Modal.Footer>
                 <Modal.Actions>
-                    <button
+                    <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={close}
-                        className="btn btn-ghost btn-sm"
                         data-testid="org-remove-member-cancel"
                     >
                         Cancel
-                    </button>
+                    </Button>
                     <Button
                         type="button"
                         variant="danger"
@@ -767,14 +774,15 @@ function ChangeRoleModal({
             </Modal.Body>
             <Modal.Footer>
                 <Modal.Actions>
-                    <button
+                    <Button
                         type="button"
+                        variant="ghost"
+                        size="sm"
                         onClick={close}
-                        className="btn btn-ghost btn-sm"
                         data-testid="org-change-role-cancel"
                     >
                         Cancel
-                    </button>
+                    </Button>
                     <Button
                         type="submit"
                         form="org-change-role-form"
@@ -981,14 +989,15 @@ function InviteMemberModal({ orgSlug, open, onClose, onSuccess }: InviteMemberMo
                         />
                     ) : (
                         <>
-                            <button
+                            <Button
                                 type="button"
+                                variant="ghost"
+                                size="sm"
                                 onClick={close}
-                                className="btn btn-ghost btn-sm"
                                 data-testid="org-invite-member-cancel"
                             >
                                 Cancel
-                            </button>
+                            </Button>
                             <Button
                                 type="submit"
                                 form="org-invite-member-form"
@@ -1101,16 +1110,18 @@ function PendingInvitesSection({ orgSlug, invites, onMutate }: PendingInvitesSec
                     cell: ({ row }) => (
                         <div className="flex justify-end">
                             <Tooltip content={`Revoke invite for ${row.original.email}`}>
-                                <button
+                                <Button
                                     type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-content-error"
                                     disabled={revokingId === row.original.id}
                                     onClick={() => revoke(row.original.id)}
-                                    className="btn btn-ghost btn-sm text-content-error"
                                     data-testid={`org-invite-revoke-${row.original.id}`}
                                 >
                                     <X className="size-3.5" aria-hidden="true" />
                                     {revokingId === row.original.id ? 'Revoking…' : 'Revoke'}
-                                </button>
+                                </Button>
                             </Tooltip>
                         </div>
                     ),

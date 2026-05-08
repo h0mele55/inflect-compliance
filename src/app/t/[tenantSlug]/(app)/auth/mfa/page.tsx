@@ -8,6 +8,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { ShieldCheck, KeyRound, AlertTriangle } from 'lucide-react';
 
 /**
@@ -106,7 +108,7 @@ export default function MfaChallengePage() {
                     </p>
                     <a
                         href={tenantHref('/security/mfa')}
-                        className="btn btn-primary w-full justify-center"
+                        className={buttonVariants({ variant: 'primary', className: 'w-full justify-center' })}
                         id="mfa-go-enroll-btn"
                     >
                         <KeyRound className="w-4 h-4" />
@@ -154,14 +156,15 @@ export default function MfaChallengePage() {
                         autoComplete="one-time-code"
                     />
 
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={handleVerify}
                         disabled={submitting || code.length !== 6}
-                        className="btn btn-primary w-full justify-center"
+                        className="w-full justify-center"
                         id="mfa-challenge-submit"
                     >
                         {submitting ? 'Verifying...' : 'Continue'}
-                    </button>
+                    </Button>
                 </div>
 
                 <p className="text-xs text-content-subtle text-center">

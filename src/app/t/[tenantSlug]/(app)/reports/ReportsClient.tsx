@@ -9,6 +9,7 @@ import type { SoAReportDTO } from '@/lib/dto/soa';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { ListPageShell } from '@/components/layout/ListPageShell';
 import { ToggleGroup } from '@/components/ui/toggle-group';
+import { Button } from '@/components/ui/button';
 
 interface ControlOption {
     id: string;
@@ -106,7 +107,7 @@ export function ReportsClient({ data, soaReport, controls, tenantSlug, canEdit, 
                     <div><h1 className="text-2xl font-bold" id="reports-heading">{t.title}</h1><p className="text-content-muted text-sm">{t.subtitle}</p></div>
                     <RequirePermission resource="reports" action="export">
                         <div className="flex flex-wrap gap-2">
-                            <button onClick={() => downloadCSV(data.riskRegister, 'risk-register.csv')} className="btn btn-secondary" id="export-risks-btn">{t.exportRisks}</button>
+                            <Button variant="secondary" onClick={() => downloadCSV(data.riskRegister, 'risk-register.csv')} id="export-risks-btn">{t.exportRisks}</Button>
                             <UpgradeGate feature="PDF_EXPORTS">
                                 <PdfExportButton
                                     tenantSlug={tenantSlug}

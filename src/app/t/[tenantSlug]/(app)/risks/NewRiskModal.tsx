@@ -45,6 +45,7 @@ import {
     type Dispatch,
     type SetStateAction,
 } from 'react';
+import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
@@ -645,9 +646,9 @@ export function NewRiskModal({
                 </Modal.Body>
 
                 <Modal.Actions>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         id="new-risk-cancel-btn"
                         onClick={() => {
                             if (!submitting) close();
@@ -655,15 +656,16 @@ export function NewRiskModal({
                         disabled={submitting}
                     >
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="submit"
-                        className="btn btn-primary btn-sm"
+                        variant="primary"
+                        size="sm"
                         id="submit-risk"
                         disabled={!canSubmit}
                     >
                         {submitting ? 'Creating…' : 'Create risk'}
-                    </button>
+                    </Button>
                 </Modal.Actions>
             </Modal.Form>
         </Modal>

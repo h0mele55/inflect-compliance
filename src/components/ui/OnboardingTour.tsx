@@ -38,6 +38,7 @@ import {
     useRef,
     useState,
 } from 'react';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { useLocalStorage } from '@/components/ui/hooks';
 import {
     DEFAULT_TOUR_STEPS,
@@ -243,7 +244,7 @@ export function StartTourButton({
             disabled={ctx.running}
             className={
                 className ??
-                'btn btn-ghost btn-sm w-full text-xs justify-start'
+                buttonVariants({ variant: 'ghost', size: 'sm', className: 'w-full text-xs justify-start' })
             }
             id={id}
             data-testid="start-tour-btn"

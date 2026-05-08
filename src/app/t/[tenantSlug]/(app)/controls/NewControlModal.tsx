@@ -38,6 +38,7 @@ import {
 } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
@@ -418,9 +419,9 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                     </div>
                 </Modal.Body>
                 <Modal.Actions>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         id="new-control-cancel-btn"
                         onClick={() => {
                             if (!isSubmitting) close();
@@ -428,15 +429,16 @@ export function NewControlModal({ open, setOpen, tenantSlug }: NewControlModalPr
                         disabled={isSubmitting}
                     >
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="submit"
-                        className="btn btn-primary btn-sm"
+                        variant="primary"
+                        size="sm"
                         id="create-control-btn"
                         disabled={submitDisabled}
                     >
                         {isSubmitting ? 'Creating…' : 'Create Control'}
-                    </button>
+                    </Button>
                 </Modal.Actions>
             </Modal.Form>
         </Modal>

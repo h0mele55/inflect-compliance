@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Sparkles } from 'lucide-react';
 import { useTenantContext, useTenantHref } from '@/lib/tenant-context-provider';
+import { buttonVariants } from '@/components/ui/button';
 
 /**
  * Dashboard card that shows "Complete Setup" when onboarding is not complete.
@@ -24,7 +25,7 @@ export default function OnboardingBanner() {
                     <h3 className="text-sm font-semibold text-content-emphasis">Complete your setup</h3>
                     <p className="text-xs text-content-muted mt-0.5">Finish the onboarding wizard to configure your compliance workspace.</p>
                 </div>
-                <Link href={tenantHref('/onboarding')} className="btn btn-primary btn-sm flex-shrink-0" data-testid="onboarding-cta">
+                <Link href={tenantHref('/onboarding')} className={buttonVariants({ variant: 'primary', size: 'sm', className: 'flex-shrink-0' })} data-testid="onboarding-cta">
                     <Sparkles className="w-3.5 h-3.5" /> Continue Setup
                 </Link>
             </div>

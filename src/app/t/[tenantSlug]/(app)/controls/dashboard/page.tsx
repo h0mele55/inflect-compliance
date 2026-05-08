@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import type { ControlDashboardDTO, ConsistencyCheckDTO } from '@/lib/dto';
 import { AppIcon } from '@/components/icons/AppIcon';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import {
     StatusBreakdown,
@@ -91,11 +93,11 @@ export default function ControlsDashboard() {
                 </div>
                 <div className="flex gap-2">
                     {permissions.canAdmin && (
-                        <button onClick={fetchConsistency} className="btn btn-secondary" id="consistency-check-btn">
+                        <Button variant="secondary" onClick={fetchConsistency} id="consistency-check-btn">
                             <AppIcon name="search" size={16} className="inline-block" /> Consistency Check
-                        </button>
+                        </Button>
                     )}
-                    <Link href={tenantHref('/controls')} className="btn btn-secondary">
+                    <Link href={tenantHref('/controls')} className={buttonVariants({ variant: 'secondary' })}>
                         ← Back to Controls
                     </Link>
                 </div>

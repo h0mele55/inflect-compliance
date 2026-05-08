@@ -10,6 +10,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
 import { AppIcon } from '@/components/icons/AppIcon';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { DataTable, createColumns } from '@/components/ui/table';
 
 export default function ControlTemplatesPage() {
@@ -97,7 +99,7 @@ export default function ControlTemplatesPage() {
                     <h1 className="text-2xl font-bold" id="templates-heading"><AppIcon name="templates" className="inline-block mr-2 align-text-bottom" /> Control Templates</h1>
                     <p className="text-content-muted text-sm">Select templates to install as controls in your register</p>
                 </div>
-                <Link href={tenantHref('/controls')} className="btn btn-secondary">
+                <Link href={tenantHref('/controls')} className={buttonVariants({ variant: 'secondary' })}>
                     ← Back to Controls
                 </Link>
             </div>
@@ -123,14 +125,14 @@ export default function ControlTemplatesPage() {
                         />
                     </div>
                     {permissions.canWrite && (
-                        <button
+                        <Button
+                            variant="primary"
                             onClick={handleInstall}
                             disabled={selectedIds.size === 0 || installing}
-                            className="btn btn-primary"
                             id="install-selected-btn"
                         >
                             {installing ? 'Installing...' : `Install Selected (${selectedIds.size})`}
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

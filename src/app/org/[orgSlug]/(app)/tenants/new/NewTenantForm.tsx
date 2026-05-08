@@ -25,7 +25,7 @@ import { ArrowLeft } from 'lucide-react';
 
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 
 interface Props {
     orgSlug: string;
@@ -287,7 +287,7 @@ export function NewTenantForm({ orgSlug }: Props) {
                 <div className="flex items-center justify-end gap-2 pt-2">
                     <Link
                         href={`/org/${orgSlug}/tenants`}
-                        className="btn btn-ghost btn-sm"
+                        className={buttonVariants({ variant: 'ghost', size: 'sm' })}
                         data-testid="org-new-tenant-cancel"
                     >
                         Cancel

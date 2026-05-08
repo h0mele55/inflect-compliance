@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -259,10 +261,10 @@ export default function CreateVendorPage() {
                 </label>
 
                 <div className="flex gap-3 pt-2">
-                    <button type="submit" className="btn btn-primary" disabled={submitting || !form.name} id="create-vendor-submit">
+                    <Button type="submit" variant="primary" disabled={submitting || !form.name} id="create-vendor-submit">
                         {submitting ? 'Creating…' : 'Create Vendor'}
-                    </button>
-                    <Link href={tenantHref('/vendors')} className="btn btn-secondary">Cancel</Link>
+                    </Button>
+                    <Link href={tenantHref('/vendors')} className={buttonVariants({ variant: 'secondary' })}>Cancel</Link>
                 </div>
             </form>
         </div>

@@ -6,6 +6,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 import { RequirePermission } from '@/components/require-permission';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { UpgradeGate } from '@/components/UpgradeGate';
 import { CopyButton } from '@/components/ui/copy-button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -128,19 +130,17 @@ export default function PackDetailPage() {
                     <div className="flex gap-2">
                         {isDraft && (
                             <RequirePermission resource="audits" action="freeze">
-                                <button onClick={freeze} disabled={freezing} className="btn btn-primary inline-flex items-center gap-2" id="freeze-pack-btn">
-                                    <AppIcon name="lock" size={16} />
+                                <Button variant="primary" onClick={freeze} disabled={freezing} id="freeze-pack-btn" icon={<AppIcon name="lock" size={16} />}>
                                     {freezing ? 'Freezing...' : 'Freeze Pack'}
-                                </button>
+                                </Button>
                             </RequirePermission>
                         )}
                         {isFrozen && (
                             <RequirePermission resource="audits" action="share">
                                 <UpgradeGate feature="AUDIT_PACK_SHARING">
-                                    <button onClick={share} disabled={sharing} className="btn btn-primary inline-flex items-center gap-2" id="share-pack-btn">
-                                        <AppIcon name="share" size={16} />
+                                    <Button variant="primary" onClick={share} disabled={sharing} id="share-pack-btn" icon={<AppIcon name="share" size={16} />}>
                                         {sharing ? 'Creating...' : 'Generate Share Link'}
-                                    </button>
+                                    </Button>
                                 </UpgradeGate>
                             </RequirePermission>
                         )}
@@ -157,7 +157,7 @@ export default function PackDetailPage() {
                                             router.push(`/t/${tenantSlug}/audits/packs/${cloned.id}`);
                                         }
                                     } finally { setCloning(false); }
-                                }} disabled={cloning} className="btn btn-secondary" id="clone-pack-btn">
+                                }} disabled={cloning} className={buttonVariants({ variant: 'secondary' })} id="clone-pack-btn">
                                     <AppIcon name="refresh" size={16} className="inline-block mr-1" />
                                     {cloning ? 'Cloning...' : 'Clone for Retest'}
                                 </button>
@@ -241,9 +241,9 @@ export default function PackDetailPage() {
                     <h3 className="text-sm font-semibold mb-2 inline-flex items-center gap-2"><AppIcon name="export" size={16} /> Exports</h3>
                     <div className="flex gap-2">
                         <a href={apiUrl(`/audits/packs/${packId}?action=export&format=json`)}
-                            target="_blank" rel="noopener" className="btn btn-secondary btn-sm inline-flex items-center gap-1"><AppIcon name="download" size={14} /> Export JSON</a>
+                            target="_blank" rel="noopener" className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'inline-flex items-center gap-1' })}><AppIcon name="download" size={14} /> Export JSON</a>
                         <a href={apiUrl(`/audits/packs/${packId}?action=export&format=csv`)}
-                            target="_blank" rel="noopener" className="btn btn-secondary btn-sm inline-flex items-center gap-1"><AppIcon name="download" size={14} /> Export CSV</a>
+                            target="_blank" rel="noopener" className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'inline-flex items-center gap-1' })}><AppIcon name="download" size={14} /> Export CSV</a>
                     </div>
                 </div>
             )}

@@ -8,6 +8,7 @@ import { ListPageShell } from '@/components/layout/ListPageShell';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { TableEmptyState } from '@/components/ui/table';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { buttonVariants } from '@/components/ui/button';
 import { useOrgPermissions } from '@/lib/org-context-provider';
 import type { TenantHealthRow, RagBadge } from '@/app-layer/schemas/portfolio';
 
@@ -152,7 +153,7 @@ export function TenantsTable({ rows, orgSlug }: Props) {
                     {perms.canManageTenants && (
                         <Link
                             href={`/org/${orgSlug}/tenants/new`}
-                            className="btn btn-primary btn-sm"
+                            className={buttonVariants({ variant: 'primary', size: 'sm' })}
                             data-testid="org-tenants-new-link"
                         >
                             <Plus className="w-4 h-4" aria-hidden="true" />

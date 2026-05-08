@@ -35,6 +35,7 @@ import {
     type WidgetLayoutChange,
 } from '@/components/ui/dashboard-widgets';
 import { AnimatedNumber } from '@/components/ui/animated-number';
+import { Button } from '@/components/ui/button';
 import type {
     CreateOrgDashboardWidgetInput,
     OrgDashboardWidgetDto,
@@ -205,36 +206,39 @@ export function PortfolioDashboard({
                 </div>
                 <div className="flex items-center gap-2">
                     {canEdit && !editMode && (
-                        <button
+                        <Button
                             type="button"
+                            variant="secondary"
+                            size="sm"
                             onClick={() => setEditMode(true)}
-                            className="btn btn-secondary btn-sm flex items-center gap-1.5"
                             data-testid="dashboard-edit-toggle"
                         >
                             <Pencil className="size-3.5" aria-hidden="true" />
                             Edit dashboard
-                        </button>
+                        </Button>
                     )}
                     {canEdit && editMode && (
                         <>
-                            <button
+                            <Button
                                 type="button"
+                                variant="secondary"
+                                size="sm"
                                 onClick={() => setPickerOpen(true)}
-                                className="btn btn-secondary btn-sm flex items-center gap-1.5"
                                 data-testid="dashboard-add-widget"
                             >
                                 <Plus className="size-3.5" aria-hidden="true" />
                                 Add widget
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 type="button"
+                                variant="primary"
+                                size="sm"
                                 onClick={() => setEditMode(false)}
-                                className="btn btn-primary btn-sm flex items-center gap-1.5"
                                 data-testid="dashboard-edit-done"
                             >
                                 <X className="size-3.5" aria-hidden="true" />
                                 Done
-                            </button>
+                            </Button>
                         </>
                     )}
                 </div>

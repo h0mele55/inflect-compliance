@@ -17,6 +17,8 @@ import { toApiSearchParams } from '@/lib/filters/url-sync';
 import { buildAssetFilters, ASSET_FILTER_KEYS } from './filter-defs';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { NumberStepper } from '@/components/ui/number-stepper';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 
 const ASSET_TYPES = ['INFORMATION', 'APPLICATION', 'SYSTEM', 'SERVICE', 'DATA_STORE', 'INFRASTRUCTURE', 'VENDOR', 'PROCESS', 'PEOPLE_PROCESS', 'OTHER'];
 const ASSET_TYPE_OPTIONS: ComboboxOption[] = ASSET_TYPES.map(t => ({ value: t, label: t.replace(/_/g, ' ') }));
@@ -169,8 +171,8 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
                         <p className="text-content-muted text-sm">{assets.length} assets</p>
                     </div>
                     <div className="flex gap-2">
-                        <Link href={tenantHref('/coverage')} className="btn btn-secondary">Coverage</Link>
-                        <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t.addAsset}</button>
+                        <Link href={tenantHref('/coverage')} className={buttonVariants({ variant: 'secondary' })}>Coverage</Link>
+                        <Button variant="primary" onClick={() => setShowForm(!showForm)}>{t.addAsset}</Button>
                     </div>
                 </div>
             </ListPageShell.Header>
@@ -234,7 +236,7 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
                             />
                         </div>
                     </div>
-                    <div className="flex gap-2"><button type="submit" className="btn btn-primary">{t.createAsset}</button><button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary">{t.cancel}</button></div>
+                    <div className="flex gap-2"><Button type="submit" variant="primary">{t.createAsset}</Button><Button type="button" variant="secondary" onClick={() => setShowForm(false)}>{t.cancel}</Button></div>
                 </form>
             )}
 

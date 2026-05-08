@@ -34,6 +34,7 @@ import {
     ChevronDown, ChevronUp, Users,
 } from 'lucide-react';
 import type { Role } from '@prisma/client';
+import { Button } from '@/components/ui/button';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
 import { DataTable, createColumns } from '@/components/ui/table';
@@ -294,18 +295,19 @@ function RoleForm({
             </div>
 
             <div className="flex gap-2 pt-2">
-                <button
+                <Button
+                    variant="primary"
                     type="button"
                     onClick={() => onSubmit({ name: name.trim(), description: description.trim(), baseRole, permissionsJson: permissions })}
                     disabled={submitting || !name.trim()}
-                    className="btn btn-primary"
+                    loading={submitting}
                     id="role-submit-btn"
                 >
                     {submitting ? 'Saving...' : submitLabel}
-                </button>
-                <button type="button" onClick={onCancel} className="btn btn-secondary">
+                </Button>
+                <Button variant="secondary" type="button" onClick={onCancel}>
                     Cancel
-                </button>
+                </Button>
             </div>
         </div>
     );
@@ -503,27 +505,29 @@ export default function CustomRolesPage() {
                     return (
                         <div className="flex gap-1 justify-end" onClick={(e) => e.stopPropagation()}>
                             <Tooltip content="Edit role">
-                                <button
+                                <Button
+                                    variant="secondary"
+                                    size="xs"
                                     onClick={() => {
                                         setShowCreate(false);
                                         setEditingId(role.id);
                                     }}
-                                    className="btn btn-secondary text-xs py-1 px-2"
                                     aria-label="Edit role"
                                     id={`edit-role-${role.id}`}
                                 >
                                     <Pencil className="w-3 h-3" />
-                                </button>
+                                </Button>
                             </Tooltip>
                             <Tooltip content="Delete role">
-                                <button
+                                <Button
+                                    variant="danger-outline"
+                                    size="xs"
                                     onClick={() => handleDelete(role)}
-                                    className="btn btn-secondary text-xs py-1 px-2 text-red-400 hover:bg-red-500/10"
                                     aria-label="Delete role"
                                     id={`delete-role-${role.id}`}
                                 >
                                     <Trash2 className="w-3 h-3" />
-                                </button>
+                                </Button>
                             </Tooltip>
                         </div>
                     );
@@ -566,14 +570,14 @@ export default function CustomRolesPage() {
                         </p>
                     </div>
                     {!showCreate && !editingId && (
-                        <button
+                        <Button
+                            variant="primary"
                             onClick={() => setShowCreate(true)}
-                            className="btn btn-primary"
                             id="create-role-btn"
                         >
                             <Plus className="w-3.5 h-3.5" />
                             Create Custom Role
-                        </button>
+                        </Button>
                     )}
                 </div>
             </ListPageShell.Header>

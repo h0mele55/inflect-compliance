@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 import { ClipboardCheck } from 'lucide-react';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FormField } from '@/components/ui/form-field';
 import { Input } from '@/components/ui/input';
@@ -115,9 +116,9 @@ export default function AuditCyclesPage() {
                     <h1 className="text-2xl font-bold">Audit Readiness</h1>
                     <p className="text-content-muted text-sm">{cycles.length} audit cycle{cycles.length !== 1 ? 's' : ''}</p>
                 </div>
-                <button onClick={() => setShowForm(!showForm)} className="btn btn-primary" id="create-cycle-btn">
+                <Button variant="primary" onClick={() => setShowForm(!showForm)} id="create-cycle-btn">
                     {showForm ? 'Cancel' : '+ New Audit Cycle'}
-                </button>
+                </Button>
             </div>
 
             {showForm && (
@@ -188,8 +189,8 @@ export default function AuditCyclesPage() {
                         </FormField>
                     </div>
                     <div className="mt-4 flex gap-2">
-                        <button type="submit" className="btn btn-primary" id="submit-cycle-btn">Create Cycle</button>
-                        <button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary">Cancel</button>
+                        <Button type="submit" variant="primary" id="submit-cycle-btn">Create Cycle</Button>
+                        <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>Cancel</Button>
                     </div>
                 </form>
             )}

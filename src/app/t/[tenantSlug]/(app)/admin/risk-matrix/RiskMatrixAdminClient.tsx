@@ -30,6 +30,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { Button } from '@/components/ui/button';
 import { NumberStepper } from '@/components/ui/number-stepper';
 import { RiskMatrix } from '@/components/ui/RiskMatrix';
 import { DEFAULT_RISK_MATRIX_CONFIG } from '@/lib/risk-matrix/defaults';
@@ -271,24 +272,27 @@ export function RiskMatrixAdminClient({
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         type="button"
-                        className="btn btn-secondary btn-sm"
                         id="risk-matrix-restore-defaults"
                         onClick={restoreDefaults}
                         disabled={saving}
                     >
                         Restore defaults
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="primary"
+                        size="sm"
                         type="button"
-                        className="btn btn-primary btn-sm"
                         id="risk-matrix-save-btn"
                         onClick={save}
                         disabled={saving || validationIssues.length > 0}
+                        loading={saving}
                     >
                         {saving ? 'Saving…' : 'Save changes'}
-                    </button>
+                    </Button>
                 </div>
             </header>
 
@@ -462,14 +466,15 @@ export function RiskMatrixAdminClient({
                             <h2 className="text-sm font-semibold text-content-default">
                                 Severity bands
                             </h2>
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="sm"
                                 type="button"
-                                className="btn btn-secondary btn-sm"
                                 id="rm-add-band-btn"
                                 onClick={addBand}
                             >
                                 + Add band
-                            </button>
+                            </Button>
                         </div>
                         <p className="text-xs text-content-subtle">
                             Bands must cover scores 1..{totalCells} without
@@ -540,16 +545,18 @@ export function RiskMatrixAdminClient({
                                         aria-label={`Band ${idx + 1} colour`}
                                         data-testid={`rm-band-color-${idx}`}
                                     />
-                                    <button
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
                                         type="button"
-                                        className="btn btn-secondary btn-sm col-span-2"
+                                        className="col-span-2"
                                         onClick={() => removeBand(idx)}
                                         aria-label={`Remove band ${idx + 1}`}
                                         data-testid={`rm-band-remove-${idx}`}
                                         disabled={config.bands.length <= 1}
                                     >
                                         Remove
-                                    </button>
+                                    </Button>
                                 </li>
                             ))}
                         </ul>

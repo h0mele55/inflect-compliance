@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { ListPageShell } from '@/components/layout/ListPageShell';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { ToggleGroup } from '@/components/ui/toggle-group';
 
 interface TestPlanSummary {
@@ -94,9 +95,9 @@ export default function TestsRollupPage() {
                         <p className="text-sm text-content-muted mt-1">Test plans and recent results across all controls</p>
                     </div>
                     <div className="flex gap-2">
-                        <Link href={tenantHref('/tests/due')} className="btn btn-ghost btn-sm">Due Queue</Link>
-                        <Link href={tenantHref('/tests/dashboard')} className="btn btn-ghost btn-sm">Dashboard</Link>
-                        <Link href={tenantHref('/findings')} className="btn btn-ghost btn-sm" id="findings-link-btn">Findings</Link>
+                        <Link href={tenantHref('/tests/due')} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>Due Queue</Link>
+                        <Link href={tenantHref('/tests/dashboard')} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>Dashboard</Link>
+                        <Link href={tenantHref('/findings')} className={buttonVariants({ variant: 'ghost', size: 'sm' })} id="findings-link-btn">Findings</Link>
                     </div>
                 </div>
             </ListPageShell.Header>

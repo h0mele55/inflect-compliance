@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
+import { Button } from '@/components/ui/button';
 
 const FW_META: Record<string, { icon: AppIconName; label: string }> = {
     ISO27001: { icon: 'shield', label: 'ISO/IEC 27001:2022' },
@@ -89,11 +90,9 @@ export default function CycleDetailPage() {
             <div className="glass-card p-6 space-y-4">
                 <div className="flex items-center justify-between">
                     <h2 className="text-lg font-semibold">Default Pack Preview</h2>
-                    <button onClick={createDefaultPack} disabled={creating}
-                        className="btn btn-primary" id="create-default-pack-btn">
-                        <AppIcon name="package" size={16} className="inline-block mr-1" />
+                    <Button variant="primary" onClick={createDefaultPack} disabled={creating} id="create-default-pack-btn" icon={<AppIcon name="package" size={16} />}>
                         {creating ? 'Creating...' : 'Create Pack from Default Selection'}
-                    </button>
+                    </Button>
                 </div>
 
                 {preview ? (

@@ -8,6 +8,7 @@ import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback, use } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
 import { Combobox } from '@/components/ui/combobox';
 import { Tooltip } from '@/components/ui/tooltip';
@@ -210,24 +211,24 @@ export default function AssessmentPage(
             <div className="flex gap-3 items-center flex-wrap">
                 {isDraft && canWrite && (
                     <>
-                        <button className="btn btn-primary" onClick={saveAnswers} disabled={saving} id="save-answers-btn">
+                        <Button variant="primary" onClick={saveAnswers} disabled={saving} id="save-answers-btn">
                             {saving ? 'Saving…' : 'Save Answers'}
-                        </button>
-                        <button className="btn btn-secondary" onClick={submitAssessment} disabled={submitting} id="submit-assessment-btn">
+                        </Button>
+                        <Button variant="secondary" onClick={submitAssessment} disabled={submitting} id="submit-assessment-btn">
                             {submitting ? 'Submitting…' : 'Submit for Review'}
-                        </button>
+                        </Button>
                     </>
                 )}
                 {isInReview && isAdmin && (
                     <div className="flex items-center gap-2 w-full">
                         <input className="input flex-1" placeholder="Decision notes (optional)…" value={decideNotes}
                             onChange={e => setDecideNotes(e.target.value)} id="decide-notes-input" />
-                        <button className="btn btn-primary" onClick={() => decideAssessment('APPROVED')} disabled={deciding} id="approve-assessment-btn">
+                        <Button variant="primary" onClick={() => decideAssessment('APPROVED')} disabled={deciding} id="approve-assessment-btn">
                             Approve
-                        </button>
-                        <button className="btn btn-danger" onClick={() => decideAssessment('REJECTED')} disabled={deciding} id="reject-assessment-btn">
+                        </Button>
+                        <Button variant="danger" onClick={() => decideAssessment('REJECTED')} disabled={deciding} id="reject-assessment-btn">
                             Reject
-                        </button>
+                        </Button>
                     </div>
                 )}
                 {isDecided && (

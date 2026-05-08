@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Download, Loader2, Save } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 
 export type PdfReportType = 'AUDIT_READINESS' | 'RISK_REGISTER' | 'GAP_ANALYSIS';
@@ -83,8 +84,9 @@ export function PdfExportButton({
 
     return (
         <div className="inline-flex gap-1">
-            <button
-                className={`btn btn-secondary ${className}`}
+            <Button
+                variant="secondary"
+                className={className}
                 onClick={() => handleExport(false)}
                 disabled={isLoading}
                 id={`export-pdf-${reportType.toLowerCase()}-btn`}
@@ -95,12 +97,12 @@ export function PdfExportButton({
                     <Download className="w-3.5 h-3.5" />
                 )}
                 {generating ? 'Generating...' : label}
-            </button>
+            </Button>
 
             {allowSave && (
                 <Tooltip content="Export PDF and save as an evidence file">
-                    <button
-                        className="btn btn-secondary"
+                    <Button
+                        variant="secondary"
                         onClick={() => handleExport(true)}
                         disabled={isLoading}
                         aria-label="Export PDF and save as evidence file"
@@ -111,7 +113,7 @@ export function PdfExportButton({
                         ) : (
                             <Save className="w-3.5 h-3.5" />
                         )}
-                    </button>
+                    </Button>
                 </Tooltip>
             )}
         </div>

@@ -21,6 +21,7 @@ import {
     useFilters,
 } from '@/components/ui/filter';
 import { EntityListPage } from '@/components/layout/EntityListPage';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { toApiSearchParams } from '@/lib/filters/url-sync';
 import {
     buildPolicyFilters,
@@ -351,14 +352,14 @@ function PoliciesPageInner({
                     <>
                         <Link
                             href={tenantHref('/policies/templates')}
-                            className="btn btn-secondary"
+                            className={buttonVariants({ variant: 'secondary' })}
                             id="policy-from-template-btn"
                         >
                             From Template
                         </Link>
                         <Link
                             href={tenantHref('/policies/new')}
-                            className="btn btn-primary"
+                            className={buttonVariants({ variant: 'primary' })}
                             id="new-policy-btn"
                         >
                             + New Policy

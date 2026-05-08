@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTenantApiUrl } from '@/lib/tenant-context-provider';
 import { CloudCog, Plus, Trash2, Copy, Check, AlertTriangle, Clock, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 import { useCopyToClipboard } from '@/components/ui/hooks';
 import { CopyButton } from '@/components/ui/copy-button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -169,19 +170,21 @@ export default function ScimAdminPage() {
                                 <code className="text-xs text-content-emphasis flex-1 break-all select-all" id="scim-token-value">
                                     {newTokenPlaintext}
                                 </code>
-                                <button onClick={copyToken} className="btn btn-secondary btn-sm shrink-0" id="copy-token-btn">
+                                <Button variant="secondary" size="sm" onClick={copyToken} className="shrink-0" id="copy-token-btn">
                                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                                     {copied ? 'Copied' : 'Copy'}
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </div>
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setNewTokenPlaintext(null)}
-                        className="btn btn-secondary btn-sm mt-3 w-full"
+                        className="mt-3 w-full"
                     >
                         I&apos;ve copied the token — dismiss
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -189,15 +192,16 @@ export default function ScimAdminPage() {
             <div className="glass-card">
                 <div className="flex items-center justify-between p-4 border-b border-border-default/50">
                     <h2 className="text-sm font-semibold">SCIM Tokens</h2>
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => setShowForm(true)}
-                        className="btn btn-primary btn-sm"
                         id="generate-token-btn"
                         disabled={generating}
                     >
                         <Plus className="w-3.5 h-3.5" />
                         Generate Token
-                    </button>
+                    </Button>
                 </div>
 
                 {/* Generate form */}
@@ -213,12 +217,12 @@ export default function ScimAdminPage() {
                                 id="token-label-input"
                                 autoFocus
                             />
-                            <button onClick={generateToken} className="btn btn-primary btn-sm" disabled={generating}>
+                            <Button variant="primary" size="sm" onClick={generateToken} disabled={generating} loading={generating}>
                                 {generating ? 'Generating…' : 'Create'}
-                            </button>
-                            <button onClick={() => setShowForm(false)} className="btn btn-secondary btn-sm">
+                            </Button>
+                            <Button variant="secondary" size="sm" onClick={() => setShowForm(false)}>
                                 Cancel
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 )}
@@ -260,13 +264,14 @@ export default function ScimAdminPage() {
                                         )}
                                     </div>
                                 </div>
-                                <button
+                                <Button
+                                    variant="danger-outline"
+                                    size="sm"
                                     onClick={() => revokeToken(token.id)}
-                                    className="btn btn-secondary btn-sm text-red-400 hover:text-red-300"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                     Revoke
-                                </button>
+                                </Button>
                             </div>
                         ))}
                     </div>

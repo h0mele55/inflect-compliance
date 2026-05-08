@@ -27,6 +27,7 @@ import {
     type Dispatch,
     type SetStateAction,
 } from 'react';
+import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
@@ -303,9 +304,9 @@ export function NewEvidenceTextModal({
                 </Modal.Body>
 
                 <Modal.Actions>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         id="text-evidence-cancel-btn"
                         onClick={() => {
                             if (!mutation.isPending) close();
@@ -313,15 +314,16 @@ export function NewEvidenceTextModal({
                         disabled={mutation.isPending}
                     >
                         Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="submit"
-                        className="btn btn-primary btn-sm"
+                        variant="primary"
+                        size="sm"
                         id="create-text-evidence-btn"
                         disabled={!canSubmit}
                     >
                         {mutation.isPending ? 'Creating…' : 'Add evidence'}
-                    </button>
+                    </Button>
                 </Modal.Actions>
             </Modal.Form>
         </Modal>

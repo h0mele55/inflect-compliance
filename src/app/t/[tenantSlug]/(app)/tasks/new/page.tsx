@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { UserCombobox } from '@/components/ui/user-combobox';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
@@ -369,7 +371,7 @@ export default function NewTaskPage() {
                                 onChange={e => setLinkEntityId(e.target.value)}
                             />
                         </FormField>
-                        <button type="button" className="btn btn-secondary" onClick={addPendingLink} id="add-link-btn">+ Add</button>
+                        <Button type="button" variant="secondary" onClick={addPendingLink} id="add-link-btn">+ Add</Button>
                     </div>
                     {pendingLinks.length > 0 && (
                         <div className="space-y-1" id="pending-links-list">
@@ -387,10 +389,10 @@ export default function NewTaskPage() {
                 </div>
 
                 <div className="flex gap-3 pt-2">
-                    <button type="submit" disabled={saving} className="btn btn-primary" id="create-task-btn">
+                    <Button type="submit" variant="primary" disabled={saving} id="create-task-btn">
                         {saving ? 'Creating...' : 'Create Task'}
-                    </button>
-                    <Link href={tenantHref('/tasks')} className="btn btn-secondary">Cancel</Link>
+                    </Button>
+                    <Link href={tenantHref('/tasks')} className={buttonVariants({ variant: 'secondary' })}>Cancel</Link>
                 </div>
             </form>
         </div>

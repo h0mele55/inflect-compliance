@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useTenantContext, useTenantHref, usePermissions } from '@/lib/tenant-context-provider';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { Button } from '@/components/ui/button';
 import { useKeyboardShortcut } from '@/lib/hooks/use-keyboard-shortcut';
 import { StartTourButton } from '@/components/ui/OnboardingTour';
 import {
@@ -217,14 +218,16 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
                 <div className="mb-1">
                     <StartTourButton />
                 </div>
-                <button
+                <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={onLogout}
-                    className="btn btn-ghost btn-sm w-full text-xs"
+                    className="w-full text-xs"
                     data-testid="nav-logout"
                 >
                     <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
                     {tc('signOut')}
-                </button>
+                </Button>
             </div>
         </div>
     );

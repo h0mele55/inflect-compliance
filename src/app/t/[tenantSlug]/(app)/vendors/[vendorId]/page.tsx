@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/format-date';
 import { useEffect, useState, useCallback, use } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { SkeletonDetailPage } from '@/components/ui/skeleton';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { useToastWithUndo } from '@/components/ui/hooks';
@@ -218,12 +219,12 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                 </div>
                 <div className="flex gap-2">
                     {canWrite && (vendor.domain || vendor.websiteUrl) && (
-                        <button className="btn btn-secondary" onClick={handleEnrich} disabled={enriching} id="enrich-vendor-btn">
+                        <Button variant="secondary" onClick={handleEnrich} disabled={enriching} id="enrich-vendor-btn">
                             {enriching ? 'Enriching…' : 'Auto-fill'}
-                        </button>
+                        </Button>
                     )}
                     {canWrite && !editing && (
-                        <button className="btn btn-secondary" onClick={() => setEditing(true)} id="edit-vendor-btn">Edit</button>
+                        <Button variant="secondary" onClick={() => setEditing(true)} id="edit-vendor-btn">Edit</Button>
                     )}
                 </div>
             </div>
@@ -298,8 +299,8 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                         <textarea className="input w-full h-20" value={editForm.description} onChange={e => setEditForm((p: any) => ({ ...p, description: e.target.value }))} />
                     </div>
                     <div className="flex gap-3">
-                        <button className="btn btn-primary" onClick={saveEdit} id="save-vendor-btn">Save</button>
-                        <button className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
+                        <Button variant="primary" onClick={saveEdit} id="save-vendor-btn">Save</Button>
+                        <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>
                     </div>
                 </div>
             )}
@@ -309,9 +310,9 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                 <div className="space-y-4">
                     {canWrite && (
                         <div className="flex justify-end">
-                            <button className="btn btn-primary" onClick={() => setShowDocForm(!showDocForm)} id="add-doc-btn">
+                            <Button variant="primary" onClick={() => setShowDocForm(!showDocForm)} id="add-doc-btn">
                                 {showDocForm ? 'Cancel' : '+ Add Document'}
-                            </button>
+                            </Button>
                         </div>
                     )}
                     {showDocForm && canWrite && (
@@ -334,7 +335,7 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                                 <label className="block text-sm text-content-muted mb-1">Notes</label>
                                 <input className="input w-full" value={docForm.notes} onChange={e => setDocForm(p => ({ ...p, notes: e.target.value }))} id="doc-notes-input" />
                             </div>
-                            <button type="submit" className="btn btn-primary" id="submit-doc-btn">Add Document</button>
+                            <Button type="submit" variant="primary" id="submit-doc-btn">Add Document</Button>
                         </form>
                     )}
                     <div className="card overflow-x-auto">
@@ -375,9 +376,9 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                     {canWrite && (
                         <div className="flex items-center gap-3 justify-end">
                             {!showStartAssessment ? (
-                                <button className="btn btn-primary" onClick={() => setShowStartAssessment(true)} id="start-assessment-btn">
+                                <Button variant="primary" onClick={() => setShowStartAssessment(true)} id="start-assessment-btn">
                                     + Start Assessment
-                                </button>
+                                </Button>
                             ) : (
                                 <div className="flex items-center gap-2">
                                     <Combobox
@@ -389,8 +390,8 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                                         matchTriggerWidth
                                         buttonProps={{ className: 'w-48' }}
                                     />
-                                    <button className="btn btn-primary" onClick={startAssessment} disabled={!selectedTemplate} id="confirm-start-assessment">Start</button>
-                                    <button className="btn btn-secondary" onClick={() => setShowStartAssessment(false)}>Cancel</button>
+                                    <Button variant="primary" onClick={startAssessment} disabled={!selectedTemplate} id="confirm-start-assessment">Start</Button>
+                                    <Button variant="secondary" onClick={() => setShowStartAssessment(false)}>Cancel</Button>
                                 </div>
                             )}
                         </div>
@@ -434,9 +435,9 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                 <div className="space-y-4">
                     {canWrite && (
                         <div className="flex justify-end">
-                            <button className="btn btn-primary" onClick={() => setShowLinkForm(!showLinkForm)} id="add-link-btn">
+                            <Button variant="primary" onClick={() => setShowLinkForm(!showLinkForm)} id="add-link-btn">
                                 {showLinkForm ? 'Cancel' : '+ Link Entity'}
-                            </button>
+                            </Button>
                         </div>
                     )}
                     {showLinkForm && canWrite && (
@@ -453,13 +454,13 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                                 <label className="block text-sm text-content-muted mb-1">Relation</label>
                                 <Combobox hideSearch id="link-relation" selected={VENDOR_LINK_RELATION_OPTIONS.find(o => o.value === linkForm.relation) ?? null} setSelected={(opt) => setLinkForm(p => ({ ...p, relation: opt?.value ?? p.relation }))} options={VENDOR_LINK_RELATION_OPTIONS} matchTriggerWidth />
                             </div>
-                            <button className="btn btn-primary" id="submit-link-btn" onClick={async () => {
+                            <Button variant="primary" id="submit-link-btn" onClick={async () => {
                                 await fetch(apiUrl(`/vendors/${params.vendorId}/links`), {
                                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(linkForm),
                                 });
                                 setShowLinkForm(false); setLinkForm({ entityType: 'ASSET', entityId: '', relation: 'RELATED' }); fetchLinks();
-                            }}>Add</button>
+                            }}>Add</Button>
                         </div>
                     )}
                     {['ASSET', 'RISK', 'ISSUE', 'CONTROL'].map(type => {
@@ -490,13 +491,13 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                         <div className="flex items-center gap-2 justify-end">
                             <input className="input w-48" placeholder="Bundle name…" value={bundleName}
                                 onChange={e => setBundleName(e.target.value)} id="bundle-name-input" />
-                            <button className="btn btn-primary" disabled={!bundleName} id="create-bundle-btn" onClick={async () => {
+                            <Button variant="primary" disabled={!bundleName} id="create-bundle-btn" onClick={async () => {
                                 await fetch(apiUrl(`/vendors/${params.vendorId}/bundles`), {
                                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ name: bundleName }),
                                 });
                                 setBundleName(''); fetchBundles();
-                            }}>+ New Bundle</button>
+                            }}>+ New Bundle</Button>
                         </div>
                     )}
                     {bundles.map((b: any) => (
@@ -508,11 +509,11 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                                     {b.frozenAt && <span className="badge badge-success ml-2">Frozen</span>}
                                 </div>
                                 {canWrite && !b.frozenAt && (
-                                    <button className="btn btn-secondary text-xs" id={`freeze-bundle-${b.id}`} onClick={async () => {
+                                    <Button variant="secondary" size="xs" id={`freeze-bundle-${b.id}`} onClick={async () => {
                                         if (!confirm('Freeze this bundle? Items become immutable.')) return;
                                         await fetch(apiUrl(`/vendors/${params.vendorId}/bundles/${b.id}?action=freeze`), { method: 'POST' });
                                         fetchBundles();
-                                    }}>Freeze</button>
+                                    }}>Freeze</Button>
                                 )}
                             </div>
                             <div className="text-xs text-content-muted">Created by {b.createdBy?.name || '—'} on {formatDate(b.createdAt)}</div>
@@ -537,13 +538,13 @@ export default function VendorDetailPage(props: { params: Promise<{ tenantSlug: 
                                 <input className="input w-48" value={subForm.purpose}
                                     onChange={e => setSubForm(p => ({ ...p, purpose: e.target.value }))} id="sub-purpose" placeholder="e.g. Data hosting" />
                             </div>
-                            <button className="btn btn-primary" disabled={!subForm.subprocessorVendorId} id="add-subprocessor-btn" onClick={async () => {
+                            <Button variant="primary" disabled={!subForm.subprocessorVendorId} id="add-subprocessor-btn" onClick={async () => {
                                 await fetch(apiUrl(`/vendors/${params.vendorId}/subprocessors`), {
                                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify(subForm),
                                 });
                                 setSubForm({ subprocessorVendorId: '', purpose: '' }); fetchSubs();
-                            }}>+ Add</button>
+                            }}>+ Add</Button>
                         </div>
                     )}
                     <div className="card overflow-x-auto">

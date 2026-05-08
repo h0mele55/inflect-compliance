@@ -11,6 +11,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { useToastWithUndo } from '@/components/ui/hooks';
 import { SkeletonLine, SkeletonCard } from '@/components/ui/skeleton';
 import { UserCombobox } from '@/components/ui/user-combobox';
@@ -352,9 +353,9 @@ export default function TaskDetailPage() {
                                 forceDropdown={false}
                             />
                         </div>
-                        <button className="btn btn-secondary" onClick={handleAssign} disabled={assigning} id="assign-task-btn">
+                        <Button variant="secondary" onClick={handleAssign} disabled={assigning} id="assign-task-btn">
                             {assigning ? 'Saving...' : 'Assign'}
-                        </button>
+                        </Button>
                     </div>
                 </div>
             )}
@@ -457,9 +458,9 @@ export default function TaskDetailPage() {
                 <div className="space-y-4">
                     {permissions.canWrite && (
                         <div className="flex justify-end">
-                            <button className="btn btn-primary" onClick={() => setShowLinkForm(!showLinkForm)} id="add-link-btn">
+                            <Button variant="primary" onClick={() => setShowLinkForm(!showLinkForm)} id="add-link-btn">
                                 + Add Link
-                            </button>
+                            </Button>
                         </div>
                     )}
                     {showLinkForm && permissions.canWrite && (
@@ -469,9 +470,9 @@ export default function TaskDetailPage() {
                                 <input type="text" className="input" placeholder="Entity ID *" value={linkEntityId} onChange={e => setLinkEntityId(e.target.value)} required id="link-entity-id" />
                                 <Combobox hideSearch id="link-relation" selected={RELATION_CB_OPTIONS.find(o => o.value === linkRelation) ?? null} setSelected={(opt) => setLinkRelation(opt?.value ?? linkRelation)} options={RELATION_CB_OPTIONS} matchTriggerWidth />
                             </div>
-                            <button type="submit" disabled={savingLink} className="btn btn-primary" id="submit-link-btn">
+                            <Button type="submit" variant="primary" disabled={savingLink} id="submit-link-btn">
                                 {savingLink ? 'Linking...' : 'Add Link'}
-                            </button>
+                            </Button>
                         </form>
                     )}
                     <div className="glass-card overflow-hidden">
@@ -525,9 +526,9 @@ export default function TaskDetailPage() {
                                 required
                                 id="comment-body"
                             />
-                            <button type="submit" disabled={savingComment} className="btn btn-primary" id="submit-comment-btn">
+                            <Button type="submit" variant="primary" disabled={savingComment} id="submit-comment-btn">
                                 {savingComment ? 'Posting...' : 'Add Comment'}
-                            </button>
+                            </Button>
                         </form>
                     )}
                     <div className="glass-card overflow-hidden" id="comments-list">

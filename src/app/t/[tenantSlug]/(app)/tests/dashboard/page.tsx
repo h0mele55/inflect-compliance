@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref } from '@/lib/tenant-context-provider';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { ProgressBar, type ProgressBarVariant } from '@/components/ui/progress-bar';
 import { ProgressCircle } from '@/components/ui/progress-circle';
 import {
@@ -108,8 +109,8 @@ export default function TestDashboardPage() {
                     <p className="text-sm text-content-muted mt-1">Testing health and framework readiness</p>
                 </div>
                 <div className="flex gap-3">
-                    <Link href={tenantHref('/tests')} className="btn btn-ghost btn-sm">← Tests</Link>
-                    <Link href={tenantHref('/tests/due')} className="btn btn-ghost btn-sm">Due Queue</Link>
+                    <Link href={tenantHref('/tests')} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>← Tests</Link>
+                    <Link href={tenantHref('/tests/due')} className={buttonVariants({ variant: 'ghost', size: 'sm' })}>Due Queue</Link>
                     <div className="flex gap-1 bg-bg-default/50 rounded-lg p-1">
                         {[30, 90].map(d => (
                             <button

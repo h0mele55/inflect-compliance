@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTenantContext, useTenantHref } from '@/lib/tenant-context-provider';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
+import { Button } from '@/components/ui/button';
 import { useEnterSubmit } from '@/components/ui/hooks';
 import {
     Building2,
@@ -249,10 +250,10 @@ export default function OnboardingWizard() {
                     </div>
                     <h2 className="text-xl font-bold text-white mb-2">Welcome! Let&apos;s set up your workspace.</h2>
                     <p className="text-slate-400 text-sm mb-6">This wizard will guide you through configuring your compliance platform in just a few steps.</p>
-                    <button onClick={handleStart} disabled={saving} className="btn btn-primary btn-lg">
+                    <Button variant="primary" size="lg" onClick={handleStart} disabled={saving}>
                         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                         Start Setup
-                    </button>
+                    </Button>
                 </div>
             </div>
         );
@@ -268,9 +269,9 @@ export default function OnboardingWizard() {
                     </div>
                     <h2 className="text-xl font-bold text-white mb-2">Onboarding Complete</h2>
                     <p className="text-slate-400 text-sm mb-6">Your workspace has been configured. You can always update settings from the admin panel.</p>
-                    <button onClick={() => router.push(tenantHref('/dashboard'))} className="btn btn-primary btn-lg">
+                    <Button variant="primary" size="lg" onClick={() => router.push(tenantHref('/dashboard'))}>
                         Go to Dashboard
-                    </button>
+                    </Button>
                 </div>
             </div>
         );
@@ -288,9 +289,9 @@ export default function OnboardingWizard() {
                     <h1 className="text-2xl font-bold">Setup Wizard</h1>
                     <p className="text-slate-400 text-sm mt-1">Complete these steps to configure your compliance workspace.</p>
                 </div>
-                <button onClick={handleSaveAndExit} className="btn btn-ghost btn-sm">
+                <Button variant="ghost" size="sm" onClick={handleSaveAndExit}>
                     <Save className="w-3.5 h-3.5" /> Save & Exit
-                </button>
+                </Button>
             </div>
 
             {error && (
@@ -370,33 +371,35 @@ export default function OnboardingWizard() {
                         </div>
                         {/* Navigation footer */}
                         <div className="p-4 border-t border-slate-700/50 flex items-center justify-between gap-3">
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => setActiveStepIdx(Math.max(0, activeStepIdx - 1))}
                                 disabled={activeStepIdx === 0}
-                                className="btn btn-ghost btn-sm"
                             >
                                 <ChevronLeft className="w-3.5 h-3.5" /> Back
-                            </button>
+                            </Button>
                             <div className="flex items-center gap-2">
                                 {!isLast && (
-                                    <button
+                                    <Button
+                                        variant="primary"
                                         onClick={() => handleCompleteStep(currentStep.key)}
                                         disabled={saving}
-                                        className="btn btn-primary"
                                     >
                                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                                         Continue <ChevronRight className="w-3.5 h-3.5" />
-                                    </button>
+                                    </Button>
                                 )}
                                 {isLast && (
-                                    <button
+                                    <Button
+                                        variant="success"
+                                        size="lg"
                                         onClick={handleFinish}
                                         disabled={saving}
-                                        className="btn btn-success btn-lg"
                                     >
                                         {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                                         Complete Setup
-                                    </button>
+                                    </Button>
                                 )}
                             </div>
                         </div>
@@ -571,7 +574,7 @@ function AssetSetupStep({ data, onUpdate }: { data: StepData; onUpdate: (d: Step
             <div className="flex gap-2">
                 <input className="input flex-1" placeholder="e.g. Customer Database, Cloud Infrastructure..." value={newAsset}
                     onChange={(e) => setNewAsset(e.target.value)} onKeyDown={assetKeyDown} data-testid="asset-input" />
-                <button onClick={addAsset} className="btn btn-primary">Add</button>
+                <Button variant="primary" onClick={addAsset}>Add</Button>
             </div>
             {assets.length > 0 && (
                 <div className="space-y-1">
@@ -676,7 +679,7 @@ function TeamSetupStep({ data, onUpdate }: { data: StepData; onUpdate: (d: StepD
             <div className="flex gap-2">
                 <input className="input flex-1" placeholder="colleague@company.com" type="email" value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)} onKeyDown={emailKeyDown} data-testid="invite-email" />
-                <button onClick={addEmail} className="btn btn-primary">Invite</button>
+                <Button variant="primary" onClick={addEmail}>Invite</Button>
             </div>
             {emails.length > 0 && (
                 <div className="space-y-1">

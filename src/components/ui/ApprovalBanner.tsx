@@ -27,6 +27,7 @@
 
 import { useState } from 'react';
 import { CheckCircle2, XCircle, Clock, AlertTriangle, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export interface ApprovalBannerUserRef {
     id: string;
@@ -218,11 +219,11 @@ export function ApprovalBanner({
                                 + Comment
                             </button>
                         )}
-                        <button
-                            type="button"
+                        <Button
+                            variant="success"
+                            size="sm"
                             onClick={() => onDecide?.(approval.id, 'APPROVED', comment)}
                             disabled={!canActNow}
-                            className="btn btn-success btn-sm"
                             id={`approval-banner-approve-${approval.id}`}
                             data-testid="approval-banner-approve"
                             title={
@@ -232,12 +233,12 @@ export function ApprovalBanner({
                             }
                         >
                             {busy ? '…' : 'Approve'}
-                        </button>
-                        <button
-                            type="button"
+                        </Button>
+                        <Button
+                            variant="danger"
+                            size="sm"
                             onClick={() => onDecide?.(approval.id, 'REJECTED', comment)}
                             disabled={!canActNow}
-                            className="btn btn-danger btn-sm"
                             id={`approval-banner-reject-${approval.id}`}
                             data-testid="approval-banner-reject"
                             title={
@@ -247,7 +248,7 @@ export function ApprovalBanner({
                             }
                         >
                             {busy ? '…' : 'Reject'}
-                        </button>
+                        </Button>
                     </div>
                 )}
             </div>

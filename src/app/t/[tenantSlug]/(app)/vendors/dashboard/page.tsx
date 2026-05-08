@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { StatusBreakdown, type StatusBreakdownItem } from '@/components/ui/status-breakdown';
 
 const CRIT_BADGE: Record<string, string> = { LOW: 'badge-neutral', MEDIUM: 'badge-warning', HIGH: 'badge-danger', CRITICAL: 'badge-danger' };
@@ -72,7 +73,7 @@ export default function VendorDashboardPage() {
                     <h1 className="text-2xl font-bold">Vendor Dashboard</h1>
                     <p className="text-content-muted text-sm">{metrics.totalVendors} total vendors</p>
                 </div>
-                <Link href={tenantHref('/vendors')} className="btn btn-secondary">← Register</Link>
+                <Link href={tenantHref('/vendors')} className={buttonVariants({ variant: 'secondary' })}>← Register</Link>
             </div>
 
             {/* KPI Cards */}

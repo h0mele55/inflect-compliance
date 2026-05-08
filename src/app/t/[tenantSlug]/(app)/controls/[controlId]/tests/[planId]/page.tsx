@@ -9,6 +9,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
+import { Button } from '@/components/ui/button';
 import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { TestPlanScheduleSection } from '@/components/TestPlanScheduleSection';
 
@@ -176,13 +177,13 @@ export default function TestPlanDetailPage() {
                 </div>
                 {permissions.canWrite && (
                     <div className="flex gap-2">
-                        <button className="btn btn-secondary btn-sm" onClick={() => setEditing(!editing)} id="edit-test-plan-btn">
+                        <Button variant="secondary" size="sm" onClick={() => setEditing(!editing)} id="edit-test-plan-btn">
                             {editing ? 'Cancel' : 'Edit'}
-                        </button>
+                        </Button>
                         {plan.status === 'ACTIVE' && (
-                            <button className="btn btn-primary btn-sm" onClick={createRun} disabled={creatingRun} id="create-test-run-btn">
+                            <Button variant="primary" size="sm" onClick={createRun} disabled={creatingRun} id="create-test-run-btn">
                                 {creatingRun ? '...' : 'Run Test Now'}
-                            </button>
+                            </Button>
                         )}
                     </div>
                 )}
@@ -213,9 +214,9 @@ export default function TestPlanDetailPage() {
                             <Combobox hideSearch id="edit-plan-status" selected={PLAN_STATUS_OPTIONS.find(o => o.value === editStatus) ?? null} setSelected={(opt) => setEditStatus(opt?.value ?? editStatus)} options={PLAN_STATUS_OPTIONS} matchTriggerWidth />
                         </div>
                     </div>
-                    <button className="btn btn-primary btn-sm" onClick={savePlan} disabled={saving} id="save-plan-changes-btn">
+                    <Button variant="primary" size="sm" onClick={savePlan} disabled={saving} id="save-plan-changes-btn">
                         {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -289,9 +290,9 @@ export default function TestPlanDetailPage() {
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-content-default">Test Run History</h3>
                     {permissions.canWrite && plan.status === 'ACTIVE' && (
-                        <button className="btn btn-primary btn-xs" onClick={createRun} disabled={creatingRun}>
+                        <Button variant="primary" size="xs" onClick={createRun} disabled={creatingRun}>
                             {creatingRun ? '...' : 'New Run'}
-                        </button>
+                        </Button>
                     )}
                 </div>
 

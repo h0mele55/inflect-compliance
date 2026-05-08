@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
+import { Button } from '@/components/ui/button';
 import { DataTable, createColumns } from '@/components/ui/table';
 import { ListPageShell } from '@/components/layout/ListPageShell';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -188,9 +189,9 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
                 const f = row.original;
                 return (
                     <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                        {f.status === 'OPEN' && <button onClick={() => updateStatus(f.id, 'IN_PROGRESS')} className="btn btn-sm btn-secondary">{t.inProgress}</button>}
-                        {f.status === 'IN_PROGRESS' && <button onClick={() => updateStatus(f.id, 'READY_FOR_VERIFICATION')} className="btn btn-sm btn-secondary">{t.readyForVerification}</button>}
-                        {f.status === 'READY_FOR_VERIFICATION' && <button onClick={() => updateStatus(f.id, 'CLOSED')} className="btn btn-sm btn-success">{t.closed}</button>}
+                        {f.status === 'OPEN' && <Button variant="secondary" size="sm" onClick={() => updateStatus(f.id, 'IN_PROGRESS')}>{t.inProgress}</Button>}
+                        {f.status === 'IN_PROGRESS' && <Button variant="secondary" size="sm" onClick={() => updateStatus(f.id, 'READY_FOR_VERIFICATION')}>{t.readyForVerification}</Button>}
+                        {f.status === 'READY_FOR_VERIFICATION' && <Button variant="success" size="sm" onClick={() => updateStatus(f.id, 'CLOSED')}>{t.closed}</Button>}
                     </div>
                 );
             },
@@ -204,7 +205,7 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
                 <div className="flex items-center justify-between">
                     {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                     <div><h1 className="text-2xl font-bold">{t.title}</h1><p className="text-content-muted text-sm">{findings.filter((f: any) => f.status !== 'CLOSED').length} {t.open.toLowerCase()}</p></div>
-                    <button onClick={() => setShowForm(!showForm)} className="btn btn-primary">{t.newFinding}</button>
+                    <Button variant="primary" onClick={() => setShowForm(!showForm)}>{t.newFinding}</Button>
                 </div>
             </ListPageShell.Header>
 
@@ -289,7 +290,7 @@ export function FindingsClient({ initialFindings, tenantSlug, translations: t }:
                             />
                         </div>
                     </div>
-                    <div className="flex gap-2"><button type="submit" className="btn btn-primary">{t.createFinding}</button><button type="button" onClick={() => setShowForm(false)} className="btn btn-secondary">{t.cancel}</button></div>
+                    <div className="flex gap-2"><Button type="submit" variant="primary">{t.createFinding}</Button><Button variant="secondary" onClick={() => setShowForm(false)}>{t.cancel}</Button></div>
                 </form>
             )}
 

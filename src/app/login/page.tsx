@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getProviders, signIn } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 
+import { Button } from '@/components/ui/button';
+
 function extractErrorMessage(value: unknown, fallback: string): string {
     if (typeof value === 'string') return value;
     if (value && typeof value === 'object' && 'message' in value) {
@@ -280,9 +282,9 @@ function LoginForm() {
                                     <label htmlFor="login-password" className="input-label">{t('password')}</label>
                                     <input id="login-password" className="input" type="password" name="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder={t('passwordPlaceholder')} minLength={6} />
                                 </div>
-                                <button type="submit" disabled={loading} className="btn btn-primary w-full py-2.5">
+                                <Button type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
                                     {loading ? t('pleaseWait') : mode === 'login' ? t('submitLogin') : t('submitRegister')}
-                                </button>
+                                </Button>
                             </form>
 
                             <div className="mt-6 text-center text-sm text-slate-400">

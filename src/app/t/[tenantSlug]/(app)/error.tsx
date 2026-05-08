@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 
 /**
  * Error boundary for the tenant-scoped app shell.
@@ -50,18 +51,18 @@ export default function AppSectionError({
                 </p>
 
                 <div className="flex gap-3 justify-center">
-                    <button
+                    <Button
+                        variant="primary"
                         onClick={() => reset()}
-                        className="btn btn-primary"
                     >
                         Try again
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="secondary"
                         onClick={() => window.location.href = '/dashboard'}
-                        className="btn btn-secondary"
                     >
                         Go to Dashboard
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>

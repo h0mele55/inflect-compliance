@@ -133,7 +133,7 @@ describe('ConfirmDialog', () => {
     it('paints the destructive button class when tone="danger"', async () => {
         render(<Harness onConfirm={() => undefined} tone="danger" />);
         const confirm = await screen.findByRole('button', { name: 'Revoke' });
-        expect(confirm.className).toMatch(/btn-danger/);
+        expect(confirm.className).toMatch(/bg-red-600/);
     });
 
     it('keeps the modal open when onConfirm rejects', async () => {

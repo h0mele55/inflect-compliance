@@ -53,6 +53,7 @@ import {
     type Dispatch,
     type SetStateAction,
 } from 'react';
+import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import {
     FileDropzone,
@@ -532,17 +533,18 @@ export function UploadEvidenceModal({
                 </Modal.Body>
 
                 <Modal.Actions>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         id="upload-evidence-cancel-btn"
                         onClick={cancel}
                     >
                         {uploadingAll ? 'Stop' : 'Cancel'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                         type="submit"
-                        className="btn btn-primary btn-sm"
+                        variant="primary"
+                        size="sm"
                         id="submit-upload-btn"
                         disabled={submitDisabled}
                     >
@@ -551,7 +553,7 @@ export function UploadEvidenceModal({
                             : queuedCount > 1
                               ? `Upload ${queuedCount} files`
                               : 'Upload'}
-                    </button>
+                    </Button>
                 </Modal.Actions>
             </Modal.Form>
         </Modal>

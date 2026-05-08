@@ -12,6 +12,8 @@ import { PdfExportButton } from '@/components/PdfExportButton';
 import { RequirePermission } from '@/components/require-permission';
 import { Modal } from '@/components/ui/modal';
 import { Tooltip } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button-variants';
 
 // ─── Types ───
 
@@ -179,7 +181,7 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                     <div className="flex flex-wrap gap-2">
                         <a
                             href={`/api/t/${tenantSlug}/reports/soa/export.csv`}
-                            className="btn btn-secondary"
+                            className={buttonVariants({ variant: 'secondary' })}
                             download
                             id="export-soa-btn"
                         >
@@ -223,12 +225,13 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                             {summary.missingJustification > 0 && <span>{summary.missingJustification} missing justification{summary.missingJustification > 1 ? 's' : ''}</span>}
                         </div>
                     </div>
-                    <button
-                        className="btn btn-xs btn-danger"
+                    <Button
+                        variant="danger"
+                        size="xs"
                         onClick={() => setGapsOnly(true)}
                     >
                         Fix now
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -255,24 +258,22 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                     )}
                 </div>
 
-                <button
-                    type="button"
-                    className={`btn ${gapsOnly ? 'btn-danger' : 'btn-ghost'}`}
+                <Button
+                    variant={gapsOnly ? 'danger' : 'ghost'}
                     onClick={() => setGapsOnly(!gapsOnly)}
                     id="soa-gaps-only"
                 >
                     <AlertTriangle className="w-3.5 h-3.5" />
                     {gapsOnly ? 'Showing gaps only' : 'Show gaps only'}
-                </button>
+                </Button>
 
                 {(search || gapsOnly) && (
-                    <button
-                        type="button"
-                        className="btn btn-ghost"
+                    <Button
+                        variant="ghost"
                         onClick={() => { setSearch(''); setGapsOnly(false); }}
                     >
                         <FilterX className="w-3.5 h-3.5" /> Clear
-                    </button>
+                    </Button>
                 )}
 
                 <span className="text-xs text-content-subtle ml-auto">
@@ -386,14 +387,14 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                     </div>
                 </Modal.Body>
                 <Modal.Actions>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setMapModal(null)}
                         disabled={saving}
                     >
                         Cancel
-                    </button>
+                    </Button>
                 </Modal.Actions>
             </Modal>
 
@@ -439,22 +440,22 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                     />
                 </Modal.Body>
                 <Modal.Actions>
-                    <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setJustModal(null)}
                         disabled={saving}
                     >
                         Cancel
-                    </button>
-                    <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
+                    </Button>
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={handleSaveJustification}
                         disabled={saving || !justText.trim()}
                     >
                         {saving ? 'Saving…' : 'Save justification'}
-                    </button>
+                    </Button>
                 </Modal.Actions>
             </Modal>
         </>
@@ -502,13 +503,14 @@ function SoARow({
                         <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                             {entry.applicable === null && (
                                 <Tooltip content="Map control">
-                                    <button
-                                        className="btn btn-xs btn-primary"
+                                    <Button
+                                        variant="primary"
+                                        size="xs"
                                         onClick={onMap}
                                         aria-label="Map control"
                                     >
                                         <Plus className="w-3 h-3" />
-                                    </button>
+                                    </Button>
                                 </Tooltip>
                             )}
                         </div>
@@ -543,12 +545,13 @@ function SoARow({
                                             </span>
                                         )}
                                         {c.applicability === 'NOT_APPLICABLE' && !c.justification && canEdit && (
-                                            <button
-                                                className="btn btn-xs btn-danger"
+                                            <Button
+                                                variant="danger"
+                                                size="xs"
                                                 onClick={(e) => { e.stopPropagation(); onJustify(c.controlId, c.code || c.controlId.slice(0, 8)); }}
                                             >
                                                 <MessageSquare className="w-3 h-3" /> Justify
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
                                 </div>

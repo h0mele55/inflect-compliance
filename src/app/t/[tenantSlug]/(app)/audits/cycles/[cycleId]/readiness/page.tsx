@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
+import { buttonVariants } from '@/components/ui/button-variants';
 import { ProgressBar } from '@/components/ui/progress-bar';
 
 function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
@@ -140,11 +141,11 @@ export default function CycleReadinessPage() {
                 <h3 className="text-sm font-semibold mb-3 inline-flex items-center gap-2"><AppIcon name="export" size={16} /> Exports</h3>
                 <div className="flex flex-wrap gap-2">
                     <a href={apiUrl(`/audits/cycles/${cycleId}/readiness?action=export-json`)}
-                        target="_blank" rel="noopener" className="btn btn-secondary btn-sm">Readiness Report (JSON)</a>
+                        target="_blank" rel="noopener" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>Readiness Report (JSON)</a>
                     <a href={apiUrl(`/audits/cycles/${cycleId}/readiness?action=export-unmapped-csv`)}
-                        target="_blank" rel="noopener" className="btn btn-secondary btn-sm">Unmapped Requirements (CSV)</a>
+                        target="_blank" rel="noopener" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>Unmapped Requirements (CSV)</a>
                     <a href={apiUrl(`/audits/cycles/${cycleId}/readiness?action=export-control-gaps-csv`)}
-                        target="_blank" rel="noopener" className="btn btn-secondary btn-sm">Control Gaps (CSV)</a>
+                        target="_blank" rel="noopener" className={buttonVariants({ variant: 'secondary', size: 'sm' })}>Control Gaps (CSV)</a>
                 </div>
             </div>
         </div>
