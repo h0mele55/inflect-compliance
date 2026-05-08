@@ -62,14 +62,19 @@ const RETIRED_VARIANTS = [
 // `variant="success"` because that catches StatusBadge/InlineNotice/
 // ProgressBar — they have independent variant systems.
 function buildPatterns(variant: string): RegExp[] {
-    const escaped = variant.replace(/-/g, "\\-");
+    // The retired variant names contain only [a-z-] characters. The
+    // hyphen is literal outside character classes so no escape is
+    // needed; we interpolate the variant name directly. (CodeQL was
+    // flagging an earlier `variant.replace(/-/g, "\\-")` pass as
+    // js/incomplete-sanitization — false positive on trusted input,
+    // but the simpler form is also correct.)
     return [
         // <Button ... variant="X" ...> on a single line
-        new RegExp(`<Button[^>]*variant=["']${escaped}["']`),
+        new RegExp(`<Button[^>]*variant=["']${variant}["']`),
         // multi-line <Button> followed (within ~10 lines) by variant="X"
         // — caught by the line-by-line scan below
         // buttonVariants({ ... variant: 'X' ... })
-        new RegExp(`buttonVariants\\(\\{[^}]*variant:\\s*['"\`]${escaped}['"\`]`),
+        new RegExp(`buttonVariants\\(\\{[^}]*variant:\\s*['"\`]${variant}['"\`]`),
     ];
 }
 
@@ -108,8 +113,8 @@ function walk(dir: string): string[] {
 function scanMultiLineButton(content: string, variant: string): number[] {
     const hits: number[] = [];
     const lines = content.split("\n");
-    const escaped = variant.replace(/-/g, "\\-");
-    const variantRe = new RegExp(`variant=["']${escaped}["']`);
+    // Hyphen is literal outside character classes — no escape needed.
+    const variantRe = new RegExp(`variant=["']${variant}["']`);
     for (let i = 0; i < lines.length; i++) {
         if (!/<Button(\s|>|$)/.test(lines[i])) continue;
         // single-line case is caught by buildPatterns; here we want
@@ -219,7 +224,7 @@ describe("v2-PR-1 Button variant cull ratchet", () => {
                 // `outline:` — the `-` before `outline` breaks the
                 // word boundary cleanly.
                 const re = new RegExp(
-                    `(^|\\W)["']?${v.replace(/-/g, "\\-")}["']?\\s*:\\s*\\[`,
+                    `(^|\\W)["']?${v}["']?\\s*:\\s*\\[`,
                     "m",
                 );
                 // Tighter: require the preceding char to NOT be `-`
