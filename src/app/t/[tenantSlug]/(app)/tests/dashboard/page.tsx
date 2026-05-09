@@ -15,6 +15,7 @@ import {
     type DashboardUpcomingItem,
 } from '@/components/TestDashboardG2Section';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { KPIStat, type MetricTone } from '@/components/ui/metric';
 import { Heading } from '@/components/ui/typography';
 
 interface DashboardMetrics {
@@ -284,17 +285,20 @@ export default function TestDashboardPage() {
 }
 
 function MetricCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
-    const colorMap: Record<string, string> = {
-        green: 'text-content-success',
-        red: 'text-content-error',
-        amber: 'text-content-warning',
-        brand: 'text-[var(--brand-default)]',
+    const toneMap: Record<string, MetricTone> = {
+        green: 'success',
+        red: 'critical',
+        amber: 'attention',
+        brand: 'default',
     };
     return (
-        <div className="glass-card p-4 text-center">
-            <div className={`text-2xl font-bold ${colorMap[color] || 'text-content-emphasis'}`}>{value}</div>
-            <div className="text-xs text-content-muted mt-1 font-medium">{label}</div>
-            <div className="text-xs text-content-subtle mt-0.5">{sub}</div>
+        <div className="glass-card p-4">
+            <KPIStat
+                value={value}
+                label={label}
+                tone={toneMap[color] ?? 'default'}
+                description={sub}
+            />
         </div>
     );
 }

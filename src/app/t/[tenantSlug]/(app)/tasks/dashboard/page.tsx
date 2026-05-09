@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/status-breakdown';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 
 const STATUS_LABELS: Record<string, string> = {
     OPEN: 'Open', TRIAGED: 'Triaged', IN_PROGRESS: 'In Progress',
@@ -117,23 +118,27 @@ export default function TaskDashboardPage() {
                 <Link href={tenantHref('/tasks')} className={buttonVariants({ variant: 'secondary' })}>← Task Register</Link>
             </div>
 
-            {/* KPI Cards */}
+            {/* KPI Cards — Polish PR-2: KPIStat primitive. */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-default" id="dashboard-metrics">
-                <div className="glass-card p-4 text-center">
-                    <div className="text-3xl font-bold text-content-emphasis">{metrics.total}</div>
-                    <div className="text-xs text-content-muted mt-1">Total Tasks</div>
+                <div className="glass-card p-4">
+                    <KPIStat value={metrics.total} label="Total Tasks" />
                 </div>
-                <div className="glass-card p-4 text-center border-border-error">
-                    <div className="text-3xl font-bold text-content-error">{metrics.overdue}</div>
-                    <div className="text-xs text-content-muted mt-1">Overdue</div>
+                <div className="glass-card p-4">
+                    <KPIStat
+                        value={metrics.overdue}
+                        label="Overdue"
+                        tone={metrics.overdue > 0 ? 'critical' : 'default'}
+                    />
                 </div>
-                <div className="glass-card p-4 text-center border-border-warning">
-                    <div className="text-3xl font-bold text-content-warning">{metrics.dueIn7d}</div>
-                    <div className="text-xs text-content-muted mt-1">Due in 7 days</div>
+                <div className="glass-card p-4">
+                    <KPIStat
+                        value={metrics.dueIn7d}
+                        label="Due in 7 days"
+                        tone={metrics.dueIn7d > 0 ? 'attention' : 'default'}
+                    />
                 </div>
-                <div className="glass-card p-4 text-center border-border-info">
-                    <div className="text-3xl font-bold text-content-info">{metrics.dueIn30d}</div>
-                    <div className="text-xs text-content-muted mt-1">Due in 30 days</div>
+                <div className="glass-card p-4">
+                    <KPIStat value={metrics.dueIn30d} label="Due in 30 days" />
                 </div>
             </div>
 

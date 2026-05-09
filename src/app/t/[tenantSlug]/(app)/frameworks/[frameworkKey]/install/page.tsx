@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { Heading } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function InstallWizardPage() {
@@ -160,17 +161,14 @@ export default function InstallWizardPage() {
                     <div className="glass-card">
                         <Heading level={2} className="mb-4">Install Preview</Heading>
                         <div className="grid grid-cols-3 gap-default mb-4">
-                            <div className="text-center p-3 rounded-lg bg-bg-default/50">
-                                <div className="text-2xl font-bold text-[var(--brand-default)]" id="preview-new-controls">{preview.newControls}</div>
-                                <div className="text-xs text-content-muted">New Controls</div>
+                            <div className="p-3 rounded-lg bg-bg-default/50">
+                                <KPIStat id="preview-new-controls" value={preview.newControls} label="New Controls" />
                             </div>
-                            <div className="text-center p-3 rounded-lg bg-bg-default/50">
-                                <div className="text-2xl font-bold text-content-warning">{preview.existingControls}</div>
-                                <div className="text-xs text-content-muted">Already Exist</div>
+                            <div className="p-3 rounded-lg bg-bg-default/50">
+                                <KPIStat value={preview.existingControls} label="Already Exist" tone="attention" />
                             </div>
-                            <div className="text-center p-3 rounded-lg bg-bg-default/50">
-                                <div className="text-2xl font-bold text-content-default">{preview.totalTemplates}</div>
-                                <div className="text-xs text-content-muted">Total Templates</div>
+                            <div className="p-3 rounded-lg bg-bg-default/50">
+                                <KPIStat value={preview.totalTemplates} label="Total Templates" />
                             </div>
                         </div>
 
@@ -224,16 +222,13 @@ export default function InstallWizardPage() {
                     <Heading level={1}>Pack Installed Successfully!</Heading>
                     <div className="grid grid-cols-3 gap-default">
                         <div className="p-3 rounded-lg bg-bg-success">
-                            <div className="text-2xl font-bold text-content-success" id="result-controls">{result.controlsCreated}</div>
-                            <div className="text-xs text-content-muted">Controls Created</div>
+                            <KPIStat id="result-controls" value={result.controlsCreated} label="Controls Created" tone="success" />
                         </div>
                         <div className="p-3 rounded-lg bg-[var(--brand-subtle)]">
-                            <div className="text-2xl font-bold text-[var(--brand-default)]" id="result-tasks">{result.tasksCreated}</div>
-                            <div className="text-xs text-content-muted">Tasks Created</div>
+                            <KPIStat id="result-tasks" value={result.tasksCreated} label="Tasks Created" />
                         </div>
-                        <div className="p-3 rounded-lg bg-purple-500/10">
-                            <div className="text-2xl font-bold text-purple-400" id="result-mappings">{result.mappingsCreated}</div>
-                            <div className="text-xs text-content-muted">Mappings Created</div>
+                        <div className="p-3 rounded-lg bg-bg-info/40">
+                            <KPIStat id="result-mappings" value={result.mappingsCreated} label="Mappings Created" />
                         </div>
                     </div>
                     <div className="flex gap-compact justify-center">

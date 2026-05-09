@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 
 interface DuePlan {
     id: string;
@@ -132,19 +133,16 @@ export default function DueQueuePage() {
             )}
             {error && <div className="glass-card p-4 border border-border-error text-content-error text-sm">{error}</div>}
 
-            {/* Stats */}
+            {/* Stats — Polish PR-2: KPIStat primitive. */}
             <div className="grid grid-cols-3 gap-default">
-                <div className="glass-card p-4 text-center">
-                    <div className="text-2xl font-bold text-[var(--brand-default)]">{queue.length}</div>
-                    <div className="text-xs text-content-muted mt-1">Due / Due Soon</div>
+                <div className="glass-card p-4">
+                    <KPIStat value={queue.length} label="Due / Due Soon" />
                 </div>
-                <div className="glass-card p-4 text-center">
-                    <div className={`text-2xl font-bold ${overdueCount > 0 ? 'text-content-error' : 'text-content-success'}`}>{overdueCount}</div>
-                    <div className="text-xs text-content-muted mt-1">Overdue</div>
+                <div className="glass-card p-4">
+                    <KPIStat value={overdueCount} label="Overdue" tone={overdueCount > 0 ? 'critical' : 'success'} />
                 </div>
-                <div className="glass-card p-4 text-center">
-                    <div className={`text-2xl font-bold ${pendingCount > 0 ? 'text-content-warning' : 'text-content-subtle'}`}>{pendingCount}</div>
-                    <div className="text-xs text-content-muted mt-1">Pending Runs</div>
+                <div className="glass-card p-4">
+                    <KPIStat value={pendingCount} label="Pending Runs" tone={pendingCount > 0 ? 'attention' : 'default'} />
                 </div>
             </div>
 

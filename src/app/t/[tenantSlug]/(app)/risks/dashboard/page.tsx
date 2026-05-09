@@ -8,6 +8,7 @@ import { buttonVariants } from '@/components/ui/button-variants';
 import { StatusBreakdown } from '@/components/ui/status-breakdown';
 import { Heading } from '@/components/ui/typography';
 import { Card } from '@/components/ui/card';
+import { KPIStat } from '@/components/ui/metric';
 
 type Risk = {
     id: string;
@@ -82,23 +83,23 @@ export default function RiskDashboardPage() {
                 </Link>
             </div>
 
-            {/* KPI Cards */}
+            {/* KPI Cards — Polish PR-2: KPIStat primitive. */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-default">
-                <Card className="text-center">
-                    <p className="text-xs text-content-muted uppercase tracking-wider">{t('totalRisks')}</p>
-                    <p className="text-3xl font-bold mt-2">{total}</p>
+                <Card>
+                    <KPIStat value={total} label={t('totalRisks')} />
                 </Card>
-                <Card className="text-center">
-                    <p className="text-xs text-content-muted uppercase tracking-wider">{t('avgScore')}</p>
-                    <p className="text-3xl font-bold mt-2 text-content-warning">{avgScore}</p>
+                <Card>
+                    <KPIStat value={avgScore} label={t('avgScore')} tone="attention" />
                 </Card>
-                <Card className="text-center">
-                    <p className="text-xs text-content-muted uppercase tracking-wider">{t('openRisks')}</p>
-                    <p className="text-3xl font-bold mt-2 text-content-success">{openCount}</p>
+                <Card>
+                    <KPIStat value={openCount} label={t('openRisks')} tone="success" />
                 </Card>
-                <Card className="text-center">
-                    <p className="text-xs text-content-muted uppercase tracking-wider">{t('overdueReviews')}</p>
-                    <p className="text-3xl font-bold mt-2 text-content-error">{overdueRisks.length}</p>
+                <Card>
+                    <KPIStat
+                        value={overdueRisks.length}
+                        label={t('overdueReviews')}
+                        tone={overdueRisks.length > 0 ? 'critical' : 'success'}
+                    />
                 </Card>
             </div>
 

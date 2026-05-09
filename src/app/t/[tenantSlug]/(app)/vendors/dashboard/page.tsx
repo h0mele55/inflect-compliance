@@ -11,14 +11,14 @@ import { buttonVariants } from '@/components/ui/button-variants';
 import { StatusBreakdown, type StatusBreakdownItem } from '@/components/ui/status-breakdown';
 import { type StatusBadgeVariant } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
+import { KPIStat, type MetricTone } from '@/components/ui/metric';
 
 const CRIT_BADGE: Record<string, StatusBadgeVariant> = { LOW: 'neutral', MEDIUM: 'warning', HIGH: 'error', CRITICAL: 'error' };
 
-function MetricCard({ label, value, accentClass, href }: { label: string; value: number | string; accentClass?: string; href?: string }) {
+function MetricCard({ label, value, tone, href }: { label: string; value: number | string; tone?: MetricTone; href?: string }) {
     const inner = (
-        <div className={`card p-4 text-center ${href ? 'hover:bg-bg-elevated/50 cursor-pointer' : ''}`}>
-            <div className={`text-2xl font-bold ${accentClass || ''}`}>{value}</div>
-            <div className="text-xs text-content-muted mt-1">{label}</div>
+        <div className={`card p-4 ${href ? 'hover:bg-bg-elevated/50 cursor-pointer' : ''}`}>
+            <KPIStat value={value} label={label} tone={tone} />
         </div>
     );
     return href ? <Link href={href}>{inner}</Link> : inner;
@@ -81,12 +81,12 @@ export default function VendorDashboardPage() {
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-default">
                 <MetricCard label="Total Vendors" value={metrics.totalVendors} />
-                <MetricCard label="Overdue Reviews" value={metrics.overdueReview} accentClass={metrics.overdueReview > 0 ? 'text-content-error' : 'text-content-success'}
+                <MetricCard label="Overdue Reviews" value={metrics.overdueReview} tone={metrics.overdueReview > 0 ? 'critical' : 'success'}
                     href={tenantHref('/vendors?reviewDue=overdue')} />
-                <MetricCard label="Upcoming Reviews" value={metrics.upcomingReview} accentClass="text-content-warning" />
-                <MetricCard label="Overdue Renewals" value={metrics.overdueRenewal} accentClass={metrics.overdueRenewal > 0 ? 'text-content-error' : 'text-content-success'} />
-                <MetricCard label="Upcoming Renewals" value={metrics.upcomingRenewal} accentClass="text-content-warning" />
-                <MetricCard label="High Risk (No Assessment)" value={metrics.highRiskNoAssessment} accentClass={metrics.highRiskNoAssessment > 0 ? 'text-content-error' : 'text-content-success'} />
+                <MetricCard label="Upcoming Reviews" value={metrics.upcomingReview} tone="attention" />
+                <MetricCard label="Overdue Renewals" value={metrics.overdueRenewal} tone={metrics.overdueRenewal > 0 ? 'critical' : 'success'} />
+                <MetricCard label="Upcoming Renewals" value={metrics.upcomingRenewal} tone="attention" />
+                <MetricCard label="High Risk (No Assessment)" value={metrics.highRiskNoAssessment} tone={metrics.highRiskNoAssessment > 0 ? 'critical' : 'success'} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-section">

@@ -13,6 +13,7 @@ import { useCelebration } from '@/components/ui/hooks';
 import { MILESTONES, scopedMilestone } from '@/lib/celebrations';
 import type { FrameworkTreePayload } from '@/lib/framework-tree/types';
 import { Heading, Caption } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout';
 
 type Tab = 'requirements' | 'packs' | 'coverage' | 'builder';
@@ -202,19 +203,20 @@ export default function FrameworkDetailPage() {
             {/* Coverage Tab */}
             {activeTab === 'coverage' && coverage && (
                 <div className="space-y-default" id="coverage-panel">
-                    {/* Summary cards */}
+                    {/* Summary cards — Polish PR-2: KPIStat primitive. */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-default">
-                        <div className="glass-card text-center">
-                            <div className="text-3xl font-bold text-content-emphasis">{coverage.total}</div>
-                            <div className="text-xs text-content-muted mt-1">Total Requirements</div>
+                        <div className="glass-card">
+                            <KPIStat value={coverage.total} label="Total Requirements" />
                         </div>
-                        <div className="glass-card text-center">
-                            <div className="text-3xl font-bold text-content-success">{coverage.mapped}</div>
-                            <div className="text-xs text-content-muted mt-1">Mapped</div>
+                        <div className="glass-card">
+                            <KPIStat value={coverage.mapped} label="Mapped" tone="success" />
                         </div>
-                        <div className="glass-card text-center">
-                            <div className={`text-3xl font-bold ${coverage.unmapped > 0 ? 'text-content-warning' : 'text-content-success'}`}>{coverage.unmapped}</div>
-                            <div className="text-xs text-content-muted mt-1">Unmapped</div>
+                        <div className="glass-card">
+                            <KPIStat
+                                value={coverage.unmapped}
+                                label="Unmapped"
+                                tone={coverage.unmapped > 0 ? 'attention' : 'success'}
+                            />
                         </div>
                     </div>
 
@@ -222,7 +224,7 @@ export default function FrameworkDetailPage() {
                     <div className="glass-card">
                         <div className="flex items-center justify-between mb-4">
                             <Heading level={2}>Overall Coverage</Heading>
-                            <span className={`text-2xl font-bold ${coverage.coveragePercent === 100 ? 'text-content-success' : 'text-[var(--brand-default)]'}`}>
+                            <span className={`text-xl font-semibold tabular-nums ${coverage.coveragePercent === 100 ? 'text-content-success' : 'text-[var(--brand-default)]'}`}>
                                 {coverage.coveragePercent}%
                             </span>
                         </div>
