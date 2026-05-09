@@ -71,9 +71,21 @@ describe('Controls detail page — EntityDetailLayout adoption', () => {
     });
 
     it('preserves the Edit modal', () => {
+        // Elevation PR-2 — modal extracted to _modals/EditControlModal.tsx.
+        // The page renders <EditControlModal>; the modal sub-component
+        // owns the inner <Modal> + 'control-edit-dialog' id.
         const src = read();
-        expect(src).toContain('control-edit-dialog');
-        expect(src).toMatch(/<Modal\b/);
+        expect(src).toContain('<EditControlModal');
+        const modalSrc = fs.readFileSync(
+            path.resolve(
+                __dirname,
+                '../..',
+                'src/app/t/[tenantSlug]/(app)/controls/[controlId]/_modals/EditControlModal.tsx',
+            ),
+            'utf8',
+        );
+        expect(modalSrc).toContain('control-edit-dialog');
+        expect(modalSrc).toMatch(/<Modal\b/);
     });
 
     it('does NOT hand-roll the tab bar (shell paints it)', () => {
