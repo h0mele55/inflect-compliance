@@ -128,6 +128,26 @@ export interface EntityDetailLayoutProps<TKey extends string = string> {
      * `activeTab`. When tabs are omitted, this is the entire body.
      */
     children: ReactNode;
+    /**
+     * Roadmap-2 PR-5 — opt-in master-detail right rail.
+     *
+     * When supplied AND the viewport is ≥ `xl` (1280px), the body
+     * renders as a 2-column grid: main content 1fr, rail 320px,
+     * gap-default between, both columns scrollable independently.
+     * Below `xl` the rail collapses below the main column —
+     * mobile and small desktops keep the current single-column
+     * behaviour.
+     *
+     * Use this slot for content that ABOUT the entity but is not
+     * the entity itself: linked tasks, recent activity, quick
+     * actions, related entities. Anything the user would want
+     * to act on without losing place inside the main content.
+     *
+     * Pages that don't need a rail simply don't pass it — the
+     * shell falls back to the prior single-column shape and no
+     * test or call site changes.
+     */
+    rail?: ReactNode;
 }
 
 // ─── Component ──────────────────────────────────────────────────
@@ -147,6 +167,7 @@ export function EntityDetailLayout<TKey extends string = string>({
     className,
     id,
     children,
+    rail,
 }: EntityDetailLayoutProps<TKey>) {
     // v2-fu-4 — render the breadcrumbs / back link in EVERY state
     // (loading / error / empty / main). Previously the loading
@@ -265,8 +286,43 @@ export function EntityDetailLayout<TKey extends string = string>({
                 </nav>
             )}
 
-            {/* Body */}
-            {tabs && activeTab ? (
+            {/* Body — wraps in a 2-column grid when a `rail` slot
+                is provided (Roadmap-2 PR-5). The grid kicks in at
+                `xl` (1280px); below that the rail stacks under the
+                main column so phones/laptops keep the prior
+                single-column shape. */}
+            {rail ? (
+                <div
+                    className="grid gap-default xl:grid-cols-[minmax(0,1fr)_320px]"
+                    data-testid="entity-detail-rail-grid"
+                >
+                    {tabs && activeTab ? (
+                        <div
+                            role="tabpanel"
+                            id={`tabpanel-${activeTab}`}
+                            aria-labelledby={`tab-${activeTab}`}
+                            data-testid="entity-detail-tabpanel"
+                            className="min-w-0"
+                        >
+                            {children}
+                        </div>
+                    ) : (
+                        <div
+                            data-testid="entity-detail-body"
+                            className="min-w-0"
+                        >
+                            {children}
+                        </div>
+                    )}
+                    <aside
+                        className="space-y-default xl:sticky xl:top-20 xl:self-start"
+                        aria-label="Context"
+                        data-testid="entity-detail-rail"
+                    >
+                        {rail}
+                    </aside>
+                </div>
+            ) : tabs && activeTab ? (
                 <div
                     role="tabpanel"
                     id={`tabpanel-${activeTab}`}
