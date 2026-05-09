@@ -303,6 +303,25 @@ export default function RiskDetailPage() {
                     </>
                 )
             }
+            // Roadmap-2 PR-5 — lift Linked Tasks into the right
+            // rail so a user investigating a risk can act on its
+            // tasks without scrolling past the treatment plan.
+            // Activates at xl (1280px+); below that, the rail
+            // collapses below the body and the user sees the same
+            // vertical flow they had before.
+            rail={
+                <div className="glass-card p-6">
+                    <Heading level={2} className="mb-3 inline-flex items-center gap-tight text-base">
+                        <AppIcon name="tasks" size={16} /> Linked Tasks
+                    </Heading>
+                    <LinkedTasksPanel
+                        apiBase={apiUrl('')}
+                        entityType="RISK"
+                        entityId={riskId}
+                        tenantHref={href}
+                    />
+                </div>
+            }
         >
             {error && (
                 <div className="glass-card p-4 border-border-error text-content-error text-sm">{error}</div>
@@ -502,17 +521,6 @@ export default function RiskDetailPage() {
                         </div>
                     </>
                 )}
-            </div>
-
-            {/* Linked Tasks */}
-            <div className="glass-card p-6">
-                <Heading level={2} className="mb-4 inline-flex items-center gap-tight"><AppIcon name="tasks" size={18} /> Linked Tasks</Heading>
-                <LinkedTasksPanel
-                    apiBase={apiUrl('')}
-                    entityType="RISK"
-                    entityId={riskId}
-                    tenantHref={href}
-                />
             </div>
 
             {/* Traceability */}
