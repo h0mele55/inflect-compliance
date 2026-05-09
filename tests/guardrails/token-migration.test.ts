@@ -58,8 +58,12 @@ describe('Dashboard page token migration', () => {
         expect(src).toContain('text-content-default');
     });
 
-    it('uses buttonVariants for Link elements', () => {
-        expect(src).toContain("buttonVariants({ variant: 'secondary'");
+    it('uses buttonVariants for Link elements (post v2-PR-11)', () => {
+        // The 6 secondary `buttonVariants({ variant: 'secondary' })`
+        // Quick-Actions buttons were retired in v2-PR-11; the
+        // dashboard now renders a `<NextBestActionCard>` + the
+        // notifications-bell ghost link in the header. Only the
+        // `ghost` Link remains.
         expect(src).toContain("buttonVariants({ variant: 'ghost'");
     });
 
