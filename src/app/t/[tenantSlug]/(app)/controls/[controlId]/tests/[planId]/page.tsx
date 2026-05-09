@@ -14,6 +14,7 @@ import { Combobox, ComboboxOption } from '@/components/ui/combobox';
 import { TestPlanScheduleSection } from '@/components/TestPlanScheduleSection';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 
 interface TestPlanDetail {
     id: string;
@@ -233,27 +234,27 @@ export default function TestPlanDetailPage() {
                 onSaved={fetchPlan}
             />
 
-            {/* Info Cards */}
+            {/* Info Cards — Polish PR-2: KPIStat primitive. */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-default">
-                <div className="glass-card p-4 text-center">
-                    <div className="text-2xl font-bold text-[var(--brand-default)]">{plan._count?.runs ?? 0}</div>
-                    <div className="text-xs text-content-muted mt-1">Total Runs</div>
+                <div className="glass-card p-4">
+                    <KPIStat value={plan._count?.runs ?? 0} label="Total Runs" />
                 </div>
-                <div className="glass-card p-4 text-center">
-                    <div className="text-2xl font-bold text-content-success">
-                        {plan.runs?.filter(r => r.result === 'PASS').length ?? 0}
-                    </div>
-                    <div className="text-xs text-content-muted mt-1">Passed</div>
+                <div className="glass-card p-4">
+                    <KPIStat
+                        value={plan.runs?.filter(r => r.result === 'PASS').length ?? 0}
+                        label="Passed"
+                        tone="success"
+                    />
                 </div>
-                <div className="glass-card p-4 text-center">
-                    <div className="text-2xl font-bold text-content-error">
-                        {plan.runs?.filter(r => r.result === 'FAIL').length ?? 0}
-                    </div>
-                    <div className="text-xs text-content-muted mt-1">Failed</div>
+                <div className="glass-card p-4">
+                    <KPIStat
+                        value={plan.runs?.filter(r => r.result === 'FAIL').length ?? 0}
+                        label="Failed"
+                        tone="critical"
+                    />
                 </div>
-                <div className="glass-card p-4 text-center">
-                    <div className="text-2xl font-bold text-content-default">{plan._count?.steps ?? 0}</div>
-                    <div className="text-xs text-content-muted mt-1">Steps</div>
+                <div className="glass-card p-4">
+                    <KPIStat value={plan._count?.steps ?? 0} label="Steps" />
                 </div>
             </div>
 

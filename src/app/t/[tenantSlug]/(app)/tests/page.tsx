@@ -14,6 +14,7 @@ import { buttonVariants } from '@/components/ui/button-variants';
 import { ToggleGroup } from '@/components/ui/toggle-group';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 
 interface TestPlanSummary {
@@ -113,29 +114,19 @@ export default function TestsRollupPage() {
             </ListPageShell.Header>
 
             <ListPageShell.Filters className="space-y-section">
-                {/* Stats */}
+                {/* Stats — Polish PR-2: KPIStat primitive. */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-default">
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition" onClick={() => setFilter('all')}>
-                    <div className="text-2xl font-bold text-[var(--brand-default)]">{plans.length}</div>
-                    <div className="text-xs text-content-muted mt-1">Total Plans</div>
+                <div className="glass-card p-4 cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition-colors duration-150 ease-out" onClick={() => setFilter('all')}>
+                    <KPIStat value={plans.length} label="Total Plans" />
                 </div>
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition" onClick={() => setFilter('due')}>
-                    <div className={`text-2xl font-bold ${duePlans.length > 0 ? 'text-content-error' : 'text-content-success'}`}>
-                        {duePlans.length}
-                    </div>
-                    <div className="text-xs text-content-muted mt-1">Overdue</div>
+                <div className="glass-card p-4 cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition-colors duration-150 ease-out" onClick={() => setFilter('due')}>
+                    <KPIStat value={duePlans.length} label="Overdue" tone={duePlans.length > 0 ? 'critical' : 'success'} />
                 </div>
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition" onClick={() => setFilter('failed')}>
-                    <div className={`text-2xl font-bold ${failedPlans.length > 0 ? 'text-content-error' : 'text-content-success'}`}>
-                        {failedPlans.length}
-                    </div>
-                    <div className="text-xs text-content-muted mt-1">Last Failed</div>
+                <div className="glass-card p-4 cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition-colors duration-150 ease-out" onClick={() => setFilter('failed')}>
+                    <KPIStat value={failedPlans.length} label="Last Failed" tone={failedPlans.length > 0 ? 'critical' : 'success'} />
                 </div>
-                <div className="glass-card p-4 text-center cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition" onClick={() => setFilter('passed')}>
-                    <div className="text-2xl font-bold text-content-success">
-                        {plans.filter(p => getLastResult(p) === 'PASS').length}
-                    </div>
-                    <div className="text-xs text-content-muted mt-1">Last Passed</div>
+                <div className="glass-card p-4 cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition-colors duration-150 ease-out" onClick={() => setFilter('passed')}>
+                    <KPIStat value={plans.filter(p => getLastResult(p) === 'PASS').length} label="Last Passed" tone="success" />
                 </div>
             </div>
 

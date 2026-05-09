@@ -9,6 +9,7 @@ import { ProgressBar } from '@/components/ui/progress-bar';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
 import { Card } from '@/components/ui/card';
+import { KPIStat } from '@/components/ui/metric';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -53,12 +54,6 @@ function pctTextClass(pct: number): string {
     if (pct >= 80) return 'text-content-success';
     if (pct >= 50) return 'text-content-warning';
     return 'text-content-error';
-}
-
-function pctGradient(pct: number): string {
-    if (pct >= 80) return 'from-emerald-500 to-teal-500';
-    if (pct >= 50) return 'from-amber-500 to-yellow-500';
-    return 'from-red-500 to-rose-500';
 }
 
 function statusBadge(status: string): StatusBadgeVariant {
@@ -343,7 +338,6 @@ function CoverageKpiCard({
     subtitle: string;
 }) {
     const color = pctColor(pct);
-    const gradientClass = pctGradient(pct);
 
     return (
         <Card className="hover:border-border-emphasis transition-colors duration-150 ease-out" id={id}>
@@ -367,10 +361,13 @@ function CoverageKpiCard({
                     showLegend={false}
                 />
                 <div className="flex-1 min-w-0">
-                    <p className={`text-3xl font-bold bg-gradient-to-r ${gradientClass} bg-clip-text text-transparent`}>
-                        {pct}%
-                    </p>
-                    <p className="text-xs text-content-subtle mt-1">{subtitle}</p>
+                    {/* Polish PR-2 — KPIStat primitive replaces the
+                        decorative gradient-text treatment. */}
+                    <KPIStat
+                        value={`${pct}%`}
+                        label={subtitle}
+                        tone={pct >= 80 ? 'success' : pct >= 50 ? 'attention' : 'critical'}
+                    />
                 </div>
             </div>
         </Card>

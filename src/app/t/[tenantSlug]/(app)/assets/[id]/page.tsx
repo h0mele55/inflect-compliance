@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
 import { Heading, Eyebrow } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout';
 
 const TraceabilityPanel = dynamic(() => import('@/components/TraceabilityPanel'), {
@@ -196,9 +197,15 @@ export default function AssetDetailPage() {
                             <div><Eyebrow className="mb-1">Data Residency</Eyebrow><p className="text-sm">{asset.dataResidency || '—'}</p></div>
                         </div>
                         <div className="grid grid-cols-3 gap-default">
-                            <div className="glass-card p-4 text-center"><p className="text-xs text-content-muted uppercase">Confidentiality</p><p className="text-2xl font-bold mt-1">{asset.confidentiality ?? '—'}</p></div>
-                            <div className="glass-card p-4 text-center"><p className="text-xs text-content-muted uppercase">Integrity</p><p className="text-2xl font-bold mt-1">{asset.integrity ?? '—'}</p></div>
-                            <div className="glass-card p-4 text-center"><p className="text-xs text-content-muted uppercase">Availability</p><p className="text-2xl font-bold mt-1">{asset.availability ?? '—'}</p></div>
+                            <div className="glass-card p-4">
+                                <KPIStat value={asset.confidentiality ?? '—'} label="Confidentiality" size="sm" />
+                            </div>
+                            <div className="glass-card p-4">
+                                <KPIStat value={asset.integrity ?? '—'} label="Integrity" size="sm" />
+                            </div>
+                            <div className="glass-card p-4">
+                                <KPIStat value={asset.availability ?? '—'} label="Availability" size="sm" />
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-default border-t border-border-default/50 pt-4">
                             <div><Eyebrow className="mb-1">Created</Eyebrow><p className="text-sm text-content-muted">{formatDate(asset.createdAt)}</p></div>

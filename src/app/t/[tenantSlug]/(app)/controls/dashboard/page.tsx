@@ -14,6 +14,7 @@ import {
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
 import { Card } from '@/components/ui/card';
+import { KPIStat } from '@/components/ui/metric';
 
 const STATUS_LABELS: Record<string, string> = {
     NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress', IMPLEMENTED: 'Implemented', NEEDS_REVIEW: 'Needs Review',
@@ -106,12 +107,15 @@ export default function ControlsDashboard() {
                 </div>
             </div>
 
-            {/* Stat Cards Row */}
+            {/* Stat Cards Row — Polish PR-2: KPIStat primitive. */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-default" id="dashboard-stats">
                 <div className="glass-card p-4">
-                    <p className="text-xs text-content-subtle uppercase">Implementation Progress</p>
-                    <p className="text-3xl font-bold text-content-success mt-1" id="implementation-progress">{data.implementationProgress}%</p>
-                    <p className="text-xs text-content-subtle mt-1">{data.implementedCount}/{data.applicableCount} applicable controls</p>
+                    <KPIStat
+                        value={`${data.implementationProgress}%`}
+                        label="Implementation Progress"
+                        tone="success"
+                        description={`${data.implementedCount}/${data.applicableCount} applicable controls`}
+                    />
                     <ProgressBar
                         value={data.implementationProgress}
                         variant={data.implementationProgress >= 80 ? 'success' : data.implementationProgress >= 50 ? 'warning' : 'error'}
@@ -121,19 +125,27 @@ export default function ControlsDashboard() {
                     />
                 </div>
                 <div className="glass-card p-4">
-                    <p className="text-xs text-content-subtle uppercase">Overdue Tasks</p>
-                    <p className={`text-3xl font-bold mt-1 ${data.overdueTasks > 0 ? 'text-content-error' : 'text-content-muted'}`} id="overdue-tasks">{data.overdueTasks}</p>
-                    <p className="text-xs text-content-subtle mt-1">tasks past due date</p>
+                    <KPIStat
+                        value={data.overdueTasks}
+                        label="Overdue Tasks"
+                        tone={data.overdueTasks > 0 ? 'critical' : 'default'}
+                        description="tasks past due date"
+                    />
                 </div>
                 <div className="glass-card p-4">
-                    <p className="text-xs text-content-subtle uppercase">Controls Due Soon</p>
-                    <p className={`text-3xl font-bold mt-1 ${data.controlsDueSoon > 0 ? 'text-content-warning' : 'text-content-muted'}`} id="due-soon">{data.controlsDueSoon}</p>
-                    <p className="text-xs text-content-subtle mt-1">within next 30 days</p>
+                    <KPIStat
+                        value={data.controlsDueSoon}
+                        label="Controls Due Soon"
+                        tone={data.controlsDueSoon > 0 ? 'attention' : 'default'}
+                        description="within next 30 days"
+                    />
                 </div>
                 <div className="glass-card p-4">
-                    <p className="text-xs text-content-subtle uppercase">Applicability</p>
-                    <p className="text-3xl font-bold text-content-info mt-1">{data.applicabilityDistribution.applicable}</p>
-                    <p className="text-xs text-content-subtle mt-1">{data.applicabilityDistribution.notApplicable} excluded (N/A)</p>
+                    <KPIStat
+                        value={data.applicabilityDistribution.applicable}
+                        label="Applicability"
+                        description={`${data.applicabilityDistribution.notApplicable} excluded (N/A)`}
+                    />
                 </div>
             </div>
 

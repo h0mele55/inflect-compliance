@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Heading } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function DiffPage() {
@@ -70,25 +71,23 @@ export default function DiffPage() {
 
             {diff && (
                 <>
-                    {/* Summary cards */}
+                    {/* Summary cards — Polish PR-2: KPIStat primitive. */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-default" id="diff-summary">
-                        <div className="glass-card text-center">
-                            <div className="text-3xl font-bold text-content-success">{diff.summary.added}</div>
-                            <div className="text-xs text-content-muted mt-1">Added</div>
+                        <div className="glass-card">
+                            <KPIStat value={diff.summary.added} label="Added" tone="success" />
                         </div>
-                        <div className="glass-card text-center">
-                            <div className="text-3xl font-bold text-content-error">{diff.summary.removed}</div>
-                            <div className="text-xs text-content-muted mt-1">Removed</div>
+                        <div className="glass-card">
+                            <KPIStat value={diff.summary.removed} label="Removed" tone="critical" />
                         </div>
-                        <div className="glass-card text-center">
-                            <div className="text-3xl font-bold text-content-warning">{diff.summary.changed}</div>
-                            <div className="text-xs text-content-muted mt-1">Changed</div>
+                        <div className="glass-card">
+                            <KPIStat value={diff.summary.changed} label="Changed" tone="attention" />
                         </div>
-                        <div className="glass-card text-center">
-                            <div className={`text-3xl font-bold ${diff.summary.unmappedNewRequirements > 0 ? 'text-content-error' : 'text-content-success'}`}>
-                                {diff.summary.unmappedNewRequirements}
-                            </div>
-                            <div className="text-xs text-content-muted mt-1">New Unmapped</div>
+                        <div className="glass-card">
+                            <KPIStat
+                                value={diff.summary.unmappedNewRequirements}
+                                label="New Unmapped"
+                                tone={diff.summary.unmappedNewRequirements > 0 ? 'critical' : 'success'}
+                            />
                         </div>
                     </div>
 

@@ -7,6 +7,7 @@ import { AppIcon, type AppIconName } from '@/components/icons/AppIcon';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout';
 
 const FW_META: Record<string, { icon: AppIconName; label: string }> = {
@@ -116,21 +117,17 @@ export default function CycleDetailPage() {
 
                 {preview ? (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-default" id="preview-counts">
-                        <div className="p-4 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                            <div className="text-2xl font-bold text-indigo-400" id="preview-controls">{preview.selection?.controls?.count || 0}</div>
-                            <div className="text-xs text-content-muted">Controls</div>
+                        <div className="p-4 rounded-lg bg-bg-default border border-border-default">
+                            <KPIStat value={preview.selection?.controls?.count || 0} label="Controls" />
                         </div>
-                        <div className="p-4 rounded-lg bg-bg-info border border-border-info">
-                            <div className="text-2xl font-bold text-content-info" id="preview-policies">{preview.selection?.policies?.count || 0}</div>
-                            <div className="text-xs text-content-muted">Policies</div>
+                        <div className="p-4 rounded-lg bg-bg-default border border-border-default">
+                            <KPIStat value={preview.selection?.policies?.count || 0} label="Policies" />
                         </div>
-                        <div className="p-4 rounded-lg bg-bg-success border border-border-success">
-                            <div className="text-2xl font-bold text-content-success" id="preview-evidence">{preview.selection?.evidence?.count || 0}</div>
-                            <div className="text-xs text-content-muted">Evidence</div>
+                        <div className="p-4 rounded-lg bg-bg-default border border-border-default">
+                            <KPIStat value={preview.selection?.evidence?.count || 0} label="Evidence" tone="success" />
                         </div>
-                        <div className="p-4 rounded-lg bg-bg-warning border border-border-warning">
-                            <div className="text-2xl font-bold text-content-warning" id="preview-issues">{preview.selection?.issues?.count || 0}</div>
-                            <div className="text-xs text-content-muted">Issues</div>
+                        <div className="p-4 rounded-lg bg-bg-default border border-border-default">
+                            <KPIStat value={preview.selection?.issues?.count || 0} label="Issues" tone="attention" />
                         </div>
                     </div>
                 ) : (

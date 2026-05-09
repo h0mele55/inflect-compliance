@@ -14,6 +14,7 @@ import { useTenantContext, useTenantApiUrl, useTenantHref } from '@/lib/tenant-c
 import dynamic from 'next/dynamic';
 import LinkedTasksPanel from '@/components/LinkedTasksPanel';
 import { Heading, Eyebrow } from '@/components/ui/typography';
+import { KPIStat } from '@/components/ui/metric';
 import { EntityDetailLayout } from '@/components/layout/EntityDetailLayout';
 // Epic G-7 — treatment plan card. Dynamic-imported so the modal +
 // react-query machinery only loads on risks the user actually opens.
@@ -424,19 +425,19 @@ export default function RiskDetailPage() {
                         </div>
 
                         <div className="grid grid-cols-3 gap-default">
-                            <div className="glass-card p-4 text-center">
-                                <p className="text-xs text-content-muted uppercase">Likelihood</p>
-                                <p className="text-2xl font-bold mt-1">{risk.likelihood}</p>
+                            <div className="glass-card p-4">
+                                <KPIStat value={risk.likelihood} label="Likelihood" size="sm" />
                             </div>
-                            <div className="glass-card p-4 text-center">
-                                <p className="text-xs text-content-muted uppercase">Impact</p>
-                                <p className="text-2xl font-bold mt-1">{risk.impact}</p>
+                            <div className="glass-card p-4">
+                                <KPIStat value={risk.impact} label="Impact" size="sm" />
                             </div>
-                            <div className="glass-card p-4 text-center">
-                                <p className="text-xs text-content-muted uppercase">Inherent Score</p>
-                                <p className={`text-2xl font-bold mt-1 ${risk.inherentScore > 12 ? 'text-content-error' : risk.inherentScore > 5 ? 'text-content-warning' : 'text-content-success'}`}>
-                                    {risk.inherentScore}
-                                </p>
+                            <div className="glass-card p-4">
+                                <KPIStat
+                                    value={risk.inherentScore}
+                                    label="Inherent Score"
+                                    size="sm"
+                                    tone={risk.inherentScore > 12 ? 'critical' : risk.inherentScore > 5 ? 'attention' : 'success'}
+                                />
                             </div>
                         </div>
 
