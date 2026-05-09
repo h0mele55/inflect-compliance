@@ -12,6 +12,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
+import { EditControlModal } from './_modals/EditControlModal';
 // Inline pencil icon to avoid lucide-react barrel import issue with Next.js 14
 const PencilIcon = ({ size = 14 }: { size?: number }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
@@ -1024,145 +1025,22 @@ export default function ControlDetailPage() {
                 </div>
             )}
 
-            {/* Edit Control Modal — migrated to the shared <Modal> (Epic 54) */}
-            <Modal
-                showModal={showEditModal}
-                setShowModal={(v) => {
-                    const next = typeof v === 'function' ? v(showEditModal) : v;
-                    if (!next && !savingEdit) handleEditCancel();
-                }}
-                size="lg"
-                title="Edit Control"
-                description="Update the control's metadata."
-                preventDefaultClose={savingEdit}
-            >
-                <Modal.Header title="Edit Control" description="Update the control's metadata." />
-                <Modal.Form onSubmit={handleEditSave} id="control-edit-dialog" data-testid="control-edit-dialog">
-                    <Modal.Body>
-                        {editError && (
-                            <div
-                                className="mb-4 rounded-lg border border-border-error bg-bg-error px-3 py-2 text-sm text-content-error"
-                                role="alert"
-                                data-testid="edit-error"
-                            >
-                                {editError}
-                            </div>
-                        )}
-                        <fieldset className="space-y-default" disabled={savingEdit}>
-                            <div>
-                                <label htmlFor="edit-name" className="mb-1 block text-sm text-content-default">
-                                    Title <span className="text-content-error">*</span>
-                                </label>
-                                <input
-                                    id="edit-name"
-                                    type="text"
-                                    className="input w-full"
-                                    value={editForm.name}
-                                    onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-                                    required
-                                    minLength={3}
-                                    data-testid="edit-name-input"
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="edit-description" className="mb-1 block text-sm text-content-default">
-                                    Description
-                                </label>
-                                <textarea
-                                    id="edit-description"
-                                    className="input w-full"
-                                    rows={3}
-                                    value={editForm.description}
-                                    onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
-                                    data-testid="edit-description-input"
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="edit-intent" className="mb-1 block text-sm text-content-default">
-                                    Intent
-                                </label>
-                                <textarea
-                                    id="edit-intent"
-                                    className="input w-full"
-                                    rows={2}
-                                    value={editForm.intent}
-                                    onChange={(e) => setEditForm((f) => ({ ...f, intent: e.target.value }))}
-                                    data-testid="edit-intent-input"
-                                />
-                            </div>
-                            <div className="grid grid-cols-1 gap-default sm:grid-cols-2">
-                                <div>
-                                    <label htmlFor="edit-category" className="mb-1 block text-sm text-content-default">
-                                        Category
-                                    </label>
-                                    <Combobox
-                                        hideSearch
-                                        forceDropdown
-                                        id="edit-category"
-                                        selected={CATEGORY_CB_OPTIONS.find(o => o.value === editForm.category) ?? null}
-                                        setSelected={(opt) => setEditForm((f) => ({ ...f, category: opt?.value ?? '' }))}
-                                        options={CATEGORY_CB_OPTIONS}
-                                        placeholder="— None —"
-                                        matchTriggerWidth
-                                    />
-                                </div>
-                                <div>
-                                    <label htmlFor="edit-frequency" className="mb-1 block text-sm text-content-default">
-                                        Frequency
-                                    </label>
-                                    <Combobox
-                                        hideSearch
-                                        forceDropdown
-                                        id="edit-frequency"
-                                        selected={FREQ_CB_OPTIONS.find(o => o.value === editForm.frequency) ?? null}
-                                        setSelected={(opt) => setEditForm((f) => ({ ...f, frequency: opt?.value ?? '' }))}
-                                        options={FREQ_CB_OPTIONS}
-                                        placeholder="— None —"
-                                        matchTriggerWidth
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label htmlFor="edit-owner" className="mb-1 block text-sm text-content-default">
-                                    Owner
-                                </label>
-                                <input
-                                    id="edit-owner"
-                                    type="text"
-                                    className="input w-full"
-                                    placeholder="User ID (leave empty to clear)"
-                                    value={editForm.owner}
-                                    onChange={(e) => setEditForm((f) => ({ ...f, owner: e.target.value }))}
-                                    data-testid="edit-owner-input"
-                                />
-                                {control?.owner?.name && (
-                                    <p className="mt-1 text-xs text-content-muted">Current: {control.owner.name}</p>
-                                )}
-                            </div>
-                        </fieldset>
-                    </Modal.Body>
-                    <Modal.Actions>
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleEditCancel}
-                            disabled={savingEdit}
-                            data-testid="edit-cancel-button"
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            variant="primary"
-                            size="sm"
-                            disabled={savingEdit || editForm.name.trim().length < 3}
-                            data-testid="edit-save-button"
-                        >
-                            {savingEdit ? 'Saving...' : 'Save'}
-                        </Button>
-                    </Modal.Actions>
-                </Modal.Form>
-            </Modal>
+            {/* Edit Control Modal — extracted to _modals/EditControlModal.tsx
+                in Elevation PR-2. Page still owns state + mutation; the
+                modal is presentational. */}
+            <EditControlModal
+                open={showEditModal}
+                setOpen={setShowEditModal}
+                form={editForm}
+                setForm={setEditForm}
+                saving={savingEdit}
+                error={editError}
+                currentOwnerName={control.owner?.name}
+                categoryOptions={CATEGORY_CB_OPTIONS}
+                frequencyOptions={FREQ_CB_OPTIONS}
+                onCancel={handleEditCancel}
+                onSubmit={handleEditSave}
+            />
 
             {/* Success toast */}
             {editSuccess && (
