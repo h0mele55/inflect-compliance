@@ -256,23 +256,28 @@ export default function TaskDetailPage() {
     };
 
     const back = { href: tenantHref('/tasks'), label: 'Tasks' };
+    const breadcrumbs = [
+        { label: 'Dashboard', href: tenantHref('/dashboard') },
+        { label: 'Tasks', href: tenantHref('/tasks') },
+        { label: task?.title ?? 'Task' },
+    ];
     if (loading) {
         return (
-            <EntityDetailLayout loading title="" back={back}>
+            <EntityDetailLayout loading title="" breadcrumbs={breadcrumbs} back={back}>
                 <></>
             </EntityDetailLayout>
         );
     }
     if (error) {
         return (
-            <EntityDetailLayout error={error} title="" back={back}>
+            <EntityDetailLayout error={error} title="" breadcrumbs={breadcrumbs} back={back}>
                 <></>
             </EntityDetailLayout>
         );
     }
     if (!task) {
         return (
-            <EntityDetailLayout empty={{ message: 'Task not found.' }} title="" back={back}>
+            <EntityDetailLayout empty={{ message: 'Task not found.' }} title="" breadcrumbs={breadcrumbs} back={back}>
                 <></>
             </EntityDetailLayout>
         );
@@ -293,6 +298,7 @@ export default function TaskDetailPage() {
     return (
         <EntityDetailLayout
             id="task-detail-page"
+            breadcrumbs={breadcrumbs}
             back={back}
             title={<span id="task-title">{task.title}</span>}
             meta={

@@ -67,16 +67,22 @@ export default function CycleDetailPage() {
     };
 
     const back = { href: `/t/${tenantSlug}/audits/cycles`, label: 'Cycles' };
+    const breadcrumbs = [
+        { label: 'Dashboard', href: `/t/${tenantSlug}/dashboard` },
+        { label: 'Audits', href: `/t/${tenantSlug}/audits` },
+        { label: 'Cycles', href: `/t/${tenantSlug}/audits/cycles` },
+        { label: cycle?.name ?? 'Cycle' },
+    ];
     if (loading) {
         return (
-            <EntityDetailLayout loading title="" back={back}>
+            <EntityDetailLayout loading title="" breadcrumbs={breadcrumbs} back={back}>
                 <></>
             </EntityDetailLayout>
         );
     }
     if (!cycle) {
         return (
-            <EntityDetailLayout empty={{ message: 'Audit cycle not found.' }} title="" back={back}>
+            <EntityDetailLayout empty={{ message: 'Audit cycle not found.' }} title="" breadcrumbs={breadcrumbs} back={back}>
                 <></>
             </EntityDetailLayout>
         );
@@ -87,6 +93,7 @@ export default function CycleDetailPage() {
     return (
         <EntityDetailLayout
             id="cycle-detail-page"
+            breadcrumbs={breadcrumbs}
             back={back}
             title={
                 <span className="inline-flex items-center gap-compact" id="cycle-name">
