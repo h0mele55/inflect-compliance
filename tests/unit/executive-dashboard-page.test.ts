@@ -295,8 +295,13 @@ describe('Dashboard Backward Compatibility', () => {
         expect(readClient()).toContain('OnboardingBanner');
     });
 
-    test('quick actions section preserved', () => {
-        expect(readAll()).toContain('quickActions');
+    test('next-best-action card replaces the legacy quick-actions grid (v2-PR-11)', () => {
+        // The 6-button "Quick Actions" grid was retired in v2-PR-11.
+        // The dashboard now renders a state-driven recommendation
+        // card (`<NextBestActionCard>`) plus a muted "quick add"
+        // text-link row below the primary CTA.
+        expect(readAll()).toContain('NextBestActionCard');
+        expect(readAll()).not.toContain('quickActions');
     });
 
     test('i18n translations still used (server uses next-intl/server, client uses next-intl)', () => {

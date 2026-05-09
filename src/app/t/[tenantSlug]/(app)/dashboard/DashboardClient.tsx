@@ -84,6 +84,7 @@ import { useTenantHref } from '@/lib/tenant-context-provider';
 import { CACHE_KEYS } from '@/lib/swr-keys';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { HeroMetric } from '@/components/ui/HeroMetric';
+import { NextBestActionCard } from '@/components/ui/NextBestActionCard';
 
 import type { ExecutiveDashboardPayload } from '@/app-layer/repositories/DashboardRepository';
 import type { TrendPayload } from '@/app-layer/usecases/compliance-trends';
@@ -365,51 +366,26 @@ export default function DashboardClient({
                 <TrendEmptyState />
             )}
 
-            {/* ─── Quick Actions + Recent Activity ─── */}
+            {/* ─── Next Best Action + Recent Activity (v2-PR-11) ─── */}
+            {/* The Quick-Actions 6-button grid was retired in favour of
+                a state-driven decisive recommendation. The 3-link
+                "Quick add" row below the CTA preserves the most-used
+                create affordances without the 6-button noise. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-default">
-                <Card>
-                    <Heading level={3} className="mb-3">
-                        {t('quickActions')}
-                    </Heading>
-                    <div className="grid grid-cols-2 gap-tight">
-                        <Link
-                            href={href('/assets')}
-                            className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}
-                        >
-                            {t('addAsset')}
-                        </Link>
-                        <Link
-                            href={href('/risks')}
-                            className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}
-                        >
-                            {t('addRisk')}
-                        </Link>
-                        <Link
-                            href={href('/evidence')}
-                            className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}
-                        >
-                            {t('addEvidence')}
-                        </Link>
-                        <Link
-                            href={href('/audits')}
-                            className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}
-                        >
-                            {t('newAudit')}
-                        </Link>
-                        <Link
-                            href={href('/policies')}
-                            className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}
-                        >
-                            {t('newPolicy')}
-                        </Link>
-                        <Link
-                            href={href('/reports')}
-                            className={cn(buttonVariants({ variant: 'secondary', size: 'xs' }))}
-                        >
-                            {t('exportReports')}
-                        </Link>
-                    </div>
-                </Card>
+                <NextBestActionCard
+                    input={{
+                        coveragePercent: exec.controlCoverage.coveragePercent,
+                        overdueEvidence: exec.evidenceExpiry.overdue,
+                        overdueTasks: exec.taskSummary.overdue,
+                        highRisks: exec.stats.highRisks,
+                    }}
+                    tenantHref={href}
+                    quickAdds={[
+                        { label: t('addRisk'), href: href('/risks') },
+                        { label: t('addEvidence'), href: href('/evidence') },
+                        { label: t('newPolicy'), href: href('/policies') },
+                    ]}
+                />
 
                 {/* RecentActivityCard remains a server component;
                     rendered by the parent page and passed in here. */}
