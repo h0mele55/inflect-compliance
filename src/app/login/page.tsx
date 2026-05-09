@@ -291,9 +291,9 @@ function LoginForm() {
 
                             <div className="mt-6 text-center text-sm text-content-muted">
                                 {mode === 'login' ? (
-                                    <span>{t('noAccount')} <button onClick={() => setMode('register')} className="text-[var(--brand-default)] hover:text-[var(--brand-muted)]">{t('registerLink')}</button></span>
+                                    <span>{t('noAccount')} <button onClick={() => setMode('register')} className="text-content-emphasis underline underline-offset-2 hover:text-[var(--brand-default)]">{t('registerLink')}</button></span>
                                 ) : (
-                                    <span>{t('hasAccount')} <button onClick={() => setMode('login')} className="text-[var(--brand-default)] hover:text-[var(--brand-muted)]">{t('signInLink')}</button></span>
+                                    <span>{t('hasAccount')} <button onClick={() => setMode('login')} className="text-content-emphasis underline underline-offset-2 hover:text-[var(--brand-default)]">{t('signInLink')}</button></span>
                                 )}
                             </div>
 
@@ -328,7 +328,7 @@ function LoginForm() {
                                         <button
                                             type="submit"
                                             disabled={resendState === 'sending' || !resendEmail}
-                                            className="text-xs text-[var(--brand-default)] hover:text-[var(--brand-muted)] disabled:text-content-subtle"
+                                            className="text-xs text-content-emphasis underline underline-offset-2 hover:text-[var(--brand-default)] disabled:text-content-subtle disabled:no-underline"
                                         >
                                             {resendState === 'sending' ? 'Sending…' : 'Resend'}
                                         </button>
