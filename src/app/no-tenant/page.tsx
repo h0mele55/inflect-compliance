@@ -11,6 +11,8 @@
 import { auth, signOut } from '@/auth';
 import { redirect } from 'next/navigation';
 import { Heading } from '@/components/ui/typography';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 export default async function NoTenantPage() {
     const session = await auth();
@@ -21,8 +23,8 @@ export default async function NoTenantPage() {
     const email = session.user.email ?? 'your account';
 
     return (
-        <main className="min-h-screen bg-bg-default flex items-center justify-center p-4">
-            <div className="max-w-md w-full bg-bg-surface rounded-lg border border-border-subtle p-8 text-center">
+        <main className="min-h-screen bg-bg-page flex items-center justify-center p-4">
+            <Card elevation="floating" className="max-w-md w-full text-center">
                 <div className="text-4xl mb-4">&#x1F512;</div>
                 <Heading level={1} className="mb-2">
                     No access yet
@@ -41,14 +43,11 @@ export default async function NoTenantPage() {
                         await signOut({ redirectTo: '/login' });
                     }}
                 >
-                    <button
-                        type="submit"
-                        className="w-full rounded-md border border-border-default bg-bg-default px-4 py-2 text-sm font-medium text-content-default hover:bg-bg-hover transition-colors"
-                    >
+                    <Button type="submit" variant="secondary" className="w-full">
                         Sign out
-                    </button>
+                    </Button>
                 </form>
-            </div>
+            </Card>
         </main>
     );
 }

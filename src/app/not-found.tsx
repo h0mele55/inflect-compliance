@@ -4,8 +4,8 @@ import { Heading } from '@/components/ui/typography';
 
 /**
  * Global Not Found Boundary (404).
- * Polish PR-9 — uses semantic tokens + Button-variant Link instead
- * of hand-rolled gray utility classes / `transition-all`.
+ * Polish PR-4 / PR-9 — uses semantic tokens + Button-variant Link
+ * instead of hand-rolled gray utility classes / `transition-all`.
  */
 export default function NotFound() {
     return (
