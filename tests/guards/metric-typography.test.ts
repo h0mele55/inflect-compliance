@@ -58,6 +58,12 @@ const EXEMPT_FILES = new Set<string>([
     // Auth landing pages render brand wordmark / heroic copy that's
     // editorial, not a number.
     'src/app/login/page.tsx',
+    // User reverted controls + tasks dashboards to their pre-polish
+    // shape. KPIStat doesn't fit the context they want back — keep
+    // the raw `text-3xl font-bold` rendering on these two surfaces
+    // only. New dashboards still flow through KPIStat.
+    'src/app/t/[tenantSlug]/(app)/controls/dashboard/page.tsx',
+    'src/app/t/[tenantSlug]/(app)/tasks/dashboard/page.tsx',
 ]);
 
 const SIZE_RE = /\btext-(2xl|3xl|4xl|5xl|6xl)\b/;

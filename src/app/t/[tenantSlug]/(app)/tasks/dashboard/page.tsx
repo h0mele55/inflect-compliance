@@ -19,9 +19,6 @@ import {
 } from '@/components/ui/status-breakdown';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
-import { KPIStat } from '@/components/ui/metric';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { SkeletonDashboard } from '@/components/ui/skeleton';
 
 const STATUS_LABELS: Record<string, string> = {
     OPEN: 'Open', TRIAGED: 'Triaged', IN_PROGRESS: 'In Progress',
@@ -104,43 +101,39 @@ export default function TaskDashboardPage() {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     if (loading || !metrics) {
-        return <SkeletonDashboard />;
+        return <div className="p-12 text-center text-content-subtle animate-pulse">Loading dashboard...</div>;
     }
 
     const maxBar = Math.max(metrics.trend.created30d, metrics.trend.resolved30d, 1);
 
     return (
-        <DashboardLayout
-            header={{
-                title: 'Task Dashboard',
-                description: `${metrics.total} total tasks`,
-                actions: (
-                    <Link href={tenantHref('/tasks')} className={buttonVariants({ variant: 'secondary' })}>Task Register</Link>
-                ),
-            }}
-        >
+        <div className="space-y-section animate-fadeIn">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <Heading level={1}><AppIcon name="dashboard" className="inline-block mr-2 align-text-bottom" /> Task Dashboard</Heading>
+                    <p className="text-content-muted text-sm">{metrics.total} total tasks</p>
+                </div>
+                <Link href={tenantHref('/tasks')} className={buttonVariants({ variant: 'secondary' })}>← Task Register</Link>
+            </div>
 
-            {/* KPI Cards — Polish PR-2: KPIStat primitive. */}
+            {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-default" id="dashboard-metrics">
-                <div className="glass-card p-4">
-                    <KPIStat value={metrics.total} label="Total Tasks" />
+                <div className="glass-card p-4 text-center">
+                    <div className="text-3xl font-bold text-content-emphasis">{metrics.total}</div>
+                    <div className="text-xs text-content-muted mt-1">Total Tasks</div>
                 </div>
-                <div className="glass-card p-4">
-                    <KPIStat
-                        value={metrics.overdue}
-                        label="Overdue"
-                        tone={metrics.overdue > 0 ? 'critical' : 'default'}
-                    />
+                <div className="glass-card p-4 text-center border-border-error">
+                    <div className="text-3xl font-bold text-content-error">{metrics.overdue}</div>
+                    <div className="text-xs text-content-muted mt-1">Overdue</div>
                 </div>
-                <div className="glass-card p-4">
-                    <KPIStat
-                        value={metrics.dueIn7d}
-                        label="Due in 7 days"
-                        tone={metrics.dueIn7d > 0 ? 'attention' : 'default'}
-                    />
+                <div className="glass-card p-4 text-center border-border-warning">
+                    <div className="text-3xl font-bold text-content-warning">{metrics.dueIn7d}</div>
+                    <div className="text-xs text-content-muted mt-1">Due in 7 days</div>
                 </div>
-                <div className="glass-card p-4">
-                    <KPIStat value={metrics.dueIn30d} label="Due in 30 days" />
+                <div className="glass-card p-4 text-center border-border-info">
+                    <div className="text-3xl font-bold text-content-info">{metrics.dueIn30d}</div>
+                    <div className="text-xs text-content-muted mt-1">Due in 30 days</div>
                 </div>
             </div>
 
@@ -309,6 +302,6 @@ export default function TaskDashboardPage() {
                     </div>
                 </div>
             )}
-        </DashboardLayout>
+        </div>
     );
 }

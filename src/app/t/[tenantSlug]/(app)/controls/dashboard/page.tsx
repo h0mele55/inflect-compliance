@@ -14,9 +14,6 @@ import {
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
 import { Card } from '@/components/ui/card';
-import { KPIStat } from '@/components/ui/metric';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { SkeletonDashboard } from '@/components/ui/skeleton';
 
 const STATUS_LABELS: Record<string, string> = {
     NOT_STARTED: 'Not Started', IN_PROGRESS: 'In Progress', IMPLEMENTED: 'Implemented', NEEDS_REVIEW: 'Needs Review',
@@ -76,43 +73,45 @@ export default function ControlsDashboard() {
         if (res.ok) setConsistency(await res.json());
     };
 
-    if (loading) return <SkeletonDashboard />;
+    if (loading) return (
+        <div className="space-y-section animate-fadeIn">
+            <Heading level={1} id="dashboard-heading"><AppIcon name="dashboard" className="inline-block mr-2 align-text-bottom" /> Controls Dashboard</Heading>
+            <div className="p-12 text-center text-content-subtle animate-pulse">Loading dashboard...</div>
+        </div>
+    );
     if (!data) return (
-        <DashboardLayout header={{ title: 'Controls Dashboard', titleId: 'dashboard-heading' }}>
+        <div className="space-y-section animate-fadeIn">
+            <Heading level={1} id="dashboard-heading"><AppIcon name="dashboard" className="inline-block mr-2 align-text-bottom" /> Controls Dashboard</Heading>
             <div className="p-12 text-center text-content-error">Failed to load dashboard.</div>
-        </DashboardLayout>
+        </div>
     );
 
     return (
-        <DashboardLayout
-            header={{
-                title: 'Controls Dashboard',
-                titleId: 'dashboard-heading',
-                description: `${data.totalControls} controls in register`,
-                actions: (
-                    <>
-                        {permissions.canAdmin && (
-                            <Button variant="secondary" onClick={fetchConsistency} id="consistency-check-btn">
-                                <AppIcon name="search" size={16} className="inline-block" /> Consistency Check
-                            </Button>
-                        )}
-                        <Link href={tenantHref('/controls')} className={buttonVariants({ variant: 'secondary' })}>
-                            Back to Controls
-                        </Link>
-                    </>
-                ),
-            }}
-        >
-            {/* Stat Cards Row — Polish PR-2: KPIStat primitive. */}
+        <div className="space-y-section animate-fadeIn">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div>
+                    <Heading level={1} id="dashboard-heading"><AppIcon name="dashboard" className="inline-block mr-2 align-text-bottom" /> Controls Dashboard</Heading>
+                    <p className="text-content-muted text-sm">{data.totalControls} controls in register</p>
+                </div>
+                <div className="flex gap-tight">
+                    {permissions.canAdmin && (
+                        <Button variant="secondary" onClick={fetchConsistency} id="consistency-check-btn">
+                            <AppIcon name="search" size={16} className="inline-block" /> Consistency Check
+                        </Button>
+                    )}
+                    <Link href={tenantHref('/controls')} className={buttonVariants({ variant: 'secondary' })}>
+                        ← Back to Controls
+                    </Link>
+                </div>
+            </div>
+
+            {/* Stat Cards Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-default" id="dashboard-stats">
                 <div className="glass-card p-4">
-                    <KPIStat
-                        id="implementation-progress"
-                        value={`${data.implementationProgress}%`}
-                        label="Implementation Progress"
-                        tone="success"
-                        description={`${data.implementedCount}/${data.applicableCount} applicable controls`}
-                    />
+                    <p className="text-xs text-content-subtle uppercase">Implementation Progress</p>
+                    <p className="text-3xl font-bold text-content-success mt-1" id="implementation-progress">{data.implementationProgress}%</p>
+                    <p className="text-xs text-content-subtle mt-1">{data.implementedCount}/{data.applicableCount} applicable controls</p>
                     <ProgressBar
                         value={data.implementationProgress}
                         variant={data.implementationProgress >= 80 ? 'success' : data.implementationProgress >= 50 ? 'warning' : 'error'}
@@ -122,29 +121,19 @@ export default function ControlsDashboard() {
                     />
                 </div>
                 <div className="glass-card p-4">
-                    <KPIStat
-                        id="overdue-tasks"
-                        value={data.overdueTasks}
-                        label="Overdue Tasks"
-                        tone={data.overdueTasks > 0 ? 'critical' : 'default'}
-                        description="tasks past due date"
-                    />
+                    <p className="text-xs text-content-subtle uppercase">Overdue Tasks</p>
+                    <p className={`text-3xl font-bold mt-1 ${data.overdueTasks > 0 ? 'text-content-error' : 'text-content-muted'}`} id="overdue-tasks">{data.overdueTasks}</p>
+                    <p className="text-xs text-content-subtle mt-1">tasks past due date</p>
                 </div>
                 <div className="glass-card p-4">
-                    <KPIStat
-                        id="due-soon"
-                        value={data.controlsDueSoon}
-                        label="Controls Due Soon"
-                        tone={data.controlsDueSoon > 0 ? 'attention' : 'default'}
-                        description="within next 30 days"
-                    />
+                    <p className="text-xs text-content-subtle uppercase">Controls Due Soon</p>
+                    <p className={`text-3xl font-bold mt-1 ${data.controlsDueSoon > 0 ? 'text-content-warning' : 'text-content-muted'}`} id="due-soon">{data.controlsDueSoon}</p>
+                    <p className="text-xs text-content-subtle mt-1">within next 30 days</p>
                 </div>
                 <div className="glass-card p-4">
-                    <KPIStat
-                        value={data.applicabilityDistribution.applicable}
-                        label="Applicability"
-                        description={`${data.applicabilityDistribution.notApplicable} excluded (N/A)`}
-                    />
+                    <p className="text-xs text-content-subtle uppercase">Applicability</p>
+                    <p className="text-3xl font-bold text-content-info mt-1">{data.applicabilityDistribution.applicable}</p>
+                    <p className="text-xs text-content-subtle mt-1">{data.applicabilityDistribution.notApplicable} excluded (N/A)</p>
                 </div>
             </div>
 
@@ -221,6 +210,6 @@ export default function ControlsDashboard() {
                     )}
                 </Card>
             )}
-        </DashboardLayout>
+        </div>
     );
 }

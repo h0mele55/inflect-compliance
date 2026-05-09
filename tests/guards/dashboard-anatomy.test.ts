@@ -50,6 +50,12 @@ const EXEMPT_FILE_PATTERNS: RegExp[] = [
 const EXEMPT_FILES = new Set<string>([
     // Issues dashboard is a redirect page (no UI of its own).
     'src/app/t/[tenantSlug]/(app)/issues/dashboard/page.tsx',
+    // User reverted controls + tasks dashboards to their pre-PR-1
+    // shape (inline header instead of <DashboardLayout>). The
+    // remaining four dashboards (executive / risks / vendors /
+    // tests) still flow through DashboardLayout.
+    'src/app/t/[tenantSlug]/(app)/controls/dashboard/page.tsx',
+    'src/app/t/[tenantSlug]/(app)/tasks/dashboard/page.tsx',
 ]);
 
 interface Hit {

@@ -48,6 +48,13 @@ const EXEMPT_FILE_PATTERNS: RegExp[] = [
 const EXEMPT_DASHBOARDS = new Set<string>([
     // Issues dashboard is a redirect — no loading state.
     'src/app/t/[tenantSlug]/(app)/issues/dashboard/page.tsx',
+    // User reverted controls + tasks dashboards to their pre-polish
+    // shape, including the original inline `Loading dashboard...`
+    // div instead of <SkeletonDashboard />. Other four dashboards
+    // (executive / risks / vendors / tests) still use the skeleton
+    // primitive.
+    'src/app/t/[tenantSlug]/(app)/controls/dashboard/page.tsx',
+    'src/app/t/[tenantSlug]/(app)/tasks/dashboard/page.tsx',
 ]);
 
 interface Hit {
@@ -115,7 +122,7 @@ describe('State coverage ratchet (Polish PR-10)', () => {
             const abs = path.resolve(ROOT, rel);
             expect(fs.existsSync(abs)).toBe(true);
         }
-        expect(EXEMPT_DASHBOARDS.size).toBeLessThanOrEqual(2);
+        expect(EXEMPT_DASHBOARDS.size).toBeLessThanOrEqual(4);
     });
 
     it('the dashboard scanner finds at least the expected canonical files', () => {
