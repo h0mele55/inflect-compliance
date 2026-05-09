@@ -50,6 +50,7 @@ import { Modal } from '@/components/ui/modal';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { FormField } from '@/components/ui/form-field';
 import { FormError } from '@/components/ui/form-error';
+import { FormSection } from '@/components/ui/form-section';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { InfoTooltip } from '@/components/ui/tooltip';
@@ -375,7 +376,16 @@ export function NewRiskModal({
                         </div>
                     )}
 
-                    <fieldset className="space-y-default" disabled={submitting}>
+                    {/* Roadmap-2 PR-6 — `<FormSection>` wraps the
+                        risk-detail fields. The eyebrow gives the
+                        section a name; future PRs split the
+                        scoring + treatment fields into their own
+                        subsections. The `disabled` prop is now
+                        forwarded to a nested fieldset that owns
+                        the disable behaviour while FormSection
+                        owns the visual rhythm. */}
+                    <fieldset disabled={submitting} className="m-0 p-0 border-0">
+                    <FormSection eyebrow="Risk details">
                         {/* Template (optional) */}
                         {templates.length > 0 && (
                             <FormField
@@ -642,6 +652,7 @@ export function NewRiskModal({
                                 )}
                             </div>
                         </details>
+                    </FormSection>
                     </fieldset>
                 </Modal.Body>
 
