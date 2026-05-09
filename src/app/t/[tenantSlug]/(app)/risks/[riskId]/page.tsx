@@ -310,7 +310,7 @@ export default function RiskDetailPage() {
             // collapses below the body and the user sees the same
             // vertical flow they had before.
             rail={
-                <div className="glass-card p-5">
+                <div className="glass-card p-6">
                     <Heading level={2} className="mb-3 inline-flex items-center gap-tight text-base">
                         <AppIcon name="tasks" size={16} /> Linked Tasks
                     </Heading>
