@@ -13,7 +13,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@dub/utils';
-import { DataTable, createColumns } from '@/components/ui/table';
+import { DataTable, createColumns, useColumnsDropdown } from '@/components/ui/table';
 import { Package } from 'lucide-react';
 import {
     FilterProvider,
@@ -116,6 +116,28 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
     const truncated = vendorsQuery.data?.truncated ?? false;
     const liveFilters = useMemo(() => buildVendorFilters(), []);
 
+    // R10-PR7 — column-visibility gear.
+    const vendorColumnList = useMemo(
+        () => [
+            { id: 'name', label: 'Name' },
+            { id: 'status', label: 'Status' },
+            { id: 'criticality', label: 'Criticality' },
+            { id: 'risk', label: 'Risk' },
+            { id: 'nextReviewAt', label: 'Next Review' },
+            { id: 'contractRenewalAt', label: 'Contract Renewal', defaultVisible: false },
+            { id: 'owner', label: 'Owner' },
+        ],
+        [],
+    );
+    const {
+        columnVisibility,
+        setColumnVisibility,
+        dropdown: columnsDropdown,
+    } = useColumnsDropdown({
+        storageKey: 'inflect:col-vis:vendors',
+        columns: vendorColumnList,
+    });
+
     const vendorColumns = useMemo(() => createColumns<any>([
         {
             accessorKey: 'name',
@@ -217,6 +239,7 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
                     filters={liveFilters}
                     searchId="vendor-search"
                     searchPlaceholder="Search vendors…"
+                    actions={columnsDropdown}
                 />
             </ListPageShell.Filters>
 
@@ -230,6 +253,8 @@ function VendorsPageInner({ initialVendors, initialFilters, tenantSlug, permissi
                         data={vendors}
                         columns={vendorColumns}
                         getRowId={(v: any) => v.id}
+                        columnVisibility={columnVisibility}
+                        onColumnVisibilityChange={setColumnVisibility}
                         onRowClick={(row) => router.push(tenantHref(`/vendors/${row.original.id}`))}
                         emptyState={
                             <EmptyState
