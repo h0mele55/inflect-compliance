@@ -149,7 +149,7 @@ export default function ControlTemplatesPage() {
                     <div className="p-12 text-center text-content-subtle animate-pulse">Loading templates…</div>
                 ) : filtered.length === 0 ? (
                     <InlineEmptyState
-                        title="No templates found"
+                        title="No templates yet"
                         description="Templates are seeded by your admin."
                     />
                 ) : (
@@ -183,7 +183,7 @@ export default function ControlTemplatesPage() {
                                 onRowClick={(row) => toggle(row.original.id)}
                                 emptyState={
                                     <TableEmptyState
-                                        title="No templates found"
+                                        title="No templates yet"
                                         description="Templates are seeded by your admin."
                                     />
                                 }

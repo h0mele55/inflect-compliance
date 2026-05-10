@@ -366,7 +366,7 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
                             </button>
                         ))}
                         {mapFilteredControls.length === 0 && (
-                            <InlineEmptyState title="No controls found" />
+                            <InlineEmptyState title="No controls match" />
                         )}
                     </div>
                 </Modal.Body>
