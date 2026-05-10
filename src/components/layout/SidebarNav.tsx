@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { useTenantContext, useTenantHref, usePermissions } from '@/lib/tenant-context-provider';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Button } from '@/components/ui/button';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useKeyboardShortcut } from '@/lib/hooks/use-keyboard-shortcut';
 import { StartTourButton } from '@/components/ui/OnboardingTour';
 import { useCommandPalette } from '@/components/command-palette/command-palette-provider';
@@ -96,7 +97,6 @@ export function useNavSections(): NavSectionDef[] {
                 { href: tenantHref('/vendors'), label: 'Vendor', icon: Truck },
                 { href: tenantHref('/frameworks'), label: 'Framework', icon: Map },
                 { href: tenantHref('/reports'), label: t('reports'), icon: BarChart3, visible: perms.reports.view },
-                { href: tenantHref('/admin'), label: t('admin'), icon: Settings, visible: perms.admin.view },
             ].filter(item => {
                 // DEFENSE-IN-DEPTH (Layer 2 of 2):
                 // Layer 1: Server layout uses noStore() to ensure fresh permissions per request.
@@ -195,6 +195,8 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
     const pathname = usePathname();
     const tc = useTranslations('common');
     const tenant = useTenantContext();
+    const tenantHref = useTenantHref();
+    const perms = usePermissions();
     const sections = useNavSections();
     const { open: openPalette } = useCommandPalette();
 
@@ -281,7 +283,22 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
                             accent. */}
                         <p className="text-xs text-content-muted">{tenant.role}</p>
                     </div>
-                    <ThemeToggle id="theme-toggle-desktop" />
+                    <div className="flex items-center gap-tight">
+                        {perms.admin.view && (
+                            <Tooltip content="Admin">
+                                <Link
+                                    href={tenantHref('/admin')}
+                                    aria-label="Admin"
+                                    id="admin-icon-link-desktop"
+                                    data-testid="nav-admin-icon"
+                                    className="icon-btn icon-btn-sm"
+                                >
+                                    <Settings className="size-4" aria-hidden="true" />
+                                </Link>
+                            </Tooltip>
+                        )}
+                        <ThemeToggle id="theme-toggle-desktop" />
+                    </div>
                 </div>
                 {/* Driver.js product tour — manual restart entry.
                     Renders only when the OnboardingTourProvider is
