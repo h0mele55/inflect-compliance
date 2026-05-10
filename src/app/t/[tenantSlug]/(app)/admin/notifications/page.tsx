@@ -141,7 +141,7 @@ export default function NotificationSettingsPage() {
             />
 
             {tab === 'settings' ? (
-                <div className="glass-card p-6 space-y-5">
+                <div className="glass-card p-6 space-y-default">
                     {/* Enable / Disable */}
                     <label className="flex items-center gap-compact cursor-pointer">
                         <input

@@ -328,7 +328,7 @@ export default function RiskDetailPage() {
             )}
 
             {/* Detail / Edit Card */}
-            <div className="glass-card p-6 space-y-5" id="risk-detail">
+            <div className="glass-card p-6 space-y-default" id="risk-detail">
                 {editing ? (
                     /* ─── Edit Mode ─── */
                     <>

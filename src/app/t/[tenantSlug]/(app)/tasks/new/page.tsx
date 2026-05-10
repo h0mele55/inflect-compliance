@@ -187,7 +187,7 @@ export default function NewTaskPage() {
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="glass-card p-6 space-y-5" noValidate>
+            <form onSubmit={handleSubmit} className="glass-card p-6 space-y-default" noValidate>
                 <FormField label="Title" required>
                     <Input
                         id="task-title-input"

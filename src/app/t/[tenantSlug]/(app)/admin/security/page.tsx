@@ -211,7 +211,7 @@ export default function AdminSecurityPage() {
             )}
 
             {/* MFA Policy Section */}
-            <div className="glass-card p-6 space-y-5">
+            <div className="glass-card p-6 space-y-default">
                 <div>
                     <div className="flex items-center gap-tight">
                         <Heading level={2}>Multi-Factor Authentication Policy</Heading>
@@ -319,7 +319,7 @@ export default function AdminSecurityPage() {
             </div>
 
             {/* ──── Session Management ──── */}
-            <div className="glass-card p-6 space-y-5">
+            <div className="glass-card p-6 space-y-default">
                 <div>
                     <Heading level={2} className="mb-1">Session Management</Heading>
                     <p className="text-sm text-content-muted">
