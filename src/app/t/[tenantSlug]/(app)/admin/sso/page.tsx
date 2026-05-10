@@ -272,9 +272,9 @@ export default function SsoAdminPage() {
                 />
                 <Heading level={1}>SSO &amp; Identity</Heading>
                 <Card className="space-y-default">
-                    <div className="h-4 bg-bg-elevated/50 rounded w-1/3 animate-pulse" />
-                    <div className="h-4 bg-bg-elevated/50 rounded w-2/3 animate-pulse" />
-                    <div className="h-4 bg-bg-elevated/50 rounded w-1/2 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/60 rounded w-1/3 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/60 rounded w-2/3 animate-pulse" />
+                    <div className="h-4 bg-bg-elevated/60 rounded w-1/2 animate-pulse" />
                 </Card>
             </div>
         );
