@@ -33,8 +33,17 @@
  */
 
 import { cn } from "@dub/utils";
-import { type LucideIcon } from "lucide-react";
-import { type ReactNode } from "react";
+import { type ComponentType, type ReactNode, type SVGProps } from "react";
+
+/**
+ * Icon component shape — accepts both lucide-react icons (the
+ * legacy import path being migrated away) and the canonical Nucleo
+ * icon family. Both expose the same `className` + `aria-hidden`
+ * surface, so the structural type is sufficient and the primitive
+ * stays family-agnostic. Avoids importing lucide-react here so this
+ * primitive doesn't extend the legacy-icons allowlist (R2-PR8 ratchet).
+ */
+type EmptyStateIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 interface InlineEmptyStateProps {
     /**
@@ -42,7 +51,7 @@ interface InlineEmptyStateProps {
      * vertical rhythm shifts to `py-8` to give the icon breath; the
      * iconless form uses `py-6`.
      */
-    icon?: LucideIcon;
+    icon?: EmptyStateIcon;
     /**
      * Short title. Locked at `text-sm font-medium text-content-default`
      * — premium products lean on the icon + tone for hierarchy at
