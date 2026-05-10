@@ -551,10 +551,10 @@ export default function PolicyDetailPage() {
                                         aria-label="Next review date"
                                     />
                                 </div>
+                                <Button variant="secondary" size="xs" onClick={() => setEditingReview(false)}>Cancel</Button>
                                 <Button variant="primary" size="xs" onClick={saveReview} disabled={savingReview}>
-                                    {savingReview ? '...' : 'Save'}
+                                    {savingReview ? '…' : 'Save'}
                                 </Button>
-                                <Button variant="ghost" size="xs" onClick={() => setEditingReview(false)}>Cancel</Button>
                             </div>
                         )}
                     </div>
