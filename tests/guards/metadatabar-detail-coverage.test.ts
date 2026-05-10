@@ -1,32 +1,35 @@
 /**
- * Roadmap-7 PR-5 — MetadataBar detail-page coverage ratchet.
+ * Roadmap-7 PR-5 + Roadmap-8 PR-4 — Metadata-strip coverage ratchet.
  *
- * `<MetadataBar>` was built (v2-PR-13) as the canonical horizontal
- * metadata strip for detail pages — replacing 6 different layouts
- * scattered across the product (sidebar, header description, separate
- * Card under header, inline meta row). Adoption has been zero: every
- * detail page currently solves "show metadata" differently.
+ * Background. The product ships TWO meta-strip primitives:
  *
- * Reading the same product across detail surfaces feels like reading
- * three products. The strip is meant to be dense, scannable, opinionated
- * — id, status, owner, when, where — sitting in one fixed spot
- * (between the page title and the tab bar) on every detail page.
+ *   • `<MetaStrip>` (Polish PR-5) — older, label-on-top / value-below
+ *     grid. Eleven detail pages adopted it across Polish-package /
+ *     v2 work. This is the production primitive.
  *
- * This PR seeds the migration registry. The DETAIL_PAGES table lists
- * the 10 canonical entity-detail pages with a `migrated` flag. Today
- * every entry is `false` (vacuous). Each follow-up migration PR:
+ *   • `<MetadataBar>` (v2-PR-13) — newer, single-line `Label: value`
+ *     comma-separated strip. Zero production adopters; built but
+ *     never wired in.
  *
- *   1. Refactors one page to mount `<MetadataBar>` as the metadata
- *      slot in `<EntityDetailLayout>` (or directly below the page
- *      header).
- *   2. Flips that page's `migrated` flag from `false` to `true`.
- *   3. The ratchet then asserts the page actually has `<MetadataBar>`
- *      mounted in source — preventing a silent revert.
+ * R7-PR5 mistakenly registered `<MetadataBar>` as the target — every
+ * entry sat at `migrated: false` despite the same pages already
+ * mounting `<MetaStrip>` in the same slot. The original framing
+ * "no detail page renders metadata" was wrong; the framing should
+ * have been "two competing primitives, only one is wired."
  *
- * The direction of travel is one-way: `migrated: true` cannot become
- * `migrated: false` without an explicit comment justifying the
- * regression. The contributor cost of justifying is a weak deterrent;
- * the PR review on a `true → false` flip is the strong one.
+ * R8-PR4 corrects the framing. This ratchet now:
+ *
+ *   1. Tracks `<MetaStrip>` adoption (the production primitive).
+ *   2. Acknowledges that 11 of the 11 known entity-detail pages
+ *      already adopt it. Adoption is at 100% today.
+ *   3. Forbids regressions: any future PR that strips a `<MetaStrip>`
+ *      mount from a registered detail page fails the ratchet.
+ *   4. Documents `<MetadataBar>` as superseded — the cleanest path
+ *      forward is to retire `<MetadataBar>` in a future cleanup, not
+ *      to migrate AWAY from `<MetaStrip>`.
+ *
+ * The pair-with-EntityDetailLayout note is preserved: `<MetaStrip>`
+ * sits in the layout's `meta` slot on every adopted page.
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -34,76 +37,83 @@ import * as path from "path";
 const ROOT = path.resolve(__dirname, "../..");
 
 interface DetailPageEntry {
-    /** Path to the canonical detail-page file, relative to repo root. */
+    /** Path to the file that owns the layout composition. */
     file: string;
-    /** Whether this page has been migrated to MetadataBar. */
-    migrated: boolean;
-    /** Why migrated=false (or why this page is in the registry). */
-    note?: string;
+    /** Whether this page mounts <MetaStrip>. */
+    adopted: boolean;
+    /** Why this page is in the registry. */
+    note: string;
 }
 
 /**
- * Canonical entity-detail pages. Each represents one of the 10
- * top-level entity types in the product.
+ * Detail pages with explicit MetaStrip adoption status. Pairs with
+ * `entity-detail-layout-coverage.test.ts` — the metadata strip
+ * lives in the EntityDetailLayout `meta` slot for adopted pages.
  *
- * Adding a new entity-detail page: append it here with
- * `migrated: false` and a one-line note. The ratchet will then
- * require a written entry — it cannot be silently bypassed.
+ * R8-PR4 baseline: every page that has migrated to
+ * <EntityDetailLayout> also adopts <MetaStrip>. The two registries
+ * march in lockstep — when EntityDetailLayout adoption increases,
+ * MetaStrip adoption follows.
  */
 const DETAIL_PAGES: DetailPageEntry[] = [
     {
-        file: "src/app/t/[tenantSlug]/(app)/controls/[controlId]/page.tsx",
-        migrated: false,
-        note: "Heaviest detail page; metadata composition lives in CardHeader + inline rows. Migration pending.",
+        file: "src/app/t/[tenantSlug]/(app)/risks/[riskId]/page.tsx",
+        adopted: true,
+        note: "Risks detail — uses <MetaStrip> with status / severity / owner / framework / dates. Proof-of-pattern reference.",
     },
     {
-        file: "src/app/t/[tenantSlug]/(app)/risks/[riskId]/page.tsx",
-        migrated: false,
-        note: "Already mounts <EntityDetailLayout>; metadata slot is the cleanest entry point.",
+        file: "src/app/t/[tenantSlug]/(app)/controls/[controlId]/page.tsx",
+        adopted: true,
+        note: "Controls detail — uses <MetaStrip> for status / framework / owner / last-updated. Heaviest detail page in the product.",
     },
     {
         file: "src/app/t/[tenantSlug]/(app)/vendors/[vendorId]/page.tsx",
-        migrated: false,
-        note: "Vendor detail with sub-tabs (Overview, Documents, Risks, Assessments).",
+        adopted: true,
+        note: "Vendors detail — uses <MetaStrip> for tier / status / risk-rating / contact / next-review.",
     },
     {
         file: "src/app/t/[tenantSlug]/(app)/policies/[policyId]/page.tsx",
-        migrated: false,
-        note: "Policy detail with versioning + acknowledgment metadata.",
+        adopted: true,
+        note: "Policies detail — uses <MetaStrip> for status / version / approver / acknowledgment.",
     },
     {
         file: "src/app/t/[tenantSlug]/(app)/audits/cycles/[cycleId]/page.tsx",
-        migrated: false,
-        note: "Audit cycle detail with auditor + scope + period metadata.",
+        adopted: true,
+        note: "Audit cycle detail — uses <MetaStrip> for framework / period / scope / readiness score.",
     },
     {
         file: "src/app/t/[tenantSlug]/(app)/tasks/[taskId]/page.tsx",
-        migrated: false,
-        note: "Task detail with assignee + status + dates metadata.",
-    },
-    {
-        file: "src/app/t/[tenantSlug]/(app)/issues/[issueId]/page.tsx",
-        migrated: false,
-        note: "Issue detail with severity + reporter + status metadata.",
-    },
-    {
-        file: "src/app/t/[tenantSlug]/(app)/access-reviews/[reviewId]/page.tsx",
-        migrated: false,
-        note: "Access review detail with reviewer + period + entitlement metadata.",
+        adopted: true,
+        note: "Task detail — uses <MetaStrip> for status / priority / assignee / due-date / SLA.",
     },
     {
         file: "src/app/t/[tenantSlug]/(app)/assets/[id]/page.tsx",
-        migrated: false,
-        note: "Asset detail with owner + classification + lifecycle metadata.",
+        adopted: true,
+        note: "Assets detail — uses <MetaStrip> for classification / owner / lifecycle / criticality.",
     },
     {
         file: "src/app/t/[tenantSlug]/(app)/audits/packs/[packId]/page.tsx",
-        migrated: false,
-        note: "Audit pack detail with state + auditor + due-date metadata.",
+        adopted: true,
+        note: "Audit pack detail — uses <MetaStrip> for state / auditor / due-date / item-count.",
+    },
+    {
+        file: "src/app/t/[tenantSlug]/(app)/tests/runs/[runId]/page.tsx",
+        adopted: true,
+        note: "Test run detail — uses <MetaStrip> for plan / status / executor / completed-at.",
+    },
+    {
+        file: "src/app/t/[tenantSlug]/(app)/frameworks/[frameworkKey]/page.tsx",
+        adopted: true,
+        note: "Framework detail — uses <MetaStrip> for code / version / installed-at / coverage.",
+    },
+    {
+        file: "src/app/t/[tenantSlug]/(app)/access-reviews/[reviewId]/AccessReviewDetailClient.tsx",
+        adopted: true,
+        note: "Access review detail — uses <MetaStrip> in the Client component (page.tsx is a server shell).",
     },
 ];
 
-describe("MetadataBar detail-page coverage", () => {
+describe("MetaStrip detail-page coverage", () => {
     it("every registered detail page exists in the codebase", () => {
         const missing: string[] = [];
         for (const entry of DETAIL_PAGES) {
@@ -120,19 +130,19 @@ describe("MetadataBar detail-page coverage", () => {
         expect(missing).toHaveLength(0);
     });
 
-    it("every page marked `migrated: true` actually mounts <MetadataBar>", () => {
+    it("every page marked `adopted: true` actually mounts <MetaStrip>", () => {
         const violations: string[] = [];
         for (const entry of DETAIL_PAGES) {
-            if (!entry.migrated) continue;
+            if (!entry.adopted) continue;
             const full = path.join(ROOT, entry.file);
             const content = fs.readFileSync(full, "utf8");
-            if (!/<MetadataBar\b/.test(content)) {
+            if (!/<MetaStrip\b/.test(content)) {
                 violations.push(entry.file);
             }
         }
         if (violations.length > 0) {
             throw new Error(
-                `Pages marked \`migrated: true\` but missing <MetadataBar>:\n${violations.map((v) => `  ${v}`).join("\n")}\n\nEither restore the <MetadataBar> mount, or — if the migration was deliberately reverted — flip the registry entry back to \`migrated: false\` with a comment explaining why. The ratchet does NOT silently allow regressions.`,
+                `Pages marked \`adopted: true\` but missing <MetaStrip>:\n${violations.map((v) => `  ${v}`).join("\n")}\n\nEither restore the <MetaStrip> mount, or — if the migration was deliberately reverted — flip the registry entry back to \`adopted: false\` with a comment explaining why. The ratchet does NOT silently allow regressions.`,
             );
         }
         expect(violations).toHaveLength(0);
@@ -148,13 +158,41 @@ describe("MetadataBar detail-page coverage", () => {
         expect(noteless).toHaveLength(0);
     });
 
-    it("registry holds the canonical 10 entity-detail pages (drift detector)", () => {
-        // The number rules: today's ten pages are the canonical set.
-        // If a new entity-detail page is added, the registry MUST
-        // grow — and the new entry forces a written note via the
-        // previous assertion. If a page is removed, the registry
-        // shrinks — and the previous file-existence assertion forces
-        // the entry to be dropped.
+    it("registry holds the canonical entity-detail pages (drift detector)", () => {
+        // R8-PR4 baseline: 11 detail pages adopt MetaStrip. Future
+        // entity types (e.g., a new audit-cycle-readiness sub-detail
+        // that needs its own metadata strip) should add an entry
+        // here — the ≥10 floor catches an emptied registry.
         expect(DETAIL_PAGES.length).toBeGreaterThanOrEqual(10);
+    });
+
+    it("MetadataBar (the deprecated sibling primitive) has zero production adopters", () => {
+        // Forward enforcement: a future PR adopting <MetadataBar>
+        // instead of <MetaStrip> would split the design vocabulary.
+        // Until <MetadataBar> is formally retired or repurposed for
+        // a distinct shape, no app page should reach for it.
+        const SCAN_DIR = path.join(ROOT, "src/app");
+        const offenders: string[] = [];
+        const walk = (dir: string) => {
+            if (!fs.existsSync(dir)) return;
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+                const full = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    walk(full);
+                } else if (/\.tsx$/.test(entry.name)) {
+                    const content = fs.readFileSync(full, "utf8");
+                    if (/<MetadataBar\b/.test(content)) {
+                        offenders.push(path.relative(ROOT, full));
+                    }
+                }
+            }
+        };
+        walk(SCAN_DIR);
+        if (offenders.length > 0) {
+            throw new Error(
+                `Found <MetadataBar> usage in ${offenders.length} file(s). The product converges on <MetaStrip>; <MetadataBar> is a deprecated sibling primitive. Migrate to <MetaStrip> instead, OR — if this PR formally retires <MetadataBar> by repurposing it — drop this assertion in the same diff with a written reason.\n\n${offenders.map((o) => `  ${o}`).join("\n")}`,
+            );
+        }
+        expect(offenders).toHaveLength(0);
     });
 });
