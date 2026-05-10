@@ -654,6 +654,21 @@ stands for that PR only — not as a precedent.
 - **i18n**: UI strings go through `next-intl`. Message files are in `messages/`. Server components use `getTranslations()`, client components use `useTranslations()`.
 - **Path alias**: `@/` maps to `src/`. Always use this alias — never relative paths crossing layer boundaries.
 - **Two `DATABASE_URL` vars**: `DATABASE_URL` points to PgBouncer (transaction-mode, used at runtime). `DIRECT_DATABASE_URL` points directly to Postgres (used for Prisma migrations).
+- **Page-section rhythm** (Roadmap-5 PR-9): the spacing scale
+  (`tight` / `compact` / `default` / `section` / `page`) is rich, but
+  vertical page rhythm wants only TWO answers most of the time.
+    - **`space-y-section`** — between top-level page regions (page
+      header, filter toolbar, primary table, footer toast). The
+      24-32 px breath that says "this is a different kind of thing".
+    - **`space-y-default`** — inside a card, between sibling fields,
+      between rows in a panel. The 16 px breath that says "same kind
+      of thing, next instance".
+  Use `space-y-tight` / `space-y-compact` only inside dense field
+  groups where the children are micro-elements (icon + label, status
+  pills). The semantic-scale ratchet at
+  `tests/guards/spacing-scale-discipline.test.ts` already bans raw
+  numerics; this convention guides the choice between `default` and
+  `section`.
 - **Border tone discipline** (Roadmap-5 PR-10): three semantic
   border tones, each with a clear role.
     - **`border-border-subtle`** — DEFAULT. Structural separators

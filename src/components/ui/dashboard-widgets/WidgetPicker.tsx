@@ -297,7 +297,7 @@ export function WidgetPicker({
                 description="Pick a widget type and a data variant. You can rearrange and resize after it lands."
             />
             <Modal.Body>
-                <div className="space-y-5">
+                <div className="space-y-section">
                     {/* ── Step 1: type ── */}
                     <FormField
                         label="Widget type"
