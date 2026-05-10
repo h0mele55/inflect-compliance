@@ -276,9 +276,7 @@ export function EntityDetailLayout<TKey extends string = string>({
                             >
                                 {t.label}
                                 {t.count !== undefined && (
-                                    <span className="ml-1 text-xs opacity-60">
-                                        ({t.count})
-                                    </span>
+                                    <TabCount value={t.count} />
                                 )}
                             </button>
                         );
@@ -349,6 +347,43 @@ export function EntityDetailLayout<TKey extends string = string>({
                 </div>
             )}
         </div>
+    );
+}
+
+// ─── Tab count ────────────────────────────────────────────────────
+//
+// Roadmap-4 PR-7 — canonical tab-count rendering.
+//
+// Tab labels carry an optional count (e.g. "Tasks (12)") that
+// communicates "how many things will I find under this tab". The
+// rendering is centralised here for two reasons:
+//
+//   1. Visual consistency. The count sits one step weaker than the
+//      label's tone — `text-xs` (vs `text-sm` on the label) plus
+//      `opacity-60` so the count dims relative to whatever tone the
+//      label inherited (selected = emphasis, unselected = muted).
+//      The opacity-on-inherit trick is deliberate: a fixed
+//      `text-content-subtle` would look the same regardless of
+//      selection state, killing the active-tab affordance.
+//
+//   2. Digit-width stability. `tabular-nums` keeps every digit at
+//      the same width, so a count that ticks 9 → 10 doesn't shift
+//      the tab-bar layout sideways. The detail page no longer
+//      twitches as live counts update in the background.
+//
+// New tab bars MUST mount this helper instead of hand-rolling the
+// `({n})` shape — the ratchet at
+// `tests/guards/tab-count-discipline.test.ts` enforces that and the
+// class string above.
+
+function TabCount({ value }: { value: number }) {
+    return (
+        <span
+            className="ml-1 text-xs tabular-nums opacity-60"
+            data-tab-count
+        >
+            ({value})
+        </span>
     );
 }
 
