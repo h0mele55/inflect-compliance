@@ -270,7 +270,7 @@ export default function SsoAdminPage() {
                     ]}
                     className="mb-1"
                 />
-                <Heading level={1}>SSO &amp; Identity</Heading>
+                <Heading level={2}>Loading SSO &amp; Identity…</Heading>
                 <Card className="space-y-default">
                     <div className="h-4 bg-bg-elevated/60 rounded w-1/3 animate-pulse" />
                     <div className="h-4 bg-bg-elevated/60 rounded w-2/3 animate-pulse" />

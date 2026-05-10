@@ -470,9 +470,9 @@ export default function ApiKeysPage() {
     if (loading) {
         return (
             <div className="space-y-section animate-fadeIn">
-                <Heading level={1} className="flex items-center gap-tight">
+                <Heading level={2} className="flex items-center gap-tight">
                     <KeyRound className="w-6 h-6 text-[var(--brand-default)]" />
-                    API Keys
+                    Loading API keys…
                 </Heading>
                 <Card className="space-y-default">
                     <div className="h-4 bg-bg-elevated/60 rounded w-1/3 animate-pulse" />

@@ -146,9 +146,9 @@ export default function UserMfaPage() {
     if (loading) {
         return (
             <div className="space-y-section animate-fadeIn">
-                <Heading level={1} className="flex items-center gap-tight">
+                <Heading level={2} className="flex items-center gap-tight">
                     <ShieldCheck className="w-6 h-6 text-[var(--brand-default)]" />
-                    Multi-Factor Authentication
+                    Loading Multi-Factor Authentication…
                 </Heading>
                 <Card>
                     <div className="animate-pulse space-y-default">
