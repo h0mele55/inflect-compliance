@@ -557,9 +557,9 @@ export default function CustomRolesPage() {
                     ]}
                     className="mb-1"
                 />
-                <Heading level={1} className="flex items-center gap-tight">
+                <Heading level={2} className="flex items-center gap-tight">
                     <Shield className="w-6 h-6 text-[var(--brand-default)]" />
-                    Custom Roles
+                    Loading Custom Roles…
                 </Heading>
                 <Card className="space-y-default">
                     <div className="h-4 bg-bg-elevated/60 rounded w-1/3 animate-pulse" />

@@ -170,9 +170,9 @@ export default function AdminSecurityPage() {
                     ]}
                     className="mb-1"
                 />
-                <Heading level={1} className="flex items-center gap-tight">
+                <Heading level={2} className="flex items-center gap-tight">
                     <ShieldCheck className="w-6 h-6 text-[var(--brand-default)]" />
-                    Security & MFA
+                    Loading Security & MFA…
                 </Heading>
                 <Card>
                     <div className="animate-pulse space-y-default">
