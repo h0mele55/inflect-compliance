@@ -180,8 +180,8 @@ export function AuditsClient({ initialAudits, tenantSlug, translations: t }: Aud
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-compact">
                                 <Heading level={2}>{selected.title}</Heading>
                                 <div className="flex flex-wrap gap-tight">
-                                    {selected.status === 'PLANNED' && <Button variant="primary" size="sm" onClick={() => updateAuditStatus('IN_PROGRESS')}>{t.inProgress}</Button>}
-                                    {selected.status === 'IN_PROGRESS' && <Button variant="primary" size="sm" onClick={() => updateAuditStatus('COMPLETED')}>{t.completed}</Button>}
+                                    {selected.status === 'PLANNED' && <Button variant="secondary" size="sm" onClick={() => updateAuditStatus('IN_PROGRESS')}>{t.inProgress}</Button>}
+                                    {selected.status === 'IN_PROGRESS' && <Button variant="secondary" size="sm" onClick={() => updateAuditStatus('COMPLETED')}>{t.completed}</Button>}
                                 </div>
                             </div>
                             {selected.scope && <p className="text-sm text-content-muted">{selected.scope}</p>}
