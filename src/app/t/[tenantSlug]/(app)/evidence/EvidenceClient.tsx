@@ -582,14 +582,14 @@ function EvidencePageInner({ initialEvidence, initialControls, tenantSlug, permi
                             <Button variant="secondary" size="sm" onClick={() => archiveEvidence(ev.id)} id={`archive-${ev.id}`}>Archive</Button>
                         )}
                         {permissions.canWrite && ev.isArchived && (
-                            <Button variant="primary" size="sm" onClick={() => unarchiveEvidence(ev.id)} id={`unarchive-${ev.id}`}>Unarchive</Button>
+                            <Button variant="secondary" size="sm" onClick={() => unarchiveEvidence(ev.id)} id={`unarchive-${ev.id}`}>Unarchive</Button>
                         )}
                         {permissions.canWrite && ev.status === 'DRAFT' && (
                             <Button variant="secondary" size="sm" onClick={() => submitReview(ev.id, 'SUBMITTED')}>{t.submitForReview}</Button>
                         )}
                         {permissions.canWrite && ev.status === 'SUBMITTED' && (
                             <>
-                                <Button variant="primary" size="sm" onClick={() => submitReview(ev.id, 'APPROVED')}>{t.approveEvidence}</Button>
+                                <Button variant="secondary" size="sm" onClick={() => submitReview(ev.id, 'APPROVED')}>{t.approveEvidence}</Button>
                                 <Button variant="destructive" size="sm" onClick={() => submitReview(ev.id, 'REJECTED', 'Needs improvement')}>{t.rejectEvidence}</Button>
                             </>
                         )}
