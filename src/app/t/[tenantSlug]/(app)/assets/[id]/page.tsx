@@ -178,7 +178,7 @@ export default function AssetDetailPage() {
             {error && <div className="glass-card p-4 border-border-error text-content-error text-sm">{error}</div>}
 
             {/* Detail card */}
-            <div className="glass-card p-6 space-y-5" id="asset-detail">
+            <div className="glass-card p-6 space-y-default" id="asset-detail">
                 {editing ? (
                     <>
                         <div className="grid grid-cols-2 gap-default">

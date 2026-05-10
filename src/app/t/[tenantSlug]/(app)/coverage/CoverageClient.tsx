@@ -345,7 +345,7 @@ function CoverageKpiCard({
                 </span>
             </div>
 
-            <div className="flex items-center gap-5">
+            <div className="flex items-center gap-default">
                 <DonutChart
                     segments={[
                         { label: 'Covered', value: covered, color },

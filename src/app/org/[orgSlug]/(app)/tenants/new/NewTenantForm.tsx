@@ -191,7 +191,7 @@ export function NewTenantForm({ orgSlug }: Props) {
                 onSubmit={onSubmit}
                 noValidate
                 data-testid="org-new-tenant-form"
-                className="glass-card p-6 space-y-5"
+                className="glass-card p-6 space-y-default"
             >
                 <FormField
                     label="Name"

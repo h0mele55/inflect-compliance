@@ -258,7 +258,7 @@ export default function UserMfaPage() {
 
             {/* Enrollment Step: Show Secret + QR */}
             {step === 'enrolling' && enrollment && (
-                <div className="glass-card p-6 space-y-5">
+                <div className="glass-card p-6 space-y-default">
                     <div>
                         <Heading level={2} className="mb-1">Set Up Authenticator App</Heading>
                         <p className="text-sm text-content-muted">

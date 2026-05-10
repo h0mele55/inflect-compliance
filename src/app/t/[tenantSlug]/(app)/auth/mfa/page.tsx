@@ -97,7 +97,7 @@ export default function MfaChallengePage() {
     if (enrolled === false) {
         return (
             <div className="min-h-[60vh] flex items-center justify-center">
-                <Card className="max-w-md w-full space-y-5 text-center">
+                <Card className="max-w-md w-full space-y-default text-center">
                     <div className="flex justify-center">
                         <div className="w-16 h-16 rounded-full bg-bg-warning flex items-center justify-center">
                             <AlertTriangle className="w-8 h-8 text-content-warning" />
@@ -123,7 +123,7 @@ export default function MfaChallengePage() {
 
     return (
         <div className="min-h-[60vh] flex items-center justify-center">
-            <Card className="max-w-md w-full space-y-5">
+            <Card className="max-w-md w-full space-y-default">
                 <div className="flex justify-center">
                     <div className="w-16 h-16 rounded-full bg-[var(--brand-subtle)] flex items-center justify-center">
                         <ShieldCheck className="w-8 h-8 text-[var(--brand-default)]" />
