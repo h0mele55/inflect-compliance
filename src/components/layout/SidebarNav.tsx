@@ -287,20 +287,22 @@ export function SidebarContent({ user, onLogout, onNavClick }: SidebarContentPro
                         <p className="text-xs text-content-muted">{tenant.role}</p>
                     </div>
                     <div className="flex flex-col items-end justify-between">
-                        {perms.admin.view && (
-                            <Tooltip content="Admin">
-                                <Link
-                                    href={tenantHref('/admin')}
-                                    aria-label="Admin"
-                                    id="admin-icon-link-desktop"
-                                    data-testid="nav-admin-icon"
-                                    className="icon-btn icon-btn-sm"
-                                >
-                                    <Settings className="size-4" aria-hidden="true" />
-                                </Link>
-                            </Tooltip>
-                        )}
-                        <ThemeToggle id="theme-toggle-desktop" />
+                        <div className="flex items-center gap-tight">
+                            {perms.admin.view && (
+                                <Tooltip content="Admin">
+                                    <Link
+                                        href={tenantHref('/admin')}
+                                        aria-label="Admin"
+                                        id="admin-icon-link-desktop"
+                                        data-testid="nav-admin-icon"
+                                        className="icon-btn icon-btn-sm"
+                                    >
+                                        <Settings className="size-4" aria-hidden="true" />
+                                    </Link>
+                                </Tooltip>
+                            )}
+                            <ThemeToggle id="theme-toggle-desktop" />
+                        </div>
                         <Tooltip content={tc('signOut')}>
                             <button
                                 type="button"
