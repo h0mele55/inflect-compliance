@@ -41,7 +41,7 @@ export default async function VendorRegisterPage({
     );
 
     return (
-        <div className="space-y-section">
+        <div className="space-y-section animate-fadeIn">
             <VendorsClient
                 initialVendors={JSON.parse(JSON.stringify(vendors))}
                 initialFilters={filters}

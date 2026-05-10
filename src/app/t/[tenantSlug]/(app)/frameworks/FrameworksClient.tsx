@@ -109,7 +109,7 @@ export function FrameworksClient({
     );
 
     return (
-        <div className="space-y-section">
+        <div className="space-y-section animate-fadeIn">
             <div className="flex items-end justify-between gap-default flex-wrap">
                 <div>
                     <PageBreadcrumbs

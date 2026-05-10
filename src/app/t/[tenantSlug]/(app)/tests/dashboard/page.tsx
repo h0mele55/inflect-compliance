@@ -234,7 +234,7 @@ export default function TestDashboardPage() {
                     <p className="text-sm text-content-muted mb-4">
                         How well your mapped controls are covered by active test plans and recent test runs
                     </p>
-                    <div className="space-y-section">
+                    <div className="space-y-section animate-fadeIn">
                         {readiness.map(fw => (
                             <div key={fw.frameworkKey} className="border border-border-default/30 rounded-lg p-4">
                                 <div className="flex items-center justify-between mb-3">
