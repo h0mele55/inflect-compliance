@@ -329,7 +329,7 @@ export function RiskMatrixAdminClient({
 
             <div className="grid grid-cols-1 gap-section lg:grid-cols-2">
                 {/* ── Editor ─────────────────────────────────────── */}
-                <section className="space-y-section">
+                <section className="space-y-section animate-fadeIn">
                     {/* Dimensions */}
                     <Card className="space-y-default">
                         <Heading level={3}>

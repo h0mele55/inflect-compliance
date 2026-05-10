@@ -120,7 +120,7 @@ export default function TemplateLibraryPage() {
     if (loading) return <div className="p-8 animate-pulse text-content-muted">Loading template library...</div>;
 
     return (
-        <div className="space-y-section">
+        <div className="space-y-section animate-fadeIn">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>

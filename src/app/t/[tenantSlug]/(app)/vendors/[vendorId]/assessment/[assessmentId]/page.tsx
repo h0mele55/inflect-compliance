@@ -166,7 +166,7 @@ export default function AssessmentPage(
     };
 
     return (
-        <div className="space-y-section max-w-3xl mx-auto">
+        <div className="space-y-section animate-fadeIn max-w-3xl mx-auto">
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-compact">

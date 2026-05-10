@@ -45,7 +45,7 @@ export default function DiffPage() {
     if (loading) return <div className="p-8 animate-pulse text-content-muted">Loading diff…</div>;
 
     return (
-        <div className="space-y-section">
+        <div className="space-y-section animate-fadeIn">
             <div>
                 <Link href={tenantHref(`/frameworks/${frameworkKey}`)} className="text-content-muted hover:text-content-emphasis transition-colors text-sm">
                     ← Back to {framework?.name || frameworkKey}

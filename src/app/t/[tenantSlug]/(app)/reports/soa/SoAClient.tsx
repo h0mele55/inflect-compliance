@@ -182,7 +182,7 @@ export function SoAClient({ report, controls, tenantSlug, canEdit }: SoAClientPr
         // same place as the Risk Register's exports). The body
         // gets `space-y-section` so summary / banner / filters /
         // table breathe at the canonical 32px rhythm.
-        <div className="space-y-section">
+        <div className="space-y-section animate-fadeIn">
             {/* Eyebrow + summary line — section-level, not page-level */}
             <div>
                 <p className="text-sm text-content-muted">
