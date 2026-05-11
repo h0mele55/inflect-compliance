@@ -133,9 +133,19 @@ export function SkeletonTable({
     cols?: number;
     className?: string;
 }) {
+    // R12-followup — same recipe as `SkeletonDataTable` so the
+    // legacy `SkeletonTable` (kept for backward compat) matches
+    // the live `<DataTable>`'s outer card. Pre-fix used the
+    // glass-card variant via `cardVariants({ density: 'none' })`
+    // — visibly different from the solid card DataTable
+    // actually renders. Parity matters because pages mixing the
+    // two would flash a different shell on data swap.
     return (
         <div
-            className={cn(cardVariants({ density: 'none' }), 'overflow-hidden', className)}
+            className={cn(
+                'bg-bg-default rounded-lg border border-border-subtle overflow-hidden',
+                className,
+            )}
             aria-hidden="true"
             data-skeleton-table
         >
@@ -221,8 +231,16 @@ export function SkeletonFilterBar() {
  * See: src/components/ui/table/GUIDE.md
  */
 export function SkeletonDataTable({ rows = 8, cols = 8 }: { rows?: number; cols?: number }) {
+    // R12-followup — mirror the live `<DataTable>` primitive's
+    // outer card recipe so the skeleton-to-data swap doesn't
+    // flash a different shell. PRE-fix this used
+    // `cardVariants({ density: 'none' })` which rendered as a
+    // glass-card with backdrop-blur — visibly different from the
+    // solid `bg-bg-default` card DataTable actually renders, so
+    // the swap landed with a perceptible "card change". Now both
+    // sides use the same outer-card recipe.
     return (
-        <div className={cn(cardVariants({ density: 'none' }), 'overflow-hidden')}>
+        <div className="bg-bg-default rounded-lg border border-border-subtle overflow-hidden">
             <table className="data-table">
                 <thead>
                     <tr>
