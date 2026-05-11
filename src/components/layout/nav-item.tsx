@@ -88,6 +88,34 @@ export const NAV_ITEM_RADIUS = 'rounded-lg';
  */
 export const NAV_ITEM_ICON_SIZE = 'w-[18px] h-[18px]';
 
+/**
+ * Icon class — full recipe. (R12-PR9 lock.)
+ *
+ * Two tokens, both load-bearing:
+ *
+ *   (1) `NAV_ITEM_ICON_SIZE` — 18×18, the geometry above.
+ *
+ *   (2) `flex-shrink-0` — the icon MUST hold its 18×18 box.
+ *       Without this, on a row with a very long label and a
+ *       narrow sidebar, flex would steal pixels from the icon
+ *       too, rendering a squished 14×18 lozenge. The icon is the
+ *       row's anchor — geometry has to be unconditional.
+ *
+ * The icon is `aria-hidden="true"` at the JSX layer (not in this
+ * class string). The label is the accessible name; the icon is
+ * decorative. Screen readers announce "Controls", not "icon
+ * Controls". This is the right semantic and is locked by the
+ * R12-PR9 ratchet.
+ *
+ * Why a named const (not inline)?
+ *   - The R12 pattern: every state recipe is a named export so
+ *     the rationale + the ratchet both anchor on the same name.
+ *   - A future "let's add a hover:scale-110 to the icon" PR has
+ *     to argue against both the doc-comment and the ratchet,
+ *     not just edit a string literal.
+ */
+export const NAV_ITEM_ICON_CLASS = `${NAV_ITEM_ICON_SIZE} flex-shrink-0`;
+
 export interface NavItemProps {
     /** Tenant-prefixed href. */
     href: string;
@@ -331,7 +359,7 @@ export function NavItem({ href, icon: Icon, label, active, badge, onClick }: Nav
             className={`${NAV_ITEM_BASE} ${active ? NAV_ITEM_ACTIVE : NAV_ITEM_DEFAULT}`}
             data-testid={`nav-${slug}`}
         >
-            <Icon className={`${NAV_ITEM_ICON_SIZE} flex-shrink-0`} aria-hidden="true" />
+            <Icon className={NAV_ITEM_ICON_CLASS} aria-hidden="true" />
             <span className="truncate">{label}</span>
             {badge != null && (
                 <StatusBadge variant="info" size="sm" className={NAV_ITEM_BADGE}>
