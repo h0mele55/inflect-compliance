@@ -33,7 +33,7 @@ import { cn } from '@dub/utils';
 import { CardList } from '@/components/ui/card-list';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { DataTable, createColumns } from '@/components/ui/table';
+import { DataTable, createColumns, useColumnsDropdown } from '@/components/ui/table';
 import { ViewToggle } from '@/components/ui/view-toggle';
 import { useViewMode } from '@/components/ui/hooks';
 import { Heading } from '@/components/ui/typography';
@@ -82,6 +82,26 @@ export function FrameworksClient({
     const [view, setView] = useViewMode('frameworks', 'cards');
     const href = (path: string) => `/t/${tenantSlug}${path}`;
 
+    // R10-PR7 — column-visibility gear, table-mode only.
+    const frameworkColumnList = useMemo(
+        () => [
+            { id: 'name', label: 'Framework' },
+            { id: 'kind', label: 'Domain' },
+            { id: 'requirementCount', label: 'Requirements' },
+            { id: 'coverage', label: 'Coverage' },
+            { id: 'status', label: 'Status' },
+        ],
+        [],
+    );
+    const {
+        columnVisibility,
+        setColumnVisibility,
+        dropdown: columnsDropdown,
+    } = useColumnsDropdown({
+        storageKey: 'inflect:col-vis:frameworks',
+        columns: frameworkColumnList,
+    });
+
     const rows: FwRow[] = useMemo(
         () =>
             frameworks.map((fw: any): FwRow => {
@@ -126,11 +146,14 @@ export function FrameworksClient({
                         Browse standards, install control packs, and track requirement coverage
                     </p>
                 </div>
-                <ViewToggle
-                    view={view}
-                    onChange={setView}
-                    data-testid="frameworks-view-toggle"
-                />
+                <div className="flex items-center gap-tight">
+                    {view === 'table' && columnsDropdown}
+                    <ViewToggle
+                        view={view}
+                        onChange={setView}
+                        data-testid="frameworks-view-toggle"
+                    />
+                </div>
             </div>
 
             {view === 'cards' && (
@@ -219,6 +242,8 @@ export function FrameworksClient({
             {view === 'table' && (
                 <DataTable<FwRow>
                     data={rows}
+                    columnVisibility={columnVisibility}
+                    onColumnVisibilityChange={setColumnVisibility}
                     columns={createColumns<FwRow>([
                         {
                             id: 'name',

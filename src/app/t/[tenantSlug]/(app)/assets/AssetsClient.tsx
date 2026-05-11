@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
-import { DataTable, createColumns } from '@/components/ui/table';
+import { DataTable, createColumns, useColumnsDropdown } from '@/components/ui/table';
 import {
     FilterProvider,
     useFilterContext,
@@ -133,6 +133,27 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
         createMutation.mutate(form);
     };
 
+    // R10-PR7 — column-visibility gear.
+    const assetColumnList = useMemo(
+        () => [
+            { id: 'name', label: 'Name' },
+            { id: 'type', label: 'Type' },
+            { id: 'classification', label: 'Classification' },
+            { id: 'owner', label: 'Owner' },
+            { id: 'cia', label: 'C/I/A' },
+            { id: 'controls', label: 'Controls' },
+        ],
+        [],
+    );
+    const {
+        columnVisibility,
+        setColumnVisibility,
+        dropdown: columnsDropdown,
+    } = useColumnsDropdown({
+        storageKey: 'inflect:col-vis:assets',
+        columns: assetColumnList,
+    });
+
     const assetColumns = useMemo(() => createColumns<any>([
         {
             accessorKey: 'name',
@@ -197,6 +218,7 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
                     filters={liveFilters}
                     searchId="asset-search"
                     searchPlaceholder="Search assets…"
+                    actions={columnsDropdown}
                 />
             </ListPageShell.Filters>
 
@@ -261,6 +283,8 @@ function AssetsPageInner({ initialAssets, initialFilters, tenantSlug, permission
                     data={assets}
                     columns={assetColumns}
                     getRowId={(a: any) => a.id}
+                    columnVisibility={columnVisibility}
+                    onColumnVisibilityChange={setColumnVisibility}
                     onRowClick={(row) => router.push(tenantHref(`/assets/${row.original.id}`))}
                     emptyState={hasActive ? 'No assets match your filters' : t.noAssets}
                     resourceName={(p) => p ? 'assets' : 'asset'}

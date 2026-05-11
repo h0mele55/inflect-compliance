@@ -17,7 +17,7 @@ import type { CappedList } from '@/lib/list-backfill-cap';
 import { TruncationBanner } from '@/components/ui/TruncationBanner';
 import { TimestampTooltip } from '@/components/ui/timestamp-tooltip';
 import { TERMINAL_WORK_ITEM_STATUSES } from '@/app-layer/domain/work-item-status';
-import { DataTable, createColumns } from '@/components/ui/table';
+import { DataTable, createColumns, useColumnsDropdown } from '@/components/ui/table';
 import {
     FilterProvider,
     useFilterContext,
@@ -309,6 +309,28 @@ function TasksPageInner({
             });
     };
 
+    // R10-PR7 — column-visibility gear.
+    const taskColumnList = useMemo(
+        () => [
+            { id: 'title', label: 'Title' },
+            { id: 'type', label: 'Type' },
+            { id: 'severity', label: 'Severity' },
+            { id: 'status', label: 'Status' },
+            { id: 'assignee', label: 'Assignee' },
+            { id: 'dueAt', label: 'Due' },
+            { id: 'updatedAt', label: 'Updated', defaultVisible: false },
+        ],
+        [],
+    );
+    const {
+        columnVisibility,
+        setColumnVisibility,
+        dropdown: columnsDropdown,
+    } = useColumnsDropdown({
+        storageKey: 'inflect:col-vis:tasks',
+        columns: taskColumnList,
+    });
+
     // ── Column definitions ──
     const taskColumns = useMemo(() => {
         const cols: ReturnType<typeof createColumns<TaskListItem>> = [];
@@ -459,6 +481,7 @@ function TasksPageInner({
                     filters={liveFilters}
                     searchId="task-search"
                     searchPlaceholder="Search tasks…"
+                    actions={columnsDropdown}
                 />
             </ListPageShell.Filters>
 
@@ -532,6 +555,8 @@ function TasksPageInner({
                     columns={taskColumns}
                     loading={loading}
                     getRowId={(t) => t.id}
+                    columnVisibility={columnVisibility}
+                    onColumnVisibilityChange={setColumnVisibility}
                     onRowClick={(row) => router.push(tenantHref(`/tasks/${row.original.id}`))}
                     emptyState="No tasks found. Create a task to get started."
                     resourceName={(p) => p ? 'tasks' : 'task'}
