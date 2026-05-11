@@ -91,11 +91,19 @@ describe('Roadmap-12 PR-2 — NavItem geometry discipline', () => {
             expect(inFile).toBe(true);
             if (name === 'NAV_ITEM_ICON_SIZE') {
                 // Icon size is applied to the JSX element, not the
-                // base class. Verify it's referenced at the
-                // <Icon> use site.
-                expect(SRC).toMatch(
-                    /<Icon\b[\s\S]*?\$\{NAV_ITEM_ICON_SIZE\}/,
-                );
+                // base class. After R12-PR9 the icon consumes
+                // `NAV_ITEM_ICON_CLASS`, which itself composes
+                // `NAV_ITEM_ICON_SIZE`. Accept either: direct
+                // interpolation at the JSX use site, OR the
+                // composition chain (JSX consumes ICON_CLASS, and
+                // ICON_CLASS interpolates ICON_SIZE).
+                const directAtJsx = /<Icon\b[\s\S]*?\$\{NAV_ITEM_ICON_SIZE\}/.test(SRC);
+                const jsxConsumesIconClass =
+                    /<Icon\b[\s\S]*?\{NAV_ITEM_ICON_CLASS\}/.test(SRC);
+                const iconClassComposesSize =
+                    /NAV_ITEM_ICON_CLASS\s*=\s*`[^`]*\$\{\s*NAV_ITEM_ICON_SIZE\s*\}/.test(SRC);
+                const viaIndirection = jsxConsumesIconClass && iconClassComposesSize;
+                expect(directAtJsx || viaIndirection).toBe(true);
             } else {
                 expect(inBase).toBe(true);
             }
