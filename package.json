@@ -159,7 +159,7 @@
     "@next/swc-linux-x64-musl": "14.2.35",
     "@next/swc-win32-arm64-msvc": "14.2.35",
     "@next/swc-win32-ia32-msvc": "14.2.35",
-    "@next/swc-win32-x64-msvc": "14.2.35"
+    "@next/swc-win32-x64-msvc": "16.2.6"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",
