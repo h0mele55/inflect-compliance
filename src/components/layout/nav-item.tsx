@@ -279,7 +279,11 @@ const NAV_ITEM_BAND_BASE = [
  */
 export const NAV_ITEM_BASE = [
     // `relative` anchors the brand-gradient `::before` band.
-    'relative flex items-center',
+    // `group` lets the child label `<span>` react to hover on the
+    // PARENT row — required for the R15-PR8 magnetic-letter
+    // tracking (the label's `letter-spacing` opens up via
+    // `group-hover:tracking-wide`).
+    'relative flex items-center group',
     NAV_ITEM_GAP,
     NAV_ITEM_PADDING,
     NAV_ITEM_HEIGHT_MIN,
@@ -552,7 +556,22 @@ export function NavItem({ href, icon: Icon, label, active, badge, onClick }: Nav
             style={driftStyle}
         >
             <Icon className={NAV_ITEM_ICON_CLASS} aria-hidden="true" />
-            <span className="truncate">{label}</span>
+            {/* R15-PR8 — magnetic letter spacing. The label
+                breathes its tracking open on hover-of-the-row.
+                `tracking-normal` is the resting state (0em);
+                `group-hover:tracking-wide` opens to 0.025em —
+                small enough that the row's geometry stays
+                stable (the label still fits in the same width
+                bucket; `truncate` semantics unchanged), large
+                enough that the eye reads the letters subtly
+                "leaning into" the cursor. 200ms ease-out
+                transition keeps the open synchronised with the
+                band's reveal tempo. The shape is opacity + tone
+                language inside the row's content — no transform,
+                no scale, no translate. */}
+            <span className="truncate tracking-normal transition-[letter-spacing] duration-200 ease-out group-hover:tracking-wide">
+                {label}
+            </span>
             {badge != null && (
                 <StatusBadge variant="info" size="sm" className={NAV_ITEM_BADGE}>
                     {badge}
