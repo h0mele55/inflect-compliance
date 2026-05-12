@@ -30,11 +30,12 @@
  * R14-PR12 unifies the two; until then the mobile bar is the
  * authoritative mobile surface.
  */
+import { useParams } from 'next/navigation';
 import { Breadcrumbs } from '@/components/ui/breadcrumbs';
 import { useCurrentBreadcrumbs } from './breadcrumbs-store';
 import { TenantIdentityPill, OrgIdentityPill } from './IdentityPill';
 import type { AppShellVariant } from './AppShell';
-import { NavBar } from './nav-bar';
+import { NavBar, NavBarBrand } from './nav-bar';
 
 interface TopChromeProps {
     variant: AppShellVariant;
@@ -44,27 +45,50 @@ interface TopChromeProps {
  * Sticky top chrome. Hidden on mobile to preserve vertical space —
  * the existing mobile top bar in `<AppShell>` is a load-bearing
  * surface there.
+ *
+ * R14-PR3 adds the animated brand mark before breadcrumbs in the
+ * left slot. The mark's destination href is computed from the
+ * variant + URL params: tenant → `/t/<slug>/dashboard`,
+ * org → `/org/<slug>` (org root).
  */
 export function TopChrome({ variant }: TopChromeProps) {
     const breadcrumbs = useCurrentBreadcrumbs();
+    const params = useParams();
     const Identity =
         variant === 'org' ? OrgIdentityPill : TenantIdentityPill;
+
+    // The brand mark's destination is the current variant's root.
+    // Tenant pages: dashboard is the canonical landing surface.
+    // Org pages: the org's root index (no `/dashboard` route).
+    // Fallback to `/` if params haven't resolved yet — first paint
+    // in App Router can run before `useParams()` populates.
+    const brandHref =
+        variant === 'org'
+            ? params?.orgSlug
+                ? `/org/${params.orgSlug}`
+                : '/'
+            : params?.tenantSlug
+              ? `/t/${params.tenantSlug}/dashboard`
+              : '/';
 
     return (
         <NavBar
             left={
-                breadcrumbs.length > 0 ? (
-                    <Breadcrumbs
-                        items={breadcrumbs}
-                        data-testid="top-chrome-breadcrumbs"
-                    />
-                ) : (
-                    // No breadcrumbs pushed yet — empty sentinel for
-                    // layout stability so the chrome's height
-                    // doesn't jump when a page resolves its
-                    // breadcrumbs after first paint.
-                    <span className="sr-only">No breadcrumbs</span>
-                )
+                <>
+                    <NavBarBrand href={brandHref} />
+                    {breadcrumbs.length > 0 ? (
+                        <Breadcrumbs
+                            items={breadcrumbs}
+                            data-testid="top-chrome-breadcrumbs"
+                        />
+                    ) : (
+                        // No breadcrumbs pushed yet — empty sentinel
+                        // for layout stability so the chrome's
+                        // height doesn't jump when a page resolves
+                        // its breadcrumbs after first paint.
+                        <span className="sr-only">No breadcrumbs</span>
+                    )}
+                </>
             }
             right={<Identity />}
         />

@@ -60,6 +60,7 @@
  */
 
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 
 // ─── Geometry tokens (R14-PR2) ─────────────────────────────────────
 //
@@ -195,6 +196,111 @@ export const NAV_BAR_SLOT_CENTER =
  */
 export const NAV_BAR_SLOT_RIGHT =
     'flex shrink-0 items-center justify-end gap-default';
+
+// ─── Brand mark (R14-PR3) ──────────────────────────────────────────
+
+/**
+ * **The brand mark recipe.**
+ *
+ * 32×32 rounded square containing the product's two-letter initials
+ * over a 3-stop brand gradient. The visual signature of the chrome.
+ *
+ * Six load-bearing tokens, each documented:
+ *
+ *   (1) `w-8 h-8` — 32×32 footprint. Pairs with the 64px bar height
+ *       (R14-PR2) — 32px = half-bar, leaving 16px of breath above
+ *       + below. Smaller (24px) reads as an avatar, not a brand;
+ *       larger (40px) starts dominating the breadcrumbs slot.
+ *
+ *   (2) `rounded-lg` — 8px corner radius. Parity with `<NavItem>`
+ *       and the `<Button>` primitive (both rounded-lg). Mixing
+ *       corner radii across primary chrome reads as un-decided.
+ *
+ *   (3) **3-stop brand gradient at 200% bg-size.** Same hue family
+ *       as the R13-PR2 band: `from-default → via-muted → to-emphasis`.
+ *       The 200% horizontal size gives the `nav-brand-pulse`
+ *       animation room to pan the gradient left → right → left.
+ *       The mark visibly "breathes" without geometry change.
+ *
+ *   (4) `shadow-[var(--nav-band-glow)]` — same outer glow token as
+ *       the band (R13-PR2). Coordinates the chrome's two brand
+ *       surfaces (brand mark + band on active row) as one piece
+ *       of jewellery.
+ *
+ *   (5) `text-content-inverted text-[11px] font-bold` — the
+ *       initials text. Inverted-content (dark on yellow METRO,
+ *       white on dark PwC). 11px is the smallest size at which
+ *       bold "IC" reads clearly at 32×32 without looking cramped.
+ *
+ *   (6) `animate-nav-brand-pulse` — the 6s breath. Tempo
+ *       deliberately slower than the band's 4s so the eye reads
+ *       a hierarchy.
+ *
+ * Hover treatment: `hover:brightness-110` warms the mark on
+ * pointer-over. Filter is not in the motion-language ban list
+ * (which targets transform / scale / outer-shadow / translate);
+ * brightness is the right tool for "this is clickable, the light
+ * just came on".
+ *
+ * Accessibility:
+ *   • `<Link>` with `aria-label` carrying the full product name
+ *     + destination ("Inflect Compliance — go to dashboard").
+ *   • Visible "IC" initials are `aria-hidden="true"` — they're a
+ *     visual signature, not the accessible name.
+ *   • `focus-visible:ring-2` for keyboard story (same vocabulary
+ *     as `<NavItem>` + `<Button>`).
+ *
+ * H1-rule carve-out: the R7 `single-h1-per-page` ratchet bans
+ * multiple H1s. The brand mark is NOT a heading element — it's a
+ * `<Link>` with `aria-label`. The R14-PR3 recipe deliberately
+ * avoids `<h1>` to preserve the page-content H1 as the canonical
+ * page heading. Documented inline so a future "let's make this an
+ * h1 for SEO" PR has to argue against it.
+ */
+export const NAV_BAR_BRAND_CLASS = [
+    // Geometry
+    'relative w-8 h-8 rounded-lg flex-shrink-0',
+    // Flex / type
+    'flex items-center justify-center',
+    'text-content-inverted text-[11px] font-bold',
+    // Brand gradient (3-stop) + bg-size for the pan animation
+    'bg-gradient-to-r from-[var(--brand-default)] via-[var(--brand-muted)] to-[var(--brand-emphasis)]',
+    'bg-[length:200%_100%]',
+    // Outer glow — same token as the band
+    'shadow-[var(--nav-band-glow)]',
+    // Slow 6s pulse via background-position pan
+    'animate-nav-brand-pulse',
+    // Hover — brightness, NOT shadow/transform/scale (motion-language safe)
+    'transition-[filter] duration-200 ease-out hover:brightness-110',
+    // Focus story — match NavItem / Button vocabulary
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page',
+].join(' ');
+
+export interface NavBarBrandProps {
+    /** Destination href — usually the dashboard root for the current variant. */
+    href: string;
+    /** Two-letter initials. Defaults to `IC` (Inflect Compliance). */
+    initials?: string;
+    /** Accessible name. */
+    ariaLabel?: string;
+}
+
+export function NavBarBrand({
+    href,
+    initials = 'IC',
+    ariaLabel = 'Inflect Compliance — go to dashboard',
+}: NavBarBrandProps) {
+    return (
+        <Link
+            href={href}
+            aria-label={ariaLabel}
+            className={NAV_BAR_BRAND_CLASS}
+            data-testid="nav-bar-brand"
+        >
+            <span aria-hidden="true">{initials}</span>
+        </Link>
+    );
+}
 
 // ─── Component ───
 
