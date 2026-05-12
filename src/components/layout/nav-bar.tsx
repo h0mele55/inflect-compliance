@@ -61,24 +61,108 @@
 
 import type { ReactNode } from 'react';
 
-// ─── Slot recipes (R14-PR2 will extract to named geometry tokens) ──
+// ─── Geometry tokens (R14-PR2) ─────────────────────────────────────
+//
+// Five measurements drive how the top-bar feels on the page. Each
+// is a named const so the rationale lives next to the value. A
+// future "just bump height by 4px" PR has to argue against both
+// the doc-comment and the ratchet at
+// `tests/guards/r14-nav-bar-geometry-discipline.test.ts`.
 
 /**
- * Shell recipe — the `<header>`'s class string.
+ * **64px desktop height.** R14-PR2 bumped this from R2-era 56px
+ * (`h-14`). Reasoning: the bar will host a brand mark (32px), a
+ * search anchor (28px), a user-avatar button (32px), and a
+ * notifications bell (28px) — fitting all four at 56px feels
+ * cramped, and the brand mark loses presence next to the
+ * breadcrumbs. 64px gives each control an 8px halo of breathing
+ * room above + below.
  *
- * PR-1 preserves R12-era inline values verbatim (h-14, gap-default,
- * px-4 md:px-6, sticky top-0 z-30, border + glass blur). R14-PR2
- * extracts these into named geometry consts; PR-10 adds the R13
- * living-chrome polish (gloss `::after` + fading bottom border +
- * brand-radial wash).
+ * `h-16` resolves to 64px in Tailwind's default spacing scale
+ * (4px × 16). Pairs cleanly with `NAV_BAR_GAP` (8px) — the
+ * horizontal rhythm and the vertical rhythm share a multiple.
+ */
+export const NAV_BAR_HEIGHT = 'h-16';
+
+/**
+ * **16px horizontal padding mobile, 24px desktop.** The bar lives
+ * flush with the viewport edges; the left + right padding is the
+ * only breath between the first slot's content and the screen
+ * edge. 16px is the minimum that doesn't look amateur; 24px on
+ * desktop matches the page-content `md:p-6` so the bar's edges
+ * align with the content below it (the eye reads "everything is
+ * on the same grid").
+ *
+ * `px-4 md:px-6` resolves to 16px / 24px — Tailwind's spacing
+ * scale at 4-unit + 6-unit.
+ */
+export const NAV_BAR_PADDING = 'px-4 md:px-6';
+
+/**
+ * **8px gap between slots.** The shell uses `justify-between` so
+ * the three slots (left, centre, right) anchor to their edges;
+ * the `gap-default` is the fallback breath if any two slots end
+ * up adjacent.
+ *
+ * `gap-default` resolves to 8px via the semantic spacing scale
+ * (Roadmap-5 PR-9). Same vocabulary the sidebar + every premium
+ * primitive uses. Mixing 6/8/12px gaps across primary chrome
+ * reads as un-decided.
+ */
+export const NAV_BAR_GAP = 'gap-default';
+
+/**
+ * **Sticky-positioned at the top, z-30.** The bar must stay
+ * pinned as the user scrolls page content; `top-0` anchors it,
+ * `sticky` keeps the element in flow so the chrome doesn't
+ * overlap the first row of content the way `fixed` would.
+ *
+ * z-30 sits ABOVE row-sticky headers (which use z-20 for pinned
+ * table column headers) but BELOW modal overlays (z-50). Modals
+ * SHOULD obscure the chrome.
+ */
+export const NAV_BAR_POSITION = 'sticky top-0 z-30';
+
+/**
+ * **Bottom border + glass blur surface.** The bar reads as
+ * "elevated" — slightly translucent over the page bg, with a
+ * 1px bottom rule that defines the seam where chrome ends and
+ * page content begins.
+ *
+ * `bg-bg-page/80 backdrop-blur-sm` gives the frosted-glass effect
+ * the macOS / Notion / Linear nav chromes all converge on. The
+ * `/80` alpha + `blur-sm` is the recipe that doesn't choke on
+ * scrolling content underneath (heavier blur stutters on lower-end
+ * GPUs).
+ *
+ * `border-b border-border-subtle` is the seam. R14-PR10 will
+ * replace the flat border with a fading horizontal gradient
+ * (matching `nav-section.tsx`'s R13-PR10 evolution).
+ */
+export const NAV_BAR_SURFACE =
+    'border-b border-border-subtle bg-bg-page/80 backdrop-blur-sm';
+
+/**
+ * Shell recipe — composes the five geometry tokens above into the
+ * `<header>`'s class string. PR-1 declared this inline; PR-2
+ * extracts each piece into a named token. The `hidden md:flex` +
+ * `items-center justify-between` are layout-mode declarations
+ * (not geometry) and stay here.
  *
  * `hidden md:flex` is the dual-chrome compromise of today — the
  * desktop bar hides below md while AppShell renders a mobile-only
- * bar. PR-12 unifies the two; PR-1 only LOCKS THE PRIMITIVE
- * BOUNDARY, it doesn't yet rewrite mobile.
+ * bar. R14-PR12 unifies the two; until then the mobile bar is
+ * the authoritative mobile surface.
  */
-export const NAV_BAR_SHELL =
-    'hidden md:flex sticky top-0 z-30 h-14 items-center justify-between gap-default border-b border-border-subtle bg-bg-page/80 backdrop-blur-sm px-4 md:px-6';
+export const NAV_BAR_SHELL = [
+    'hidden md:flex',
+    NAV_BAR_POSITION,
+    NAV_BAR_HEIGHT,
+    'items-center justify-between',
+    NAV_BAR_GAP,
+    NAV_BAR_SURFACE,
+    NAV_BAR_PADDING,
+].join(' ');
 
 /**
  * Left-slot recipe — flex row that hugs left, truncates gracefully.
