@@ -179,6 +179,21 @@
    * actual geometry change.
    */
   --nav-gloss-highlight: rgba(255, 255, 255, 0.08);
+
+  /* ── Sidebar bevel shadow (R13-PR7) ────────────────────────────── */
+  /*
+   * A subtle inner shadow at the bottom edge of the row, applied on
+   * hover + active. Pairs with the `::after` top-edge highlight
+   * (R13-PR6) to create a faint two-edge bevel — the row reads as
+   * "slightly recessed", which is what gives clicks the "I'm
+   * pressing on a real button" feel.
+   *
+   * On METRO's deep-navy surface a dark-tinted inset (0.25 black)
+   * lands as a near-invisible bottom edge that the eye reads as
+   * subtle concavity. Heavier alpha would make the row look bruised;
+   * lighter would disappear entirely.
+   */
+  --nav-bevel-shadow: inset 0 -1px 1px 0 rgba(0, 0, 0, 0.25);
 }
 
 
@@ -335,6 +350,17 @@
    * the alpha tunes for surface luminance.
    */
   --nav-gloss-highlight: rgba(255, 255, 255, 0.70);
+
+  /* ── Sidebar bevel shadow (R13-PR7) ────────────────────────────── */
+  /*
+   * On cream the bevel shadow is a warm-tinted alpha rather than
+   * pure black — matches the warm-neutral shadow vocabulary of the
+   * light theme (see `--shadow`, also rgba(60, 50, 40, …)). Alpha
+   * is lower than METRO (0.08 vs 0.25) because cream is more
+   * sensitive to dark inserts; a heavier value would make the row
+   * look smudged.
+   */
+  --nav-bevel-shadow: inset 0 -1px 1px 0 rgba(60, 50, 40, 0.08);
 }
 
 /* ─────────────────────────────────────────────────────────────────
