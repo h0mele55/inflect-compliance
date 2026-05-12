@@ -57,14 +57,23 @@ describe('Roadmap-14 PR-4 — TenantSwitcher discipline', () => {
             );
         });
 
-        it('reads memberships from the NextAuth session JWT', () => {
-            // `useSession()` is the canonical client-side accessor.
-            // The membership list is on the typed `session.user`
-            // (declared in src/auth.ts as `MembershipEntry[]`).
-            expect(SWITCHER_SRC).toMatch(
+        it('accepts memberships as a prop (NOT via useSession)', () => {
+            // The codebase deliberately does NOT mount a
+            // <SessionProvider> client-side (see the rationale in
+            // src/app/providers.tsx). The R14-PR4 original called
+            // useSession() — the hotfix threads memberships in as
+            // a prop from the server-side layout via AppShell →
+            // TopChrome → here.
+            //
+            // useSession imports are explicitly banned in this
+            // file (regression class: re-adding the provider-
+            // dependent call).
+            expect(SWITCHER_SRC).not.toMatch(
                 /import\s+\{[^}]*\buseSession\b[^}]*\}\s+from\s+['"]next-auth\/react['"]/,
             );
-            expect(SWITCHER_SRC).toMatch(/session\?\.user\?\.memberships/);
+            expect(SWITCHER_SRC).toMatch(
+                /export\s+interface\s+TenantSwitcherProps\s*\{[\s\S]+?memberships:/,
+            );
         });
 
         it('reads the active tenant from `useTenantContext`', () => {
@@ -167,12 +176,15 @@ describe('Roadmap-14 PR-4 — TenantSwitcher discipline', () => {
         });
 
         it('mounts TenantSwitcher in the tenant variant', () => {
-            // The variant ternary picks: tenant → TenantSwitcher,
-            // org → OrgIdentityPill. The OrgIdentityPill side is
-            // out of scope for R14-PR4.
-            expect(TOP_CHROME_SRC).toMatch(
-                /variant\s*===\s*['"]org['"]\s*\?\s*OrgIdentityPill\s*:\s*TenantSwitcher/,
-            );
+            // The variant picks: tenant → <TenantSwitcher>,
+            // org → <OrgIdentityPill>. After the R14 hotfix the
+            // selection moved from a ternary on a Component
+            // variable to a `renderIdentity()` helper (so the
+            // memberships prop could be threaded only to the
+            // tenant branch). Both names are required to appear;
+            // the relative order is enforced separately.
+            expect(TOP_CHROME_SRC).toMatch(/<TenantSwitcher\b/);
+            expect(TOP_CHROME_SRC).toMatch(/<OrgIdentityPill\b/);
         });
 
         it('no longer imports the retired `TenantIdentityPill`', () => {

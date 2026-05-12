@@ -121,10 +121,21 @@ describe('Roadmap-14 PR-1 — NavBar primitive extraction discipline', () => {
         it('still fills the left + right slots (PR-1 preserves R2 behaviour)', () => {
             // R14-PR1 is purely structural — every R2 behaviour
             // stays. The left slot mounts breadcrumbs; the right
-            // slot mounts the identity pill. PR-1 doesn't touch
-            // content.
+            // slot mounts some identity affordance (R14-PR4 made
+            // it TenantSwitcher for tenant variant; the R14 hotfix
+            // moved the variant ternary into a `renderIdentity()`
+            // helper). Both forms satisfy the structural
+            // contract.
             expect(TOP_CHROME_SRC).toMatch(/<Breadcrumbs\b/);
-            expect(TOP_CHROME_SRC).toMatch(/<Identity\s*\/>/);
+            // Identity is now mounted via either <Identity /> (R14-PR1
+            // shape, pre-R14-PR4) or renderIdentity() helper (post-
+            // hotfix). At least one must exist.
+            const hasIdentityComponent =
+                /<Identity\s*\/>/.test(TOP_CHROME_SRC) ||
+                /renderIdentity\(\)/.test(TOP_CHROME_SRC) ||
+                /<TenantSwitcher\b/.test(TOP_CHROME_SRC) ||
+                /<OrgIdentityPill\b/.test(TOP_CHROME_SRC);
+            expect(hasIdentityComponent).toBe(true);
             // The slot prop names are part of the contract.
             expect(TOP_CHROME_SRC).toMatch(/\bleft=\{/);
             expect(TOP_CHROME_SRC).toMatch(/\bright=\{/);

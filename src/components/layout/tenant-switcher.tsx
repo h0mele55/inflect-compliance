@@ -42,12 +42,29 @@
 
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import { Check, ChevronsUpDown } from 'lucide-react';
 
 import { Popover } from '@/components/ui/popover';
 import { useTenantContext } from '@/lib/tenant-context-provider';
 import { NAV_BAR_SLOT_PRESS } from './nav-bar';
+
+// ─── Types ─────────────────────────────────────────────────────────
+
+export interface TenantSwitcherMembership {
+    slug: string;
+    role: string;
+    tenantId: string;
+}
+
+export interface TenantSwitcherProps {
+    /**
+     * Memberships threaded from the server-side layout (via
+     * `<AppShell>` → `<TopChrome>` → here). Replaces the original
+     * R14-PR4 `useSession()` call that violated the project's
+     * no-SessionProvider convention.
+     */
+    memberships: TenantSwitcherMembership[];
+}
 
 // ─── Recipe (extracted so PR-11 can compose the unified slot recipe) ──
 
@@ -85,18 +102,10 @@ function initialsFromSlug(slug: string): string {
     );
 }
 
-export function TenantSwitcher() {
+export function TenantSwitcher({ memberships }: TenantSwitcherProps) {
     const { tenantName, tenantSlug } = useTenantContext();
-    const { data: session } = useSession();
     const [open, setOpen] = useState(false);
     const close = useCallback(() => setOpen(false), []);
-
-    // session.user.memberships is the typed `MembershipEntry[]`
-    // declared in src/auth.ts. May be undefined during initial
-    // hydration; fall back to empty array (the active row still
-    // renders because tenantName comes from the route's tenant
-    // context, independent of the membership list).
-    const memberships = session?.user?.memberships ?? [];
 
     return (
         <Popover

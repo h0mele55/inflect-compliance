@@ -33,12 +33,25 @@
  */
 
 import { useCallback, useState } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 import { LogOut } from 'lucide-react';
 
 import { Popover } from '@/components/ui/popover';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { NAV_BAR_SLOT_PRESS } from './nav-bar';
+
+// ─── Props ────────────────────────────────────────────────────────
+
+export interface UserMenuProps {
+    /**
+     * Display name + email threaded from the server-side layout.
+     * Replaces the R14-PR5 `useSession()` call that violated the
+     * project's no-SessionProvider convention. `null` is the
+     * legitimate "unset" state (rendered as "Account" fallback).
+     */
+    displayName: string | null;
+    displayEmail: string | null;
+}
 
 // ─── Recipe ────────────────────────────────────────────────────────
 
@@ -59,13 +72,14 @@ function initialsFromName(name: string | null | undefined): string {
     );
 }
 
-export function UserMenu() {
-    const { data: session } = useSession();
+export function UserMenu({ displayName, displayEmail }: UserMenuProps) {
     const [open, setOpen] = useState(false);
     const close = useCallback(() => setOpen(false), []);
 
-    const displayName = session?.user?.name?.trim() ?? 'Account';
-    const displayEmail = session?.user?.email ?? null;
+    // Trim + fallback. `null` or whitespace-only renders as
+    // "Account" so the chrome never shows an empty trigger.
+    const resolvedName = displayName?.trim() ?? '';
+    const effectiveName = resolvedName.length > 0 ? resolvedName : 'Account';
 
     const handleSignOut = useCallback(async () => {
         close();
@@ -90,7 +104,7 @@ export function UserMenu() {
                             className="truncate text-sm font-medium text-content-emphasis"
                             data-testid="user-menu-display-name"
                         >
-                            {displayName}
+                            {effectiveName}
                         </p>
                         {displayEmail && (
                             <p
@@ -137,12 +151,12 @@ export function UserMenu() {
             <button
                 type="button"
                 className={AVATAR_BUTTON_CLASS}
-                aria-label={`Account menu for ${displayName}`}
+                aria-label={`Account menu for ${effectiveName}`}
                 aria-expanded={open}
                 aria-haspopup="menu"
                 data-testid="top-chrome-user-menu"
             >
-                <span aria-hidden="true">{initialsFromName(displayName)}</span>
+                <span aria-hidden="true">{initialsFromName(effectiveName)}</span>
             </button>
         </Popover>
     );

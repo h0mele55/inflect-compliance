@@ -53,6 +53,21 @@ interface TopChromeProps {
      * passes the setter through.
      */
     onMobileMenuClick: () => void;
+    /**
+     * R14-hotfix — user data threaded from the server-side layout
+     * (`session.user`). Replaces the `useSession()` calls that
+     * R14-PR4 + PR-5 introduced (which violated the project's
+     * no-SessionProvider convention).
+     */
+    user: {
+        name?: string | null;
+        email?: string | null;
+        memberships?: Array<{
+            slug: string;
+            role: string;
+            tenantId: string;
+        }>;
+    };
 }
 
 /**
@@ -65,15 +80,22 @@ interface TopChromeProps {
  * variant + URL params: tenant → `/t/<slug>/dashboard`,
  * org → `/org/<slug>` (org root).
  */
-export function TopChrome({ variant, onMobileMenuClick }: TopChromeProps) {
+export function TopChrome({ variant, user, onMobileMenuClick }: TopChromeProps) {
     const breadcrumbs = useCurrentBreadcrumbs();
     const params = useParams();
     // R14-PR4 — tenant variant now mounts the workspace switcher
     // (popover-driven). Org variant continues to mount the passive
     // identity pill until a future PR extends the switcher pattern
     // to organizations.
-    const Identity =
-        variant === 'org' ? OrgIdentityPill : TenantSwitcher;
+    // R14-hotfix — TenantSwitcher needs the memberships list as a
+    // prop now (no more useSession). Org variant stays on the
+    // passive pill (no membership-list rendering).
+    const renderIdentity = () =>
+        variant === 'org' ? (
+            <OrgIdentityPill />
+        ) : (
+            <TenantSwitcher memberships={user.memberships ?? []} />
+        );
 
     // The brand mark's destination is the current variant's root.
     // Tenant pages: dashboard is the canonical landing surface.
@@ -130,9 +152,12 @@ export function TopChrome({ variant, onMobileMenuClick }: TopChromeProps) {
             center={<SearchAnchor />}
             right={
                 <>
-                    <Identity />
+                    {renderIdentity()}
                     <NotificationsBell />
-                    <UserMenu />
+                    <UserMenu
+                        displayName={user.name ?? null}
+                        displayEmail={user.email ?? null}
+                    />
                 </>
             }
         />
