@@ -60,9 +60,31 @@ describe('<NavItem>', () => {
             expect(link.className).toContain('text-content-muted');
             expect(link.className).toContain('hover:text-content-emphasis');
             expect(link.className).toContain('hover:before:opacity-100');
+            // R13 hover additions wired.
+            expect(link.className).toContain(
+                'hover:before:animate-nav-band-shimmer',
+            );
+            expect(link.className).toContain('hover:after:opacity-100');
+            expect(link.className).toContain(
+                'hover:shadow-[var(--nav-bevel-shadow)]',
+            );
+            expect(link.className).toContain('hover:before:top-1');
+            expect(link.className).toContain('hover:before:w-[4px]');
+            // R13-PR8 — press feedback present in base.
+            expect(link.className).toContain('active:translate-y-px');
+            expect(link.className).toContain(
+                'motion-reduce:active:translate-y-0',
+            );
+            // R13-PR6 — gloss `::after` plumbing.
+            expect(link.className).toContain(
+                'after:bg-[var(--nav-gloss-highlight)]',
+            );
             // ACTIVE tokens are absent.
             expect(link.className).not.toContain('bg-[var(--brand-subtle)]');
             expect(link.className).not.toContain('font-medium');
+            expect(link.className).not.toContain(
+                'text-[var(--brand-default)]',
+            );
         });
 
         it('renders the icon with the canonical 18×18 + flex-shrink-0', () => {
@@ -102,7 +124,7 @@ describe('<NavItem>', () => {
         });
     });
 
-    describe('active state (active=true)', () => {
+    describe('active state (active=true) — R12-PR6 + R13 evolution', () => {
         it('renders the link with BASE + ACTIVE class compositions', () => {
             render(
                 <NavItem
@@ -113,16 +135,46 @@ describe('<NavItem>', () => {
                 />,
             );
             const link = screen.getByRole('link', { name: 'Controls' });
-            // ACTIVE recipe — four conviction tokens.
-            expect(link.className).toContain('text-content-emphasis');
-            expect(link.className).toContain('bg-[var(--brand-subtle)]');
+            // Active conviction tokens — R13-evolved vocabulary.
+            // Text colour (R13-PR5): brand-default (yellow/orange).
+            expect(link.className).toContain(
+                'text-[var(--brand-default)]',
+            );
+            // Wash (R13-PR11): radial gradient from secondary-subtle.
+            expect(link.className).toMatch(/bg-\[radial-gradient\(/);
+            expect(link.className).toContain(
+                'var(--brand-secondary-subtle)',
+            );
+            // Band held visible (R12-PR6 preserved).
             expect(link.className).toContain('before:opacity-100');
+            // Weight bump (R12-PR6 preserved).
             expect(link.className).toContain('font-medium');
+            // Navy band overrides (R13-PR4).
+            expect(link.className).toContain(
+                'before:from-[var(--brand-secondary-default)]!',
+            );
+            expect(link.className).toContain(
+                'before:shadow-[var(--nav-band-glow-active)]!',
+            );
+            // Reach geometry (R13-PR9).
+            expect(link.className).toContain('before:top-1!');
+            expect(link.className).toContain('before:w-[4px]!');
+            // Gloss + bevel held visible (R13-PR6 + PR-7).
+            expect(link.className).toContain('after:opacity-100');
+            expect(link.className).toContain(
+                'shadow-[var(--nav-bevel-shadow)]',
+            );
+            // Band shimmer animation un-gated (R13-PR3).
+            expect(link.className).toContain(
+                'before:animate-nav-band-shimmer',
+            );
             // BASE is still present.
             expect(link.className).toContain('min-h-[44px]');
             // DEFAULT-specific hover tokens are absent (we're active).
             expect(link.className).not.toContain('text-content-muted');
-            expect(link.className).not.toContain('hover:text-content-emphasis');
+            expect(link.className).not.toContain(
+                'hover:text-content-emphasis',
+            );
         });
 
         it('uses the same canonical icon class as the default state', () => {
