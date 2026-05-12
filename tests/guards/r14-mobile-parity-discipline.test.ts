@@ -134,9 +134,13 @@ describe('Roadmap-14 PR-12 — Mobile parity (unify dual chrome)', () => {
         });
 
         it('destructures and passes onMobileMenuClick to NavBarMobileMenu', () => {
-            expect(TOP_CHROME_SRC).toMatch(
-                /\{\s*variant,\s*onMobileMenuClick\s*\}/,
-            );
+            // After the R14 hotfix the destructure also includes
+            // the `user` prop (server-side session data threaded
+            // through). The exact destructure shape is locked
+            // permissively — variant + onMobileMenuClick must
+            // appear in any order with other props allowed.
+            expect(TOP_CHROME_SRC).toMatch(/\bvariant\b/);
+            expect(TOP_CHROME_SRC).toMatch(/\bonMobileMenuClick\b/);
             expect(TOP_CHROME_SRC).toMatch(
                 /<NavBarMobileMenu[\s\S]+?onClick=\{onMobileMenuClick\}/,
             );

@@ -203,9 +203,27 @@ describe('Roadmap-14 PR-8 — NotificationsBell discipline', () => {
             // would put account before notifications, which feels
             // wrong (account scope is widest; notifications are
             // tenant-scoped; switcher is the narrowest = leftmost).
-            expect(TOP_CHROME_SRC).toMatch(
-                /<Identity\s*\/>\s*\n\s*<NotificationsBell\s*\/>\s*\n\s*<UserMenu\s*\/>/,
+            //
+            // After the R14 hotfix the identity affordance moved
+            // from `<Identity />` to `renderIdentity()`. The bell
+            // sits between the identity invocation and the user
+            // menu; assert by source-index ordering.
+            const identityAnchorIdx = Math.min(
+                ...[
+                    'renderIdentity()',
+                    '<TenantSwitcher',
+                    '<OrgIdentityPill',
+                ]
+                    .map((s) => TOP_CHROME_SRC.indexOf(s))
+                    .filter((i) => i > -1),
             );
+            const bellIdx = TOP_CHROME_SRC.indexOf(
+                '<NotificationsBell',
+            );
+            const userMenuIdx = TOP_CHROME_SRC.indexOf('<UserMenu');
+            expect(identityAnchorIdx).toBeGreaterThan(-1);
+            expect(bellIdx).toBeGreaterThan(identityAnchorIdx);
+            expect(userMenuIdx).toBeGreaterThan(bellIdx);
         });
     });
 });

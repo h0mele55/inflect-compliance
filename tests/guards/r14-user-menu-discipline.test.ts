@@ -53,24 +53,27 @@ describe('Roadmap-14 PR-5 — UserMenu discipline', () => {
             );
         });
 
-        it('reads display name + email from `useSession()`', () => {
-            // Same data source as the rest of the chrome (header,
-            // tenant switcher). useSession() is the canonical
-            // client-side accessor.
-            expect(USER_MENU_SRC).toMatch(
+        it('accepts displayName + displayEmail as props (NOT via useSession)', () => {
+            // The codebase deliberately has no <SessionProvider>
+            // mounted client-side (see src/app/providers.tsx).
+            // The R14-PR5 original called useSession() — the
+            // hotfix threads display name + email in as props
+            // from the server-side layout via AppShell →
+            // TopChrome → here.
+            expect(USER_MENU_SRC).not.toMatch(
                 /import\s+\{[^}]*\buseSession\b[^}]*\}\s+from\s+['"]next-auth\/react['"]/,
             );
-            expect(USER_MENU_SRC).toMatch(/session\?\.user\?\.name/);
-            expect(USER_MENU_SRC).toMatch(/session\?\.user\?\.email/);
+            expect(USER_MENU_SRC).toMatch(
+                /export\s+interface\s+UserMenuProps\s*\{[\s\S]+?displayName:\s*string\s*\|\s*null[\s\S]+?displayEmail:\s*string\s*\|\s*null/,
+            );
         });
 
-        it('falls back to "Account" when name is missing', () => {
+        it('falls back to "Account" when displayName is null/empty', () => {
             // Defence in depth — the menu must never render
             // empty-string or "undefined" as the display name.
-            // Legitimate state during hydration; the fallback is
-            // the visible safety net.
+            // The fallback is the visible safety net.
             expect(USER_MENU_SRC).toMatch(
-                /session\?\.user\?\.name\?\.trim\(\)\s*\?\?\s*['"]Account['"]/,
+                /effectiveName\s*=\s*resolvedName\.length\s*>\s*0\s*\?\s*resolvedName\s*:\s*['"]Account['"]/,
             );
         });
     });
@@ -99,7 +102,7 @@ describe('Roadmap-14 PR-5 — UserMenu discipline', () => {
             expect(USER_MENU_SRC).toMatch(/h-8\s+w-8/);
             expect(USER_MENU_SRC).toMatch(/rounded-full/);
             expect(USER_MENU_SRC).toMatch(
-                /<span\s+aria-hidden="true">\{initialsFromName\(displayName\)\}<\/span>/,
+                /<span\s+aria-hidden="true">\{initialsFromName\(effectiveName\)\}<\/span>/,
             );
         });
 
@@ -198,17 +201,27 @@ describe('Roadmap-14 PR-5 — UserMenu discipline', () => {
         it('mounts UserMenu in the right slot AFTER the identity affordance', () => {
             // The slot order matters — switcher first (workspace
             // context), user menu LAST (account scope). Between
-            // them, R14-PR8 inserts <NotificationsBell />. The
-            // exact regex accepts the bell + any future sibling
-            // (notifications, env badge follow-up, etc.) as long
-            // as Identity appears before UserMenu in the right-slot
-            // JSX. A regression that swaps Identity ↔ UserMenu
-            // entirely is still caught — the relative order is the
-            // load-bearing piece.
-            const identityIdx = TOP_CHROME_SRC.indexOf('<Identity ');
-            const userMenuIdx = TOP_CHROME_SRC.indexOf('<UserMenu ');
-            expect(identityIdx).toBeGreaterThan(-1);
-            expect(userMenuIdx).toBeGreaterThan(identityIdx);
+            // them, R14-PR8 inserts <NotificationsBell />.
+            //
+            // After the R14 hotfix the identity affordance moved
+            // from a `<Identity />` component variable to a
+            // `renderIdentity()` helper (so memberships could be
+            // threaded only to the tenant branch). The "Identity"
+            // anchor is now the `renderIdentity()` invocation OR
+            // the literal `<TenantSwitcher`/`<OrgIdentityPill`
+            // mounts; user menu must follow.
+            const identityAnchorIdx = Math.min(
+                ...[
+                    'renderIdentity()',
+                    '<TenantSwitcher',
+                    '<OrgIdentityPill',
+                ]
+                    .map((s) => TOP_CHROME_SRC.indexOf(s))
+                    .filter((i) => i > -1),
+            );
+            const userMenuIdx = TOP_CHROME_SRC.indexOf('<UserMenu');
+            expect(identityAnchorIdx).toBeGreaterThan(-1);
+            expect(userMenuIdx).toBeGreaterThan(identityAnchorIdx);
         });
     });
 });

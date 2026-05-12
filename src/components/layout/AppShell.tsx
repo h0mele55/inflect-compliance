@@ -10,8 +10,30 @@ import { TopChrome } from './TopChrome';
 
 // ─── Types ───
 
+/**
+ * User shape threaded through the shell from the server-side
+ * layout (which resolves the session via `auth()`).
+ *
+ * The codebase deliberately does NOT mount a `<SessionProvider>`
+ * client-side (see the rationale in `src/app/providers.tsx`); any
+ * chrome that needs user data takes it via props. R14-PR4 +
+ * R14-PR5 originally violated this by calling `useSession()` —
+ * the hotfix on this branch threads the data here instead.
+ */
 interface AppShellUser {
     name?: string | null;
+    email?: string | null;
+    /**
+     * Active tenant memberships from the JWT. Same shape as
+     * `MembershipEntry` in `src/auth.ts` — `{ slug, role,
+     * tenantId }`. Optional because the org variant has no
+     * tenant context.
+     */
+    memberships?: Array<{
+        slug: string;
+        role: string;
+        tenantId: string;
+    }>;
 }
 
 export type AppShellVariant = 'tenant' | 'org';
@@ -144,6 +166,7 @@ export function AppShell({
                 <BreadcrumbsProvider>
                     <TopChrome
                         variant={variant}
+                        user={user}
                         onMobileMenuClick={openDrawer}
                     />
 
