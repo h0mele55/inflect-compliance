@@ -319,7 +319,7 @@ export const NAV_ITEM_BASE = [
  * colour only — locked by the motion-language ratchet.
  */
 export const NAV_ITEM_DEFAULT =
-    'text-content-muted hover:text-content-emphasis hover:before:opacity-100 hover:before:animate-nav-band-shimmer hover:after:opacity-100';
+    'text-content-muted hover:text-content-emphasis hover:before:opacity-100 hover:before:animate-nav-band-shimmer hover:after:opacity-100 hover:shadow-[var(--nav-bevel-shadow)]';
 
 /**
  * Active state — conviction. (R12-PR6 lock, R13-PR4 evolution.)
@@ -378,7 +378,7 @@ export const NAV_ITEM_DEFAULT =
  * five secondary-brand override classes + the navy-glow plumbing.
  */
 export const NAV_ITEM_ACTIVE =
-    'text-[var(--brand-default)] bg-[var(--brand-subtle)] before:opacity-100 before:animate-nav-band-shimmer before:from-[var(--brand-secondary-default)]! before:via-[var(--brand-secondary-muted)]! before:to-[var(--brand-secondary-emphasis)]! before:shadow-[var(--nav-band-glow-active)]! after:opacity-100 font-medium';
+    'text-[var(--brand-default)] bg-[var(--brand-subtle)] before:opacity-100 before:animate-nav-band-shimmer before:from-[var(--brand-secondary-default)]! before:via-[var(--brand-secondary-muted)]! before:to-[var(--brand-secondary-emphasis)]! before:shadow-[var(--nav-band-glow-active)]! after:opacity-100 shadow-[var(--nav-bevel-shadow)] font-medium';
 
 /**
  * Badge recipe — aligned + breathing. (R12-PR8 lock.)
