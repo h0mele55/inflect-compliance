@@ -96,9 +96,12 @@ describe('Roadmap-14 PR-1 — NavBar primitive extraction discipline', () => {
         it('imports NavBar from `./nav-bar`', () => {
             // The import path is locked — moving the primitive (or
             // re-exporting via a barrel) needs an explicit diff
-            // here.
+            // here. Multiple named imports from `./nav-bar` are
+            // allowed (R14-PR3 adds `NavBarBrand`; later PRs add
+            // more); the only requirement is that `NavBar` itself
+            // is one of them.
             expect(TOP_CHROME_SRC).toMatch(
-                /import\s+\{\s*NavBar\s*\}\s+from\s+['"]\.\/nav-bar['"]/,
+                /import\s+\{[^}]*\bNavBar\b[^}]*\}\s+from\s+['"]\.\/nav-bar['"]/,
             );
         });
 
