@@ -187,6 +187,28 @@ export default function DonutChart({
     const outerRadius = (size - 2) / 2;
     const innerRadius = outerRadius - strokeWidth;
 
+    // R16 hotfix (2026-05-13) — visx `<Pie>` + d3-shape's pie
+    // generator misrenders when any segment has value === 0 and
+    // padAngle > 0. The pad gets subtracted from each arc's
+    // range; a zero-range arc goes NEGATIVE and renders as a
+    // malformed path (or its neighbours stretch into the gap
+    // and overpaint the visible segments).
+    //
+    // Concretely: dashboard with Critical=0 / High=1 / Medium=1 /
+    // Low=1 rendered as a single thin orange crescent — Medium
+    // and Low were SHADOWED out by the malformed Critical arc.
+    //
+    // The pre-R16 stroke-dasharray implementation handled this
+    // by returning `null` for zero-value segments inside the
+    // .map() callback. The R16 rebuild lost that filter when
+    // we switched to feeding the whole `segments` array into
+    // <Pie>. Re-introduce the filter by computing a separate
+    // `pieSegments` array of only-non-zero entries; the legend
+    // below still renders every entry (including zero ones)
+    // because the legend is a separate concern from the chart
+    // geometry.
+    const pieSegments = segments.filter((s) => s.value > 0);
+
     // Empty state — same shape as pre-R16 but rendered via Pie
     // so the centring + sizing matches the populated case.
     if (total === 0) {
@@ -303,7 +325,7 @@ export default function DonutChart({
                     arc geometry with optional cornerRadius and
                     padAngle. */}
                 <Pie
-                    data={segments}
+                    data={pieSegments}
                     pieValue={(d: DonutSegment) => d.value}
                     outerRadius={outerRadius}
                     innerRadius={innerRadius}
