@@ -1,22 +1,40 @@
 /**
- * DonutChart — Lightweight SVG donut chart for distribution visualization.
+ * DonutChart — proportional distribution donut.
  *
- * Zero external dependencies. Uses SVG circle + stroke-dasharray
- * to render proportional arcs. Center can display a summary value.
+ * R16-PR5 rebuild — internally rewritten on top of visx's `<Pie>`
+ * + the R16 chart primitive layer. Two visible improvements over
+ * the pre-R16 `stroke-dasharray` rendering:
  *
- * Design:
- *   - Dark-theme friendly (transparent background, slate text)
- *   - Accessible with aria-labels and titles
- *   - Responsive via viewBox (scales to container)
- *   - Smooth segment transitions
+ *   1. **Gradient segments where adjacent series meet.** Each
+ *      segment paints via a `<ChartRadialGradient>` from R16-PR2
+ *      (start-stop concentrated near the inner edge, end-stop at
+ *      the outer edge — lit-from-within feel). Adjacent series'
+ *      end-stops are tuned per R16-PR1 adjacent-tonal pairing so
+ *      the boundary between two segments reads as a continuous
+ *      tonal surface, not a hard hue jump.
+ *
+ *   2. **Curved end-caps.** visx's `cornerRadius` rounds each
+ *      slice's corners by 1.5px. The donut reads as polished
+ *      jewellery rather than pie slices stamped out of cardboard.
+ *
+ * Back-compat: the existing `color` prop on `DonutSegment` keeps
+ * working for callers that haven't adopted the R16 series palette
+ * yet. New consumers should set `seriesIndex` (1..6) and let the
+ * gradient layer handle the colour resolution.
+ *
+ * Loading + empty branches inherited from the pre-R16 version:
+ *
+ *   - `loading={true}` renders the `<ShimmerDots>` placeholder
+ *     inside a same-size box so layout doesn't shift.
+ *   - `total === 0` renders a quiet "No data" disc.
  *
  * @example
  * ```tsx
  * <DonutChart
  *     segments={[
- *         { label: 'Open', value: 10, color: '#f59e0b' },
- *         { label: 'Mitigating', value: 5, color: '#22c55e' },
- *         { label: 'Closed', value: 3, color: '#64748b' },
+ *         { label: 'Open',      value: 10, seriesIndex: 6 },
+ *         { label: 'Mitigating', value: 5, seriesIndex: 5 },
+ *         { label: 'Closed',    value: 3, seriesIndex: 3 },
  *     ]}
  *     centerLabel="10"
  *     centerSub="Open"
@@ -25,44 +43,55 @@
  * ```
  */
 
+import { useId } from 'react';
+import Pie from '@visx/shape/lib/shapes/Pie';
+import {
+    ChartRadialGradient,
+    chartGradientId,
+    type ChartSeriesIndex,
+} from '@/components/ui/charts/chart-gradient';
 import { ShimmerDots } from '@/components/ui/shimmer-dots';
 
 // ─── Props ──────────────────────────────────────────────────────────
 
 export interface DonutSegment {
-    /** Segment label (for legend and accessibility) */
+    /** Segment label (legend + accessibility). */
     label: string;
-    /** Numeric value */
+    /** Numeric value. */
     value: number;
     /**
-     * Segment colour. Accepts either:
-     *   - a CSS colour string (hex, rgb, …) for back-compat
-     *   - a CSS custom-property name (`var(--bg-success-emphasis)`)
+     * Optional R16 series index (1..6). When set, the segment
+     * paints via `<ChartRadialGradient>` resolving through the
+     * R16-PR1 token palette. Recommended for new consumers.
      *
-     * Elevation PR-7 — prefer the CSS-var form. Theme flips re-tone
-     * the chart automatically because `var()` resolves at paint time
-     * against the active theme's tokens. SVG `stroke` and `fill`
-     * support `var(...)` natively — no JS resolver needed.
+     * When omitted, the legacy `color` field is used. This keeps
+     * pre-R16 callers working without an immediate migration.
+     */
+    seriesIndex?: ChartSeriesIndex;
+    /**
+     * Legacy / back-compat — CSS colour string (hex, rgb, or
+     * `var(--token)`). Used only when `seriesIndex` is not set.
+     * New consumers should reach for `seriesIndex` instead.
      */
     color: string;
 }
 
 export interface DonutChartProps {
-    /** Data segments */
+    /** Data segments. */
     segments: DonutSegment[];
-    /** Diameter in px (default: 160) */
+    /** Diameter in px (default: 160). */
     size?: number;
-    /** Stroke width for the arc (default: 20) */
+    /** Stroke width for the arc (default: 20). */
     strokeWidth?: number;
-    /** Center headline text (e.g. "75%") */
+    /** Center headline text (e.g. "75%"). */
     centerLabel?: string;
-    /** Center subtitle text (e.g. "Coverage") */
+    /** Center subtitle text (e.g. "Coverage"). */
     centerSub?: string;
-    /** Show legend below the chart */
+    /** Show legend below the chart. */
     showLegend?: boolean;
-    /** Optional CSS class */
+    /** Optional CSS class. */
     className?: string;
-    /** Optional test-id */
+    /** Optional test-id. */
     id?: string;
     /**
      * Epic 64 — render `<ShimmerDots>` inside the donut frame
@@ -86,6 +115,12 @@ export default function DonutChart({
     id,
     loading = false,
 }: DonutChartProps) {
+    // useId provides a unique-per-instance gradient id prefix so
+    // multiple donuts on the same page don't collide on SVG defs.
+    const reactId = useId();
+    // useId returns `:r0:` style values — sanitise for SVG id use.
+    const chartId = `donut-${reactId.replace(/:/g, '')}`;
+
     // Loading takes precedence — shimmer in a same-size box keeps
     // layout stable while the data resolves.
     if (loading) {
@@ -109,12 +144,14 @@ export default function DonutChart({
             </div>
         );
     }
-    const total = segments.reduce((sum, s) => sum + s.value, 0);
-    const radius = (size - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const center = size / 2;
 
-    // Empty state
+    const total = segments.reduce((sum, s) => sum + s.value, 0);
+    const center = size / 2;
+    const outerRadius = (size - 2) / 2;
+    const innerRadius = outerRadius - strokeWidth;
+
+    // Empty state — same shape as pre-R16 but rendered via Pie
+    // so the centring + sizing matches the populated case.
     if (total === 0) {
         return (
             <div id={id} className={`flex flex-col items-center ${className}`}>
@@ -128,7 +165,7 @@ export default function DonutChart({
                     <circle
                         cx={center}
                         cy={center}
-                        r={radius}
+                        r={(innerRadius + outerRadius) / 2}
                         fill="none"
                         stroke="var(--bg-muted)"
                         strokeWidth={strokeWidth}
@@ -150,8 +187,17 @@ export default function DonutChart({
         );
     }
 
-    // Build offset arcs
-    let accumulatedOffset = 0;
+    // Stable list of unique series indices for the <defs> block.
+    // A single donut may have multiple segments sharing a series
+    // (e.g. open + reopened both styled as series-6), so we
+    // deduplicate.
+    const seriesInUse = Array.from(
+        new Set(
+            segments
+                .map((s) => s.seriesIndex)
+                .filter((v): v is ChartSeriesIndex => v !== undefined),
+        ),
+    );
 
     return (
         <div id={id} className={`flex flex-col items-center ${className}`}>
@@ -160,53 +206,93 @@ export default function DonutChart({
                 height={size}
                 viewBox={`0 0 ${size} ${size}`}
                 role="img"
-                aria-label={`Donut chart: ${segments.map(s => `${s.label} ${s.value}`).join(', ')}`}
+                aria-label={`Donut chart: ${segments
+                    .map((s) => `${s.label} ${s.value}`)
+                    .join(', ')}`}
             >
-                {/* Background ring */}
+                <defs>
+                    {seriesInUse.map((series) => (
+                        <ChartRadialGradient
+                            key={series}
+                            id={chartGradientId(chartId, series, 'radial')}
+                            series={series}
+                            // Donut segments read best when the
+                            // brighter start-stop concentrates
+                            // toward the inner edge — the eye
+                            // reads the band as "lit from within"
+                            // rather than uniformly painted.
+                            cx="50%"
+                            cy="50%"
+                            // Smaller radial radius pulls the
+                            // colour transition tighter so the
+                            // brighter start-stop is visible on
+                            // a relatively narrow donut band.
+                            r="65%"
+                        />
+                    ))}
+                </defs>
+
+                {/* Background ring — quiet bg-muted underneath the
+                    segments so any small visual gaps read as
+                    "missing data" rather than naked. */}
                 <circle
                     cx={center}
                     cy={center}
-                    r={radius}
+                    r={(innerRadius + outerRadius) / 2}
                     fill="none"
                     stroke="var(--bg-muted)"
                     strokeWidth={strokeWidth}
+                    opacity={0.35}
                 />
 
-                {/* Data segments */}
-                {segments.map((seg) => {
-                    if (seg.value <= 0) return null;
-                    const segPercent = seg.value / total;
-                    const dashLength = circumference * segPercent;
-                    const dashGap = circumference - dashLength;
-                    const offset = circumference * accumulatedOffset;
-
-                    // Accumulator pattern inside `.map()` to position
-                    // each donut segment relative to the previous. The
-                    // mutation is deterministic per render (no closure
-                    // leak across renders) but the Compiler rule sees
-                    // any `let`-reassignment in render as a violation.
-                    // eslint-disable-next-line react-hooks/immutability
-                    accumulatedOffset += segPercent;
-
-                    return (
-                        <circle
-                            key={seg.label}
-                            cx={center}
-                            cy={center}
-                            r={radius}
-                            fill="none"
-                            stroke={seg.color}
-                            strokeWidth={strokeWidth}
-                            strokeDasharray={`${dashLength} ${dashGap}`}
-                            strokeDashoffset={-offset}
-                            strokeLinecap="butt"
-                            transform={`rotate(-90 ${center} ${center})`}
-                            className="transition-all duration-500 ease-out"
-                        >
-                            <title>{`${seg.label}: ${seg.value} (${(segPercent * 100).toFixed(1)}%)`}</title>
-                        </circle>
-                    );
-                })}
+                {/* Data segments — visx Pie produces real <path>
+                    arc geometry with optional cornerRadius and
+                    padAngle. */}
+                <Pie
+                    data={segments}
+                    pieValue={(d: DonutSegment) => d.value}
+                    outerRadius={outerRadius}
+                    innerRadius={innerRadius}
+                    // Subtle curved end-caps. Larger values
+                    // make the slices look like bubbles; 1.5
+                    // is the sweet spot for polished without
+                    // distorting the proportional read.
+                    cornerRadius={1.5}
+                    // Tiny gap between segments. Avoids the
+                    // colour bleed at boundaries while staying
+                    // far short of "stamped wedges".
+                    padAngle={0.012}
+                    // Centre the pie in the SVG viewBox.
+                    top={center}
+                    left={center}
+                >
+                    {(pie) =>
+                        pie.arcs.map((arc) => {
+                            const seg = arc.data;
+                            const fill =
+                                seg.seriesIndex !== undefined
+                                    ? `url(#${chartGradientId(
+                                          chartId,
+                                          seg.seriesIndex,
+                                          'radial',
+                                      )})`
+                                    : seg.color;
+                            const path = pie.path(arc);
+                            if (path === null) return null;
+                            const segPercent = seg.value / total;
+                            return (
+                                <path
+                                    key={`${seg.label}-${arc.index}`}
+                                    d={path}
+                                    fill={fill}
+                                    className="transition-all duration-500 ease-out"
+                                >
+                                    <title>{`${seg.label}: ${seg.value} (${(segPercent * 100).toFixed(1)}%)`}</title>
+                                </path>
+                            );
+                        })
+                    }
+                </Pie>
 
                 {/* Center label */}
                 {centerLabel && (
@@ -241,16 +327,31 @@ export default function DonutChart({
             {/* Legend */}
             {showLegend && (
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3">
-                    {segments.map((seg) => (
-                        <div key={seg.label} className="flex items-center gap-1.5 text-xs text-content-muted">
-                            <span
-                                className="w-2.5 h-2.5 rounded-full shrink-0"
-                                style={{ backgroundColor: seg.color }}
-                            />
-                            <span>{seg.label}</span>
-                            <span className="text-content-subtle tabular-nums">({seg.value})</span>
-                        </div>
-                    ))}
+                    {segments.map((seg) => {
+                        // Legend swatches use the series START
+                        // stop as a flat fill — the gradient
+                        // layer is internal to the donut itself.
+                        // Keeps the legend readable at chip size.
+                        const swatch =
+                            seg.seriesIndex !== undefined
+                                ? `var(--chart-series-${seg.seriesIndex}-start)`
+                                : seg.color;
+                        return (
+                            <div
+                                key={seg.label}
+                                className="flex items-center gap-1.5 text-xs text-content-muted"
+                            >
+                                <span
+                                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: swatch }}
+                                />
+                                <span>{seg.label}</span>
+                                <span className="text-content-subtle tabular-nums">
+                                    ({seg.value})
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>
