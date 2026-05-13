@@ -129,9 +129,9 @@ describe('OI-2 — deploy job invariants', () => {
         expect(text()).toMatch(/role-to-assume:\s*\$\{\{\s*secrets\.AWS_ROLE_TO_ASSUME\s*\}\}/);
     });
 
-    it('uses aws-actions/configure-aws-credentials@v4 + azure/setup-helm@v4', () => {
+    it('uses aws-actions/configure-aws-credentials@v6 + azure/setup-helm@v4', () => {
         const src = text();
-        expect(src).toMatch(/aws-actions\/configure-aws-credentials@v4/);
+        expect(src).toMatch(/aws-actions\/configure-aws-credentials@v6/);
         expect(src).toMatch(/azure\/setup-helm@v4/);
     });
 

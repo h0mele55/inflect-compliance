@@ -252,8 +252,8 @@ describe('OI-3 — restore-test.yml workflow scheduling', () => {
         expect(job.environment).toBe('production');
     });
 
-    it('uses aws-actions/configure-aws-credentials@v4', () => {
-        expect(read(WORKFLOW)).toMatch(/aws-actions\/configure-aws-credentials@v4/);
+    it('uses aws-actions/configure-aws-credentials@v6', () => {
+        expect(read(WORKFLOW)).toMatch(/aws-actions\/configure-aws-credentials@v6/);
     });
 
     it('invokes infra/scripts/restore-test.sh with the required env vars', () => {
