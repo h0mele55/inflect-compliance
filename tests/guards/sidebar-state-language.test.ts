@@ -92,15 +92,20 @@ describe('Sidebar state-language ratchet (Elevation PR-3)', () => {
             path.resolve(ROOT, 'src/components/layout/nav-item.tsx'),
             'utf8',
         );
-        // The brand-gradient band recipe — 2-stop or 3-stop both
-        // satisfy.
-        expect(navItem).toMatch(/before:bg-gradient-to-b/);
-        expect(navItem).toMatch(
-            /before:from-\[var\(--brand-default\)\]/,
-        );
-        expect(navItem).toMatch(
-            /before:to-\[var\(--brand-emphasis\)\]/,
-        );
+        // The brand-gradient band recipe — Tailwind utility form
+        // (2-stop or 3-stop) OR R15-PR1 comprehensive arbitrary-
+        // value form (which stacks stardust radial particles on
+        // top of the linear gradient). Both preserve the
+        // `--brand-default` / `--brand-emphasis` stops in order.
+        const utilityForm =
+            /before:bg-gradient-to-b/.test(navItem) &&
+            /before:from-\[var\(--brand-default\)\]/.test(navItem) &&
+            /before:to-\[var\(--brand-emphasis\)\]/.test(navItem);
+        const arbitraryForm =
+            /before:bg-\[[\s\S]*?linear-gradient\(to_bottom/.test(navItem) &&
+            /before:bg-\[[\s\S]*?var\(--brand-default\)/.test(navItem) &&
+            /before:bg-\[[\s\S]*?var\(--brand-emphasis\)/.test(navItem);
+        expect(utilityForm || arbitraryForm).toBe(true);
         // Hover: band fades in via opacity 100 on `::before`.
         expect(navItem).toMatch(/hover:before:opacity-100/);
         // Active: band stays visible (un-gated opacity-100).
