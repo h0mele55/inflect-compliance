@@ -87,6 +87,25 @@ export type {
 
 export { ChartFrame } from './chart-frame';
 
+// ─── Roadmap-16 — chart motion hooks ────────────────────────────────
+//
+// `useChartHoverPop` — hover-pop transforms for donut segments /
+// bars / line focus points. Subtle by design (4px donut, 2px lift,
+// 1.05× scale). Motion-reduce snaps to identity.
+//
+// `useChartFlow` — animate `gradientTransform` translate on a
+// `<ChartFlowGradient>` ref so the gradient pans across the segment
+// in a continuous loop. The "flowing river" effect.
+
+export {
+    useChartHoverPop,
+    useChartFlow,
+    CHART_HOVER_POP_DISTANCE,
+    CHART_HOVER_LIFT,
+    CHART_HOVER_POINT_SCALE,
+    CHART_FLOW_PERIOD_MS,
+} from './chart-motion';
+
 // ─── Shared scale / layout helpers (Epic 59) ─────────────────────────
 //
 // Pure helpers charts (and non-chart consumers that need to speak the
