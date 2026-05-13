@@ -61,6 +61,24 @@ export * from './funnel-chart';
 export * from './chart-context';
 export * from './tooltip-sync';
 
+// ─── Roadmap-16 — Lickable Chart gradient primitives ─────────────────
+//
+// SVG `<defs>` gradient primitives wired to the R16-PR1 token
+// foundation. Every R16 chart consumer (donut, line, radar, gantt)
+// paints fills via `fill="url(#<id>)"` referencing a gradient
+// rendered through one of these primitives.
+
+export {
+    ChartLinearGradient,
+    ChartRadialGradient,
+    ChartFlowGradient,
+    chartGradientId,
+} from './chart-gradient';
+export type {
+    ChartSeriesIndex,
+    ChartGradientDirection,
+} from './chart-gradient';
+
 // ─── Shared scale / layout helpers (Epic 59) ─────────────────────────
 //
 // Pure helpers charts (and non-chart consumers that need to speak the
