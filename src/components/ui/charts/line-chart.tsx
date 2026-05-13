@@ -34,11 +34,13 @@
  *     on top via the existing R16 `<XAxis>` / `<YAxis>` from
  *     the chart-platform barrel if they need axes.
  */
-import { useId } from 'react';
+import { useCallback, useId, useMemo, useState, type MouseEvent } from 'react';
 import { Group } from '@visx/group';
 import { scaleLinear, scaleUtc } from '@visx/scale';
-import { Area, LinePath } from '@visx/shape';
+import { Area, Line, LinePath } from '@visx/shape';
 import { curveCatmullRom } from '@visx/curve';
+import { localPoint } from '@visx/event';
+import { bisector } from 'd3-array';
 import { motion } from 'motion/react';
 
 import { ChartFrame } from './chart-frame';
@@ -47,6 +49,7 @@ import {
     chartGradientId,
     type ChartSeriesIndex,
 } from './chart-gradient';
+import { CHART_HOVER_POINT_SCALE } from './chart-motion';
 import type { ChartState, TimeSeriesPoint } from './types';
 
 /**
@@ -106,46 +109,126 @@ export function LineChart({
     ariaLabel,
     showArea = true,
 }: LineChartProps) {
+    return (
+        <ChartFrame state={state} className={className} testId={testId}>
+            {({ width, height, data }) => (
+                <LineChartInner
+                    width={width}
+                    height={height}
+                    data={data}
+                    seriesIndex={seriesIndex}
+                    ariaLabel={ariaLabel}
+                    showArea={showArea}
+                />
+            )}
+        </ChartFrame>
+    );
+}
+
+interface LineChartInnerProps {
+    width: number;
+    height: number;
+    data: TimeSeriesPoint[];
+    seriesIndex: ChartSeriesIndex;
+    ariaLabel?: string;
+    showArea: boolean;
+}
+
+/**
+ * The actual rendering. Lifted into a component so the hover
+ * state hooks can run inside a real React component (the render-
+ * prop callback is just a function, not a component, so hooks
+ * inside it would violate the rules of hooks).
+ */
+function LineChartInner({
+    width,
+    height,
+    data,
+    seriesIndex,
+    ariaLabel,
+    showArea,
+}: LineChartInnerProps) {
     const reactId = useId();
     const chartId = `line-${reactId.replace(/:/g, '')}`;
     const strokeGradId = chartGradientId(chartId, seriesIndex, 'linear');
     const areaGradId = `${chartId}-area`;
 
+    const padding = DEFAULT_PADDING;
+    const innerWidth = Math.max(0, width - padding.left - padding.right);
+    const innerHeight = Math.max(0, height - padding.top - padding.bottom);
+
+    // R16-PR8 — hover state. Tracks which data-point index is
+    // currently focused (or null). Pointer-driven via the
+    // transparent overlay below; bisector finds the nearest
+    // point to the cursor's x-position.
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+    // R16-PR8 — bisector to find the data-point nearest to a
+    // given x-coordinate. Memoised so the comparator function
+    // doesn't reallocate every render.
+    const dateBisector = useMemo(
+        () => bisector<TimeSeriesPoint, Date>((d) => d.date).center,
+        [],
+    );
+
+    const scales = useMemo(() => {
+        if (data.length === 0) return null;
+        const xExtent = [data[0]!.date, data[data.length - 1]!.date] as [
+            Date,
+            Date,
+        ];
+        const yValues = data.map((d) => d.value);
+        const yMin = Math.min(...yValues);
+        const yMax = Math.max(...yValues);
+        const yPadding = (yMax - yMin) * 0.1 || 1;
+        return {
+            xScale: scaleUtc({
+                domain: xExtent,
+                range: [0, innerWidth],
+            }),
+            yScale: scaleLinear({
+                domain: [yMin - yPadding, yMax + yPadding],
+                range: [innerHeight, 0],
+                clamp: true,
+            }),
+        };
+    }, [data, innerWidth, innerHeight]);
+
+    const handlePointerMove = useCallback(
+        (event: MouseEvent<SVGRectElement>) => {
+            if (!scales) return;
+            const point = localPoint(event);
+            if (!point) return;
+            // localPoint returns SVG-coordinate space; subtract
+            // the chart's inner-padding to get the position
+            // inside the plot area.
+            const xInsidePlot = point.x - padding.left;
+            const date = scales.xScale.invert(xInsidePlot);
+            const idx = dateBisector(data, date);
+            if (idx >= 0 && idx < data.length) {
+                setHoveredIndex(idx);
+            }
+        },
+        [scales, dateBisector, data, padding.left],
+    );
+
+    const handlePointerLeave = useCallback(() => {
+        setHoveredIndex(null);
+    }, []);
+
+    if (data.length === 0 || !scales) return null;
+
+    const { xScale, yScale } = scales;
+    const x = (d: TimeSeriesPoint) => xScale(d.date);
+    const y = (d: TimeSeriesPoint) => yScale(d.value);
+    const y0 = () => innerHeight;
+
+    const hoveredPoint =
+        hoveredIndex !== null ? data[hoveredIndex] : null;
+    const hoveredX = hoveredPoint ? xScale(hoveredPoint.date) : 0;
+    const hoveredY = hoveredPoint ? yScale(hoveredPoint.value) : 0;
+
     return (
-        <ChartFrame state={state} className={className} testId={testId}>
-            {({ width, height, data }) => {
-                if (data.length === 0) return null;
-
-                const padding = DEFAULT_PADDING;
-                const innerWidth = Math.max(0, width - padding.left - padding.right);
-                const innerHeight = Math.max(0, height - padding.top - padding.bottom);
-
-                const xExtent = [data[0]!.date, data[data.length - 1]!.date] as [
-                    Date,
-                    Date,
-                ];
-                const yValues = data.map((d) => d.value);
-                const yMin = Math.min(...yValues);
-                const yMax = Math.max(...yValues);
-                // Top padding inside the y-range so the line
-                // never crashes into the top edge of the area.
-                const yPadding = (yMax - yMin) * 0.1 || 1;
-
-                const xScale = scaleUtc({
-                    domain: xExtent,
-                    range: [0, innerWidth],
-                });
-                const yScale = scaleLinear({
-                    domain: [yMin - yPadding, yMax + yPadding],
-                    range: [innerHeight, 0],
-                    clamp: true,
-                });
-
-                const x = (d: TimeSeriesPoint) => xScale(d.date);
-                const y = (d: TimeSeriesPoint) => yScale(d.value);
-                const y0 = () => innerHeight;
-
-                return (
                     <svg
                         width={width}
                         height={height}
@@ -252,10 +335,70 @@ export function LineChart({
                                     );
                                 }}
                             </LinePath>
+
+                            {/* R16-PR8 — crosshair + focus point.
+                                Renders only when a point is
+                                hovered. The vertical crosshair
+                                marks the x-position; the focus
+                                point pulses via the R16-PR4
+                                hover-point scale (1.05×). */}
+                            {hoveredPoint && (
+                                <>
+                                    <Line
+                                        from={{ x: hoveredX, y: 0 }}
+                                        to={{ x: hoveredX, y: innerHeight }}
+                                        stroke="var(--content-muted)"
+                                        strokeWidth={1}
+                                        strokeDasharray="3 3"
+                                        opacity={0.6}
+                                        pointerEvents="none"
+                                    />
+                                    <motion.circle
+                                        cx={hoveredX}
+                                        cy={hoveredY}
+                                        r={5}
+                                        fill={`url(#${strokeGradId})`}
+                                        stroke="var(--bg-default)"
+                                        strokeWidth={2}
+                                        initial={{ scale: 1, opacity: 0 }}
+                                        animate={{
+                                            scale: CHART_HOVER_POINT_SCALE,
+                                            opacity: 1,
+                                        }}
+                                        transition={{
+                                            duration: 0.2,
+                                            ease: 'easeOut',
+                                        }}
+                                        style={{
+                                            transformOrigin: `${hoveredX}px ${hoveredY}px`,
+                                        }}
+                                        pointerEvents="none"
+                                    />
+                                </>
+                            )}
+
+                            {/* R16-PR8 — transparent overlay
+                                captures pointer events across
+                                the full plot area. visx's
+                                localPoint resolves to the SVG's
+                                coordinate space; we subtract
+                                padding.left to get plot-relative
+                                x, then bisect to find the nearest
+                                data point. */}
+                            <rect
+                                width={innerWidth}
+                                height={innerHeight}
+                                fill="transparent"
+                                onMouseMove={handlePointerMove}
+                                onMouseLeave={handlePointerLeave}
+                                onTouchMove={
+                                    handlePointerMove as unknown as (
+                                        e: React.TouchEvent<SVGRectElement>,
+                                    ) => void
+                                }
+                                onTouchEnd={handlePointerLeave}
+                            />
                         </Group>
                     </svg>
-                );
-            }}
-        </ChartFrame>
     );
 }
