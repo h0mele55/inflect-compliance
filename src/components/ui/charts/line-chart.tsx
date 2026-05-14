@@ -49,6 +49,7 @@ import {
     chartGradientId,
     type ChartSeriesIndex,
 } from './chart-gradient';
+import { ChartGloss, chartGlossId } from './chart-gloss';
 import { CHART_HOVER_POINT_SCALE } from './chart-motion';
 import type { ChartState, TimeSeriesPoint } from './types';
 
@@ -275,6 +276,19 @@ function LineChartInner({
                                     stopOpacity={0}
                                 />
                             </linearGradient>
+                            {/* R18-PR7 — area gloss. A vertical
+                                sheen painted as an overlay on the
+                                area-under-line so the filled
+                                region reads as a glossy surface,
+                                same two-layer paint as the donut
+                                + mini-area. `default` intensity:
+                                the LineChart is a full-size chart,
+                                not a tiny sparkline. */}
+                            <ChartGloss
+                                id={chartGlossId(chartId)}
+                                direction="vertical"
+                                intensity="default"
+                            />
                         </defs>
 
                         <Group left={padding.left} top={padding.top}>
@@ -289,6 +303,8 @@ function LineChartInner({
                                         ease: 'easeOut',
                                     }}
                                 >
+                                    {/* Colour layer — the series
+                                        area gradient. */}
                                     <Area
                                         data={data}
                                         x={x}
@@ -296,6 +312,27 @@ function LineChartInner({
                                         y1={y}
                                         curve={curveCatmullRom}
                                         fill={`url(#${areaGradId})`}
+                                    />
+                                    {/* R18-PR7 — gloss layer. Same
+                                        Area geometry, painted on
+                                        top, filled with the gloss
+                                        def. The white→transparent
+                                        ramp gives the filled
+                                        region a glass sheen near
+                                        the top edge. aria-hidden +
+                                        pointer-events:none — it
+                                        carries light, not data,
+                                        and must not intercept the
+                                        plot-area hover overlay. */}
+                                    <Area
+                                        data={data}
+                                        x={x}
+                                        y0={y0}
+                                        y1={y}
+                                        curve={curveCatmullRom}
+                                        fill={`url(#${chartGlossId(chartId)})`}
+                                        aria-hidden="true"
+                                        pointerEvents="none"
                                     />
                                 </motion.g>
                             )}
@@ -353,6 +390,23 @@ function LineChartInner({
                                         opacity={0.6}
                                         pointerEvents="none"
                                     />
+                                    {/* R18-PR7 — bubbly focus
+                                        point. The hover dot scales
+                                        in through a SPRING (not
+                                        the prior plain ease-out)
+                                        so it overshoots its target
+                                        size and settles — it
+                                        "bubbles out" toward the
+                                        pointer. `stiffness` +
+                                        `damping` tuned so the
+                                        overshoot is visible but
+                                        the dot settles inside the
+                                        same ~200ms window the old
+                                        ease-out used. The spring
+                                        starts from `scale: 0` (not
+                                        1) so the bubble grows from
+                                        nothing — a 1→1.05 spring
+                                        would barely register. */}
                                     <motion.circle
                                         cx={hoveredX}
                                         cy={hoveredY}
@@ -360,14 +414,21 @@ function LineChartInner({
                                         fill={`url(#${strokeGradId})`}
                                         stroke="var(--bg-default)"
                                         strokeWidth={2}
-                                        initial={{ scale: 1, opacity: 0 }}
+                                        initial={{ scale: 0, opacity: 0 }}
                                         animate={{
                                             scale: CHART_HOVER_POINT_SCALE,
                                             opacity: 1,
                                         }}
                                         transition={{
-                                            duration: 0.2,
-                                            ease: 'easeOut',
+                                            scale: {
+                                                type: 'spring',
+                                                stiffness: 520,
+                                                damping: 16,
+                                            },
+                                            opacity: {
+                                                duration: 0.12,
+                                                ease: 'easeOut',
+                                            },
                                         }}
                                         style={{
                                             transformOrigin: `${hoveredX}px ${hoveredY}px`,
