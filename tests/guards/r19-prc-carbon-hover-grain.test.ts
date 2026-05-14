@@ -33,10 +33,12 @@
  *      lifts it with `hover:before:opacity-100` — carbon emerges
  *      on hover, not at rest.
  *
- *   6. `carbonOnHover` adds the bevel on hover
- *      (`hover:shadow-[var(--btn-carbon-bevel)]`) and does NOT
- *      touch the border — `ghost` stays borderless,
- *      `destructive-outline` keeps its red danger edge.
+ *   6. `carbonOnHover` carries the bevel on the `::before`
+ *      (`before:shadow-[var(--btn-carbon-bevel)]` — gated by the
+ *      same hover-opacity lift, NOT `hover:shadow-*` which the
+ *      motion-language ratchet bans) and does NOT touch the
+ *      border — `ghost` stays borderless, `destructive-outline`
+ *      keeps its red danger edge.
  *
  *   7. `ghost` + `destructive-outline` consume `...carbonOnHover`
  *      (and still NOT `...carbonSurface` — they have no rest-state
@@ -114,11 +116,16 @@ describe('R19-PR-C — carbon-on-hover + micro-grain', () => {
             );
         });
 
-        it('adds the bevel on hover and never touches the border', () => {
+        it('carries the bevel on the `::before` (not `hover:shadow-*`) and never touches the border', () => {
             const recipe = recipeBlock('carbonOnHover');
+            // The bevel rides the `::before` — already opacity-gated
+            // on hover — so it inherits the hover gate without a
+            // `hover:shadow-*` class (which the motion-language
+            // ratchet bans as a decorative depth-lift).
             expect(recipe).toMatch(
-                /hover:shadow-\[var\(--btn-carbon-bevel\)\]/,
+                /before:shadow-\[var\(--btn-carbon-bevel\)\]/,
             );
+            expect(recipe).not.toMatch(/hover:shadow-/);
             // The border is the variants' own identity — ghost
             // borderless, destructive-outline red. The recipe must
             // not carry ANY border class.

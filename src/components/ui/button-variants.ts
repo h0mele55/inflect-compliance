@@ -46,10 +46,19 @@ const carbonSurface = [
  * to their low-chrome intent. But the moment they gain a
  * `hover:bg-*` they DO have a surface, so the full carbon field
  * fades in: the same grain+pool `::before` (parked at
- * `opacity-0`, lifted to `opacity-100` on hover) plus the bevel
- * shadow. The border is deliberately NOT touched — `ghost` stays
- * borderless and `destructive-outline` keeps its red danger edge;
- * carbon emerges as DEPTH, not as a new outline.
+ * `opacity-0`, lifted to `opacity-100` on hover) carrying the
+ * bevel shadow too. The border is deliberately NOT touched —
+ * `ghost` stays borderless and `destructive-outline` keeps its
+ * red danger edge; carbon emerges as DEPTH, not as a new outline.
+ *
+ * Why the bevel rides on `before:shadow-*` and NOT `hover:shadow-*`:
+ * the `::before` is ALREADY opacity-gated on hover, so a shadow
+ * declared on it inherits the hover gate for free — and the
+ * v2-PR-4 motion-language ratchet bans `hover:shadow-*` outright
+ * (hover-driven box-shadow reads as a decorative depth-lift). The
+ * `--btn-carbon-bevel` is inset-led volume, not a lift; pinning
+ * it to the `::before` keeps the whole carbon field on one gated
+ * layer and stays inside the motion language.
  *
  * `before:transition-opacity` makes the carbon emerge as a
  * smooth fade rather than a snap; `motion-reduce` drops the
@@ -59,9 +68,9 @@ const carbonSurface = [
 const carbonOnHover = [
   "before:content-[''] before:absolute before:inset-0 before:rounded-[inherit] before:pointer-events-none",
   "before:bg-[image:var(--btn-carbon-grain),var(--btn-carbon-overlay)]",
+  "before:shadow-[var(--btn-carbon-bevel)]",
   "before:opacity-0 before:transition-opacity before:duration-150",
   "hover:before:opacity-100",
-  "hover:shadow-[var(--btn-carbon-bevel)]",
   "motion-reduce:before:transition-none",
 ];
 
