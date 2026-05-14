@@ -509,18 +509,19 @@ export default function DonutChart({
                                         entrance (PR-5, the group
                                         scale) owns the mount; this
                                         layer only animates on
-                                        UPDATE. The prior
-                                        `transition-all duration-500`
-                                        was a no-op — CSS can't
-                                        reliably transition the `d`
-                                        attribute; framer-motion's
-                                        path interpolation can. */}
+                                        UPDATE. Replaces the prior
+                                        CSS-transition className,
+                                        which was a no-op — CSS
+                                        can't reliably transition
+                                        the `d` attribute;
+                                        framer-motion's path
+                                        interpolation can. */}
                                     <motion.path
                                         initial={false}
                                         animate={{ d: path }}
                                         transition={{
                                             duration: 0.5,
-                                            ease: 'easeInOut',
+                                            ease: 'easeOut',
                                         }}
                                         fill={fill}
                                     >
@@ -548,7 +549,7 @@ export default function DonutChart({
                                         animate={{ d: path }}
                                         transition={{
                                             duration: 0.5,
-                                            ease: 'easeInOut',
+                                            ease: 'easeOut',
                                         }}
                                         fill={`url(#${chartGlossId(chartId)})`}
                                         pointerEvents="none"
@@ -571,7 +572,7 @@ export default function DonutChart({
                                         animate={{ d: path }}
                                         transition={{
                                             duration: 0.5,
-                                            ease: 'easeInOut',
+                                            ease: 'easeOut',
                                         }}
                                         fill={`url(#${chartSheenId(chartId)})`}
                                         pointerEvents="none"
