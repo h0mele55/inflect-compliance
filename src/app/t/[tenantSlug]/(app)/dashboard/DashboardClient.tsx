@@ -259,43 +259,47 @@ export default function DashboardClient({
 
             {/* ─── Control Coverage + Risk Distribution ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-default">
-                <ProgressCard
-                    id="control-coverage"
-                    label="Control Coverage"
-                    value={exec.controlCoverage.implemented}
-                    max={exec.controlCoverage.applicable || 1}
-                    segments={[
-                        {
-                            label: 'Implemented',
-                            value: exec.controlCoverage.implemented,
-                            color: 'bg-bg-success-emphasis',
-                        },
-                        {
-                            label: 'In Progress',
-                            value: exec.controlCoverage.inProgress,
-                            color: 'bg-bg-warning-emphasis',
-                        },
-                        {
-                            label: 'Not Started',
-                            value: exec.controlCoverage.notStarted,
-                            color: 'bg-border-emphasis',
-                        },
-                    ]}
-                    footer={
-                        <Link
-                            href={href('/clauses')}
-                            className="text-[var(--brand-emphasis)] hover:text-[var(--brand-muted)]"
-                        >
-                            {t('viewAllClauses')}
-                        </Link>
-                    }
-                />
+                <ChartFocusWrapper kpiKey="coverage">
+                    <ProgressCard
+                        id="control-coverage"
+                        label="Control Coverage"
+                        value={exec.controlCoverage.implemented}
+                        max={exec.controlCoverage.applicable || 1}
+                        segments={[
+                            {
+                                label: 'Implemented',
+                                value: exec.controlCoverage.implemented,
+                                color: 'bg-bg-success-emphasis',
+                            },
+                            {
+                                label: 'In Progress',
+                                value: exec.controlCoverage.inProgress,
+                                color: 'bg-bg-warning-emphasis',
+                            },
+                            {
+                                label: 'Not Started',
+                                value: exec.controlCoverage.notStarted,
+                                color: 'bg-border-emphasis',
+                            },
+                        ]}
+                        footer={
+                            <Link
+                                href={href('/clauses')}
+                                className="text-[var(--brand-emphasis)] hover:text-[var(--brand-muted)]"
+                            >
+                                {t('viewAllClauses')}
+                            </Link>
+                        }
+                    />
+                </ChartFocusWrapper>
                 <RiskDistributionSection exec={exec} />
             </div>
 
             {/* ─── Evidence Status + Compliance Alerts ─── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-default">
-                <EvidenceStatusSection exec={exec} />
+                <ChartFocusWrapper kpiKey="evidence">
+                    <EvidenceStatusSection exec={exec} />
+                </ChartFocusWrapper>
                 <ComplianceAlerts exec={exec} t={t} />
             </div>
 
@@ -363,6 +367,47 @@ export default function DashboardClient({
             </div>
         </DashboardLayout>
         </DashboardChartProvider>
+    );
+}
+
+// ─── Chart focus wrapper (R17-PR9) ───────────────────────────────────
+//
+// Generic wrapper that gives any dashboard chart the same
+// focus-or-dim affordance the RiskDistributionSection got in PR-8.
+// Pass `kpiKey` matching the KpiCard that "owns" this chart;
+// when that KPI is selected, the wrapper applies the brand ring
+// (focused). When ANY OTHER KPI is selected, it dims to 60%.
+// Null selection ⇒ baseline render.
+//
+// The wrapper is a plain `<div>` (no card chassis of its own) so
+// it composes cleanly around an already-styled section without
+// double-bordering. The `rounded-lg` mirrors the underlying card's
+// radius so the ring traces the card boundary, not a wider rect.
+
+function ChartFocusWrapper({
+    kpiKey,
+    children,
+}: {
+    kpiKey: DashboardKpiKey;
+    children: React.ReactNode;
+}) {
+    const { selectedKpi } = useDashboardChartFilter();
+    const isFocused = selectedKpi === kpiKey;
+    const isDimmed = selectedKpi !== null && !isFocused;
+    return (
+        <div
+            data-chart-focus={isFocused ? 'true' : undefined}
+            data-chart-dimmed={isDimmed ? 'true' : undefined}
+            data-chart-focus-key={kpiKey}
+            className={cn(
+                "rounded-lg transition-opacity duration-200 ease-out",
+                isFocused &&
+                    "ring-2 ring-brand-default ring-offset-2 ring-offset-bg-page",
+                isDimmed && "opacity-60",
+            )}
+        >
+            {children}
+        </div>
     );
 }
 
