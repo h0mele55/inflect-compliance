@@ -16,11 +16,9 @@ test.describe('Policy Center', () => {
         await gotoAndVerify(page, `/t/${tenantSlug}/policies`, 'h1');
         await expect(page.locator('#new-policy-btn')).toBeVisible({ timeout: 10000 });
         await expect(page.locator('#policy-from-template-btn')).toBeVisible();
-        // Search input — `#policy-search` is the FilterToolbar searchId
-        // on this page (Epic 53 migrated status/owner/etc. into the
-        // consolidated Filter popover — there's no longer a discrete
-        // `#policy-status-filter` element).
-        await expect(page.locator('#policy-search')).toBeVisible();
+        // R14 (#443) removed the FilterToolbar text-search input from every
+        // list page — the navbar ⌘K palette is the sole search affordance
+        // now. No `#policy-search` element to assert.
     });
 
     test('template library page loads', async ({ page }) => {
