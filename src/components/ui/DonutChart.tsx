@@ -45,6 +45,7 @@
 
 import { useId, useState } from 'react';
 import Pie from '@visx/shape/lib/shapes/Pie';
+import { motion } from 'motion/react';
 import {
     ChartFlowGradient,
     ChartRadialGradient,
@@ -493,14 +494,38 @@ export default function DonutChart({
                                 >
                                     {/* Colour layer — the segment's
                                         series gradient (or legacy
-                                        hex). */}
-                                    <path
-                                        d={path}
+                                        hex).
+
+                                        R18-PR11 — fluid data-change
+                                        morph. `<motion.path>` with
+                                        `animate={{ d }}` tweens the
+                                        arc geometry whenever the
+                                        `segments` prop changes — a
+                                        risk count flips, a status
+                                        moves — instead of snapping
+                                        to the new shape. `initial=
+                                        {false}` means NO mount
+                                        animation: the bubble-
+                                        entrance (PR-5, the group
+                                        scale) owns the mount; this
+                                        layer only animates on
+                                        UPDATE. The prior
+                                        `transition-all duration-500`
+                                        was a no-op — CSS can't
+                                        reliably transition the `d`
+                                        attribute; framer-motion's
+                                        path interpolation can. */}
+                                    <motion.path
+                                        initial={false}
+                                        animate={{ d: path }}
+                                        transition={{
+                                            duration: 0.5,
+                                            ease: 'easeInOut',
+                                        }}
                                         fill={fill}
-                                        className="transition-all duration-500 ease-out"
                                     >
                                         <title>{`${seg.label}: ${seg.value} (${(segPercent * 100).toFixed(1)}%)`}</title>
-                                    </path>
+                                    </motion.path>
                                     {/* R18-PR4 — gloss layer. SAME
                                         `d`, painted on top, filled
                                         with the shared vertical
@@ -514,9 +539,17 @@ export default function DonutChart({
                                         events-none so the gloss
                                         overlay never intercepts the
                                         hover that belongs to the
-                                        colour layer's <g>. */}
-                                    <path
-                                        d={path}
+                                        colour layer's <g>.
+                                        R18-PR11 — same `d` morph so
+                                        the gloss tracks the colour
+                                        layer through a data change. */}
+                                    <motion.path
+                                        initial={false}
+                                        animate={{ d: path }}
+                                        transition={{
+                                            duration: 0.5,
+                                            ease: 'easeInOut',
+                                        }}
                                         fill={`url(#${chartGlossId(chartId)})`}
                                         pointerEvents="none"
                                         aria-hidden="true"
@@ -531,9 +564,15 @@ export default function DonutChart({
                                         this segment. Stacked third:
                                         colour → static gloss →
                                         moving sheen. Inert like the
-                                        gloss layer. */}
-                                    <path
-                                        d={path}
+                                        gloss layer. R18-PR11 — same
+                                        `d` morph. */}
+                                    <motion.path
+                                        initial={false}
+                                        animate={{ d: path }}
+                                        transition={{
+                                            duration: 0.5,
+                                            ease: 'easeInOut',
+                                        }}
                                         fill={`url(#${chartSheenId(chartId)})`}
                                         pointerEvents="none"
                                         aria-hidden="true"
