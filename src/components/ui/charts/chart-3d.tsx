@@ -203,7 +203,10 @@ export function Chart3D({
             >
                 {/* Lights — ambient + a key directional. Defaults
                     that read at all. Charts can override by
-                    rendering their own lights as children. */}
+                    rendering their own lights as children.
+                    JSX intrinsic types for r3f elements are
+                    augmented globally by `r3f-jsx.d.ts` at the
+                    repo root. */}
                 <ambientLight intensity={0.5} />
                 <directionalLight
                     position={[10, 10, 5]}
