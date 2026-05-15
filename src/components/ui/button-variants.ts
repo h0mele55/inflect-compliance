@@ -399,10 +399,27 @@ export const buttonVariants = cva(
         //   lg     font-bold      — featured CTA, magazine-bold
         // The graded ladder mirrors the tracking ladder: small
         // text restrained, large text deliberate.
+        // R20-PR-F (2026-05-15) — density correction. PR-C had
+        // padded md +2px and lg +4px for "airy density"; on dense
+        // toolbars (gear-trigger + a row of text buttons:
+        // "AI Assessment", "Import", primary CTA) the air read as
+        // "idle space around the label" — the text inside each
+        // button felt small relative to the chrome. The new scale
+        // tightens md and lg below pre-PR-C levels: md goes
+        // px-4 → px-3, lg goes px-6 → px-4. Both lose visible
+        // chrome; the text inside feels confidently centered.
+        // lg's gap also collapses back to `gap-tight` (R19) — the
+        // 10px gap was a compensation for the lg's airy padding;
+        // with tighter padding the icon↔label rhythm wants to
+        // tighten back too.
+        //
+        // Tracking + weight ladder (PR-C / PR-E) are untouched —
+        // they live on a different axis (typographic weight, not
+        // spatial chrome).
         xs: "h-7 px-2.5 text-[11px] gap-1 rounded-md tracking-[0.005em] font-medium",
         sm: "h-8 px-3 text-xs gap-1.5 tracking-[0.01em] font-medium",
-        md: "h-9 px-4 text-sm gap-tight tracking-[-0.005em] font-semibold",
-        lg: "h-10 px-6 text-sm gap-2.5 tracking-[-0.01em] font-bold",
+        md: "h-9 px-3 text-sm gap-tight tracking-[-0.005em] font-semibold",
+        lg: "h-10 px-4 text-sm gap-tight tracking-[-0.01em] font-bold",
       },
     },
     defaultVariants: {
