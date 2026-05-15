@@ -52,10 +52,12 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
               "rounded-lg border border-border-subtle bg-bg-subtle text-sm text-content-subtle",
               // R20-PR-C — horizontal padding mirrors the airy
               // density scale (xs/sm don't size up; md/lg do).
-              size === "xs" && "h-7 px-2.5 text-[11px]",
-              size === "sm" && "h-8 px-3 text-xs",
-              size === "lg" && "h-10 px-6",
-              !size && "h-9 px-4",
+              // R20-PR-E — graded font-weight ladder also mirrors
+              // the cva size scale.
+              size === "xs" && "h-7 px-2.5 text-[11px] font-medium",
+              size === "sm" && "h-8 px-3 text-xs font-medium",
+              size === "lg" && "h-10 px-6 font-bold",
+              !size && "h-9 px-4 font-semibold",
               className,
             )}
           >
@@ -95,17 +97,21 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             ? cn(
                 "flex items-center justify-center gap-tight whitespace-nowrap",
                 "rounded-lg border border-border-subtle bg-bg-subtle text-content-subtle",
-                "cursor-not-allowed outline-none text-sm font-medium",
+                "cursor-not-allowed outline-none text-sm",
                 // R20-PR-C — mirror the airy density scale from
                 // button-variants.ts. These classes drive the disabled
                 // branch which does NOT route through the cva variant
                 // (cn-only fallback for a non-interactive shape), so
                 // they must move in lockstep. The R20-PR-C ratchet
                 // asserts the two scales agree.
-                size === "xs" && "h-7 px-2.5 text-[11px] gap-1 rounded-md",
-                size === "sm" && "h-8 px-3 text-xs gap-1.5",
-                size === "lg" && "h-10 px-6 gap-2.5",
-                !size && "h-9 px-4 gap-tight",
+                //
+                // R20-PR-E — graded font-weight ladder also mirrored
+                // here (medium for xs/sm, semibold for md, bold for
+                // lg). Locked by the R20-PR-E ratchet.
+                size === "xs" && "h-7 px-2.5 text-[11px] gap-1 rounded-md font-medium",
+                size === "sm" && "h-8 px-3 text-xs gap-1.5 font-medium",
+                size === "lg" && "h-10 px-6 gap-2.5 font-bold",
+                !size && "h-9 px-4 gap-tight font-semibold",
               )
             : buttonVariants({ variant, size }),
           className,

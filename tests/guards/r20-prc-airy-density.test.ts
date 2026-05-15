@@ -153,19 +153,21 @@ describe('R20-PR-C — Airy density + typography', () => {
         // styled via hand-rolled classes (not the cva variant) so
         // they don't pick up the variant-level changes for free.
         // The size mirrors must match the cva scale exactly.
+        // R20-PR-E (2026-05-15) appended per-size `font-*` classes
+        // to each fallback branch, so the assertions match the
+        // size/padding/gap prefix WITHOUT pinning the closing quote.
+        // The R20-PR-E ratchet locks the appended `font-*` token.
         it('disabled-fallback md (no size) uses `px-4`', () => {
-            expect(BUTTON_TSX).toMatch(/!size && "h-9 px-4 gap-tight"/);
+            expect(BUTTON_TSX).toMatch(/!size && "h-9 px-4 gap-tight\b/);
         });
         it('disabled-fallback lg uses `px-6` + `gap-2.5`', () => {
-            expect(BUTTON_TSX).toMatch(
-                /size === "lg" && "h-10 px-6 gap-2.5"/,
-            );
+            expect(BUTTON_TSX).toMatch(/size === "lg" && "h-10 px-6 gap-2\.5\b/);
         });
         it('disabledTooltip md (no size) uses `px-4`', () => {
-            expect(BUTTON_TSX).toMatch(/!size && "h-9 px-4"/);
+            expect(BUTTON_TSX).toMatch(/!size && "h-9 px-4\b/);
         });
         it('disabledTooltip lg uses `px-6`', () => {
-            expect(BUTTON_TSX).toMatch(/size === "lg" && "h-10 px-6"/);
+            expect(BUTTON_TSX).toMatch(/size === "lg" && "h-10 px-6\b/);
         });
     });
 
