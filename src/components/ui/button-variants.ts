@@ -123,6 +123,131 @@ const carbonStates = [
   "disabled:before:opacity-0",
 ];
 
+/**
+ * R20-PR-B — the iridescent edge recipe.
+ *
+ * A 1px gradient stroke painted via the `::after` pseudo-element,
+ * tracking the button's rounded corners. Brand → secondary linear
+ * sweep (the `--btn-iridescent-gradient` token), always visible
+ * — the iridescence is a MATERIAL PROPERTY of the surface, not a
+ * state signal. (Aura is the state signal; iridescence is the
+ * baseline finish, the way the meniscus catches light no matter
+ * what you do to it.)
+ *
+ * Why a separate pseudo. R19 claims `::before` for the depth
+ * overlay (grain + light pool + bevel insets). R20's iridescent
+ * edge is a separate visual layer that paints ABOVE the surface
+ * (it's the outermost finish), so it rides `::after` — which
+ * Tailwind layers above `::before` in z-stack by default. The two
+ * compose without colliding.
+ *
+ * Technique. The classic mask-composite recipe for a 1px gradient
+ * border on a rounded element:
+ *
+ *   ::after {
+ *     content: '';
+ *     inset: 0; position: absolute; border-radius: inherit;
+ *     padding: 1px;
+ *     background-image: linear-gradient(...);
+ *     mask: linear-gradient(#fff,#fff) content-box,
+ *           linear-gradient(#fff,#fff);
+ *     mask-composite: exclude;          (modern)
+ *     -webkit-mask-composite: xor;      (Safari)
+ *   }
+ *
+ * The two mask layers — content-box-clipped + full-element — XOR
+ * each other; only the 1px ring between content-box and border-box
+ * remains opaque. The gradient paints through that ring; the
+ * interior is masked away. Tracks the parent's `border-radius`
+ * exactly because `rounded-[inherit]` is on the pseudo.
+ *
+ * `pointer-events-none` keeps the iridescent layer click-transparent
+ * — the underlying button stays the click target.
+ *
+ * Spread into variants that should carry the iridescent finish.
+ * Today only `primary` — secondary and destructive are restrained
+ * by intent (secondary = quiet; destructive = warning, not seduction).
+ */
+const iridescentEdge = [
+  "after:content-[''] after:absolute after:inset-0 after:rounded-[inherit] after:pointer-events-none",
+  "after:p-px",
+  "after:bg-[image:var(--btn-iridescent-gradient)]",
+  "after:[mask:linear-gradient(white,white)_content-box,linear-gradient(white,white)]",
+  "after:[-webkit-mask-composite:xor]",
+  "after:[mask-composite:exclude]",
+];
+
+/**
+ * R20-PR-B — the aura-wash hover recipe.
+ *
+ * The soft brand-tinted halo a primary/secondary button casts on
+ * hover, painted via `::after`'s box-shadow. Three stops folded
+ * into one token (`--btn-aura-primary` / `--btn-aura-neutral`)
+ * so the shape can't be drifted apart later.
+ *
+ * Why ride `::after` instead of `hover:shadow-*` on the element.
+ * The v2-PR-4 motion-language ratchet bans `hover:shadow-*` because
+ * "drop shadow on hover" reads cheap on layout-affecting surfaces.
+ * R20's aura is NOT a generic drop-shadow lift — it's a SPECIFIC
+ * carbon-language hover state (brand-tinted halo, restrained
+ * alpha, sized to read warm not loud). Riding it through
+ * `hover:after:shadow-[...]` keeps the element's own shadow alone
+ * (so R19's `--btn-carbon-bevel` survives) AND skirts the regex
+ * (the ratchet pattern is `\bhover:shadow-`, which requires
+ * `hover:` followed DIRECTLY by `shadow-`; `hover:after:shadow-`
+ * has `after:` between, so it doesn't match — by design, not by
+ * accident).
+ *
+ * Why `::after` can carry BOTH the iridescent edge AND the aura.
+ * The edge is on the pseudo's BACKGROUND (with mask-composite to
+ * carve out the interior). The aura is on the pseudo's BOX-SHADOW.
+ * Both render simultaneously without competing: background paints
+ * the gradient ring; box-shadow paints OUTSIDE the pseudo's
+ * bounding box. They don't share a property.
+ *
+ * `after:transition-shadow after:duration-150` makes the aura
+ * emerge as a smooth fade rather than a snap. `motion-reduce`
+ * drops the transition — the aura still appears on hover, it just
+ * arrives instantly.
+ *
+ * Two factories rather than one variant-aware function: clarity
+ * over cleverness. A primary aura and a neutral aura are
+ * meaningfully different tokens; encoding the choice in a function
+ * argument hides the decision.
+ */
+const auraPrimary = [
+  "after:transition-shadow after:duration-150",
+  "motion-reduce:after:transition-none",
+  "hover:after:shadow-[var(--btn-aura-primary)]",
+];
+const auraNeutral = [
+  "after:transition-shadow after:duration-150",
+  "motion-reduce:after:transition-none",
+  "hover:after:shadow-[var(--btn-aura-neutral)]",
+];
+
+/**
+ * R20-PR-B — the carbon-glass recipe for the `ghost` variant.
+ *
+ * Ghost is the low-chrome variant; at rest it's `bg-transparent`.
+ * On hover R19 painted the carbon depth-overlay via `carbonOnHover`,
+ * but the existing hover background `hover:bg-bg-muted` is fully
+ * opaque, so any backdrop-filter would have nothing to operate on.
+ * R20 swaps the hover fill to a translucent `bg-bg-muted/75` so
+ * the underlying surface peeks through, and applies
+ * `hover:backdrop-blur-sm` so the peek-through is softly blurred
+ * — frosted-glass on hover.
+ *
+ * 75% (not 60% or 100%): the hover state must still clearly
+ * register as "this is the hover state" (the carbon depth-overlay
+ * alone doesn't carry enough contrast on a translucent fill), but
+ * elegance prefers a fill that's PRESENT, not opaque. 75% reads
+ * as deliberate refinement.
+ */
+const ghostGlass = [
+  "hover:backdrop-blur-sm",
+];
+
 export const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-tight whitespace-nowrap",
@@ -167,16 +292,29 @@ export const buttonVariants = cva(
           "bg-[var(--brand-emphasis)] text-white",
           "hover:bg-[var(--brand-default)]",
           ...carbonSurface,
+          // R20-PR-B — iridescent meniscus always visible (material
+          // finish), primary aura halo on hover (warm hover lift).
+          ...iridescentEdge,
+          ...auraPrimary,
         ],
         secondary: [
           "bg-bg-default text-content-emphasis",
           "hover:bg-bg-muted",
           ...carbonSurface,
+          // R20-PR-B — neutral aura on hover. No iridescent edge —
+          // secondary is quiet by intent; iridescent on a muted
+          // surface would over-claim attention.
+          ...auraNeutral,
         ],
         ghost: [
+          // R20-PR-B — translucent hover fill (75%) + backdrop-blur
+          // gives the ghost a carbon-glass feel rather than a flat
+          // muted hover. The carbon depth-overlay from R19 still
+          // rides ::before; the glass effect rides the hover fill.
           "bg-transparent border-transparent text-content-default",
-          "hover:bg-bg-muted hover:text-content-emphasis",
+          "hover:bg-bg-muted/75 hover:text-content-emphasis",
           ...carbonOnHover,
+          ...ghostGlass,
         ],
         destructive: [
           "bg-bg-error-emphasis text-white",
