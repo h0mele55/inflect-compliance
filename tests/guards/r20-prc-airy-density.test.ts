@@ -69,22 +69,32 @@ function sizeClasses(size: 'xs' | 'sm' | 'md' | 'lg'): string {
 }
 
 describe('R20-PR-C — Airy density + typography', () => {
-    describe('padding scale — md/lg gain air, xs/sm stay compact', () => {
-        it('md horizontal padding is `px-4` (up from R19 `px-3.5`)', () => {
-            expect(sizeClasses('md')).toMatch(/\bpx-4\b/);
-            expect(sizeClasses('md')).not.toMatch(/\bpx-3\.5\b/);
+    // R20-PR-F (2026-05-15) — density correction. PR-C had pushed
+    // md/lg padding up for "airy density"; on dense toolbars the
+    // air read as idle space around the label. PR-F tightens
+    // md (px-4→px-3) and lg (px-6→px-4), bringing them BELOW
+    // pre-PR-C levels. xs/sm stay where PR-C left them. The
+    // ratchet below reflects the corrected scale; the original
+    // PR-C "px-4 / px-6" assertions are intentionally inverted
+    // (they now assert px-4 and px-6 are NOT present on md/lg)
+    // so a future revert to the wider scale fires this test
+    // first.
+    describe('padding scale — tightened in PR-F (the density correction)', () => {
+        it('md horizontal padding is `px-3` (R20-PR-F tightened from px-4)', () => {
+            expect(sizeClasses('md')).toMatch(/\bpx-3\b/);
+            expect(sizeClasses('md')).not.toMatch(/\bpx-4\b/);
         });
 
-        it('lg horizontal padding is `px-6` (up from R19 `px-5`)', () => {
-            expect(sizeClasses('lg')).toMatch(/\bpx-6\b/);
-            expect(sizeClasses('lg')).not.toMatch(/\bpx-5\b/);
+        it('lg horizontal padding is `px-4` (R20-PR-F tightened from px-6)', () => {
+            expect(sizeClasses('lg')).toMatch(/\bpx-4\b/);
+            expect(sizeClasses('lg')).not.toMatch(/\bpx-6\b/);
         });
 
-        it('xs stays at `px-2.5` — small buttons want density', () => {
+        it('xs stays at `px-2.5` — small buttons want density (unchanged)', () => {
             expect(sizeClasses('xs')).toMatch(/\bpx-2\.5\b/);
         });
 
-        it('sm stays at `px-3` — small buttons want density', () => {
+        it('sm stays at `px-3` — small buttons want density (unchanged)', () => {
             expect(sizeClasses('sm')).toMatch(/\bpx-3\b/);
             expect(sizeClasses('sm')).not.toMatch(/\bpx-3\.5\b/);
         });
@@ -133,9 +143,14 @@ describe('R20-PR-C — Airy density + typography', () => {
         });
     });
 
-    describe('gap rhythm — lg gets +2px breath', () => {
-        it('lg gap is `gap-2.5` (up from R19 `gap-tight`)', () => {
-            expect(sizeClasses('lg')).toMatch(/\bgap-2\.5\b/);
+    // R20-PR-F also collapsed lg's gap back to `gap-tight` (PR-C
+    // had bumped it to gap-2.5 to compensate for the airy padding;
+    // with tightened padding the icon↔label rhythm wants to tighten
+    // back too).
+    describe('gap rhythm — uniform gap-tight at md and lg after PR-F', () => {
+        it('lg gap is `gap-tight` (R20-PR-F collapsed from gap-2.5)', () => {
+            expect(sizeClasses('lg')).toMatch(/\bgap-tight\b/);
+            expect(sizeClasses('lg')).not.toMatch(/\bgap-2\.5\b/);
         });
 
         it('md gap stays at `gap-tight` (8px is right for default)', () => {
@@ -156,18 +171,19 @@ describe('R20-PR-C — Airy density + typography', () => {
         // R20-PR-E (2026-05-15) appended per-size `font-*` classes
         // to each fallback branch, so the assertions match the
         // size/padding/gap prefix WITHOUT pinning the closing quote.
-        // The R20-PR-E ratchet locks the appended `font-*` token.
-        it('disabled-fallback md (no size) uses `px-4`', () => {
-            expect(BUTTON_TSX).toMatch(/!size && "h-9 px-4 gap-tight\b/);
+        // R20-PR-F (2026-05-15) tightened md → px-3, lg → px-4 +
+        // gap-tight.
+        it('disabled-fallback md (no size) uses `px-3`', () => {
+            expect(BUTTON_TSX).toMatch(/!size && "h-9 px-3 gap-tight\b/);
         });
-        it('disabled-fallback lg uses `px-6` + `gap-2.5`', () => {
-            expect(BUTTON_TSX).toMatch(/size === "lg" && "h-10 px-6 gap-2\.5\b/);
+        it('disabled-fallback lg uses `px-4` + `gap-tight`', () => {
+            expect(BUTTON_TSX).toMatch(/size === "lg" && "h-10 px-4 gap-tight\b/);
         });
-        it('disabledTooltip md (no size) uses `px-4`', () => {
-            expect(BUTTON_TSX).toMatch(/!size && "h-9 px-4\b/);
+        it('disabledTooltip md (no size) uses `px-3`', () => {
+            expect(BUTTON_TSX).toMatch(/!size && "h-9 px-3\b/);
         });
-        it('disabledTooltip lg uses `px-6`', () => {
-            expect(BUTTON_TSX).toMatch(/size === "lg" && "h-10 px-6\b/);
+        it('disabledTooltip lg uses `px-4`', () => {
+            expect(BUTTON_TSX).toMatch(/size === "lg" && "h-10 px-4\b/);
         });
     });
 
