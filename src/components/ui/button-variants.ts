@@ -289,7 +289,12 @@ export const buttonVariants = cva(
     // negative tightening; xs flips positive so 11-12px labels
     // don't feel cramped. The size variant defines the value; the
     // base no longer declares one.
-    "text-sm font-medium transition-all duration-150",
+    //
+    // R20-PR-E — per-size font WEIGHT also lives on the size
+    // variant now. The graded ladder (medium → semibold → bold)
+    // mirrors the tracking ladder: dense UI sizes stay restrained,
+    // featured sizes climb in confidence. See the size block below.
+    "text-sm transition-all duration-150",
     "border rounded-lg",
     "disabled:opacity-50 disabled:pointer-events-none",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -381,10 +386,23 @@ export const buttonVariants = cva(
         // open up (+0.005 / +0.01em), default sizes tighten
         // (-0.005 / -0.01em). Two felt characteristics of
         // "expensive type".
-        xs: "h-7 px-2.5 text-[11px] gap-1 rounded-md tracking-[0.005em]",
-        sm: "h-8 px-3 text-xs gap-1.5 tracking-[0.01em]",
-        md: "h-9 px-4 text-sm gap-tight tracking-[-0.005em]",
-        lg: "h-10 px-6 text-sm gap-2.5 tracking-[-0.01em]",
+        //
+        // R20-PR-E — graded weight ladder. The "section header"
+        // weight (`font-semibold`) is the typographic confidence
+        // the button family was missing. Applied as a GRADE so
+        // dense UI sizes (xs/sm) stay restrained — bold xs buttons
+        // shout in filter toolbars. md climbs to semibold (the
+        // editorial-caption weight); lg climbs to bold (the
+        // headline weight). Three weights, one ladder:
+        //   xs/sm  font-medium    — quiet in dense rows
+        //   md     font-semibold  — confident default
+        //   lg     font-bold      — featured CTA, magazine-bold
+        // The graded ladder mirrors the tracking ladder: small
+        // text restrained, large text deliberate.
+        xs: "h-7 px-2.5 text-[11px] gap-1 rounded-md tracking-[0.005em] font-medium",
+        sm: "h-8 px-3 text-xs gap-1.5 tracking-[0.01em] font-medium",
+        md: "h-9 px-4 text-sm gap-tight tracking-[-0.005em] font-semibold",
+        lg: "h-10 px-6 text-sm gap-2.5 tracking-[-0.01em] font-bold",
       },
     },
     defaultVariants: {
