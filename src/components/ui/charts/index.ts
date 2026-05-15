@@ -170,6 +170,19 @@ export type {
     ChartLegendGradientProps,
 } from './chart-legend';
 
+// ─── Roadmap-21 PR-E — 3D foundation ────────────────────────────────
+//
+// `<Chart3D>` wraps react-three-fiber's <Canvas> with SSR-safe
+// dynamic import + prefers-reduced-motion fallback + constrained
+// OrbitControls. `tokenColor()` resolves a chart-series CSS var to
+// a hex string Three.js materials can consume. Three.js + drei +
+// r3f only load on routes that mount a 3D chart (~180KB gzipped,
+// dynamic-imported via `dynamicChart3D()`).
+
+export { Chart3D, tokenColor } from './chart-3d';
+export type { Chart3DProps } from './chart-3d';
+export { dynamicChart3D } from './chart-3d-dynamic';
+
 // ─── Roadmap-16 — RadarChart primitive ──────────────────────────────
 //
 // Multi-axis radar chart with gradient polygon fill. Phase 4 of R16.
