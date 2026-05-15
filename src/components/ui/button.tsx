@@ -49,11 +49,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           <div
             className={cn(
               "flex items-center justify-center gap-x-2 cursor-not-allowed",
-              "rounded-lg border border-border-subtle bg-bg-subtle px-4 text-sm text-content-subtle",
-              size === "xs" && "h-7 text-[11px]",
-              size === "sm" && "h-8 text-xs",
-              size === "lg" && "h-10",
-              !size && "h-9",
+              "rounded-lg border border-border-subtle bg-bg-subtle text-sm text-content-subtle",
+              // R20-PR-C — horizontal padding mirrors the airy
+              // density scale (xs/sm don't size up; md/lg do).
+              size === "xs" && "h-7 px-2.5 text-[11px]",
+              size === "sm" && "h-8 px-3 text-xs",
+              size === "lg" && "h-10 px-6",
+              !size && "h-9 px-4",
               className,
             )}
           >
@@ -94,10 +96,16 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                 "flex items-center justify-center gap-tight whitespace-nowrap",
                 "rounded-lg border border-border-subtle bg-bg-subtle text-content-subtle",
                 "cursor-not-allowed outline-none text-sm font-medium",
+                // R20-PR-C — mirror the airy density scale from
+                // button-variants.ts. These classes drive the disabled
+                // branch which does NOT route through the cva variant
+                // (cn-only fallback for a non-interactive shape), so
+                // they must move in lockstep. The R20-PR-C ratchet
+                // asserts the two scales agree.
                 size === "xs" && "h-7 px-2.5 text-[11px] gap-1 rounded-md",
                 size === "sm" && "h-8 px-3 text-xs gap-1.5",
-                size === "lg" && "h-10 px-5 gap-tight",
-                !size && "h-9 px-3.5 gap-tight",
+                size === "lg" && "h-10 px-6 gap-2.5",
+                !size && "h-9 px-4 gap-tight",
               )
             : buttonVariants({ variant, size }),
           className,

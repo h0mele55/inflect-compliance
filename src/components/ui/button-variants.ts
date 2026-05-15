@@ -251,11 +251,16 @@ const ghostGlass = [
 export const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-tight whitespace-nowrap",
-    // R19-PR-C — density tuning. A whisper of negative tracking
-    // (`-0.01em`) pulls the label into a denser, more deliberate
-    // unit — the typographic half of "feels solid". Small enough
-    // that no one clocks it as "tight type"; felt, not seen.
-    "text-sm font-medium tracking-[-0.01em] transition-all duration-150",
+    // R20-PR-C — per-size letter-spacing (tracking) replaces the
+    // R19 flat `-0.01em` baseline. The new scale gives tiny labels
+    // breathing room (small text wants OPEN tracking to stay
+    // legible — that's why classic small-caps feel "confident")
+    // and gives large labels confidence (headlines want TIGHT
+    // tracking to feel deliberate). md sits at a barely-noticed
+    // negative tightening; xs flips positive so 11-12px labels
+    // don't feel cramped. The size variant defines the value; the
+    // base no longer declares one.
+    "text-sm font-medium transition-all duration-150",
     "border rounded-lg",
     "disabled:opacity-50 disabled:pointer-events-none",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -328,10 +333,20 @@ export const buttonVariants = cva(
         ],
       },
       size: {
-        xs: "h-7 px-2.5 text-[11px] gap-1 rounded-md",
-        sm: "h-8 px-3 text-xs gap-1.5",
-        md: "h-9 px-3.5 text-sm gap-tight",
-        lg: "h-10 px-5 text-sm gap-tight",
+        // R20-PR-C — airy density scale. Heights stay (filter-
+        // toolbar alignment with <Input> is locked by the R20-PR-A
+        // ratchet), but horizontal padding + gap + tracking each
+        // get a size-conditional refinement. md gains +2px
+        // horizontal breath; lg gains +4px horizontal + +2px gap.
+        // xs/sm stay compact by intent — small buttons want
+        // density, large buttons want air. Tracking: tiny sizes
+        // open up (+0.005 / +0.01em), default sizes tighten
+        // (-0.005 / -0.01em). Two felt characteristics of
+        // "expensive type".
+        xs: "h-7 px-2.5 text-[11px] gap-1 rounded-md tracking-[0.005em]",
+        sm: "h-8 px-3 text-xs gap-1.5 tracking-[0.01em]",
+        md: "h-9 px-4 text-sm gap-tight tracking-[-0.005em]",
+        lg: "h-10 px-6 text-sm gap-2.5 tracking-[-0.01em]",
       },
     },
     defaultVariants: {

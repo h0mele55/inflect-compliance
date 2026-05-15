@@ -154,10 +154,20 @@ describe('R19-PR-C — carbon-on-hover + micro-grain', () => {
     });
 
     describe('density tuning', () => {
-        it('the cva base carries the negative tracking', () => {
-            const base =
-                VARIANTS.match(/cva\(\s*\[([\s\S]*?)\]\s*,/)?.[1] ?? '';
-            expect(base).toMatch(/tracking-\[-0\.01em\]/);
+        // R19-PR-C originally pinned `tracking-[-0.01em]` to the cva
+        // BASE so every size inherited one negative tracking value.
+        // R20-PR-C (2026-05-15) split tracking into a per-size scale
+        // — xs/sm open up positive (small text wants breathing), md
+        // tightens slightly, lg keeps the deepest negative tracking
+        // the R19 design intended. The R19 invariant is preserved
+        // in spirit (the lg size still carries `-0.01em`) and lifted
+        // off the base; the per-size scale is locked structurally by
+        // the R20-PR-C ratchet, so we keep this assertion narrowly
+        // focused on "tracking is configured somewhere" rather than
+        // "tracking is on the base", which would prevent the R20
+        // refinement from landing.
+        it('button-variants.ts carries the historical -0.01em tracking somewhere (lg, post-R20)', () => {
+            expect(VARIANTS).toMatch(/tracking-\[-0\.01em\]/);
         });
     });
 });
