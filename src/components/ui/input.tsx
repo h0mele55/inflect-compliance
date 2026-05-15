@@ -32,15 +32,30 @@ import { Eye, EyeSlash } from "./icons";
 
 // ─── CVA ────────────────────────────────────────────────────────────
 
+// R20-PR-B — Input migrated to the R20 control-parity edge tokens.
+// Same shape as before, but the border / hover / focus channels
+// now ride `--ctrl-edge-rest` / `--ctrl-edge-hover` / `--ctrl-edge-focus`
+// so a focused Input feels like a cousin of a focused Button rather
+// than an unrelated control. The Tailwind ring is dropped in favour
+// of a brand-tinted box-shadow halo on focus — the halo composes
+// cleanly with future iridescent input edges (deferred) and reads
+// as the same "warm focus glow" the R20 button family wears.
+//
+// The `controlEdge` recipe from `control-variants.ts` carries the
+// border + hover-border + focus-shadow + transition; the cva here
+// adds Input-specific surface chrome (bg, text colour, disabled /
+// read-only states) and the size scale.
 export const inputVariants = cva(
     [
-        "w-full rounded-lg border text-sm transition-colors",
+        "w-full rounded-lg text-sm",
         "bg-bg-default text-content-emphasis placeholder-content-subtle",
-        "border-border-subtle",
-        "hover:border-border-emphasis",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-border-emphasis",
-        "disabled:cursor-not-allowed disabled:bg-bg-muted disabled:text-content-muted disabled:hover:border-border-subtle",
-        "read-only:bg-bg-muted read-only:text-content-muted read-only:hover:border-border-subtle",
+        "focus:outline-none focus-visible:outline-none",
+        "border border-[var(--ctrl-edge-rest)]",
+        "hover:border-[var(--ctrl-edge-hover)]",
+        "focus-visible:shadow-[var(--ctrl-edge-focus)]",
+        "transition-colors duration-150 motion-reduce:transition-none",
+        "disabled:cursor-not-allowed disabled:bg-bg-muted disabled:text-content-muted disabled:hover:border-[var(--ctrl-edge-rest)]",
+        "read-only:bg-bg-muted read-only:text-content-muted read-only:hover:border-[var(--ctrl-edge-rest)]",
     ],
     {
         variants: {
@@ -50,7 +65,7 @@ export const inputVariants = cva(
                 lg: "h-10 px-3.5",
             },
             invalid: {
-                true: "border-border-error text-content-error placeholder-content-error/60 focus-visible:border-border-error focus-visible:ring-border-error",
+                true: "border-border-error text-content-error placeholder-content-error/60 focus-visible:border-border-error focus-visible:shadow-[0_0_0_3px_rgb(220_38_38_/_0.20)] hover:border-border-error",
                 false: "",
             },
         },

@@ -34,21 +34,31 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { forwardRef, type ComponentProps } from 'react';
 
+// R20-PR-B — date-picker trigger migrated to the R20 control-parity
+// edge tokens. The rest/hover/focus channels now ride
+// `--ctrl-edge-rest` / `--ctrl-edge-hover` / `--ctrl-edge-focus` so
+// a focused date-picker trigger feels like a cousin of a focused
+// Input and a focused Button — three controls, one focus
+// vocabulary. The Tailwind ring is dropped in favour of a
+// brand-tinted box-shadow halo so the open state can layer cleanly
+// (R20 doesn't widen open-state styling here; that's a later
+// roadmap if we go to "iridescent OPEN trigger" territory).
 const triggerStyles = cva(
     [
-        'group peer flex h-10 appearance-none items-center gap-x-2 truncate rounded-lg border px-3 text-sm outline-none',
+        'group peer flex h-10 appearance-none items-center gap-x-2 truncate rounded-lg px-3 text-sm outline-none',
         'transition-[color,border-color,box-shadow] duration-150 ease-out motion-reduce:transition-none',
-        'border-border-default bg-bg-default text-content-emphasis',
+        'border border-[var(--ctrl-edge-rest)] bg-bg-default text-content-emphasis',
+        'hover:border-[var(--ctrl-edge-hover)]',
         'cursor-pointer disabled:cursor-not-allowed',
-        'focus-visible:border-border-emphasis focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg-default',
-        'data-[state=open]:border-border-emphasis data-[state=open]:ring-4 data-[state=open]:ring-ring',
+        'focus-visible:shadow-[var(--ctrl-edge-focus)]',
+        'data-[state=open]:border-[var(--ctrl-edge-hover)] data-[state=open]:shadow-[var(--ctrl-edge-focus)]',
         'active:scale-[0.99] motion-reduce:active:scale-100',
-        'disabled:bg-bg-muted disabled:text-content-subtle disabled:border-border-subtle',
+        'disabled:bg-bg-muted disabled:text-content-subtle disabled:border-[var(--ctrl-edge-rest)]',
     ],
     {
         variants: {
             hasError: {
-                true: 'border-border-error ring-2 ring-border-error data-[state=open]:border-border-error data-[state=open]:ring-border-error',
+                true: 'border-border-error shadow-[0_0_0_3px_rgb(220_38_38_/_0.20)] data-[state=open]:border-border-error',
             },
         },
     },
