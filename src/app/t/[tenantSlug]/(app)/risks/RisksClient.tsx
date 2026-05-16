@@ -48,8 +48,7 @@ import { resolveBandForScore } from '@/lib/risk-matrix/scoring';
 import type { RiskMatrixConfigShape } from '@/lib/risk-matrix/types';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
 import { Heading } from '@/components/ui/typography';
-import { Card } from '@/components/ui/card';
-import { KPIStat } from '@/components/ui/metric';
+import { KpiFilterCard } from '@/components/ui/kpi-filter-card';
 import { PageBreadcrumbs } from '@/components/layout/PageBreadcrumbs';
 
 interface RiskListItem {
@@ -499,20 +498,32 @@ function RisksPageInner({
             </ListPageShell.Header>
 
             <ListPageShell.Filters className="space-y-section">
-                {/* KPI Cards — Polish PR-2: KPIStat primitive. */}
+                {/* KPI Cards — R23-PR-A: KpiFilterCard primitive. The
+                    Risks page is the first consumer of the shared
+                    primitive; later R23 PRs roll it out to Assets,
+                    Controls, Tasks, Evidence, Policies, Vendors. */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-default">
-                    <Card className="cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition-colors duration-150 ease-out" onClick={() => filterCtx.clearAll()}>
-                        <KPIStat value={total} label={t.totalRisks} />
-                    </Card>
-                    <Card>
-                        <KPIStat value={avgScore} label={t.avgScore} tone="attention" />
-                    </Card>
-                    <Card className="cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition-colors duration-150 ease-out" onClick={() => filterCtx.set('status', 'OPEN')}>
-                        <KPIStat value={openCount} label={t.openRisks} tone="success" />
-                    </Card>
-                    <Card>
-                        <KPIStat value={overdueRisks.length} label={t.overdueReviews} tone={overdueRisks.length > 0 ? 'critical' : 'success'} />
-                    </Card>
+                    <KpiFilterCard
+                        label={t.totalRisks}
+                        value={total}
+                        onClick={() => filterCtx.clearAll()}
+                    />
+                    <KpiFilterCard
+                        label={t.avgScore}
+                        value={avgScore}
+                        tone="attention"
+                    />
+                    <KpiFilterCard
+                        label={t.openRisks}
+                        value={openCount}
+                        tone="success"
+                        onClick={() => filterCtx.set('status', 'OPEN')}
+                    />
+                    <KpiFilterCard
+                        label={t.overdueReviews}
+                        value={overdueRisks.length}
+                        tone={overdueRisks.length > 0 ? 'critical' : 'success'}
+                    />
                 </div>
 
                 <RisksFilterToolbar
