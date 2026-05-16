@@ -1,0 +1,181 @@
+/**
+ * R23-PR-A — KpiFilterCard primitive.
+ *
+ * Extracts the Risks-page KPI card pattern into a reusable shared
+ * component. Six other list pages (Assets, Controls, Tasks, Evidence,
+ * Policies, Vendors) need the same look + interaction, so the
+ * primitive lives here and the Risks page becomes its first consumer.
+ *
+ * Visual contract — matches the Risks-page Card + KPIStat exactly:
+ *   • `<Card>` chassis (glass-card recipe, raised elevation, default
+ *     density).
+ *   • `<KPIStat>` typography (md size: 11px uppercase label, 30px
+ *     tabular-nums value, optional description, optional trend).
+ *   • Tone bag: default / success / attention / critical (inherits
+ *     KPIStat's TONE_VALUE_CLASS).
+ *
+ * Interaction contract — three states:
+ *   1. Static (no `onClick`)              — read-only KPI, used for
+ *                                           metrics that don't map to
+ *                                           a single filter (avg
+ *                                           score, total count).
+ *   2. Clickable (`onClick`, not selected) — `cursor-pointer` +
+ *                                           hover ring. Click sets
+ *                                           the page's KPI filter.
+ *   3. Selected (`onClick` + selected)    — brand-emphasis ring +
+ *                                           filled accent. Visual
+ *                                           lock that "this filter is
+ *                                           the active KPI right
+ *                                           now". Click again to
+ *                                           deactivate (caller wires
+ *                                           the toggle).
+ *
+ * The `selected` state is the R23 ADDITION on top of the existing
+ * Risks-page pattern. The R22-era Risks page had clickable cards but
+ * NO active-state affordance — clicking the OPEN card set the filter
+ * but the card itself didn't visibly mark itself as the active one.
+ * R23 closes that loop so the user can tell at a glance which KPI is
+ * driving the table.
+ *
+ * Accessibility
+ *   • Clickable cards render as `<button>` (via `as="button"`-like
+ *     props on the underlying Card) so keyboard activation works for
+ *     free — Enter and Space both fire `onClick`.
+ *   • Selected state mirrors to `aria-pressed="true"` so screen
+ *     readers announce the toggle state.
+ *
+ * Composition
+ *   • Pairs with the shared `useKpiFilter` hook (R23-PR-B).
+ *   • Renders inside a `<KpiCardRow>` grid (R23-PR-D+).
+ */
+
+"use client";
+
+import * as React from "react";
+import { cn } from "@dub/utils";
+
+import { Card } from "@/components/ui/card";
+import { KPIStat, type KPIStatProps, type MetricTone, type MetricTrend } from "@/components/ui/metric";
+
+export interface KpiFilterCardProps {
+    /** Short label rendered as 11px uppercase eyebrow above the value. */
+    label: React.ReactNode;
+    /** Headline numeric value. */
+    value: React.ReactNode;
+    /** Optional secondary text below the value (e.g. "5 due this week"). */
+    description?: React.ReactNode;
+    /** Optional trend indicator next to the value. */
+    trend?: MetricTrend;
+    /** Tone bag for the value colour. */
+    tone?: MetricTone;
+    /**
+     * When provided, makes the card clickable. Renders as a `<button>`
+     * for keyboard accessibility; `cursor-pointer` + hover ring on
+     * hover. Pair with `selected` to indicate the active filter state.
+     */
+    onClick?: () => void;
+    /**
+     * Visually indicates this card's filter is the active KPI. Pairs
+     * with `onClick`. Without `onClick` the prop is a no-op (selected
+     * read-only cards don't carry meaning).
+     */
+    selected?: boolean;
+    /** Optional id forwarded to KPIStat's value span — preserves E2E selectors. */
+    id?: string;
+    /** Optional class on the outer Card. */
+    className?: string;
+    /** Optional test-id for the wrapper element. */
+    "data-testid"?: string;
+}
+
+/**
+ * Static card class — matches the Risks-page Card defaults. Outer
+ * spacing and elevation come from Card's own defaults (density
+ * "comfortable" = p-6, elevation "raised" = glass-card recipe).
+ */
+const STATIC_CARD_CLASSES = "";
+
+/**
+ * Hover affordance for clickable cards — preserves the exact ring
+ * recipe the Risks page uses today (`hover:ring-1 hover:ring-[color:var(--ring)]`
+ * with a 150ms ease-out colour transition). The `cursor-pointer` is
+ * the click cue; the ring is the hover-state lift.
+ */
+const CLICKABLE_CARD_CLASSES =
+    "cursor-pointer hover:ring-1 hover:ring-[color:var(--ring)] transition-colors duration-150 ease-out";
+
+/**
+ * Selected affordance — brand-emphasis ring + tinted glow. R23's
+ * NEW visual that closes the loop on "which KPI is driving the
+ * table right now?". Heavier than hover (ring-2 vs ring-1, brand-
+ * emphasis vs --ring) so the active state stays visually distinct
+ * from the cursor-hover state. Composes with CLICKABLE_CARD_CLASSES
+ * — selected cards stay clickable (the toggle is "click active card
+ * to deactivate").
+ */
+const SELECTED_CARD_CLASSES =
+    "ring-2 ring-[color:var(--brand-default)] bg-bg-elevated";
+
+export function KpiFilterCard({
+    label,
+    value,
+    description,
+    trend,
+    tone,
+    onClick,
+    selected = false,
+    id,
+    className,
+    "data-testid": testId = "kpi-filter-card",
+}: KpiFilterCardProps) {
+    const isClickable = onClick !== undefined;
+
+    const kpiStatProps: KPIStatProps = {
+        label,
+        value,
+        description,
+        trend,
+        tone,
+        size: "md",
+        id,
+    };
+
+    // Render a <button> when clickable so Enter/Space activate the
+    // filter for free. Without onClick, render a plain <div> Card
+    // (read-only KPI surface).
+    if (isClickable) {
+        return (
+            <Card
+                as="div"
+                className={cn(
+                    CLICKABLE_CARD_CLASSES,
+                    selected && SELECTED_CARD_CLASSES,
+                    className,
+                )}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected}
+                data-testid={testId}
+                data-selected={selected ? "true" : "false"}
+                onClick={onClick}
+                onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onClick();
+                    }
+                }}
+            >
+                <KPIStat {...kpiStatProps} />
+            </Card>
+        );
+    }
+
+    return (
+        <Card
+            className={cn(STATIC_CARD_CLASSES, className)}
+            data-testid={testId}
+        >
+            <KPIStat {...kpiStatProps} />
+        </Card>
+    );
+}
