@@ -39,13 +39,19 @@ describe('R24-PR-A — Liquid-glass token foundation', () => {
             it(`declares ${token}`, () => {
                 // The token must appear at least twice — once in the
                 // dark-theme `:root` block and once in the light-theme
-                // `:root.light` block. A single declaration means one
-                // theme is missing the material parity R24 commits to.
-                const matches = TOKENS.match(
-                    new RegExp(`${token.replace(/-/g, '\\-')}\\s*:`, 'g'),
-                );
-                expect(matches).not.toBeNull();
-                expect((matches ?? []).length).toBeGreaterThanOrEqual(2);
+                // `[data-theme="light"]` block. A single declaration
+                // means one theme is missing the material parity R24
+                // commits to.
+                //
+                // Count via `split` rather than building a regex from
+                // the token string — avoids the CodeQL
+                // js/incomplete-sanitization alert on dynamic regex
+                // construction. The literal `${token}:` substring is
+                // unambiguous since CSS custom-property declarations
+                // always use `--name:` syntax.
+                const needle = `${token}:`;
+                const occurrences = TOKENS.split(needle).length - 1;
+                expect(occurrences).toBeGreaterThanOrEqual(2);
             });
         }
     });
