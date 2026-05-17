@@ -1,0 +1,108 @@
+/**
+ * R25-PR-E — interaction model ratchet.
+ *
+ * The R25 interaction model is deliberately constrained:
+ *   - Drag from palette → drop creates a node (PR-B).
+ *   - Drag from node handle → connect creates an edge (PR-B).
+ *   - Click on edge → "+ Add control" affordance at midpoint;
+ *     click → adds ControlOnEdge with default label "Control".
+ *   - Standard xyflow drag for repositioning.
+ *   - Standard xyflow Backspace for delete.
+ *
+ * Out-of-scope (and the ratchet enforces the absence):
+ *   - Right-click context menus.
+ *   - Inspector / properties panel.
+ *   - Inline editing dialogs for control label.
+ *
+ * This ratchet locks the "+ Add control" affordance contract:
+ *   1. The affordance appears ONLY when edge.selected === true.
+ *   2. The affordance disappears once a control is added.
+ *   3. Clicking the affordance mutates the edge's data.control via
+ *      useReactFlow().setEdges.
+ *   4. The affordance uses a contextual icon (ShieldPlus) distinct
+ *      from the placed-control icon (ShieldCheck) so users see the
+ *      action vs the result.
+ */
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+const ROOT = path.resolve(__dirname, "../..");
+const EDGE_PATH = "src/components/processes/ProcessEdge.tsx";
+
+const SRC = fs.readFileSync(path.join(ROOT, EDGE_PATH), "utf8");
+
+describe("R25-PR-E — interaction model", () => {
+    describe("Add-control affordance", () => {
+        it("uses useReactFlow().setEdges to mutate edge data", () => {
+            // setEdges is the xyflow-blessed way to update edge
+            // state from inside a custom edge component. Mutating
+            // a parent's state directly would break xyflow's
+            // change-detection optimisations.
+            expect(SRC).toMatch(/useReactFlow\(\)/);
+            expect(SRC).toMatch(/setEdges\(/);
+        });
+
+        it("affordance is rendered conditionally on (selected && !control)", () => {
+            // The affordance must NOT be always-on — that would
+            // clutter every edge at rest. Pattern: only show when
+            // the edge is SELECTED and does NOT yet carry a control.
+            expect(SRC).toMatch(
+                /\{!control\s*&&\s*selected\s*&&\s*\(/,
+            );
+        });
+
+        it("affordance click handler adds a control with the default label", () => {
+            // The constrained model: one click adds a control with
+            // a default label. No naming dialog, no inline editing
+            // (those are explicitly out of R25 scope).
+            expect(SRC).toMatch(
+                /control:\s*\{\s*label:\s*["']Control["']\s*\}/,
+            );
+        });
+
+        it("affordance uses ShieldPlus icon (distinct from placed control's ShieldCheck)", () => {
+            // Different icons for the AFFORDANCE (action) vs the
+            // RESULT (placed control). Visual feedback that the
+            // click did something.
+            expect(SRC).toMatch(/ShieldPlus/);
+            expect(SRC).toMatch(/ShieldCheck/);
+        });
+
+        it("affordance positions at the edge midpoint (labelX/labelY)", () => {
+            // Affordance must appear AT the connection it'll add
+            // a control to. Per-edge midpoint via getBezierPath's
+            // labelX/labelY (same positioning the placed control
+            // uses). Slice from the conditional opener so the
+            // transform style precedes the marker attribute.
+            const affordanceBlock = SRC.slice(
+                SRC.indexOf("{!control && selected"),
+                SRC.indexOf("data-add-control-affordance") + 100,
+            );
+            expect(affordanceBlock).toMatch(/translate\([^)]*labelX/);
+        });
+
+        it("affordance marker for downstream selectors", () => {
+            expect(SRC).toMatch(/data-add-control-affordance/);
+        });
+    });
+
+    describe("Constrained model — explicit absences", () => {
+        it("no context-menu wiring (right-click)", () => {
+            // R25 scope: no per-edge context menu. xyflow has
+            // onEdgeContextMenu — we deliberately don't use it.
+            expect(SRC).not.toMatch(/onEdgeContextMenu/);
+            expect(SRC).not.toMatch(/contextMenu/);
+        });
+
+        it("no inline label-editing input/dialog inside ProcessEdge", () => {
+            // The constrained model: control labels are not edited
+            // inline. Adding an <input> here would expand scope
+            // into label editing semantics — explicitly out.
+            const stripped = SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(
+                /\/\/[^\n]*/g,
+                "",
+            );
+            expect(stripped).not.toMatch(/<input\b/);
+        });
+    });
+});

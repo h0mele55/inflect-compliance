@@ -29,10 +29,11 @@ import {
     BaseEdge,
     EdgeLabelRenderer,
     getBezierPath,
+    useReactFlow,
     type EdgeProps,
 } from "@xyflow/react";
-import { ShieldCheck } from "lucide-react";
-import { memo } from "react";
+import { ShieldCheck, ShieldPlus } from "lucide-react";
+import { memo, useCallback } from "react";
 
 export interface ProcessEdgeData {
     /** Optional control placed on this connection. PR-E adds/removes it. */
@@ -66,6 +67,29 @@ function ProcessEdgeImpl(props: EdgeProps) {
 
     const edgeData = data as ProcessEdgeData | undefined;
     const control = edgeData?.control;
+    const { setEdges } = useReactFlow();
+
+    // R25-PR-E — single-click "+ Control" affordance. When an edge
+    // is selected AND carries no control, a small inline button
+    // appears at the midpoint. Click → mutates this edge's data
+    // to add a control with the default label. The constrained
+    // model: no inline editing, no naming dialog, no settings
+    // panel. Visual-authoring intent only.
+    const addControl = useCallback(() => {
+        setEdges((eds) =>
+            eds.map((edge) =>
+                edge.id === id
+                    ? {
+                          ...edge,
+                          data: {
+                              ...(edge.data as ProcessEdgeData | undefined),
+                              control: { label: "Control" },
+                          },
+                      }
+                    : edge,
+            ),
+        );
+    }, [id, setEdges]);
 
     return (
         <>
@@ -100,6 +124,32 @@ function ProcessEdgeImpl(props: EdgeProps) {
                         data-control-on-edge="true"
                     >
                         <ControlOnEdge label={control.label} />
+                    </div>
+                </EdgeLabelRenderer>
+            )}
+            {!control && selected && (
+                // R25-PR-E — affordance only appears when the user
+                // has SELECTED an edge that doesn't yet carry a
+                // control. This keeps the canvas calm at rest;
+                // affordance is contextual, not always-on.
+                <EdgeLabelRenderer>
+                    <div
+                        style={{
+                            position: "absolute",
+                            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+                            pointerEvents: "all",
+                        }}
+                        className="nodrag nopan"
+                        data-add-control-affordance="true"
+                    >
+                        <button
+                            type="button"
+                            onClick={addControl}
+                            className="inline-flex items-center gap-1 rounded-[8px] border border-border-emphasis bg-bg-default px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-content-emphasis shadow-sm hover:bg-bg-muted transition-colors"
+                        >
+                            <ShieldPlus className="h-3 w-3 shrink-0 text-[color:var(--brand-default)]" />
+                            <span>Add control</span>
+                        </button>
                     </div>
                 </EdgeLabelRenderer>
             )}
