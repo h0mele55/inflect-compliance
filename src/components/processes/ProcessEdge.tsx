@@ -145,7 +145,7 @@ function ProcessEdgeImpl(props: EdgeProps) {
                         <button
                             type="button"
                             onClick={addControl}
-                            className="inline-flex items-center gap-1 rounded-[8px] border border-border-emphasis bg-bg-default px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-content-emphasis shadow-sm hover:bg-bg-muted transition-colors"
+                            className="inline-flex items-center gap-1 rounded-[8px] border border-border-emphasis bg-bg-default px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-content-emphasis hover:bg-bg-muted transition-colors"
                         >
                             <ShieldPlus className="h-3 w-3 shrink-0 text-[color:var(--brand-default)]" />
                             <span>Add control</span>
