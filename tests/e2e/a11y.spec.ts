@@ -121,6 +121,26 @@ async function runA11yScan(page: Page, surfaceLabel: string) {
         .catch(() => {
             /* settle window expired — axe runs against current DOM */
         });
+
+    // Animation settle. Entry animations (R17's dashboard rise-in,
+    // card fade-ins) leave elements mid-transition: axe then samples
+    // a half-faded foreground against the background and reports a
+    // phantom `color-contrast` failure — the `#6f6f6e` / `#777776`
+    // greys that match no documented token, varying run-to-run with
+    // exactly the timing-flake signature. Zero out every animation /
+    // transition so each element snaps to its settled, fully-opaque
+    // colour before the scan; the brief repaint pause lets the
+    // recalculated styles land.
+    await page.addStyleTag({
+        content: `*, *::before, *::after {
+            animation-duration: 0s !important;
+            animation-delay: 0s !important;
+            transition-duration: 0s !important;
+            transition-delay: 0s !important;
+        }`,
+    });
+    await page.waitForTimeout(150);
+
     const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
         // See the docblock for why these are disabled.

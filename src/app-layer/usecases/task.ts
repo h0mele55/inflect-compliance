@@ -4,6 +4,7 @@ import { assertCanReadTasks, assertCanWriteTasks, assertCanCommentOnTasks } from
 import { logEvent } from '../events/audit';
 import { emitAutomationEvent } from '../automation';
 import { enqueueEmail } from '../notifications/enqueue';
+import { createTaskDueNotification } from '../notifications/task-due';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
 import { sanitizePlainText } from '@/lib/security/sanitize';
@@ -168,6 +169,10 @@ export async function createTask(ctx: RequestContext, input: {
 
         return task;
     });
+    // In-app TASK_DUE notification if the new task is already assigned
+    // and due within a reminder window. Runs AFTER the task
+    // transaction commits — see `emitTaskDueNotification`.
+    await emitTaskDueNotification(ctx, result);
     await bumpEntityCacheVersion(ctx, 'task');
     return result;
 }
@@ -202,6 +207,9 @@ export async function updateTask(ctx: RequestContext, taskId: string, patch: {
         });
         return task;
     });
+    // A rescheduled `dueAt` may move the task into a reminder window —
+    // re-evaluate the in-app notification after the commit.
+    await emitTaskDueNotification(ctx, result);
     await bumpEntityCacheVersion(ctx, 'task');
     return result;
 }
@@ -269,9 +277,11 @@ export async function assignTask(ctx: RequestContext, taskId: string, assigneeUs
         if (assigneeUserId) {
             await enqueueTaskAssignedNotification(db, ctx, taskId, task.title, task.key, task.type, assigneeUserId);
         }
-
         return task;
     });
+    // In-app TASK_DUE notification for the new assignee if the task
+    // is due within a reminder window — after the commit.
+    await emitTaskDueNotification(ctx, result);
     await bumpEntityCacheVersion(ctx, 'task');
     return result;
 }
@@ -316,6 +326,62 @@ async function enqueueTaskAssignedNotification(
     } catch (err) {
         // Fire-and-forget — never break the task operation
         logger.warn('failed to enqueue task assignment email', { component: 'notifications' });
+    }
+}
+
+/**
+ * Fire the in-app `TASK_DUE` notification the moment a task is
+ * created / rescheduled / assigned, so a near-term deadline reaches
+ * the notification bell immediately — instead of waiting on the
+ * daily 08:00 `task-due-notification` cron (which also depends on
+ * the scheduler having registered the repeatable).
+ *
+ * Runs AFTER the task's own transaction has committed, in its own
+ * short `runInTenantContext` transaction. It must NOT share the
+ * caller's transaction:
+ *   - A notification write must never roll back the task write — the
+ *     task is the user's intent; the notification is a side effect.
+ *   - `createTaskDueNotification` is idempotent via `ON CONFLICT DO
+ *     NOTHING` (it shares the cron's `dedupeKey`), but isolating it
+ *     in its own transaction also keeps any genuine DB error off the
+ *     task transaction entirely.
+ * Fully fire-and-forget — any failure is logged and swallowed.
+ */
+async function emitTaskDueNotification(
+    ctx: RequestContext,
+    task: {
+        id: string;
+        tenantId: string;
+        title: string;
+        key: string | null;
+        dueAt: Date | null;
+        assigneeUserId: string | null;
+    },
+): Promise<void> {
+    if (!task.assigneeUserId || !task.dueAt || !ctx.tenantSlug) return;
+    // Hoist the narrowed values — the closure below would otherwise
+    // see the wider nullable property types.
+    const tenantSlug = ctx.tenantSlug;
+    const assigneeUserId = task.assigneeUserId;
+    const dueAt = task.dueAt;
+    try {
+        await runInTenantContext(ctx, (db) =>
+            createTaskDueNotification(db, {
+                id: task.id,
+                tenantId: task.tenantId,
+                tenantSlug,
+                title: task.title,
+                key: task.key,
+                dueAt,
+                assigneeUserId,
+            }),
+        );
+    } catch (err) {
+        logger.warn('failed to create task-due notification', {
+            component: 'notifications',
+            taskId: task.id,
+            error: err instanceof Error ? err.message : String(err),
+        });
     }
 }
 
