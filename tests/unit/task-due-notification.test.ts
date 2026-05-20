@@ -28,6 +28,7 @@ import {
     classifyDueWindow,
     buildTaskDueDedupeKey,
     processTaskDueNotifications,
+    createTaskDueNotification,
     TASK_DUE_WINDOWS,
 } from '../../src/app-layer/jobs/task-due-notification';
 
@@ -365,6 +366,72 @@ describe('processTaskDueNotifications — deduplication', () => {
 
         await expect(
             processTaskDueNotifications(db, { now: NOW }),
+        ).rejects.toThrow('connection reset');
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 8. createTaskDueNotification — the shared per-task helper
+//    (the event-driven seam the task usecases call directly)
+// ════════════════════════════════════════════════════════════════════
+
+describe('createTaskDueNotification — per-task helper', () => {
+    const target = {
+        id: 'task-x',
+        tenantId: 'tenant-a',
+        tenantSlug: 'acme',
+        title: 'Ship it',
+        key: 'TSK-9',
+        dueAt: DUE_TOMORROW,
+        assigneeUserId: 'user-1',
+    };
+
+    it('creates a TASK_DUE notification for an in-window task', async () => {
+        const { db, create } = makeDb([]);
+
+        const outcome = await createTaskDueNotification(db, target, NOW);
+
+        expect(outcome).toEqual({ status: 'created', window: 'day' });
+        expect(create).toHaveBeenCalledTimes(1);
+        expect(lastCreateData(create)).toMatchObject({
+            tenantId: 'tenant-a',
+            userId: 'user-1',
+            type: 'TASK_DUE',
+            title: 'Task due tomorrow',
+            message: 'TSK-9 "Ship it" is due tomorrow.',
+            linkUrl: '/t/acme/tasks/task-x',
+            dedupeKey: 'tenant-a:TASK_DUE:day:task-x:user-1:2026-05-20',
+        });
+    });
+
+    it('does nothing for a task outside the {7,1,0}-day windows', async () => {
+        const { db, create } = makeDb([]);
+
+        const outcome = await createTaskDueNotification(
+            db,
+            { ...target, dueAt: DUE_IN_3_DAYS },
+            NOW,
+        );
+
+        expect(outcome).toEqual({ status: 'out-of-window', window: null });
+        expect(create).not.toHaveBeenCalled();
+    });
+
+    it('reports a dedupeKey collision as duplicate — not an error', async () => {
+        const { db, create } = makeDb([]);
+        create.mockRejectedValueOnce({ code: 'P2002' });
+
+        const outcome = await createTaskDueNotification(db, target, NOW);
+
+        expect(outcome).toEqual({ status: 'duplicate', window: 'day' });
+    });
+
+    it('a non-P2002 database error propagates', async () => {
+        const { db, create } = makeDb([]);
+        create.mockRejectedValueOnce(new Error('connection reset'));
+
+        await expect(
+            createTaskDueNotification(db, target, NOW),
         ).rejects.toThrow('connection reset');
     });
 });

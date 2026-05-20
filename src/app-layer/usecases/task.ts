@@ -4,6 +4,7 @@ import { assertCanReadTasks, assertCanWriteTasks, assertCanCommentOnTasks } from
 import { logEvent } from '../events/audit';
 import { emitAutomationEvent } from '../automation';
 import { enqueueEmail } from '../notifications/enqueue';
+import { createTaskDueNotification } from '../jobs/task-due-notification';
 import { runInTenantContext } from '@/lib/db-context';
 import { notFound, badRequest } from '@/lib/errors/types';
 import { sanitizePlainText } from '@/lib/security/sanitize';
@@ -165,6 +166,9 @@ export async function createTask(ctx: RequestContext, input: {
         if (input.assigneeUserId) {
             await enqueueTaskAssignedNotification(db, ctx, task.id, task.title, task.key, input.type || 'TASK', input.assigneeUserId);
         }
+        // In-app TASK_DUE notification if the new task is already
+        // assigned + due within a reminder window.
+        await emitTaskDueNotification(db, ctx, task);
 
         return task;
     });
@@ -200,6 +204,9 @@ export async function updateTask(ctx: RequestContext, taskId: string, patch: {
             detailsJson: { category: 'entity_lifecycle', entityName: 'Task', operation: 'updated', summary: 'TASK_UPDATED' },
             metadata: patch,
         });
+        // A rescheduled `dueAt` (or a reassignment) may move the task
+        // into a reminder window — re-evaluate the in-app notification.
+        await emitTaskDueNotification(db, ctx, task);
         return task;
     });
     await bumpEntityCacheVersion(ctx, 'task');
@@ -269,6 +276,9 @@ export async function assignTask(ctx: RequestContext, taskId: string, assigneeUs
         if (assigneeUserId) {
             await enqueueTaskAssignedNotification(db, ctx, taskId, task.title, task.key, task.type, assigneeUserId);
         }
+        // In-app TASK_DUE notification for the new assignee if the
+        // task is due within a reminder window.
+        await emitTaskDueNotification(db, ctx, task);
 
         return task;
     });
@@ -316,6 +326,51 @@ async function enqueueTaskAssignedNotification(
     } catch (err) {
         // Fire-and-forget — never break the task operation
         logger.warn('failed to enqueue task assignment email', { component: 'notifications' });
+    }
+}
+
+/**
+ * Fire the in-app `TASK_DUE` notification the moment a task is
+ * created / rescheduled / assigned, so a near-term deadline reaches
+ * the notification bell immediately — instead of waiting on the
+ * daily 08:00 `task-due-notification` cron (which also depends on
+ * the scheduler having registered the repeatable).
+ *
+ * `createTaskDueNotification` is idempotent — it shares the cron's
+ * `dedupeKey`, so the cron never double-notifies a task this path
+ * already covered, and a re-save the same UTC day is absorbed by
+ * the unique index. Fire-and-forget — a notification failure must
+ * never break the task write.
+ */
+async function emitTaskDueNotification(
+    db: PrismaTx,
+    ctx: RequestContext,
+    task: {
+        id: string;
+        tenantId: string;
+        title: string;
+        key: string | null;
+        dueAt: Date | null;
+        assigneeUserId: string | null;
+    },
+): Promise<void> {
+    if (!task.assigneeUserId || !task.dueAt || !ctx.tenantSlug) return;
+    try {
+        await createTaskDueNotification(db, {
+            id: task.id,
+            tenantId: task.tenantId,
+            tenantSlug: ctx.tenantSlug,
+            title: task.title,
+            key: task.key,
+            dueAt: task.dueAt,
+            assigneeUserId: task.assigneeUserId,
+        });
+    } catch (err) {
+        logger.warn('failed to create task-due notification', {
+            component: 'notifications',
+            taskId: task.id,
+            error: err instanceof Error ? err.message : String(err),
+        });
     }
 }
 

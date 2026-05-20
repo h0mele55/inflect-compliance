@@ -137,6 +137,78 @@ function isUniqueConstraintError(error: any): boolean {
     return error?.code === 'P2002' || error?.message?.includes('Unique constraint');
 }
 
+/** One task in the shape the per-task notification helper needs. */
+export interface TaskDueTarget {
+    id: string;
+    tenantId: string;
+    tenantSlug: string;
+    title: string;
+    key?: string | null;
+    dueAt: Date;
+    assigneeUserId: string;
+}
+
+export interface TaskDueNotificationOutcome {
+    status: 'created' | 'duplicate' | 'out-of-window';
+    /** The matched reminder window, or null when out of window. */
+    window: TaskDueWindow | null;
+}
+
+/**
+ * Create the in-app `TASK_DUE` notification for ONE task, if its
+ * `dueAt` lands on a {7,1,0}-day reminder window. Idempotent — the
+ * `dedupeKey` unique index absorbs a repeat (the cron and the
+ * event-driven usecase path, or two saves the same UTC day).
+ *
+ * The shared seam: the daily `task-due-notification` job calls this
+ * per scanned task, AND the task usecases (`createTask` /
+ * `updateTask` / `assignTask`) call it the moment a task is created,
+ * rescheduled, or assigned — so a near-term deadline reaches the
+ * notification bell immediately rather than waiting on the 08:00
+ * cron, and without depending on the scheduler having registered
+ * the repeatable at all.
+ */
+export async function createTaskDueNotification(
+    db: Pick<PrismaClient, 'notification'>,
+    task: TaskDueTarget,
+    now: Date = new Date(),
+): Promise<TaskDueNotificationOutcome> {
+    const window = classifyDueWindow(task.dueAt, now);
+    if (!window) return { status: 'out-of-window', window: null };
+
+    const copy = TASK_DUE_WINDOWS[window];
+    const label = task.key
+        ? `${task.key} "${task.title}"`
+        : `"${task.title}"`;
+
+    try {
+        await db.notification.create({
+            data: {
+                tenantId: task.tenantId,
+                userId: task.assigneeUserId,
+                type: 'TASK_DUE',
+                title: copy.title,
+                message: `${label} ${copy.phrase}.`,
+                linkUrl: `/t/${task.tenantSlug}/tasks/${task.id}`,
+                dedupeKey: buildTaskDueDedupeKey(
+                    task.tenantId,
+                    window,
+                    task.id,
+                    task.assigneeUserId,
+                    now,
+                ),
+            },
+        });
+        return { status: 'created', window };
+    } catch (error: unknown) {
+        if (isUniqueConstraintError(error)) {
+            // Already notified for this task+user+window this UTC day.
+            return { status: 'duplicate', window };
+        }
+        throw error;
+    }
+}
+
 /**
  * Scan + notify. Public seam — `executor-registry` calls this with
  * the global Prisma client; tests construct their own and call directly.
@@ -193,40 +265,24 @@ export async function processTaskDueNotifications(
         // them nullable through the `select` projection.
         if (!task.dueAt || !task.assigneeUserId) continue;
 
-        const window = classifyDueWindow(task.dueAt, now);
-        if (!window) continue;
-
-        const copy = TASK_DUE_WINDOWS[window];
-        const label = task.key ? `${task.key} "${task.title}"` : `"${task.title}"`;
-
-        try {
-            await db.notification.create({
-                data: {
-                    tenantId: task.tenantId,
-                    userId: task.assigneeUserId,
-                    type: 'TASK_DUE',
-                    title: copy.title,
-                    message: `${label} ${copy.phrase}.`,
-                    linkUrl: `/t/${task.tenant.slug}/tasks/${task.id}`,
-                    dedupeKey: buildTaskDueDedupeKey(
-                        task.tenantId,
-                        window,
-                        task.id,
-                        task.assigneeUserId,
-                        now,
-                    ),
-                },
-            });
+        const { status, window } = await createTaskDueNotification(
+            db,
+            {
+                id: task.id,
+                tenantId: task.tenantId,
+                tenantSlug: task.tenant.slug,
+                title: task.title,
+                key: task.key,
+                dueAt: task.dueAt,
+                assigneeUserId: task.assigneeUserId,
+            },
+            now,
+        );
+        if (status === 'created' && window) {
             created++;
             byWindow[window]++;
-        } catch (error: unknown) {
-            if (isUniqueConstraintError(error)) {
-                // Already notified for this task+user+window this UTC
-                // day — idempotent re-run. Not an error.
-                skippedDuplicate++;
-                continue;
-            }
-            throw error;
+        } else if (status === 'duplicate') {
+            skippedDuplicate++;
         }
     }
 
