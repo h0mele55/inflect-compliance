@@ -1,13 +1,10 @@
 'use client';
-/* TODO(swr-migration): this file has fetch-on-mount + setState
- * patterns flagged by react-hooks/set-state-in-effect. Each call site
- * carries an inline disable directive; collectively they should
- * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
 
 import { formatDate, formatDateTime } from '@/lib/format-date';
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useTenantSWR } from '@/lib/hooks/use-tenant-swr';
 import Link from 'next/link';
 import { AppIcon } from '@/components/icons/AppIcon';
 import { useTenantApiUrl, useTenantHref, useTenantContext } from '@/lib/tenant-context-provider';
@@ -100,135 +97,136 @@ export default function TaskDetailPage() {
     const taskId = params?.taskId as string;
     const triggerUndoToast = useToastWithUndo();
 
-    const [task, setTask] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [tab, setTab] = useState<Tab>('overview');
 
-    // Status
+    // Mutation in-flight flags (UI-disable only — not data).
     const [changingStatus, setChangingStatus] = useState(false);
-
-    // Assignment
-    const [assigneeInput, setAssigneeInput] = useState('');
     const [assigning, setAssigning] = useState(false);
+    // Assignee-picker draft. `undefined` = untouched (mirror the
+    // task's persisted assignee); `string | null` = an explicit pick.
+    const [assigneeDraft, setAssigneeDraft] = useState<string | null | undefined>(undefined);
 
-    // Links
-    const [links, setLinks] = useState<any[]>([]);
-    const [linksLoading, setLinksLoading] = useState(false);
+    // Link form state.
     const [showLinkForm, setShowLinkForm] = useState(false);
     const [linkEntityType, setLinkEntityType] = useState('CONTROL');
     const [linkEntityId, setLinkEntityId] = useState('');
     const [linkRelation, setLinkRelation] = useState('RELATES_TO');
     const [savingLink, setSavingLink] = useState(false);
 
-    // Comments
-    const [comments, setComments] = useState<any[]>([]);
-    const [commentsLoading, setCommentsLoading] = useState(false);
+    // Comment form state.
     const [commentBody, setCommentBody] = useState('');
     const [savingComment, setSavingComment] = useState(false);
 
-    // Activity
-    const [activity, setActivity] = useState<any[]>([]);
-    const [activityLoading, setActivityLoading] = useState(false);
-
     const canComment = role !== 'READER';
 
-    const fetchTask = useCallback(async () => {
-        setLoading(true);
-        try {
-            const res = await fetch(apiUrl(`/tasks/${taskId}`));
-            if (!res.ok) throw new Error('Task not found');
-            const data = await res.json();
-            setTask(data);
-            setAssigneeInput(data.assigneeUserId || '');
-        } catch (e: any) {
-            setError(e.message);
-        } finally {
-            setLoading(false);
-        }
-    }, [apiUrl, taskId]);
+    // #102 item 5 — the page read the task and each tab via raw
+    // useState + useEffect + fetch, and every mutation re-fetched the
+    // whole task. Migrated to `useTenantSWR` (Epic 69 — the pattern
+    // this file's own TODO asked for, and the one the sibling
+    // control-detail page uses). Tab data fetches lazily through a
+    // null SWR key while its tab is inactive; mutations write the
+    // cache through `mutate` — optimistic for instant feedback, then
+    // revalidate to reconcile server-derived fields.
+    const taskQuery = useTenantSWR<any>(taskId ? `/tasks/${taskId}` : null);
+    const task = taskQuery.data ?? null;
+    const loading = taskQuery.isLoading;
+    const error = taskQuery.error
+        ? (taskQuery.error instanceof Error
+            ? taskQuery.error.message
+            : 'Task not found')
+        : '';
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    useEffect(() => { fetchTask(); }, [fetchTask]);
+    const linksQuery = useTenantSWR<any[]>(
+        taskId && tab === 'links' ? `/tasks/${taskId}/links` : null,
+    );
+    const links = linksQuery.data ?? [];
+    const linksLoading = linksQuery.isLoading;
 
-    // Fetch links when tab opens
-    useEffect(() => {
-        if (tab !== 'links') return;
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setLinksLoading(true);
-        fetch(apiUrl(`/tasks/${taskId}/links`))
-            .then(r => r.ok ? r.json() : [])
-            .then(setLinks)
-            .catch(() => { })
-            .finally(() => setLinksLoading(false));
-    }, [tab, apiUrl, taskId]);
+    const commentsQuery = useTenantSWR<any[]>(
+        taskId && tab === 'comments' ? `/tasks/${taskId}/comments` : null,
+    );
+    const comments = commentsQuery.data ?? [];
+    const commentsLoading = commentsQuery.isLoading;
 
-    // Fetch comments when tab opens
-    useEffect(() => {
-        if (tab !== 'comments') return;
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setCommentsLoading(true);
-        fetch(apiUrl(`/tasks/${taskId}/comments`))
-            .then(r => r.ok ? r.json() : [])
-            .then(setComments)
-            .catch(() => { })
-            .finally(() => setCommentsLoading(false));
-    }, [tab, apiUrl, taskId]);
+    const activityQuery = useTenantSWR<any[]>(
+        taskId && tab === 'activity' ? `/tasks/${taskId}/activity` : null,
+    );
+    const activity = activityQuery.data ?? [];
+    const activityLoading = activityQuery.isLoading;
 
-    // Fetch activity when tab opens
-    useEffect(() => {
-        if (tab !== 'activity') return;
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setActivityLoading(true);
-        fetch(apiUrl(`/tasks/${taskId}/activity`))
-            .then(r => r.ok ? r.json() : [])
-            .then(setActivity)
-            .catch(() => { })
-            .finally(() => setActivityLoading(false));
-    }, [tab, apiUrl, taskId]);
+    // Effective assignee for the picker — the draft if the user has
+    // touched it, otherwise the task's persisted assignee.
+    const assigneeValue: string | null =
+        assigneeDraft !== undefined
+            ? assigneeDraft
+            : (task?.assigneeUserId ?? null);
 
     const changeStatus = async (status: string) => {
         setChangingStatus(true);
-        await fetch(apiUrl(`/tasks/${taskId}/status`), {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
-        });
-        await fetchTask();
-        setChangingStatus(false);
+        try {
+            // Optimistic — the new status shows instantly, no spinner.
+            await taskQuery.mutate(
+                (cur: any) => (cur ? { ...cur, status } : cur),
+                { revalidate: false },
+            );
+            await fetch(apiUrl(`/tasks/${taskId}/status`), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            });
+        } finally {
+            setChangingStatus(false);
+            // Reconcile — pick up server-derived fields (completedAt,
+            // resolution) the optimistic patch can't know.
+            await taskQuery.mutate();
+        }
     };
 
     const handleAssign = async () => {
         setAssigning(true);
-        await fetch(apiUrl(`/tasks/${taskId}/assign`), {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ assigneeUserId: assigneeInput || null }),
-        });
-        await fetchTask();
-        setAssigning(false);
+        const assigneeUserId = assigneeValue || null;
+        try {
+            await taskQuery.mutate(
+                (cur: any) => (cur ? { ...cur, assigneeUserId } : cur),
+                { revalidate: false },
+            );
+            await fetch(apiUrl(`/tasks/${taskId}/assign`), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ assigneeUserId }),
+            });
+        } finally {
+            setAssigning(false);
+            await taskQuery.mutate();
+        }
     };
 
     const addLink = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!linkEntityId.trim()) return;
         setSavingLink(true);
-        await fetch(apiUrl(`/tasks/${taskId}/links`), {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ entityType: linkEntityType, entityId: linkEntityId, relation: linkRelation }),
-        });
-        setLinkEntityId('');
-        setShowLinkForm(false);
-        // Refresh links
-        const res = await fetch(apiUrl(`/tasks/${taskId}/links`));
-        if (res.ok) setLinks(await res.json());
-        setSavingLink(false);
+        try {
+            await fetch(apiUrl(`/tasks/${taskId}/links`), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entityType: linkEntityType, entityId: linkEntityId, relation: linkRelation }),
+            });
+            setLinkEntityId('');
+            setShowLinkForm(false);
+        } finally {
+            setSavingLink(false);
+            // Refresh the links list + the task (its _count.links
+            // drives the Links tab badge).
+            await Promise.all([linksQuery.mutate(), taskQuery.mutate()]);
+        }
     };
 
-    // Epic 67 — delayed-commit link removal. Optimistic local filter so
-    // the row disappears immediately. On undo we refetch to restore;
-    // on commit success we leave the local state alone (already correct).
+    // Epic 67 — delayed-commit link removal. Optimistic SWR cache
+    // filter so the row disappears immediately; undo restores it,
+    // commit-failure rolls back.
     const removeLink = (linkId: string) => {
-        const previous = links;
-        setLinks(prev => prev.filter(l => l.id !== linkId));
+        const previous = linksQuery.data ?? [];
+        void linksQuery.mutate(
+            previous.filter((l: any) => l.id !== linkId),
+            { revalidate: false },
+        );
         triggerUndoToast({
             message: 'Link removed',
             undoMessage: 'Undo',
@@ -239,8 +237,12 @@ export default function TaskDetailPage() {
                 );
                 if (!res.ok) throw new Error('Remove link failed');
             },
-            undoAction: () => setLinks(previous),
-            onError: () => setLinks(previous),
+            undoAction: () => {
+                void linksQuery.mutate(previous, { revalidate: false });
+            },
+            onError: () => {
+                void linksQuery.mutate(previous, { revalidate: false });
+            },
         });
     };
 
@@ -248,15 +250,16 @@ export default function TaskDetailPage() {
         e.preventDefault();
         if (!commentBody.trim()) return;
         setSavingComment(true);
-        await fetch(apiUrl(`/tasks/${taskId}/comments`), {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ body: commentBody }),
-        });
-        setCommentBody('');
-        // Refresh comments
-        const res = await fetch(apiUrl(`/tasks/${taskId}/comments`));
-        if (res.ok) setComments(await res.json());
-        setSavingComment(false);
+        try {
+            await fetch(apiUrl(`/tasks/${taskId}/comments`), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ body: commentBody }),
+            });
+            setCommentBody('');
+        } finally {
+            setSavingComment(false);
+            await Promise.all([commentsQuery.mutate(), taskQuery.mutate()]);
+        }
     };
 
     const breadcrumbs = [
@@ -392,9 +395,9 @@ export default function TaskDetailPage() {
                                 id="task-assignee-input"
                                 name="assigneeUserId"
                                 tenantSlug={tenantSlug}
-                                selectedId={assigneeInput || null}
+                                selectedId={assigneeValue}
                                 onChange={(userId) =>
-                                    setAssigneeInput(userId ?? '')
+                                    setAssigneeDraft(userId ?? null)
                                 }
                                 placeholder="Unassigned"
                                 forceDropdown={false}
