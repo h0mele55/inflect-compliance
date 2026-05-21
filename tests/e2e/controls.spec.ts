@@ -10,6 +10,7 @@
  *
  * All selectors use existing id attributes — no data-testid additions.
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { loginAndGetTenant } from './e2e-utils';
@@ -23,7 +24,7 @@ const READER_USER = { email: 'viewer@acme.com', password: 'password123' };
  * needs a control mints its own — nothing is shared across tests.
  */
 async function createControl(page: Page, slug: string): Promise<string> {
-    const uid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const uid = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
     await page.goto(`/t/${slug}/controls/new`);
     await page.waitForSelector('#control-name-input', { timeout: 15000 });
     await page.fill('#control-name-input', `E2E Control ${uid}`);

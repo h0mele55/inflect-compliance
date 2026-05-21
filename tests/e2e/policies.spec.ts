@@ -11,6 +11,7 @@
  *
  * All selectors use existing id attributes — no data-testid additions.
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { gotoAndVerify, safeGoto } from './e2e-utils';
@@ -20,7 +21,7 @@ import { gotoAndVerify, safeGoto } from './e2e-utils';
  * path. Self-contained setup helper.
  */
 async function createPolicy(page: Page, slug: string): Promise<string> {
-    const uid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const uid = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
     await gotoAndVerify(page, `/t/${slug}/policies/new`, '#policy-title-input');
     await page.fill('#policy-title-input', `E2E Test Policy ${uid}`);
     await page.fill(

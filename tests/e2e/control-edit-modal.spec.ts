@@ -13,6 +13,7 @@
  * data-testid attributes added (the edit-modal ones predate this
  * work).
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { loginAndGetTenant } from './e2e-utils';
@@ -22,7 +23,7 @@ const READER_USER = { email: 'viewer@acme.com', password: 'password123' };
 
 /** Create a control on the isolated tenant; land on its detail page. */
 async function createControl(page: Page, slug: string): Promise<void> {
-    const uid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const uid = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
     await page.goto(`/t/${slug}/controls/new`);
     await page.waitForSelector('#control-name-input', { timeout: 15000 });
     await page.fill('#control-name-input', `Edit Modal Ctrl ${uid}`);

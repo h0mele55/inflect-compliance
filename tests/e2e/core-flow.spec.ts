@@ -21,6 +21,7 @@
  *
  * All selectors use existing id attributes — no data-testid additions.
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import * as path from 'path';
 
@@ -32,9 +33,7 @@ test.describe('Core Certification Flow', () => {
         isolatedTenant,
     }) => {
         const { tenantSlug } = isolatedTenant;
-        const unique = `${Date.now().toString(36)}-${Math.random()
-            .toString(36)
-            .slice(2, 7)}`;
+        const unique = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
         const CONTROL_CODE = `E2E-CTRL-${unique}`;
         const CONTROL_NAME = `E2E Access Control ${unique}`;
         const RISK_TITLE = `E2E Risk ${unique}`;

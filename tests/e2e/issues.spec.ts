@@ -11,6 +11,7 @@
  *
  * All selectors use existing id attributes — no data-testid additions.
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { loginAndGetTenant, gotoAndVerify, safeGoto, selectComboboxOption } from './e2e-utils';
@@ -23,7 +24,7 @@ const READER_USER = { email: 'viewer@acme.com', password: 'password123' };
  * detail page. Returns the issue title for later text-locator use.
  */
 async function createIssue(page: Page, slug: string): Promise<string> {
-    const uid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const uid = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
     const title = `E2E Issue ${uid}`;
     await gotoAndVerify(page, `/t/${slug}/tasks/new`, '#task-title-input');
 

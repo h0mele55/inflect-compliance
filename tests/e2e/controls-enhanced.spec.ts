@@ -10,13 +10,14 @@
  *
  * All selectors use existing id attributes — no data-testid additions.
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { safeGoto } from './e2e-utils';
 
 /** Create a control on the isolated tenant; land on its detail page. */
 async function createControl(page: Page, slug: string): Promise<void> {
-    const uid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const uid = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
     let r = 3;
     while (r > 0) {
         const resp = await safeGoto(page, `/t/${slug}/controls/new`, {

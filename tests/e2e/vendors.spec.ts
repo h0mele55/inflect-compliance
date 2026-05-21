@@ -10,13 +10,14 @@
  *
  * All selectors use existing id attributes — no data-testid additions.
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { gotoAndVerify, selectComboboxOption } from './e2e-utils';
 
 /** Create a vendor on the isolated tenant and land on its detail page. */
 async function createVendor(page: Page, slug: string): Promise<string> {
-    const uid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const uid = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
     const name = `E2E Vendor ${uid}`;
     await gotoAndVerify(page, `/t/${slug}/vendors/new`, '#vendor-name-input');
     await page.fill('#vendor-name-input', name);

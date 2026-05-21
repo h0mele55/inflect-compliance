@@ -13,6 +13,7 @@
  *
  * All selectors use existing id attributes — no data-testid additions.
  */
+import { randomUUID } from 'node:crypto';
 import { test, expect } from './fixtures';
 import { gotoAndVerify } from './e2e-utils';
 
@@ -22,9 +23,7 @@ test.describe('Control Tests (Test-of-Control)', () => {
         isolatedTenant,
     }) => {
         const { tenantSlug } = isolatedTenant;
-        const uid = `${Date.now().toString(36)}-${Math.random()
-            .toString(36)
-            .slice(2, 7)}`;
+        const uid = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
 
         await test.step('create control + test plan', async () => {
             await gotoAndVerify(
