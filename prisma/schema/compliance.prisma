@@ -760,6 +760,7 @@ model PolicyVersion {
 
 model PolicyApproval {
   id                String               @id @default(cuid())
+  tenantId          String
   policyId          String
   policyVersionId   String
   requestedByUserId String
@@ -772,12 +773,14 @@ model PolicyApproval {
   policy            Policy               @relation(fields: [policyId], references: [id], onDelete: Cascade)
   policyVersion     PolicyVersion        @relation(fields: [policyVersionId], references: [id], onDelete: Cascade)
   requestedBy       User                 @relation("PolicyApprovalRequester", fields: [requestedByUserId], references: [id])
+  tenant            Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  // FK reverse-lookup indexes. PolicyApproval is ownership-chained
-  // (no tenantId of its own — tenant scope flows via `policy`), so
-  // each FK must lead a standalone index.
-  @@index([policyId])
-  @@index([policyVersionId])
+  // FK reverse-lookup indexes. PolicyApproval is now first-class
+  // tenant-scoped (carries its own tenantId — direct RLS, not
+  // ownership-chained), so the FK reverse lookups ride tenant-leading
+  // composites. tenantId leads both, so no separate @@index([tenantId]).
+  @@index([tenantId, policyId])
+  @@index([tenantId, policyVersionId])
 }
 
 model PolicyAcknowledgement {

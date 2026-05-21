@@ -612,15 +612,25 @@ CREATE POLICY tenant_isolation_insert ON "PolicyVersion"
     FOR INSERT WITH CHECK ("tenantId" = current_setting('app.tenant_id', true)::text);
 DROP POLICY IF EXISTS allow_all ON "PolicyVersion";
 
+-- PolicyApproval — promoted to direct-tenantId (migration
+-- 20260521130000_promote_policy_approval_tenant).
+ALTER TABLE "PolicyApproval" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "PolicyApproval" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON "PolicyApproval";
+CREATE POLICY tenant_isolation ON "PolicyApproval"
+    USING ("tenantId" = current_setting('app.tenant_id', true)::text);
+DROP POLICY IF EXISTS tenant_isolation_insert ON "PolicyApproval";
+CREATE POLICY tenant_isolation_insert ON "PolicyApproval"
+    FOR INSERT WITH CHECK ("tenantId" = current_setting('app.tenant_id', true)::text);
+DROP POLICY IF EXISTS superuser_bypass ON "PolicyApproval";
+CREATE POLICY superuser_bypass ON "PolicyApproval"
+    USING (current_setting('role') != 'app_user');
+DROP POLICY IF EXISTS allow_all ON "PolicyApproval";
+
 -- ═══════════════════════════════════════════════════════════════════
 -- TABLES WITHOUT tenantId (handled in rls-fix.sql with USING(true))
 -- ═══════════════════════════════════════════════════════════════════
--- PolicyApproval, PolicyAcknowledgement                  → deferred: need tenantId via migration
--- EvidenceReview                                        → deferred: need tenantId via migration
--- FindingEvidence                                       → deferred: need tenantId via migration
--- AuditChecklistItem                                    → deferred: need tenantId via migration
--- AuditorPackAccess                                     → deferred: need tenantId via migration
--- PolicyControlLink                                     → deferred: need tenantId via migration
+-- PolicyAcknowledgement                                 → deferred: need tenantId via migration
 -- FrameworkMapping                                      → global by design (cross-tenant mapping)
 
 -- ═══════════════════════════════════════════════════════════════════

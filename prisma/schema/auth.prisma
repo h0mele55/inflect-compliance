@@ -113,6 +113,7 @@ model Tenant {
   notificationOutbox                NotificationOutbox[]
   policies                          Policy[]
   policyVersions                    PolicyVersion[]
+  policyApprovals                   PolicyApproval[]
   reminderHistories                 ReminderHistory[]
   risks                             Risk[]
   riskControls                      RiskControl[]
