@@ -47,10 +47,11 @@ describe('TENANT_SCOPED_MODELS catalogue', () => {
             'Task', 'Vendor', 'TenantMembership', 'TenantApiKey',
             'TenantSecuritySettings', 'UserMfaEnrollment',
             'IntegrationConnection', 'AutomationRule', 'AutomationExecution',
-            // Class E (ownership-chained)
-            'EvidenceReview', 'PolicyApproval', 'PolicyAcknowledgement',
-            'AuditChecklistItem', 'FindingEvidence', 'AuditorPackAccess',
-            'PolicyControlLink',
+            // Class A (direct tenantId — migrated from ownership-chained)
+            'EvidenceReview', 'PolicyApproval', 'AuditChecklistItem',
+            'FindingEvidence', 'AuditorPackAccess', 'PolicyControlLink',
+            // Class E (ownership-chained — no direct tenantId column)
+            'PolicyAcknowledgement',
         ];
         for (const name of mustInclude) {
             expect(TENANT_SCOPED_MODELS.has(name)).toBe(true);

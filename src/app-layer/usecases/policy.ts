@@ -391,7 +391,7 @@ export async function decidePolicyApproval(ctx: RequestContext, approvalId: stri
     assertCanAdmin(ctx);
 
     return runInTenantContext(ctx, async (db) => {
-        const approval = await PolicyApprovalRepository.getById(db, approvalId);
+        const approval = await PolicyApprovalRepository.getById(db, ctx, approvalId);
         if (!approval) throw notFound('Approval request not found');
 
         // Verify tenant ownership
@@ -399,14 +399,14 @@ export async function decidePolicyApproval(ctx: RequestContext, approvalId: stri
             throw forbidden('Access denied');
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((approval as any).status !== 'PENDING') {
+        if (approval.status !== 'PENDING') {
             throw conflict('This approval request has already been decided');
         }
 
         const result = await PolicyApprovalRepository.decide(
             db, ctx, approvalId, decision.decision, decision.comment || undefined
         );
+        if (!result) throw notFound('Approval request not found');
 
         // Update policy status based on decision
         if (decision.decision === 'APPROVED') {

@@ -409,6 +409,8 @@ const LIST_MODELS_TENANT_INDEX_SUFFICIENT: Record<string, string> = {
         'outbox queue — drained tenant-scoped by status; Layers A/B cover it; no curated composite index needed today.',
     Policy:
         'filtered only by tenantId plus leading-indexed FK / status columns — Layers A/B cover its query shapes; no curated composite index needed today.',
+    PolicyApproval:
+        'listPending filters by tenantId + status only (the [tenantId, policyId] / [tenantId, policyVersionId] composites are FK reverse-lookup indexes) — Layers A/B cover its query shapes; no curated composite index needed today.',
     PolicyVersion:
         'fetched per policy via a leading-indexed FK; Layers A/B cover its query shapes; no curated composite index needed today.',
     ProcessMap:
