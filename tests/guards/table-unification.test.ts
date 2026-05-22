@@ -94,8 +94,14 @@ describe("DataTable unification — Controls as the canonical shape", () => {
         );
         // 1. First column is `id: 'code'`.
         expect(src).toMatch(/id:\s*['"]code['"]/);
-        // 2. getRowId is set.
-        expect(src).toMatch(/getRowId:\s*\(c\)\s*=>\s*c\.id/);
+        // 2. getRowId is set. Right-rail Phase 2 extracted the row-id
+        //    fn to a stable `useCallback` (`getControlRowId`) so a
+        //    selection-toggle re-render doesn't rebuild the table
+        //    model — assert both the wiring and the definition.
+        expect(src).toMatch(/getRowId:\s*getControlRowId/);
+        expect(src).toMatch(
+            /getControlRowId\s*=\s*useCallback\(\(c:[^)]*\)\s*=>\s*c\.id/,
+        );
         // 3. onRowClick wires the canonical primitive hover.
         expect(src).toMatch(/onRowClick:/);
         // 4. The hover className is preserved on the table chrome.
