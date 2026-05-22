@@ -8,6 +8,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { RowSelectionState } from '@tanstack/react-table';
 import { useRouter, useSearchParams } from 'next/navigation';
 // NewControlModal and ControlDetailSheet were previously lazy-loaded
 // via next/dynamic, but the JIT race in `next dev` made the modals
@@ -38,6 +39,8 @@ import {
     type FilterType,
 } from '@/components/ui/filter';
 import { EntityListPage } from '@/components/layout/EntityListPage';
+import { AsidePanel } from '@/components/ui/aside-panel';
+import { SelectionSummaryPanel } from '@/components/ui/selection-summary-panel';
 import { KpiFilterCard } from '@/components/ui/kpi-filter-card';
 import { useKpiFilter, type KpiFilterDef } from '@/components/ui/kpi-filter';
 import type { CappedList } from '@/lib/list-backfill-cap';
@@ -364,6 +367,25 @@ function ControlsPageInner({
         },
     });
 
+    // ─── Row selection → selection-summary rail (right-rail Phase 2) ───
+    // The page owns the selection state; DataTable is controlled via
+    // `selectedRows` + `onRowSelectionChange`. When ≥1 row is selected
+    // (and the viewer can edit), the `aside` slot mounts the
+    // selection-summary rail with the bulk-status verbs — a calmer,
+    // persistent home than the floating batch-action toolbar.
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const selectedIds = useMemo(
+        // guardrail-ignore: reads the truthy keys out of the local RowSelectionState record (selected row ids) — not server-data filtering.
+        () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+        [rowSelection],
+    );
+    const canEditControls = appPermissions.controls.edit;
+    const bulkSetStatus = (newStatus: string) => {
+        for (const id of selectedIds) {
+            statusMutation.mutate({ controlId: id, newStatus });
+        }
+    };
+
     // ─── Helpers ───
 
     const taskStats = (c: ControlListItem) => {
@@ -541,9 +563,47 @@ function ControlsPageInner({
         },
     ]), [appPermissions, tenantHref, taskStats]);
 
+    // Selection-summary rail — mounted only when the viewer can edit
+    // AND ≥1 row is selected. `<AsidePanel>` owns the collapse chrome +
+    // the `<Sheet>` fallback below xl; `<SelectionSummaryPanel>` is the
+    // content. Absent ⇒ the list page is single-column, unchanged.
+    const selectionAside =
+        canEditControls && selectedIds.length > 0 ? (
+            <AsidePanel
+                title="Selection"
+                surfaceKey="controls-list"
+                icon={<AppIcon name="controls" size={16} />}
+            >
+                <SelectionSummaryPanel
+                    count={selectedIds.length}
+                    resourceLabel={{ singular: 'control', plural: 'controls' }}
+                    onClear={() => setRowSelection({})}
+                    actions={[
+                        {
+                            label: 'Mark Implemented',
+                            icon: <CheckCircle2 className="size-3.5" />,
+                            onClick: () => bulkSetStatus('IMPLEMENTED'),
+                        },
+                        {
+                            label: 'Mark Needs Review',
+                            icon: <AlertTriangle className="size-3.5" />,
+                            onClick: () => bulkSetStatus('NEEDS_REVIEW'),
+                        },
+                        {
+                            label: 'Mark Not Applicable',
+                            icon: <X className="size-3.5" />,
+                            tone: 'danger',
+                            onClick: () => bulkSetStatus('NOT_APPLICABLE'),
+                        },
+                    ]}
+                />
+            </AsidePanel>
+        ) : undefined;
+
     return (
         <EntityListPage<ControlListItem>
             className="animate-fadeIn gap-section"
+            aside={selectionAside}
             banner={<TruncationBanner truncated={truncated} />}
             header={{
                 breadcrumbs: [
@@ -686,52 +746,21 @@ function ControlsPageInner({
                 onColumnVisibilityChange: setColumnVisibility,
                 'data-testid': 'controls-table',
                 className: 'hover:bg-bg-muted',
-                // Bulk actions wired declaratively (Epic 52 contract).
-                // Selection state is managed internally by DataTable
-                // when batchActions are present without an explicit
-                // onRowSelectionChange — keeps this page focused on
-                // the action callbacks.
-                batchActions: appPermissions.controls.edit
-                    ? [
-                          {
-                              label: 'Mark Implemented',
-                              icon: <CheckCircle2 className="size-3.5" />,
-                              onClick: (rows) => {
-                                  for (const r of rows) {
-                                      statusMutation.mutate({
-                                          controlId: r.original.id,
-                                          newStatus: 'IMPLEMENTED',
-                                      });
-                                  }
-                              },
-                          },
-                          {
-                              label: 'Mark Needs Review',
-                              icon: <AlertTriangle className="size-3.5" />,
-                              onClick: (rows) => {
-                                  for (const r of rows) {
-                                      statusMutation.mutate({
-                                          controlId: r.original.id,
-                                          newStatus: 'NEEDS_REVIEW',
-                                      });
-                                  }
-                              },
-                          },
-                          {
-                              label: 'Mark Not Applicable',
-                              icon: <X className="size-3.5" />,
-                              variant: 'danger',
-                              title: 'Bulk-set status to NOT_APPLICABLE — applicability still requires per-control justification.',
-                              onClick: (rows) => {
-                                  for (const r of rows) {
-                                      statusMutation.mutate({
-                                          controlId: r.original.id,
-                                          newStatus: 'NOT_APPLICABLE',
-                                      });
-                                  }
-                              },
-                          },
-                      ]
+                // Right-rail Phase 2 — selection is page-controlled so
+                // the selection-summary rail can render the bulk-status
+                // verbs (see `selectionAside` above). The floating
+                // batch-action toolbar (`batchActions`) is retired here
+                // in favour of the rail. For viewers without edit
+                // permission, selection is left off entirely — no
+                // checkboxes, no rail — exactly the prior behaviour.
+                selectedRows: canEditControls ? rowSelection : undefined,
+                onRowSelectionChange: canEditControls
+                    ? (rows) =>
+                          setRowSelection(
+                              Object.fromEntries(
+                                  rows.map((r) => [r.id, true]),
+                              ),
+                          )
                     : undefined,
             }}
         >

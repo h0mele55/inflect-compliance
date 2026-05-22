@@ -207,6 +207,15 @@ export interface EntityListPageProps<TRow> {
      * they pass through verbatim.
      */
     children?: ReactNode;
+    /**
+     * Right-rail roadmap Phase 2 — optional aside slot. Threaded to
+     * `<ListPageShell.Body aside>`: docks as a third column at `xl`+,
+     * stacks below the table under `xl`. The canonical use is the
+     * multi-select selection summary — pass an `<AsidePanel>` wrapping
+     * a `<SelectionSummaryPanel>`, conditionally (only when rows are
+     * selected). Omit it and the page is single-column as before.
+     */
+    aside?: ReactNode;
     /** Forwarded to the outer ListPageShell. */
     className?: string;
 }
@@ -214,7 +223,8 @@ export interface EntityListPageProps<TRow> {
 // ─── Component ──────────────────────────────────────────────────
 
 export function EntityListPage<TRow>(props: EntityListPageProps<TRow>) {
-    const { header, filters, table, banner, kpis, children, className } = props;
+    const { header, filters, table, banner, kpis, aside, children, className } =
+        props;
 
     return (
         <ListPageShell
@@ -254,7 +264,7 @@ export function EntityListPage<TRow>(props: EntityListPageProps<TRow>) {
                 </ListPageShell.Filters>
             )}
 
-            <ListPageShell.Body>
+            <ListPageShell.Body aside={aside}>
                 {banner}
                 <DataTable<TRow>
                     fillBody={table.fillBody ?? true}

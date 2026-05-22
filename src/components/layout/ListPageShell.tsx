@@ -50,6 +50,21 @@ export interface ListPageShellProps {
     className?: string;
 }
 
+export interface ListPageShellBodyProps extends ListPageShellProps {
+    /**
+     * Right-rail roadmap Phase 2 — optional aside slot. When provided,
+     * the body becomes a flex row at `xl`+ : the main content
+     * (`flex-1`) on the left, the aside column on the right, each with
+     * its own scroll. Below `xl` the aside stacks under the main
+     * content. Pass an `<AsidePanel>` here — it owns its own width
+     * (320px expanded / 44px collapsed-to-spine) and degrades to a
+     * `<Sheet>` below `xl`. Omit it and the body is the prior
+     * single-column shape, byte-for-byte — existing pages are
+     * untouched.
+     */
+    aside?: ReactNode;
+}
+
 function ListPageShellRoot({ children, className }: ListPageShellProps) {
     return (
         <div
@@ -84,24 +99,57 @@ function ListPageShellFilters({ children, className }: ListPageShellProps) {
     );
 }
 
-function ListPageShellBody({ children, className }: ListPageShellProps) {
+function ListPageShellBody({ children, className, aside }: ListPageShellBodyProps) {
+    // No aside — the prior single-column body, unchanged. The
+    // `data-list-page-body` marker stays on this div: DataTable's
+    // whole-row clip useEffect walks up to find it and uses ITS
+    // clientHeight as the viewport allocation (since the card itself
+    // no longer has flex-1, its own clientHeight == content height,
+    // not available height).
+    if (!aside) {
+        return (
+            <div
+                className={cn(
+                    // Mobile: natural height. Desktop: fill remaining
+                    // space, hide own overflow so the inner DataTable
+                    // owns the scroll context.
+                    'md:flex-1 md:min-h-0 md:flex md:flex-col md:overflow-hidden',
+                    className,
+                )}
+                data-list-page-body="true"
+            >
+                {children}
+            </div>
+        );
+    }
+
+    // Aside present (Phase 2) — a flex row at `xl`+ : main column
+    // (flex-1) + aside column. Below `xl` it stacks (main, then aside).
+    // The OUTER row claims the height from ListPageShell; the MAIN
+    // column keeps the `data-list-page-body` marker because its
+    // clientHeight is the table's real height budget — the aside is a
+    // sibling, not an ancestor, so the table measurement is unchanged
+    // by the rail. The aside sits OUTSIDE the table's scroll context,
+    // so it stays put while the table body scrolls (co-resident, the
+    // whole point of the rail).
     return (
-        <div
-            className={cn(
-                // Mobile: natural height. Desktop: fill remaining
-                // space, hide own overflow so the inner DataTable
-                // owns the scroll context.
-                'md:flex-1 md:min-h-0 md:flex md:flex-col md:overflow-hidden',
-                className,
-            )}
-            // Marker for DataTable's whole-row clip useEffect: it
-            // walks up to find this element and uses ITS clientHeight
-            // as the viewport allocation (since the card itself no
-            // longer has flex-1, its own clientHeight == content
-            // height, not available height).
-            data-list-page-body="true"
-        >
-            {children}
+        <div className="md:flex-1 md:min-h-0 md:flex md:flex-col xl:flex-row md:overflow-hidden gap-default">
+            <div
+                className={cn(
+                    'md:flex-1 md:min-h-0 md:flex md:flex-col md:overflow-hidden xl:min-w-0',
+                    className,
+                )}
+                data-list-page-body="true"
+            >
+                {children}
+            </div>
+            <aside
+                className="flex-shrink-0 xl:self-start"
+                aria-label="Context"
+                data-testid="list-page-aside"
+            >
+                {aside}
+            </aside>
         </div>
     );
 }
