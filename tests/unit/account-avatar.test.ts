@@ -17,6 +17,7 @@ import {
     avatarServeUrl,
     uploadOwnAvatar,
     removeOwnAvatar,
+    getAvatarStream,
     AVATAR_MAX_BYTES,
 } from '@/lib/account/avatar';
 import { getStorageProvider } from '@/lib/storage';
@@ -159,5 +160,29 @@ describe('removeOwnAvatar', () => {
             where: { id: 'u1' },
             data: { image: null },
         });
+    });
+});
+
+describe('getAvatarStream — serve-route resolution', () => {
+    it('returns the stream when the stored object exists', async () => {
+        const fakeStream = { id: 'stream' };
+        const head = jest.fn().mockResolvedValue({ sizeBytes: 1 });
+        const readStream = jest.fn().mockReturnValue(fakeStream);
+        mockGetStorageProvider.mockReturnValue({ head, readStream });
+
+        const result = await getAvatarStream('u1');
+
+        expect(head).toHaveBeenCalledWith('avatars/u1.webp');
+        expect(readStream).toHaveBeenCalledWith('avatars/u1.webp');
+        expect(result).toBe(fakeStream);
+    });
+
+    it('returns null when the user has no stored avatar', async () => {
+        const head = jest.fn().mockRejectedValue(new Error('not found'));
+        const readStream = jest.fn();
+        mockGetStorageProvider.mockReturnValue({ head, readStream });
+
+        expect(await getAvatarStream('u1')).toBeNull();
+        expect(readStream).not.toHaveBeenCalled();
     });
 });
