@@ -33,7 +33,7 @@ export class ClauseRepository {
         });
     }
 
-    static async updateProgress(db: PrismaTx, ctx: RequestContext, clauseId: string, data: { status: string; notes?: string }) {
+    static async updateProgress(db: PrismaTx, ctx: RequestContext, clauseId: string, data: { status: string; notes?: string | null }) {
         return db.clauseProgress.upsert({
             where: {
                 tenantId_clauseId: { tenantId: ctx.tenantId, clauseId },
