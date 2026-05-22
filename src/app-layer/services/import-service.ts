@@ -32,7 +32,6 @@
  * @module app-layer/services/import-service
  */
 
-import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { PrismaTx } from '@/lib/db-context';
 import { logger } from '@/lib/observability/logger';
@@ -293,8 +292,11 @@ async function persistEntity(
         return 'imported';
 
     } catch (error: unknown) {
-        // Prisma unique constraint violation → conflict
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        // Prisma unique constraint violation → conflict. Detected by the
+        // `code` property (not `instanceof`) so it stays robust across
+        // Prisma client instances / bundling boundaries — the original
+        // property-based behaviour.
+        if (hasStringCode(error) && error.code === 'P2002') {
             if (strategy === 'SKIP') return 'skipped';
             return 'conflict';
         }

@@ -1,11 +1,13 @@
 /**
  * Module augmentation for @tanstack/react-table — extends `ColumnMeta`
- * with the custom fields used by the DataTable / Table primitives.
+ * with the custom fields read by the DataTable / Table primitives
+ * (`src/components/ui/table/`).
  *
- * Placing this alongside the table source (not in a global `types/`)
- * keeps the augmentation co-located with the code that reads it, and
- * avoids polluting the global `ColumnMeta` shape for consumers that
- * never use these fields.
+ * Lives in `src/types/` alongside the other ambient declarations
+ * (`globals.d.ts`): a `.d.ts` carries no runtime exports, so it must
+ * stay out of the table directory — the table-platform barrel
+ * guardrails require every `.ts`/`.tsx` file there to be re-exported
+ * from `index.ts`, which an ambient declaration cannot be.
  */
 import "@tanstack/react-table";
 
