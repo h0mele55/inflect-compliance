@@ -14,8 +14,10 @@
  *      id="applicability-pill-{id}">`. Same retirement as Status;
  *      the justification modal lives on the detail page now.
  *   4. Evidence column carries a `<Paperclip>` icon next to the count.
- *   5. The DataTable's `batchActions` are wired with the bulk-status
- *      operations (Mark Implemented / Needs Review / Not Applicable).
+ *   5. The bulk-status operations (Mark Implemented / Needs Review /
+ *      Not Applicable) render in the selection-summary rail
+ *      (`<SelectionSummaryPanel>`) — right-rail Phase 2 retired the
+ *      floating `batchActions` toolbar in favour of the docked rail.
  *
  * This is a string-scan ratchet — same shape as
  * `controls-client-shell-adoption.test.ts`. It runs in the node
@@ -114,22 +116,34 @@ describe('Controls list — UX polish', () => {
         });
     });
 
-    describe('Bulk actions', () => {
-        it('wires three batch actions (Mark Implemented / Needs Review / Not Applicable)', () => {
-            // Permission-gated array; READER sees no toolbar at all.
-            expect(source).toContain(
-                'batchActions: appPermissions.controls.edit',
-            );
+    describe('Bulk actions — selection-summary rail (right-rail Phase 2)', () => {
+        it('wires the three bulk-status verbs into the selection rail', () => {
+            // Right-rail Phase 2 retired the floating `batchActions`
+            // toolbar — the bulk-status verbs now render inside the
+            // `<SelectionSummaryPanel>` docked in the `aside` slot.
+            expect(source).toContain('<SelectionSummaryPanel');
             expect(source).toContain("label: 'Mark Implemented'");
             expect(source).toContain("label: 'Mark Needs Review'");
             expect(source).toContain("label: 'Mark Not Applicable'");
+            // The legacy declarative-toolbar prop is gone — selection
+            // is page-controlled (`selectedRows` + `onRowSelectionChange`).
+            expect(source).not.toContain('batchActions:');
         });
 
-        it('the destructive Mark-Not-Applicable action carries variant=danger', () => {
-            // Same shape Epic 52's BatchAction contract uses; locks
-            // in that the visual treatment doesn't drift.
+        it('the destructive Mark-Not-Applicable verb carries tone=danger', () => {
+            // Same intent as the retired `variant: 'danger'` on the
+            // Epic 52 BatchAction — locks the destructive treatment
+            // through to the rail's SelectionSummaryAction contract.
             expect(source).toMatch(
-                /label: 'Mark Not Applicable'[\s\S]{0,400}variant: 'danger'/,
+                /label: 'Mark Not Applicable'[\s\S]{0,400}tone: 'danger'/,
+            );
+        });
+
+        it('the rail is permission-gated AND selection-gated', () => {
+            // READER sees neither checkboxes nor rail; the rail only
+            // mounts when the viewer can edit AND ≥1 row is selected.
+            expect(source).toMatch(
+                /canEditControls\s*&&\s*selectedIds\.length\s*>\s*0/,
             );
         });
     });

@@ -5,9 +5,10 @@
  * migrate to useTenantSWR (Epic 69 shape) so the rule can lift. */
 
 /* eslint-disable react-hooks/exhaustive-deps -- Various useMemo dep arrays in this file deliberately omit identity-unstable callbacks (handlers/derived arrays recreated each render). The proper structural fix is wrapping parent-level callbacks in useCallback. Tracked as follow-up; existing per-line eslint-disable-next-line markers preserved. */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Row, RowSelectionState } from '@tanstack/react-table';
 import { useRouter, useSearchParams } from 'next/navigation';
 // NewControlModal and ControlDetailSheet were previously lazy-loaded
 // via next/dynamic, but the JIT race in `next dev` made the modals
@@ -38,6 +39,8 @@ import {
     type FilterType,
 } from '@/components/ui/filter';
 import { EntityListPage } from '@/components/layout/EntityListPage';
+import { AsidePanel } from '@/components/ui/aside-panel';
+import { SelectionSummaryPanel } from '@/components/ui/selection-summary-panel';
 import { KpiFilterCard } from '@/components/ui/kpi-filter-card';
 import { useKpiFilter, type KpiFilterDef } from '@/components/ui/kpi-filter';
 import type { CappedList } from '@/lib/list-backfill-cap';
@@ -139,8 +142,18 @@ function ControlsPageInner({
     tenantSlug,
     appPermissions,
 }: ControlsClientProps) {
-    const apiUrl = (path: string) => `/api/t/${tenantSlug}${path}`;
-    const tenantHref = (path: string) => `/t/${tenantSlug}${path}`;
+    // Stable across renders — selection-toggle re-renders (Phase 2)
+    // must NOT hand the DataTable fresh `columns` / `onRowClick` /
+    // `getRowId` references, or it rebuilds the whole table model
+    // mid-double-click and breaks double-click-to-navigate.
+    const apiUrl = useCallback(
+        (path: string) => `/api/t/${tenantSlug}${path}`,
+        [tenantSlug],
+    );
+    const tenantHref = useCallback(
+        (path: string) => `/t/${tenantSlug}${path}`,
+        [tenantSlug],
+    );
     const queryClient = useQueryClient();
     const router = useRouter();
 
@@ -364,14 +377,69 @@ function ControlsPageInner({
         },
     });
 
+    // ─── Row selection → selection-summary rail (right-rail Phase 2) ───
+    // The page owns the selection state; DataTable is controlled via
+    // `selectedRows` + `onRowSelectionChange`. When ≥1 row is selected
+    // (and the viewer can edit), the `aside` slot mounts the
+    // selection-summary rail with the bulk-status verbs — a calmer,
+    // persistent home than the floating batch-action toolbar.
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+    // The rail is gated on the *settled* selection, not the live one.
+    // DataTable's R13-PR14 click model has a single click toggle row
+    // selection and a double-click navigate — so a double-click toggles
+    // selection on, then off, within the double-click window. Gating
+    // the rail (a layout-reflowing surface) on the live selection would
+    // flash it in and then out mid-double-click, and the reflow between
+    // the two physical clicks breaks double-click-to-navigate. Settling
+    // the selection for 250ms before the rail reacts means a
+    // double-click never trips it; a genuine single-click selection
+    // (which stays put) mounts the rail a quarter-second later —
+    // imperceptible.
+    const [settledSelection, setSettledSelection] =
+        useState<RowSelectionState>({});
+    useEffect(() => {
+        const t = setTimeout(() => setSettledSelection(rowSelection), 250);
+        return () => clearTimeout(t);
+    }, [rowSelection]);
+    const selectedIds = useMemo(
+        // guardrail-ignore: reads the truthy keys out of the local RowSelectionState record (selected row ids) — not server-data filtering.
+        () => Object.keys(settledSelection).filter((id) => settledSelection[id]),
+        [settledSelection],
+    );
+    const canEditControls = appPermissions.controls.edit;
+    const bulkSetStatus = (newStatus: string) => {
+        for (const id of selectedIds) {
+            statusMutation.mutate({ controlId: id, newStatus });
+        }
+    };
+
+    // Stable DataTable callbacks — see the apiUrl/tenantHref note above.
+    // `handleRowClick` is the double-click→navigate handler; keeping it
+    // referentially stable means a selection-toggle re-render does not
+    // rebuild the table's column model.
+    const handleRowClick = useCallback(
+        (row: Row<ControlListItem>) =>
+            router.push(tenantHref(`/controls/${row.original.id}`)),
+        [router, tenantHref],
+    );
+    const getControlRowId = useCallback((c: ControlListItem) => c.id, []);
+    const handleRowSelectionChange = useCallback(
+        (rows: Row<ControlListItem>[]) =>
+            setRowSelection(
+                Object.fromEntries(rows.map((r) => [r.id, true])),
+            ),
+        [],
+    );
+
     // ─── Helpers ───
 
-    const taskStats = (c: ControlListItem) => {
+    const taskStats = useCallback((c: ControlListItem) => {
         const total = c._count?.controlTasks ?? 0;
         // guardrail-ignore: aggregating the row's own controlTasks array.
         const done = c.controlTasks?.filter(t => t.status === 'DONE').length ?? 0;
         return { total, done };
-    };
+    }, []);
 
     // ── Column definitions ──
     const controlColumns = useMemo(() => createColumns<ControlListItem>([
@@ -541,9 +609,47 @@ function ControlsPageInner({
         },
     ]), [appPermissions, tenantHref, taskStats]);
 
+    // Selection-summary rail — mounted only when the viewer can edit
+    // AND ≥1 row is selected. `<AsidePanel>` owns the collapse chrome +
+    // the `<Sheet>` fallback below xl; `<SelectionSummaryPanel>` is the
+    // content. Absent ⇒ the list page is single-column, unchanged.
+    const selectionAside =
+        canEditControls && selectedIds.length > 0 ? (
+            <AsidePanel
+                title="Selection"
+                surfaceKey="controls-list"
+                icon={<AppIcon name="controls" size={16} />}
+            >
+                <SelectionSummaryPanel
+                    count={selectedIds.length}
+                    resourceLabel={{ singular: 'control', plural: 'controls' }}
+                    onClear={() => setRowSelection({})}
+                    actions={[
+                        {
+                            label: 'Mark Implemented',
+                            icon: <CheckCircle2 className="size-3.5" />,
+                            onClick: () => bulkSetStatus('IMPLEMENTED'),
+                        },
+                        {
+                            label: 'Mark Needs Review',
+                            icon: <AlertTriangle className="size-3.5" />,
+                            onClick: () => bulkSetStatus('NEEDS_REVIEW'),
+                        },
+                        {
+                            label: 'Mark Not Applicable',
+                            icon: <X className="size-3.5" />,
+                            tone: 'danger',
+                            onClick: () => bulkSetStatus('NOT_APPLICABLE'),
+                        },
+                    ]}
+                />
+            </AsidePanel>
+        ) : undefined;
+
     return (
         <EntityListPage<ControlListItem>
             className="animate-fadeIn gap-section"
+            aside={selectionAside}
             banner={<TruncationBanner truncated={truncated} />}
             header={{
                 breadcrumbs: [
@@ -646,14 +752,14 @@ function ControlsPageInner({
                 data: controls,
                 columns: controlColumns,
                 loading,
-                getRowId: (c) => c.id,
+                getRowId: getControlRowId,
                 // Epic 68 — Controls page is the canonical opt-out
                 // for auto-virtualization. Per product directive the
                 // existing card scrolling on Controls stays as it is;
                 // bespoke per-row affordances + the JS whole-row clip
                 // depend on the standard <table> layout.
                 virtualize: false,
-                onRowClick: (row) => router.push(tenantHref(`/controls/${row.original.id}`)),
+                onRowClick: handleRowClick,
                 emptyState: hasActive ? (
                     <EmptyState
                         size="sm"
@@ -686,52 +792,16 @@ function ControlsPageInner({
                 onColumnVisibilityChange: setColumnVisibility,
                 'data-testid': 'controls-table',
                 className: 'hover:bg-bg-muted',
-                // Bulk actions wired declaratively (Epic 52 contract).
-                // Selection state is managed internally by DataTable
-                // when batchActions are present without an explicit
-                // onRowSelectionChange — keeps this page focused on
-                // the action callbacks.
-                batchActions: appPermissions.controls.edit
-                    ? [
-                          {
-                              label: 'Mark Implemented',
-                              icon: <CheckCircle2 className="size-3.5" />,
-                              onClick: (rows) => {
-                                  for (const r of rows) {
-                                      statusMutation.mutate({
-                                          controlId: r.original.id,
-                                          newStatus: 'IMPLEMENTED',
-                                      });
-                                  }
-                              },
-                          },
-                          {
-                              label: 'Mark Needs Review',
-                              icon: <AlertTriangle className="size-3.5" />,
-                              onClick: (rows) => {
-                                  for (const r of rows) {
-                                      statusMutation.mutate({
-                                          controlId: r.original.id,
-                                          newStatus: 'NEEDS_REVIEW',
-                                      });
-                                  }
-                              },
-                          },
-                          {
-                              label: 'Mark Not Applicable',
-                              icon: <X className="size-3.5" />,
-                              variant: 'danger',
-                              title: 'Bulk-set status to NOT_APPLICABLE — applicability still requires per-control justification.',
-                              onClick: (rows) => {
-                                  for (const r of rows) {
-                                      statusMutation.mutate({
-                                          controlId: r.original.id,
-                                          newStatus: 'NOT_APPLICABLE',
-                                      });
-                                  }
-                              },
-                          },
-                      ]
+                // Right-rail Phase 2 — selection is page-controlled so
+                // the selection-summary rail can render the bulk-status
+                // verbs (see `selectionAside` above). The floating
+                // batch-action toolbar (`batchActions`) is retired here
+                // in favour of the rail. For viewers without edit
+                // permission, selection is left off entirely — no
+                // checkboxes, no rail — exactly the prior behaviour.
+                selectedRows: canEditControls ? rowSelection : undefined,
+                onRowSelectionChange: canEditControls
+                    ? handleRowSelectionChange
                     : undefined,
             }}
         >

@@ -32,6 +32,14 @@ const SHELL_PATH = 'src/components/layout/EntityDetailLayout.tsx';
 const RISKS_DETAIL_PATH =
     'src/app/t/[tenantSlug]/(app)/risks/[riskId]/page.tsx';
 
+// Phase 2 — list-page aside slot.
+const LIST_SHELL_PATH = 'src/components/layout/ListPageShell.tsx';
+const ENTITY_LIST_PAGE_PATH = 'src/components/layout/EntityListPage.tsx';
+const SELECTION_PANEL_PATH =
+    'src/components/ui/selection-summary-panel.tsx';
+const CONTROLS_CLIENT_PATH =
+    'src/app/t/[tenantSlug]/(app)/controls/ControlsClient.tsx';
+
 describe('Right-rail master-detail discipline (Roadmap-2 PR-5)', () => {
     it('EntityDetailLayout exposes a `rail` prop in its public type', () => {
         const src = read(SHELL_PATH);
@@ -80,5 +88,64 @@ describe('Right-rail master-detail discipline (Roadmap-2 PR-5)', () => {
         // to the rail; removing risks is a regression.
         const src = read(RISKS_DETAIL_PATH);
         expect(src).toMatch(/<EntityDetailLayout[\s\S]*?\brail=\{/);
+    });
+});
+
+/**
+ * Right-rail roadmap, Phase 2 — the list-page `aside` slot.
+ *
+ * `<ListPageShell.Body>` and `<EntityListPage>` gain an optional
+ * `aside` slot for the multi-select selection-summary use case. The
+ * canonical content is `<SelectionSummaryPanel>` (count + batch verbs
+ * + clear), docked inside an `<AsidePanel>`. This block locks the slot
+ * shape, the a11y wrapper, the xl-only docking, and the controls-page
+ * proof-of-pattern adoption — same regression-class lock as Phase 1.
+ */
+describe('Right-rail list-page aside discipline (Phase 2)', () => {
+    it('ListPageShell.Body exposes an `aside` slot in its props type', () => {
+        const src = read(LIST_SHELL_PATH);
+        // The slot is a typed public prop — `ListPageShellBodyProps`
+        // — not an implicit pass-through.
+        expect(src).toMatch(/aside\?:\s*ReactNode/);
+    });
+
+    it('ListPageShell.Body renders the aside as a real <aside> with the canonical test-id', () => {
+        const src = read(LIST_SHELL_PATH);
+        // a11y: a real <aside aria-label> so the column is announced
+        // as a distinct region.
+        expect(src).toMatch(
+            /<aside[\s\S]*?aria-label=["'][^"']+["'][\s\S]*?data-testid=["']list-page-aside["']/,
+        );
+    });
+
+    it('the list-page aside docks at xl, never at md/lg', () => {
+        // Same editorial breakpoint as the detail-page rail — the
+        // body is a flex row only at xl+; below it the aside stacks.
+        const src = read(LIST_SHELL_PATH);
+        expect(src).toMatch(/xl:flex-row/);
+        expect(src).not.toMatch(/md:flex-row|lg:flex-row/);
+    });
+
+    it('EntityListPage exposes `aside` and threads it to ListPageShell.Body', () => {
+        const src = read(ENTITY_LIST_PAGE_PATH);
+        expect(src).toMatch(/aside\?:\s*ReactNode/);
+        expect(src).toMatch(/<ListPageShell\.Body\s+aside=\{aside\}/);
+    });
+
+    it('SelectionSummaryPanel is the selection-summary rail content primitive', () => {
+        const src = read(SELECTION_PANEL_PATH);
+        // Count headline + clear affordance are the two invariants of
+        // a selection summary; the batch verbs are caller-supplied.
+        expect(src).toMatch(/data-testid=["']selection-summary["']/);
+        expect(src).toMatch(/data-testid=["']selection-summary-count["']/);
+        expect(src).toContain('Clear selection');
+    });
+
+    it('controls list page passes a selection rail (proof-of-pattern adoption)', () => {
+        // The controls list is the canonical adopter. Removing the
+        // aside returns it to the floating batch-toolbar pattern.
+        const src = read(CONTROLS_CLIENT_PATH);
+        expect(src).toMatch(/<EntityListPage[\s\S]*?\baside=\{/);
+        expect(src).toContain('<SelectionSummaryPanel');
     });
 });
