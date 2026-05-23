@@ -59,10 +59,23 @@ const RATCHET_FLOOR: Record<string, Metrics> = {
     // `webhook-processor.ts` (485 lines, previously untested).
     // Security-critical: signature verification + cross-tenant
     // resolution + replay defense + provider dispatch fan-out.
-    // File-level 0/0/0/0 → **98/86/86/99**. Going +2 across all
-    // (cautious after stage-3d's overshoot — measured-then-back-off).
+    // File-level 0/0/0/0 → **98/86/86/99**.
+    //
+    // CI's full-suite measured: branches **62.98%** (only +0.5
+    // over stage-3d's 62.5%) and lines **73.5%**. The +2 bump
+    // to 64 branches missed by ~1; the +2 to 74 lines missed
+    // by 0.5. Backed off in fixup to:
+    //   - branches: stays at 62 (the wave's branch lift on the
+    //     broader tree was sub-percentage)
+    //   - functions: 56 → 57 (+1)
+    //   - lines:     72 → 73 (+1; measured 73.5%)
+    //   - statements: 69 → 70 (+1)
+    // The test file (durable gain) stays — only the floor moved
+    // less aggressively. Branch coverage's plateau here is real
+    // signal — webhook-processor is dense but only adds ~25-35
+    // branches to the ~4962-branch usecases tree.
     // Next stage 3f (planned): `control/queries.ts` + `framework/coverage.ts`.
-    './src/app-layer/usecases/': { branches: 64, functions: 58, lines: 74, statements: 71 },
+    './src/app-layer/usecases/': { branches: 62, functions: 57, lines: 73, statements: 70 },
     // `policies/` — quality roadmap P3. Authorization decisions —
     // a wrong branch is a security hole. Measured ≈82 branches /
     // 91 funcs / 91 lines; seeded a few points below.
