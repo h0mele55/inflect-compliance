@@ -225,20 +225,26 @@ export function EvidenceSubTable({
         [canWrite, onUnlink, tenantHref],
     );
 
+    // The wrapper preserves the original `id="evidence-table"` anchor
+    // that pre-existing E2E specs target (`tests/e2e/control-evidence.spec.ts`
+    // looks up `#evidence-table tbody tr` rows). DataTable mounts its
+    // own real `<table>` inside, so the `tbody tr` descent still works.
     return (
-        <DataTable
-            data={rows}
-            columns={columns}
-            getRowId={(r) => r.rowKey}
-            loading={loading}
-            emptyState={
-                <div id="no-evidence">
-                    <InlineEmptyState
-                        title="No evidence linked"
-                        description="Link existing evidence or upload new files to satisfy this control."
-                    />
-                </div>
-            }
-        />
+        <div id="evidence-table">
+            <DataTable
+                data={rows}
+                columns={columns}
+                getRowId={(r) => r.rowKey}
+                loading={loading}
+                emptyState={
+                    <div id="no-evidence">
+                        <InlineEmptyState
+                            title="No evidence linked"
+                            description="Link existing evidence or upload new files to satisfy this control."
+                        />
+                    </div>
+                }
+            />
+        </div>
     );
 }

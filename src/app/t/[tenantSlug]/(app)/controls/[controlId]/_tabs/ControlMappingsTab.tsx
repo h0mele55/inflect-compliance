@@ -245,18 +245,23 @@ export function ControlMappingsTab({
                     description="Something went wrong fetching this control's framework mappings. Reload the page to try again."
                 />
             ) : (
-                <DataTable
-                    data={mappingsSWR.data ?? []}
-                    columns={columns}
-                    getRowId={(m) => m.id}
-                    loading={mappingsSWR.isLoading && !mappingsSWR.data}
-                    emptyState={
-                        <InlineEmptyState
-                            title="No framework mappings"
-                            description="Map this control to specific framework requirements to track coverage."
-                        />
-                    }
-                />
+                // Preserve the `id="mappings-table"` anchor for pre-
+                // existing E2E specs; DataTable's own real `<table>`
+                // sits inside.
+                <div id="mappings-table">
+                    <DataTable
+                        data={mappingsSWR.data ?? []}
+                        columns={columns}
+                        getRowId={(m) => m.id}
+                        loading={mappingsSWR.isLoading && !mappingsSWR.data}
+                        emptyState={
+                            <InlineEmptyState
+                                title="No framework mappings"
+                                description="Map this control to specific framework requirements to track coverage."
+                            />
+                        }
+                    />
+                </div>
             )}
         </div>
     );
