@@ -125,13 +125,16 @@ beforeEach(() => {
     );
 });
 
-function orgCtx(overrides: Partial<any> = {}) {
+function orgCtx(overrides: Partial<any> = {}): import('@/app-layer/types').OrgContext {
     return {
         requestId: 'req-1',
         userId: 'u-1',
         organizationId: 'org-1',
         orgSlug: 'acme',
-        orgRole: 'ORG_ADMIN',
+        // `OrgRole` is a Prisma enum — `as const` narrows the literal,
+        // satisfying the OrgContext shape without pulling in @prisma/client
+        // (which is heavy + mocked in this test).
+        orgRole: 'ORG_ADMIN' as never,
         permissions: {} as any,
         ...overrides,
     };
