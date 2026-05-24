@@ -91,11 +91,14 @@ const TASK_VALIDATOR: RestoreValidator = async (ctx, db, record) => {
 /**
  * `AuditPack` restore — refuse when:
  *   - parent AuditCycle is deleted, OR
- *   - parent AuditCycle is CLOSED (cycle-immutable contract).
+ *   - parent AuditCycle is COMPLETE (cycle-immutable contract).
  *
  * Restoring a pack under a frozen / vanished cycle would
  * silently violate the audit-cycle integrity invariant the
- * closeout flow relies on.
+ * closeout flow relies on. The terminal status on `AuditCycleStatus`
+ * is `COMPLETE` (the enum has PLANNING / IN_PROGRESS / READY /
+ * COMPLETE — there is no CLOSED value); this is the
+ * audit-cycle equivalent of CLOSED on other lifecycles.
  */
 const AUDIT_PACK_VALIDATOR: RestoreValidator = async (ctx, db, record) => {
     const row = record as { auditCycleId: string };
@@ -108,9 +111,9 @@ const AUDIT_PACK_VALIDATOR: RestoreValidator = async (ctx, db, record) => {
             'Cannot restore: the parent audit cycle has been deleted. Restore the cycle first, then retry.',
         );
     }
-    if (cycle.status === 'CLOSED') {
+    if (cycle.status === 'COMPLETE') {
         throw badRequest(
-            'Cannot restore: the parent audit cycle is CLOSED. Reopen the cycle (or restore into a new pack) before restoring this artifact.',
+            'Cannot restore: the parent audit cycle is COMPLETE. Reopen the cycle (or restore into a new pack) before restoring this artifact.',
         );
     }
 };

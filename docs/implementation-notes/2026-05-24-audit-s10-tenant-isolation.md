@@ -53,9 +53,12 @@ in this PR; nine other models stay on `NOOP_VALIDATOR`.
     blocker is explicit at restore time.
 
   - **`AuditPack`** — refuse if the parent `AuditCycle` is
-    soft-deleted OR `CLOSED`. The cycle-immutable contract relies
-    on `CLOSED` packs staying frozen; restoring a pack into a
-    `CLOSED` cycle would silently violate it.
+    soft-deleted OR `COMPLETE`. The cycle-immutable contract
+    relies on packs under a closed-out cycle staying frozen;
+    restoring a pack into a completed cycle would silently
+    violate it. `COMPLETE` is the terminal value on the
+    `AuditCycleStatus` enum — the audit-cycle equivalent of
+    CLOSED on other lifecycles.
 
   - **`Evidence`** — refuse if `ownerUserId` is set but the user
     is no longer an `ACTIVE` member of the tenant. The owner is

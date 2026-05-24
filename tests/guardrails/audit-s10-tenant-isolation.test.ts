@@ -79,13 +79,15 @@ describe('Audit S10 — Tenant Isolation & Authorization', () => {
             expect(fnBody).toMatch(/deletedAt:\s*null/);
         });
 
-        it('AuditPack validator refuses CLOSED + deleted parent cycles', () => {
+        it('AuditPack validator refuses COMPLETE + deleted parent cycles', () => {
             const fnStart = validators.indexOf('const AUDIT_PACK_VALIDATOR');
-            const fnBody = validators.slice(fnStart, fnStart + 1000);
+            const fnBody = validators.slice(fnStart, fnStart + 1200);
             expect(fnBody).toMatch(/db\.auditCycle\.findFirst/);
-            // Both refusal paths must be wired.
+            // Both refusal paths must be wired. `COMPLETE` is the
+            // terminal status on the AuditCycleStatus enum — the
+            // equivalent of CLOSED on other lifecycles.
             expect(fnBody).toMatch(/cycle\.deletedAt/);
-            expect(fnBody).toMatch(/cycle\.status\s*===\s*['"]CLOSED['"]/);
+            expect(fnBody).toMatch(/cycle\.status\s*===\s*['"]COMPLETE['"]/);
         });
 
         it('Evidence validator checks active tenant membership', () => {

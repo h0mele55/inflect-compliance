@@ -104,17 +104,17 @@ describe('AuditPack restore validator', () => {
         ).rejects.toThrow(/audit cycle has been deleted/);
     });
 
-    it('refuses when the cycle is CLOSED', async () => {
+    it('refuses when the cycle is COMPLETE', async () => {
         const findFirst = jest.fn().mockResolvedValueOnce({
             id: 'cyc-1',
-            status: 'CLOSED',
+            status: 'COMPLETE',
             deletedAt: null,
         });
         const db = mockDb({ auditCycle: { findFirst } });
 
         await expect(
             validator(ctx, db, { auditCycleId: 'cyc-1' }),
-        ).rejects.toThrow(/audit cycle is CLOSED/);
+        ).rejects.toThrow(/audit cycle is COMPLETE/);
     });
 });
 
@@ -158,7 +158,8 @@ describe('Evidence restore validator', () => {
 
 describe('Registry totality', () => {
     it('exposes a validator for every RestorableModel', () => {
-        const expected = [
+        type RM = keyof typeof RESTORE_VALIDATORS;
+        const expected: ReadonlyArray<RM> = [
             'Asset',
             'Risk',
             'Control',
@@ -173,8 +174,7 @@ describe('Registry totality', () => {
             'AuditPack',
         ];
         for (const m of expected) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const v = RESTORE_VALIDATORS[m as any];
+            const v = RESTORE_VALIDATORS[m];
             expect(typeof v).toBe('function');
         }
     });
