@@ -157,8 +157,18 @@ describe('B9 — policy template upgrade', () => {
             expect(route).toMatch(/attachment/);
         });
 
-        it('logs a POLICY_EXPORTED audit-trail event', () => {
-            expect(route).toMatch(/action:\s*['"]POLICY_EXPORTED['"]/);
+        it('audit logging is delegated to the usecase, not inline in the route', () => {
+            // `policy-routes-guardrail.test.ts` forbids `logEvent`
+            // inside policy routes; the POLICY_EXPORTED audit row
+            // is written by `generatePolicyDocumentPdf` itself.
+            expect(route).not.toMatch(/logEvent\s*\(/);
+        });
+
+        it('usecase writes the POLICY_EXPORTED audit-trail event', () => {
+            const usecase = read(
+                'src/app-layer/reports/pdf/policyDocument.ts',
+            );
+            expect(usecase).toMatch(/action:\s*['"]POLICY_EXPORTED['"]/);
         });
 
         it('accepts the classification query string', () => {

@@ -24,6 +24,7 @@ import crypto from 'crypto';
 import { runInTenantContext } from '@/lib/db-context';
 import type { RequestContext } from '@/app-layer/types';
 import { assertCanRead } from '@/app-layer/policies/common';
+import { logEvent } from '@/app-layer/events/audit';
 import { notFound } from '@/lib/errors/types';
 import { PolicyRepository } from '@/app-layer/repositories/PolicyRepository';
 import { createPdfDocument } from '@/lib/pdf/pdfKitFactory';
@@ -222,6 +223,27 @@ export async function generatePolicyDocumentPdf(
         // header layout (left=tenant, center=title, right=date)
         // without needing a new stamping pass.
         reportTitle: `${policy.title} · ${CLASSIFICATION_LABEL[classification].toUpperCase()}`,
+    });
+
+    // Audit-log the export at the usecase layer. The route stays
+    // thin (per the `policy-routes-guardrail` structural rule
+    // forbidding direct `logEvent` calls in policy routes). The
+    // logging fires AFTER the PDF is built so a generator failure
+    // doesn't write a misleading "exported" entry.
+    await runInTenantContext(ctx, async (db) => {
+        await logEvent(db, ctx, {
+            action: 'POLICY_EXPORTED',
+            entityType: 'Policy',
+            entityId: policyId,
+            details: JSON.stringify({ classification, format: 'pdf' }),
+            detailsJson: {
+                category: 'document',
+                entityName: 'Policy',
+                operation: 'exported',
+                after: { format: 'pdf', classification },
+                summary: `Policy exported (${classification})`,
+            },
+        });
     });
 
     return doc;

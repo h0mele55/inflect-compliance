@@ -16,6 +16,12 @@
  * policy detail page is read-gated, so anyone who can view a
  * policy can export it.
  *
+ * Audit logging lives inside the usecase (`generatePolicyDocumentPdf`
+ * writes a `POLICY_EXPORTED` audit-log entry once the PDF builds
+ * cleanly). The route stays thin — the
+ * `policy-routes-guardrail` structural rule forbids `logEvent`
+ * calls in policy routes; logging is a usecase-layer concern.
+ *
  * Query string:
  *   `classification` — one of PUBLIC | INTERNAL | CONFIDENTIAL |
  *   RESTRICTED. Defaults to INTERNAL. Drives the cover chip + the
@@ -28,8 +34,6 @@ import { generatePolicyDocumentPdf } from '@/app-layer/reports/pdf/policyDocumen
 import type { PolicyClassification } from '@/lib/pdf/policyLayout';
 import { FEATURES } from '@/lib/entitlements';
 import { requireFeature } from '@/lib/entitlements-server';
-import { logEvent } from '@/app-layer/events/audit';
-import { runInTenantContext } from '@/lib/db-context';
 import { logger } from '@/lib/observability/logger';
 
 // Force Node.js runtime — PDFKit needs stream/zlib/Buffer.
@@ -92,26 +96,6 @@ export const GET = withApiErrorHandling(
         const pdfBuffer = await collectPdfBuffer(pdfDoc);
         const dateStr = new Date().toISOString().slice(0, 10);
         const fileName = `policy_${params.id}_${dateStr}.pdf`;
-
-        // Audit trail — every policy export is logged.
-        await runInTenantContext(ctx, (db) =>
-            logEvent(db, ctx, {
-                action: 'POLICY_EXPORTED',
-                entityType: 'Policy',
-                entityId: params.id,
-                details: JSON.stringify({
-                    classification,
-                    sizeBytes: pdfBuffer.length,
-                }),
-                detailsJson: {
-                    category: 'document',
-                    entityName: 'Policy',
-                    operation: 'exported',
-                    after: { format: 'pdf', classification },
-                    summary: `Policy exported (${classification})`,
-                },
-            }),
-        );
 
         return new Response(new Uint8Array(pdfBuffer), {
             status: 200,
