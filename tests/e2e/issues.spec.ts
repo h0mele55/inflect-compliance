@@ -48,16 +48,16 @@ async function seedAsset(page: Page, slug: string, name: string): Promise<void> 
 /**
  * PR-D — seed a Control so the EntityPicker on the task detail
  * page's "add link" flow has a candidate to pick. Same rationale
- * as `seedAsset`. Returns the label the EntityPicker will render
- * (`${annexId || code}: ${name}` — see entity-picker.tsx). The
- * `: ` suffix is significant for the selectComboboxOption regex,
- * so callers wrap with a regex.
+ * as `seedAsset`. Returns the control's cuid — needed because the
+ * legacy `<TaskLinksTable>` renders the raw `entityId` cuid
+ * (not the resolved name), so the post-add assertion must check
+ * the cuid, not the human-friendly name.
  */
 async function seedControl(
     page: Page,
     slug: string,
     name: string,
-): Promise<void> {
+): Promise<string> {
     const res = await page.request.post(`/api/t/${slug}/controls`, {
         headers: { 'Content-Type': 'application/json' },
         data: {
@@ -72,6 +72,8 @@ async function seedControl(
             `[issues.spec] seedControl failed: ${res.status()} ${await res.text()}`,
         );
     }
+    const body = (await res.json()) as { id: string };
+    return body.id;
 }
 
 /**
@@ -214,9 +216,15 @@ test.describe('Issue Management', () => {
 
         // PR-D — seed a Control so the EntityPicker on the task
         // detail-page add-link form has a candidate to pick.
+        // Capture the cuid so the post-add assertion can check
+        // it directly (TaskLinksTable shows entityId, not name).
         const uid = `${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
         const controlName = `E2E Control ${uid}`;
-        await seedControl(authedPage, isolatedTenant.tenantSlug, controlName);
+        const controlId = await seedControl(
+            authedPage,
+            isolatedTenant.tenantSlug,
+            controlName,
+        );
 
         await authedPage.click('#tab-links');
         await authedPage.waitForLoadState('networkidle').catch(() => {});
@@ -239,9 +247,12 @@ test.describe('Issue Management', () => {
         await expect(
             authedPage.locator('[data-testid="task-links-table"]'),
         ).toContainText('CONTROL', { timeout: 5000 });
+        // PR-D — TaskLinksTable renders the raw `entityId` (cuid),
+        // not the resolved entity name; assert against the seeded
+        // control's id rather than its display name.
         await expect(
             authedPage.locator('[data-testid="task-links-table"]'),
-        ).toContainText(controlName);
+        ).toContainText(controlId);
     });
 
     test('add comment to issue', async ({ authedPage, isolatedTenant }) => {
