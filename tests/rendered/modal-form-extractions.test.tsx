@@ -260,7 +260,11 @@ describe('modal-form P2 — list clients open the modal on ?create=1', () => {
         expect(src).toMatch(new RegExp(`<${c.modal}\\b`));
         // Reads the `?create=1` flag.
         expect(src).toMatch(/useSearchParams\b/);
-        expect(src).toMatch(/searchParams.*create.*===.*1/s);
+        // `[\s\S]*` substitutes for the `/s` (dotAll) flag — the
+        // project tsconfig targets ES2017 and rejects ES2018 regex
+        // flags. `dotAll`-style match across newlines is what we
+        // want for this multi-line ratchet.
+        expect(src).toMatch(/searchParams[\s\S]*create[\s\S]*===[\s\S]*1/);
         // Strips the flag after open (router.replace with the flag deleted).
         expect(src).toMatch(/router\.replace\(/);
         expect(src).toMatch(/next\.delete\(['"]create['"]\)/);
