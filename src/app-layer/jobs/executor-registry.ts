@@ -405,6 +405,33 @@ executorRegistry.register('access-review-reminder', async (payload) => {
     );
 });
 
+// ── access-review-overdue-escalation (Audit Coherence S7) ───────────
+
+executorRegistry.register('access-review-overdue-escalation', async (payload) => {
+    const startedAt = new Date().toISOString();
+    const startMs = performance.now();
+    const { processAccessReviewOverdueEscalation } = await import(
+        './access-review-overdue-escalation'
+    );
+    const { prisma } = await import('@/lib/prisma');
+    const r = await processAccessReviewOverdueEscalation(prisma, {
+        tenantId: payload.tenantId,
+    });
+    return makeResult(
+        'access-review-overdue-escalation',
+        startedAt,
+        startMs,
+        r.scanned,
+        r.enqueued,
+        0,
+        {
+            skippedDuplicate: r.skippedDuplicate,
+            skippedNoAdminEmail: r.skippedNoAdminEmail,
+            skippedComplete: r.skippedComplete,
+        },
+    );
+});
+
 // ── exception-expiry-monitor (Epic G-5) ─────────────────────────────
 
 executorRegistry.register('exception-expiry-monitor', async (payload) => {

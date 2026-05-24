@@ -491,6 +491,85 @@ export function buildAccessReviewReminderEmail(
     };
 }
 
+// ─── Access Review Overdue Escalation (Audit Coherence S7) ───
+
+export interface AccessReviewOverdueEscalationPayload {
+    adminName: string;
+    campaignName: string;
+    /// Always positive — the cron only fires after the campaign
+    /// is past the grace tail.
+    daysOverdue: number;
+    pendingDecisions: number;
+    totalDecisions: number;
+    tenantSlug: string;
+    accessReviewId: string;
+    reviewerName: string;
+    /// Null when the assigned reviewer was an offboarded user
+    /// whose email is no longer resolvable.
+    reviewerEmail: string | null;
+}
+
+export function buildAccessReviewOverdueEscalationEmail(
+    payload: AccessReviewOverdueEscalationPayload,
+): EmailTemplateResult {
+    const {
+        adminName,
+        campaignName,
+        daysOverdue,
+        pendingDecisions,
+        totalDecisions,
+        tenantSlug,
+        accessReviewId,
+        reviewerName,
+        reviewerEmail,
+    } = payload;
+
+    const link = `/t/${tenantSlug}/access-reviews/${accessReviewId}`;
+    const reviewerLine = reviewerEmail
+        ? `${reviewerName} (${reviewerEmail})`
+        : reviewerName;
+
+    return {
+        subject: `⚠️ Access review ${daysOverdue} days overdue: ${campaignName}`,
+        bodyText: [
+            `Hi ${adminName},`,
+            '',
+            `An access review campaign in your tenant is now ${daysOverdue} days past its deadline and still has pending decisions. The assigned reviewer has been receiving daily reminders.`,
+            '',
+            `  Campaign: ${campaignName}`,
+            `  Reviewer: ${reviewerLine}`,
+            `  Pending decisions: ${pendingDecisions} of ${totalDecisions}`,
+            `  Days overdue: ${daysOverdue}`,
+            '',
+            'As a tenant admin you can:',
+            '  - Reassign the campaign to a different reviewer.',
+            '  - Force-close the campaign (this will skip pending verdicts).',
+            '  - Chase the reviewer through other channels.',
+            '',
+            `Open the campaign: ${link}`,
+            '',
+            'Severely overdue campaigns appear in SOC 2 evidence reviews as control failures — closing this out is high-priority.',
+            '',
+            '— Inflect Compliance',
+        ].join('\n'),
+        bodyHtml: `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <h2 style="color: #b91c1c; font-size: 18px; margin-bottom: 16px;">Access review ${daysOverdue} days overdue</h2>
+  <p style="color: #444; line-height: 1.5;">Hi ${escapeHtml(adminName)},</p>
+  <p style="color: #444; line-height: 1.5;">An access review campaign in your tenant is now <strong>${daysOverdue} days past its deadline</strong> and still has pending decisions. The assigned reviewer has been receiving daily reminders.</p>
+  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+    <tr><td style="color: #888; padding: 4px 0; width: 160px;">Campaign</td><td style="color: #444;"><strong>${escapeHtml(campaignName)}</strong></td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Reviewer</td><td style="color: #444;">${escapeHtml(reviewerLine)}</td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Pending decisions</td><td style="color: #444;"><strong>${pendingDecisions}</strong> of ${totalDecisions}</td></tr>
+    <tr><td style="color: #888; padding: 4px 0;">Days overdue</td><td style="color: #b91c1c;"><strong>${daysOverdue}</strong></td></tr>
+  </table>
+  <a href="${escapeHtml(link)}" style="display: inline-block; background: #b91c1c; color: #fff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500;">Open campaign</a>
+  <p style="color: #999; font-size: 12px; margin-top: 24px;">Severely overdue campaigns appear in SOC 2 evidence reviews as control failures.</p>
+  <p style="color: #999; font-size: 12px; margin-top: 8px;">— Inflect Compliance</p>
+</div>`.trim(),
+    };
+}
+
 // ─── Exception expiring (Epic G-5) ───
 
 export interface ExceptionExpiringPayload {

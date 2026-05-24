@@ -238,6 +238,43 @@ export class AccessReviewRepository {
         return r.count;
     }
 
+    /**
+     * Reset a previously-submitted decision back to pending. The
+     * row stays in place (snapshot fields preserved) but the
+     * verdict + reviewer fields go null. Only callable while the
+     * campaign is OPEN / IN_REVIEW and the decision is not yet
+     * executed — the usecase enforces both gates before calling.
+     *
+     * (Audit Coherence S7, 2026-05-24)
+     */
+    static async resetDecision(
+        db: PrismaTx,
+        ctx: RequestContext,
+        decisionId: string,
+    ) {
+        const r = await db.accessReviewDecision.updateMany({
+            where: {
+                id: decisionId,
+                tenantId: ctx.tenantId,
+                // Executed rows are immutable — campaign is closed
+                // or the row was executed by closeout. Refuse here
+                // so the count===0 caller path surfaces a notFound
+                // instead of silently undoing an audit-evidentiary
+                // write.
+                executedAt: null,
+            },
+            data: {
+                decision: null,
+                decidedAt: null,
+                decidedByUserId: null,
+                notes: null,
+                modifiedToRole: null,
+                modifiedToCustomRoleId: null,
+            },
+        });
+        return r.count;
+    }
+
     static async setReviewStatus(
         db: PrismaTx,
         ctx: RequestContext,

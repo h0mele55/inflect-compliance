@@ -21,6 +21,7 @@ import {
     buildVendorAssessmentSubmittedEmail,
     buildVendorAssessmentReviewedEmail,
     buildAccessReviewReminderEmail,
+    buildAccessReviewOverdueEscalationEmail,
     buildExceptionExpiringEmail,
     type TaskAssignedPayload,
     type EvidenceExpiringPayload,
@@ -31,6 +32,7 @@ import {
     type VendorAssessmentSubmittedPayload,
     type VendorAssessmentReviewedPayload,
     type AccessReviewReminderPayload,
+    type AccessReviewOverdueEscalationPayload,
     type ExceptionExpiringPayload,
 } from './templates';
 
@@ -49,6 +51,7 @@ export interface EnqueueEmailInput {
         | VendorAssessmentSubmittedPayload
         | VendorAssessmentReviewedPayload
         | AccessReviewReminderPayload
+        | AccessReviewOverdueEscalationPayload
         | ExceptionExpiringPayload;
     sendAfter?: Date;
     requestId?: string;
@@ -143,6 +146,7 @@ function buildEmailContent(
         | VendorAssessmentSubmittedPayload
         | VendorAssessmentReviewedPayload
         | AccessReviewReminderPayload
+        | AccessReviewOverdueEscalationPayload
         | ExceptionExpiringPayload,
 ): { subject: string; bodyText: string; bodyHtml: string } {
     switch (type) {
@@ -175,6 +179,10 @@ function buildEmailContent(
         case 'ACCESS_REVIEW_REMINDER':
             return buildAccessReviewReminderEmail(
                 payload as AccessReviewReminderPayload,
+            );
+        case 'ACCESS_REVIEW_OVERDUE_ESCALATION':
+            return buildAccessReviewOverdueEscalationEmail(
+                payload as AccessReviewOverdueEscalationPayload,
             );
         case 'EXCEPTION_EXPIRING':
             return buildExceptionExpiringEmail(

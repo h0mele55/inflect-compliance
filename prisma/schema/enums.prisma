@@ -478,6 +478,13 @@ enum EmailNotificationType {
   // Deduped per-day per-(tenant, type, email, campaign) by the
   // outbox unique constraint.
   ACCESS_REVIEW_REMINDER
+  // Audit Coherence S7 (2026-05-24) — escalation fired when a
+  // campaign is more than ESCALATION_DAYS past `dueAt`. Reviewer
+  // already has the daily reminder; this nudges tenant ADMIN/OWNER
+  // recipients so they can intervene (reassign, force-close, or
+  // chase the reviewer). Same per-day dedupe shape as the reviewer
+  // reminder.
+  ACCESS_REVIEW_OVERDUE_ESCALATION
   // Epic G-5 — control exception approaching expiry. Fires at the
   // 30 / 14 / 7 day calendar windows before `expiresAt`. Per-day
   // dedupe at the outbox layer prevents double-fires; the

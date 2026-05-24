@@ -42,8 +42,10 @@ import { badRequest, forbidden, notFound } from '@/lib/errors/types';
 import {
     CreateAccessReviewSchema,
     SubmitDecisionSchema,
+    RevokeDecisionSchema,
     type CreateAccessReviewInput,
     type SubmitDecisionInput,
+    type RevokeDecisionInput,
 } from '../schemas/access-review.schemas';
 import type { Role, MembershipStatus } from '@prisma/client';
 import { generateAccessReviewPdf } from '../reports/pdf/accessReview';
@@ -344,6 +346,131 @@ export async function submitDecision(
             decision: parsed.decision,
             transitionedToInReview,
         };
+    });
+}
+
+// ─── revokeDecision ───────────────────────────────────────────────────
+
+export interface RevokeDecisionResult {
+    decisionId: string;
+    accessReviewId: string;
+}
+
+/**
+ * Audit Coherence S7 (2026-05-24) — reset a submitted decision back
+ * to pending.
+ *
+ * Before this usecase, `submitDecision` flat-out refused any second
+ * write to a decision row ("Re-recording is not supported"). That
+ * left reviewers no way to fix a typo'd verdict short of an admin
+ * + DB intervention. The new flow:
+ *
+ *   1. Reviewer (or admin acting on their behalf) calls
+ *      `revokeDecision(ctx, decisionId, { reason })`.
+ *   2. The row's verdict + notes + modify-target fields go null;
+ *      `snapshotRole` / `snapshotMembershipStatus` are preserved
+ *      so the evidentiary record stays intact.
+ *   3. Reviewer re-submits via `submitDecision` with the correct
+ *      verdict.
+ *
+ * Gates (all must hold):
+ *   - Decision exists in tenant.
+ *   - Campaign is OPEN or IN_REVIEW (CLOSED rejects — decisions are
+ *     immutable from closure forward).
+ *   - Caller is the assigned reviewer OR a tenant admin.
+ *   - Decision has been submitted (else there's nothing to reset).
+ *   - Decision has NOT been executed (repo gates on `executedAt:
+ *     null`; a closeout-executed row stays an evidentiary fact).
+ *
+ * Audit:
+ *   - Emits `ACCESS_REVIEW_DECISION_REVOKED` with category 'access'
+ *     so SIEM operators see the reset alongside the original submit.
+ *   - `reason` lands in detailsJson so SOC 2 auditors can review
+ *     why the decision was unwound.
+ */
+export async function revokeDecision(
+    ctx: RequestContext,
+    decisionId: string,
+    input: unknown,
+): Promise<RevokeDecisionResult> {
+    assertCanRead(ctx);
+    const parsed: RevokeDecisionInput = RevokeDecisionSchema.parse(input);
+    const reason = sanitizePlainText(parsed.reason);
+
+    return runInTenantContext(ctx, async (db) => {
+        const decision = await AccessReviewRepository.getDecision(
+            db,
+            ctx,
+            decisionId,
+        );
+        if (!decision) throw notFound('Decision not found');
+
+        const review = decision.accessReview;
+        if (!review || review.deletedAt !== null) {
+            throw notFound('Access review not found');
+        }
+        if (review.status === 'CLOSED') {
+            throw badRequest(
+                'This campaign is closed; decisions are immutable.',
+            );
+        }
+
+        const isAssignedReviewer = review.reviewerUserId === ctx.userId;
+        const isAdmin = ctx.permissions.canAdmin;
+        if (!isAssignedReviewer && !isAdmin) {
+            throw forbidden(
+                'Only the assigned reviewer (or a tenant admin) may revoke decisions for this campaign.',
+            );
+        }
+
+        if (decision.decision === null) {
+            throw badRequest(
+                'This decision has not been recorded; nothing to revoke.',
+            );
+        }
+        if (decision.executedAt !== null) {
+            throw badRequest(
+                'This decision has been executed and cannot be revoked.',
+            );
+        }
+
+        const priorDecision = decision.decision;
+        const count = await AccessReviewRepository.resetDecision(
+            db,
+            ctx,
+            decisionId,
+        );
+        if (count === 0) {
+            // Either the row was concurrently executed (executedAt
+            // flipped non-null between the gate above and the
+            // update) or RLS pushed it out of view. Both surface as
+            // notFound so the caller can retry cleanly.
+            throw notFound('Decision not found');
+        }
+
+        await logEvent(db, ctx, {
+            action: 'ACCESS_REVIEW_DECISION_REVOKED',
+            entityType: 'AccessReviewDecision',
+            entityId: decisionId,
+            detailsJson: {
+                category: 'access',
+                entityName: 'AccessReviewDecision',
+                operation: 'revoke',
+                summary: `Reviewer revoked prior ${priorDecision} verdict on decision ${decisionId}`,
+                targetUserId: decision.subjectUserId,
+                before: {
+                    decision: priorDecision,
+                },
+                after: {
+                    decision: null,
+                },
+                accessReviewId: review.id,
+                actorIsAssignedReviewer: isAssignedReviewer,
+                reason,
+            },
+        });
+
+        return { decisionId, accessReviewId: review.id };
     });
 }
 
