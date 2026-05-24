@@ -109,6 +109,19 @@ export const SCHEDULED_JOBS: ScheduleDefinition[] = [
         defaultPayload: {},
     },
     {
+        name: 'access-review-overdue-escalation',
+        // Daily at 04:15 UTC — sits between G-4's 04:00 reviewer
+        // reminder and the 04:30 exception monitor. Each campaign
+        // already got its reviewer-targeted nudge fifteen minutes
+        // earlier; this job adds the admin-fan-out for the subset
+        // that's past the grace tail. Idempotent by-day via the
+        // outbox dedupe key. (Audit Coherence S7, 2026-05-24)
+        pattern: '15 4 * * *',
+        description:
+            'Escalate severely overdue access-review campaigns to tenant ADMIN/OWNERs so they can reassign, force-close, or chase.',
+        defaultPayload: {},
+    },
+    {
         name: 'exception-expiry-monitor',
         // Daily at 04:30 UTC — chosen to land between the 04:00
         // access-review reminder (G-4) and the 05:00 compliance-

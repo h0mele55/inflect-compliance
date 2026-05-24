@@ -152,6 +152,16 @@ export interface PolicyReviewReminderPayload {
     tenantId?: string;
 }
 
+/**
+ * Audit Coherence S7 (2026-05-24) — access review overdue
+ * escalation. Sister job to `access-review-reminder` — same payload
+ * shape (tenant-scope opt-in), separate job because the fan-out
+ * recipients are tenant admins, not the campaign reviewer.
+ */
+export interface AccessReviewOverdueEscalationPayload {
+    tenantId?: string;
+}
+
 /** Task-due notification — in-app deadline reminders (7d / 1d / due day) */
 export interface TaskDueNotificationPayload {
     /** Optional: scope the scan to a single tenant. Omit for the
@@ -437,6 +447,7 @@ export interface JobPayloadMap {
     'control-test-scheduler': ControlTestSchedulerPayload;
     'control-test-runner': ControlTestRunnerPayload;
     'access-review-reminder': AccessReviewReminderPayload;
+    'access-review-overdue-escalation': AccessReviewOverdueEscalationPayload;
     'task-due-notification': TaskDueNotificationPayload;
 }
 
@@ -486,6 +497,12 @@ export const JOB_DEFAULTS: Record<JobName, {
         removeOnFail: 500,
     },
     'access-review-reminder': {
+        attempts: 2,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 200,
+        removeOnFail: 500,
+    },
+    'access-review-overdue-escalation': {
         attempts: 2,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: 200,

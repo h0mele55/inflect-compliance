@@ -74,13 +74,17 @@ describe('Infrastructure Regression Guards', () => {
             }
         });
 
-        test('exactly 12 scheduled jobs exist', () => {
-            expect(SCHEDULED_JOBS).toHaveLength(12);
+        test('exactly 13 scheduled jobs exist', () => {
+            expect(SCHEDULED_JOBS).toHaveLength(13);
         });
 
         test('scheduled job names match expected set', () => {
             const names = SCHEDULED_JOBS.map(s => s.name).sort();
             expect(names).toEqual([
+                // Audit Coherence S7 — daily admin escalation when
+                // an access-review campaign is severely past its
+                // dueAt and decisions remain pending.
+                'access-review-overdue-escalation',
                 // Epic G-4 — daily reviewer reminder for access review
                 // campaigns approaching their dueAt.
                 'access-review-reminder',

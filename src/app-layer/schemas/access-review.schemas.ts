@@ -111,3 +111,17 @@ export const SubmitDecisionSchema = z.discriminatedUnion('decision', [
 ]);
 
 export type SubmitDecisionInput = z.infer<typeof SubmitDecisionSchema>;
+
+/**
+ * Audit Coherence S7 (2026-05-24) — reset a submitted decision back
+ * to pending. The reviewer who recorded the wrong verdict can
+ * undo + re-record without admin intervention.
+ *
+ * `reason` is REQUIRED — the audit row carries it as the rationale,
+ * SOC 2 auditors will ask why a decision was unwound.
+ */
+export const RevokeDecisionSchema = z.object({
+    reason: z.string().min(3).max(2000),
+});
+
+export type RevokeDecisionInput = z.infer<typeof RevokeDecisionSchema>;
