@@ -100,6 +100,7 @@ import {
     CanvasCommandPalette,
     type CanvasCommandGroup,
 } from "./CanvasCommandPalette";
+import { CanvasDocumentBar } from "./CanvasDocumentBar";
 // R31 — CanvasHelpStrip retired. The "tips" strip occupied a
 // permanent band of chrome to teach four interactions that the
 // canvas's empty state + the palette icon labels can convey on
@@ -1416,201 +1417,41 @@ function Inner({
                 before the canvas). The page block is now gone — the
                 breadcrumbs + tenant-rooted document identity live
                 inline here, Figma-style. One bar above the canvas. */}
-            <div
-                className="flex items-center gap-default border-b border-canvas-border px-default py-2.5"
-                data-persisted-canvas-toolbar="true"
-                data-canvas-document-bar="true"
-            >
-                {/* Inline breadcrumb — the editor's own identity,
-                    not a separate page header. Sits left of the
-                    process selector so the path reads
-                    Dashboard › Processes › <selector with current
-                    map's name>. */}
-                <nav
-                    className="flex items-center gap-1 text-[11px] text-content-subtle"
-                    aria-label="Breadcrumb"
-                    data-canvas-document-breadcrumb="true"
-                >
-                    <a
-                        href={`/t/${tenantSlug}/dashboard`}
-                        className="rounded-[4px] px-1 text-content-muted hover:bg-bg-muted hover:text-content-emphasis focus-visible:outline-none focus-visible:bg-bg-muted"
-                    >
-                        Dashboard
-                    </a>
-                    <span aria-hidden="true" className="text-content-subtle">
-                        ›
-                    </span>
-                    <span className="px-1 font-medium text-content-emphasis">
-                        Processes
-                    </span>
-                    <span aria-hidden="true" className="text-content-subtle">
-                        ›
-                    </span>
-                </nav>
-                <select
-                    value={activeId ?? ""}
-                    onChange={(e) =>
-                        onActiveIdChange(e.target.value || null)
-                    }
-                    disabled={processes.length === 0 || loading || saving}
-                    className="rounded-[6px] border border-canvas-border bg-canvas-surface px-2 py-1 text-xs text-content-emphasis focus:border-border-emphasis focus:outline-none"
-                    aria-label="Select process map"
-                    data-testid="process-selector"
-                >
-                    {processes.length === 0 && (
-                        <option value="">(no processes yet)</option>
-                    )}
-                    {processes.map((p) => (
-                        <option key={p.id} value={p.id}>
-                            {p.name}
-                        </option>
-                    ))}
-                </select>
-                {activeId && (
-                    // R26-PR-E — inline rename. Commits on blur or
-                    // Enter; pressing Escape reverts to the active
-                    // process's stored name.
-                    <input
-                        type="text"
-                        value={editedName}
-                        onChange={(e) => setEditedName(e.target.value)}
-                        onBlur={handleRenameCommit}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                                e.currentTarget.blur();
-                            } else if (e.key === "Escape") {
-                                setEditedName(activeProcess?.name ?? "");
-                                e.currentTarget.blur();
-                            }
-                        }}
-                        disabled={saving || loading}
-                        aria-label="Process name"
-                        placeholder="Untitled"
-                        data-testid="process-name-input"
-                        className="min-w-[140px] rounded-[6px] border border-transparent bg-transparent px-2 py-1 text-xs font-medium text-content-emphasis hover:border-canvas-border focus:border-border-emphasis focus:bg-canvas-surface focus:outline-none"
-                    />
-                )}
-                <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleNew}
-                    disabled={creating}
-                    data-testid="new-process-btn"
-                >
-                    {creating ? "Creating…" : "New process"}
-                </Button>
-                {activeId && (
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={handleDuplicate}
-                        disabled={duplicating || saving || loading}
-                        data-testid="duplicate-process-btn"
-                    >
-                        {duplicating ? "Duplicating…" : "Duplicate"}
-                    </Button>
-                )}
-                <div className="ml-auto flex items-center gap-default">
-                    {/* R28 — undo / redo. Pure icon buttons live
-                        in the toolbar's right-side cluster so the
-                        keyboard-bind discovery (`Cmd+Z` / `Cmd+Shift+Z`)
-                        is mirrored visually. Disabled states drop
-                        out via the history hook's flags. */}
-                    {activeId && (
-                        <>
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={handleUndo}
-                                disabled={!history.canUndo || saving || loading}
-                                aria-label="Undo"
-                                title="Undo (Cmd/Ctrl+Z)"
-                                data-testid="canvas-undo-btn"
-                            >
-                                Undo
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={handleRedo}
-                                disabled={!history.canRedo || saving || loading}
-                                aria-label="Redo"
-                                title="Redo (Cmd/Ctrl+Shift+Z)"
-                                data-testid="canvas-redo-btn"
-                            >
-                                Redo
-                            </Button>
-                            {/* Snap-to-grid toggle. Persists per
-                                tenant in localStorage; reads as a
-                                soft pill so it stays calm next to
-                                the action buttons. */}
-                            <button
-                                type="button"
-                                onClick={() => setSnapEnabled((v) => !v)}
-                                className="rounded-[6px] border border-canvas-border bg-canvas-surface px-2 py-1 text-[11px] font-medium text-content-muted hover:border-border-emphasis hover:text-content-emphasis aria-pressed:border-border-emphasis aria-pressed:bg-canvas-node aria-pressed:text-content-emphasis"
-                                aria-pressed={snapEnabled}
-                                aria-label="Snap to grid"
-                                title="Snap to grid"
-                                data-testid="canvas-snap-toggle"
-                            >
-                                Snap
-                            </button>
-                        </>
-                    )}
-                    {error && (
-                        <span
-                            className="text-xs text-content-error"
-                            role="alert"
-                        >
-                            {error}
-                        </span>
-                    )}
-                    {/* R28 — autosave status. Quietly reports the
-                        debounce state; vanishes when idle so the
-                        toolbar isn't carrying constant chrome. */}
-                    {autosave.status === "pending" && (
-                        <span
-                            className="text-[11px] text-content-subtle"
-                            data-testid="autosave-status"
-                            data-autosave-status="pending"
-                        >
-                            Unsaved
-                        </span>
-                    )}
-                    {autosave.status === "saving" && (
-                        <span
-                            className="text-[11px] text-content-subtle"
-                            data-testid="autosave-status"
-                            data-autosave-status="saving"
-                        >
-                            Saving…
-                        </span>
-                    )}
-                    {autosave.status === "saved" && (
-                        <span
-                            className="text-[11px] text-content-success"
-                            data-testid="autosave-status"
-                            data-autosave-status="saved"
-                        >
-                            Saved
-                        </span>
-                    )}
-                    {loadedMap && (
-                        <span className="text-xs text-content-subtle tabular-nums">
-                            v{loadedMap.version}
-                        </span>
-                    )}
-                    <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={handleSave}
-                        disabled={!activeId || saving || loading}
-                        data-testid="save-process-btn"
-                    >
-                        {saving ? "Saving…" : "Save"}
-                    </Button>
-                </div>
-            </div>
+            {/* R32-PR10 — document bar extracted from 195 lines of
+                inline JSX into its own component. The bar owns no
+                state; every field flows from Inner via five grouped
+                props (doc / busy / editorState / handlers /
+                tenantSlug). Testids, classes, and behaviour are
+                byte-identical to the pre-R32 inline version. */}
+            <CanvasDocumentBar
+                tenantSlug={tenantSlug}
+                doc={{
+                    activeId,
+                    processes,
+                    activeProcess,
+                    editedName,
+                    loadedMap,
+                    error,
+                }}
+                busy={{ saving, loading, creating, duplicating }}
+                editorState={{
+                    snapEnabled,
+                    autosaveStatus: autosave.status,
+                    canUndo: history.canUndo,
+                    canRedo: history.canRedo,
+                }}
+                handlers={{
+                    onActiveIdChange,
+                    setEditedName,
+                    handleSave,
+                    handleNew,
+                    handleDuplicate,
+                    handleRenameCommit,
+                    handleUndo,
+                    handleRedo,
+                    setSnapEnabled,
+                }}
+            />
 
             {/* R31 Bundle 4 (PR 2) — the ProcessPalette moved
                 from a HORIZONTAL strip across the top of the

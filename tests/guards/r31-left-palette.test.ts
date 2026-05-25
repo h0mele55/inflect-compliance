@@ -127,13 +127,16 @@ describe("R31 (Bundle 4) — left palette", () => {
             // wrapping context. That site now carries the
             // retirement-comment block and NO sibling
             // <ProcessPalette /> element.
-            // Anchor on the long-lived R28 toolbar marker — it has
-            // existed since R28 (under that exact attribute name)
-            // and survives every refactor that doesn't tear out
-            // the toolbar entirely.
-            const toolbarEndIdx = src.indexOf(
-                'data-persisted-canvas-toolbar="true"',
-            );
+            // Anchor on the long-lived toolbar marker. R32-PR10
+            // extracted the toolbar JSX into `<CanvasDocumentBar>`,
+            // so the canvas now carries the COMPONENT MOUNT in
+            // place of the inline attribute. Anchor on whichever
+            // is present — the marker survives every refactor that
+            // doesn't tear out the document bar entirely.
+            const toolbarEndIdx =
+                src.indexOf('<CanvasDocumentBar') >= 0
+                    ? src.indexOf('<CanvasDocumentBar')
+                    : src.indexOf('data-persisted-canvas-toolbar="true"');
             expect(toolbarEndIdx).toBeGreaterThan(0);
             const bodyRowIdx = src.indexOf(
                 'flex flex-1 min-h-0',

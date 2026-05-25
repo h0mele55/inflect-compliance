@@ -64,46 +64,40 @@ describe("R31 (Bundle 3) — document bar", () => {
         });
     });
 
-    describe("PersistedProcessCanvas — inline breadcrumbs in the document bar", () => {
-        const src = read(
-            "src/components/processes/PersistedProcessCanvas.tsx",
-        );
+    describe("Document bar — inline breadcrumbs + testids", () => {
+        // R32-PR10 extracted the document bar JSX from
+        // `PersistedProcessCanvas` into its own
+        // `<CanvasDocumentBar>` component. The visual + testid
+        // assertions below NOW live against the extracted file;
+        // the canvas itself only carries the mount. The
+        // r32-canvas-decomposition ratchet verifies the canvas
+        // mounts the component correctly.
+        const src = read("src/components/processes/CanvasDocumentBar.tsx");
 
         it("the canonical document-bar marker is set", () => {
-            // `data-canvas-document-bar="true"` is the new
-            // canonical marker — future bundles (overflow menu,
-            // command-palette anchor, etc.) target this element.
             expect(src).toMatch(/data-canvas-document-bar="true"/);
         });
 
         it("renders an inline <nav> breadcrumb on the toolbar", () => {
             expect(src).toMatch(/data-canvas-document-breadcrumb="true"/);
-            // The breadcrumb's accessible name is the canonical
-            // 'Breadcrumb' label so screen readers identify it
-            // as a navigation landmark.
             expect(src).toMatch(/aria-label="Breadcrumb"/);
         });
 
         it("breadcrumb links to the tenant dashboard", () => {
-            // The dashboard link uses the tenantSlug closure prop
-            // (already present in the Inner component's props).
             expect(src).toMatch(
                 /href=\{`\/t\/\$\{tenantSlug\}\/dashboard`\}/,
             );
         });
 
         it("breadcrumb separator uses the standard › character", () => {
-            // One typographic separator for the whole canvas.
-            // The Unicode `›` (U+203A) — same as the IC PageBreadcrumbs
-            // primitive — keeps the navigation language consistent.
             expect(src).toMatch(/›/);
         });
 
         it("preserves every existing toolbar testid (R26/R28 contract intact)", () => {
             // These testids are pinned by upstream ratchets
-            // (R26-PR-E, R28-editor-ergonomics). The document-bar
-            // refactor preserves them — the IDs stay so the
-            // tests stay green.
+            // (R26-PR-E, R28-editor-ergonomics). The R32 extraction
+            // preserved them byte-for-byte — they NOW live in the
+            // extracted component instead of PersistedProcessCanvas.
             for (const id of [
                 "process-selector",
                 "process-name-input",
