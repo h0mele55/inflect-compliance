@@ -36,10 +36,18 @@ const ROOT = path.resolve(__dirname, '../..');
  *     population (126 rendered / 36 E2E / 5 registered primitives).
  */
 // Bumped 126 → 135 by the edit-columns gear-fix repro test +
-// other recent additions across the parity roadmap PRs. The
-// upward ratchet locks the gains; further additions raise this
-// floor in the same PR.
-const RENDERED_TEST_FLOOR = 135;
+// other recent additions across the parity roadmap PRs.
+//
+// R31 (Bundle 1) — adjusted 135 → 134. The
+// `tests/rendered/canvas-help-strip.test.tsx` rendered test
+// was retired alongside the `CanvasHelpStrip` component (the
+// "one message per state" design verdict moved the onboarding
+// affordance into the empty-state hint at canvas-bottom-centre).
+// This is the documented exception the rendered-floor ratchet
+// explicitly contemplates: "if a test was legitimately merged
+// or renamed, account for it." The floor will resume its
+// upward-only ratchet from 134 on the next addition.
+const RENDERED_TEST_FLOOR = 134;
 const E2E_SPEC_FLOOR = 36;
 const REGISTRY_FLOOR = 5;
 

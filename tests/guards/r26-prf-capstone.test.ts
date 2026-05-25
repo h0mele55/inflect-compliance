@@ -44,8 +44,11 @@ const R26_FILES_THAT_MUST_EXIST = [
     "docs/processes-canvas-semantics.md",
     // PR-E — editor UX
     "src/components/processes/ProcessInspector.tsx",
-    // PR-F — polish
-    "src/components/processes/CanvasHelpStrip.tsx",
+    // PR-F — polish. The CanvasHelpStrip file shipped here was
+    // retired in R31 (the "one message per state" principle
+    // moved the onboarding affordance into the empty-state hint
+    // at canvas-bottom-centre). The supersession is documented
+    // in the empty-state-anchor assertion below.
     // Persistence canvas — the central composition that wires
     // every PR's plumbing into one surface.
     "src/components/processes/PersistedProcessCanvas.tsx",
@@ -131,7 +134,13 @@ describe("R26-PR-F — Processes roadmap capstone", () => {
         expect(src).toMatch(/<ProcessInspector\b/);
         expect(src).toMatch(/handleRenameCommit/);
         expect(src).toMatch(/handleDuplicate/);
-        // PR-F
-        expect(src).toMatch(/<CanvasHelpStrip\b/);
+        // PR-F — superseded by R31. The CanvasHelpStrip mount
+        // was removed; the empty-but-loaded hint at canvas-bottom-
+        // centre is the canonical onboarding affordance now. The
+        // assertion below pins the new anchor so an accidental
+        // re-introduction of the strip or removal of the hint
+        // fails CI.
+        expect(src).toMatch(/data-canvas-empty-state="true"/);
+        expect(src).not.toMatch(/<CanvasHelpStrip\b/);
     });
 });

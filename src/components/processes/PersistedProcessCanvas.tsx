@@ -93,7 +93,14 @@ import {
 } from "@/lib/processes/canvas-alignment";
 import { useKeyboardShortcut } from "@/lib/hooks/use-keyboard-shortcut";
 import { ProcessInspector } from "./ProcessInspector";
-import { CanvasHelpStrip } from "./CanvasHelpStrip";
+// R31 — CanvasHelpStrip retired. The "tips" strip occupied a
+// permanent band of chrome to teach four interactions that the
+// canvas's empty state + the palette icon labels can convey on
+// their own. Per the design verdict's "one message per state"
+// principle, the empty-state hint at canvas-bottom-centre is now
+// the canonical onboarding affordance. The component file is
+// deleted alongside its rendered test; the R26-PR-F + R27-PR-F
+// capstones are updated to document the supersession.
 import type { ProcessEdgeVariant } from "./ProcessEdge";
 import type { ProcessMapSummary } from "@/app/t/[tenantSlug]/(app)/processes/ProcessesClient";
 
@@ -1554,10 +1561,6 @@ function Inner({
                     </button>
                 </div>
             )}
-            <CanvasHelpStrip
-                nodeCount={nodes.length}
-                edgeCount={edges.length}
-            />
             <div className="flex flex-1 min-h-0">
                 {/* The canvas plane — the recessed working surface.
                     A distinct deep token + a top inner shadow make it
@@ -1572,15 +1575,36 @@ function Inner({
                         <CanvasEmpty onNew={handleNew} creating={creating} />
                     )}
                     {!showEmpty && nodes.length === 0 && !loading && (
+                        // R31 — quieter empty-but-loaded hint.
+                        // Anchored to the bottom-centre instead of
+                        // dead-centre so it reads as a footnote, not
+                        // a competing card on top of the canvas.
+                        // Disappears the moment a node lands.
                         <div
-                            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+                            className="pointer-events-none absolute inset-x-0 bottom-default z-10 flex items-end justify-center"
                             data-canvas-empty-state="true"
                         >
-                            <p className="text-sm text-content-muted">
-                                Drag a process step from the palette to begin.
+                            <p className="text-[11px] text-content-subtle">
+                                Drag a process step from the palette to begin
                             </p>
                         </div>
                     )}
+                    {/* R31 — vignette overlay. A radial gradient that
+                        darkens the canvas edges ~4% so the surface
+                        reads as a "table you're working on" rather
+                        than an endless plane. Pointer-events-none so
+                        the canvas's pan/zoom still owns the gesture
+                        layer. Behind ReactFlow children so the dot
+                        grid + vignette compose visually. */}
+                    <div
+                        className="pointer-events-none absolute inset-0 z-[1]"
+                        aria-hidden="true"
+                        data-canvas-vignette="true"
+                        style={{
+                            background:
+                                "radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.04) 100%)",
+                        }}
+                    />
                     <ReactFlow
                         key={activeId ?? "no-map"}
                         nodes={nodes}
@@ -1637,11 +1661,29 @@ function Inner({
                         proOptions={{ hideAttribution: true }}
                         aria-label="Process canvas"
                     >
+                        {/* R31 — two-layer background discipline.
+                            Coarse 128px dot field at low opacity
+                            anchors orientation only; the fine 16px
+                            field rises in visibility only when snap
+                            is engaged (gives `snapToGrid` visual
+                            meaning — without this, the user has no
+                            cue that the toggle is active). Both
+                            quieter than R25's single dense pass. */}
                         <Background
+                            id="canvas-bg-coarse"
                             variant={BackgroundVariant.Dots}
-                            gap={24}
-                            size={1.3}
+                            gap={128}
+                            size={1.5}
                             color="var(--canvas-grid)"
+                            style={{ opacity: 0.18 }}
+                        />
+                        <Background
+                            id="canvas-bg-fine"
+                            variant={BackgroundVariant.Dots}
+                            gap={16}
+                            size={1}
+                            color="var(--canvas-grid)"
+                            style={{ opacity: snapEnabled ? 0.4 : 0 }}
                         />
                     </ReactFlow>
                 </div>

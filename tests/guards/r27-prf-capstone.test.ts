@@ -32,7 +32,9 @@ const PROCESS_COMPONENTS = [
     "src/components/processes/ProcessTypedNode.tsx",
     "src/components/processes/ProcessEdge.tsx",
     "src/components/processes/ProcessInspector.tsx",
-    "src/components/processes/CanvasHelpStrip.tsx",
+    // CanvasHelpStrip retired in R31 — see r26-prf-capstone.test.ts
+    // for the supersession rationale. The empty-state hint at
+    // canvas-bottom-centre is the canonical onboarding affordance.
     "src/app/t/[tenantSlug]/(app)/processes/ProcessesClient.tsx",
 ];
 
