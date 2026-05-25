@@ -29,6 +29,13 @@ import * as path from "node:path";
 const ROOT = path.resolve(__dirname, "../..");
 const CANVAS_PATH =
     "src/components/processes/PersistedProcessCanvas.tsx";
+// R32-PR10 extracted the document bar JSX (toolbar buttons, name
+// input, duplicate button) into its own `<CanvasDocumentBar>`
+// component. Testid assertions that targeted CANVAS_PATH now read
+// `DOC_BAR_PATH` instead — handlers stay on the canvas, JSX lives
+// in the bar.
+const DOC_BAR_PATH =
+    "src/components/processes/CanvasDocumentBar.tsx";
 const INSPECTOR_PATH = "src/components/processes/ProcessInspector.tsx";
 
 function read(rel: string): string {
@@ -37,34 +44,36 @@ function read(rel: string): string {
 
 describe("R26-PR-E — editor UX wiring", () => {
     const canvasSrc = read(CANVAS_PATH);
+    const docBarSrc = read(DOC_BAR_PATH);
 
     describe("inline rename", () => {
         it("the toolbar mounts an editable name input", () => {
             // The input must carry the canonical testid + an
-            // aria-label for accessibility. A future PR replacing
-            // this with a read-only badge would fail here.
-            expect(canvasSrc).toMatch(
+            // aria-label for accessibility. R32-PR10 — the JSX
+            // lives in the extracted document bar; the canvas
+            // delegates via props.
+            expect(docBarSrc).toMatch(
                 /data-testid=["']process-name-input["']/,
             );
-            expect(canvasSrc).toMatch(/aria-label=["']Process name["']/);
+            expect(docBarSrc).toMatch(/aria-label=["']Process name["']/);
         });
 
         it("rename commits on blur / Enter (NOT on every keystroke)", () => {
-            // The commit handler is wired to onBlur + Enter; the
-            // onChange path only updates the local mirror. A future
-            // PR moving commits to onChange would flood the API
-            // with one PUT per keystroke.
-            expect(canvasSrc).toMatch(/onBlur=\{handleRenameCommit\}/);
+            // The commit handler `handleRenameCommit` stays defined
+            // in the canvas; the JSX (`onBlur={handleRenameCommit}`)
+            // lives in the bar — both are required.
+            expect(docBarSrc).toMatch(/onBlur=\{handleRenameCommit\}/);
             expect(canvasSrc).toMatch(/handleRenameCommit/);
         });
     });
 
     describe("duplicate", () => {
         it("the toolbar mounts the Duplicate button when a process is active", () => {
-            expect(canvasSrc).toMatch(
+            // R32-PR10 — testid lives in the extracted bar.
+            expect(docBarSrc).toMatch(
                 /data-testid=["']duplicate-process-btn["']/,
             );
-            expect(canvasSrc).toMatch(/Duplicate/);
+            expect(docBarSrc).toMatch(/Duplicate/);
         });
 
         it("duplicate POSTs a new process then PUTs the current graph", () => {

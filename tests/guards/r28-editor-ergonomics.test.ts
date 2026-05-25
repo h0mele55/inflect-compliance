@@ -144,7 +144,15 @@ describe("R28 — editor ergonomics", () => {
         it("wires snap-to-grid + a toolbar toggle", () => {
             expect(src).toMatch(/snapToGrid=\{snapEnabled\}/);
             expect(src).toMatch(/snapGrid=\{\[16,\s*16\]\}/);
-            expect(src).toMatch(/data-testid="canvas-snap-toggle"/);
+            // R32-PR10 — the snap toggle JSX moved into the
+            // extracted `<CanvasDocumentBar>`. The testid lives
+            // there now; the toggle BEHAVIOUR (snapToGrid/
+            // snapGrid props on ReactFlow + localStorage persist)
+            // stays on the canvas.
+            const docBar = read(
+                "src/components/processes/CanvasDocumentBar.tsx",
+            );
+            expect(docBar).toMatch(/data-testid="canvas-snap-toggle"/);
             // Persistence — the canvas remembers the snap state
             // across sessions.
             expect(src).toMatch(
@@ -164,9 +172,13 @@ describe("R28 — editor ergonomics", () => {
         });
 
         it("toolbar surfaces undo / redo buttons + autosave status", () => {
-            expect(src).toMatch(/data-testid="canvas-undo-btn"/);
-            expect(src).toMatch(/data-testid="canvas-redo-btn"/);
-            expect(src).toMatch(/data-testid="autosave-status"/);
+            // R32-PR10 — toolbar JSX moved to CanvasDocumentBar.
+            const docBar = read(
+                "src/components/processes/CanvasDocumentBar.tsx",
+            );
+            expect(docBar).toMatch(/data-testid="canvas-undo-btn"/);
+            expect(docBar).toMatch(/data-testid="canvas-redo-btn"/);
+            expect(docBar).toMatch(/data-testid="autosave-status"/);
         });
     });
 
