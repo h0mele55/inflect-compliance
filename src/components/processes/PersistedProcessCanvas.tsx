@@ -30,6 +30,7 @@
 import {
     useCallback,
     useEffect,
+    useRef,
     useState,
     type DragEvent,
     type ReactNode,
@@ -100,6 +101,7 @@ import {
     type CanvasCommandGroup,
 } from "./CanvasCommandPalette";
 import { CanvasDocumentBar } from "./CanvasDocumentBar";
+import { CanvasExportMenu } from "./CanvasExportMenu";
 import { Tooltip } from "@/components/ui/tooltip";
 // R31 — CanvasHelpStrip retired. The "tips" strip occupied a
 // permanent band of chrome to teach four interactions that the
@@ -238,6 +240,9 @@ function Inner({
     // the load effect without flickering through activeId=null.
     const [reloadCounter, setReloadCounter] = useState(0);
     const toast = useToast();
+    // Epic P3-PR-A — ref to the [data-process-canvas] wrapper so
+    // the export menu can walk down to xyflow's viewport child.
+    const canvasWrapperRef = useRef<HTMLDivElement>(null);
     // R26-PR-E — inline name editing. Mirrors the active process's
     // name so the user can edit it in place without every keystroke
     // bouncing through the parent state.
@@ -1475,7 +1480,11 @@ function Inner({
         // renderers can dim themselves out when they fall
         // outside the selected node's one-hop neighbourhood.
         <CanvasEmphasisProvider emphasisIds={emphasisIds}>
-        <div className="flex h-full w-full flex-col" data-process-canvas="true">
+        <div
+            ref={canvasWrapperRef}
+            className="flex h-full w-full flex-col"
+            data-process-canvas="true"
+        >
             <CanvasCommandPalette groups={commandGroups} />
             {/* R31 Bundle 3 (PR 1) — the document bar. Pre-R31 this
                 row carried the document selector + name + actions
@@ -1518,6 +1527,16 @@ function Inner({
                     handleRedo,
                     setSnapEnabled,
                 }}
+                exportSlot={
+                    activeId && activeProcess ? (
+                        <CanvasExportMenu
+                            canvasEl={canvasWrapperRef.current}
+                            nodes={nodes}
+                            mapName={activeProcess.name}
+                            disabled={saving || loading}
+                        />
+                    ) : null
+                }
             />
 
             {/* R31 Bundle 4 (PR 2) — the ProcessPalette moved

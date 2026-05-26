@@ -80,6 +80,14 @@ export interface CanvasDocumentBarProps {
     busy: CanvasDocumentBarBusy;
     editorState: CanvasDocumentBarEditorState;
     handlers: CanvasDocumentBarHandlers;
+    /**
+     * Epic P3-PR-A — Optional slot for the export menu. The bar
+     * stays presentational; the canvas owns the menu's ref +
+     * nodes + mapName and renders <CanvasExportMenu> into this
+     * slot. Omit on contexts where export isn't appropriate
+     * (e.g. empty state).
+     */
+    exportSlot?: import("react").ReactNode;
 }
 
 export function CanvasDocumentBar({
@@ -88,6 +96,7 @@ export function CanvasDocumentBar({
     busy,
     editorState,
     handlers,
+    exportSlot,
 }: CanvasDocumentBarProps) {
     const {
         activeId,
@@ -335,6 +344,7 @@ export function CanvasDocumentBar({
                         Saved
                     </span>
                 )}
+                {exportSlot}
                 <Button
                     size="sm"
                     variant="primary"
