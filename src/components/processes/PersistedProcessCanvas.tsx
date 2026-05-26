@@ -102,6 +102,7 @@ import {
     pasteFromClipboard,
 } from "@/lib/processes/canvas-clipboard";
 import { ProcessInspector } from "./ProcessInspector";
+import { CanvasHistorySidebar } from "./CanvasHistorySidebar";
 import {
     CanvasCommandPalette,
     type CanvasCommandGroup,
@@ -2133,6 +2134,18 @@ function Inner({
                     onUpdate={handleInspectorUpdate}
                     onEdgeUpdate={handleEdgeUpdate}
                 />
+                {/* Epic P5-PR-A — Version-history sidebar. Mounts
+                    alongside the inspector; the AsidePanel primitive
+                    handles collapse-to-spine + the `?aside` deep-
+                    link so the user can toggle between Inspector
+                    and Version history without re-mounting either. */}
+                {activeId && (
+                    <CanvasHistorySidebar
+                        tenantSlug={tenantSlug}
+                        mapId={activeId}
+                        currentVersion={loadedMap?.version ?? null}
+                    />
+                )}
             </div>
         </div>
         </CanvasEmphasisProvider>
