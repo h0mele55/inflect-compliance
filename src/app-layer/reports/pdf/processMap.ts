@@ -18,13 +18,13 @@
  *     the browser.
  */
 
+import type { RequestContext } from '@/app-layer/types';
+import prisma from '@/lib/prisma';
 import { createPdfDocument, BRAND, MARGINS } from '@/lib/pdf/pdfKitFactory';
 import { addCoverPage, applyHeadersAndFooters } from '@/lib/pdf/layout';
 import type { ReportMeta } from '@/lib/pdf/types';
 
 export interface ProcessMapPdfInput {
-    /** Tenant display name for the cover page. */
-    tenantName: string;
     /** Process map name — becomes the report title. */
     mapName: string;
     /** Current version of the map at export time. */
@@ -36,13 +36,23 @@ export interface ProcessMapPdfInput {
 /**
  * Generate the PDF document. Returns the live PDFKit document; the
  * caller pipes it into a response stream.
+ *
+ * The tenant-name lookup lives HERE rather than at the route layer
+ * so `src/app/api/t/*` stays a thin orchestration shell — the
+ * structural `no-prisma-in-routes` guardrail enforces it. Same
+ * pattern as `riskRegister.ts` + the other PDF generators.
  */
-export function generateProcessMapPdf(
+export async function generateProcessMapPdf(
+    ctx: RequestContext,
     input: ProcessMapPdfInput,
-): PDFKit.PDFDocument {
+): Promise<PDFKit.PDFDocument> {
+    const tenant = await prisma.tenant.findUnique({
+        where: { id: ctx.tenantId },
+        select: { name: true },
+    });
     const generatedAt = new Date().toISOString();
     const meta: ReportMeta = {
-        tenantName: input.tenantName,
+        tenantName: tenant?.name ?? '—',
         reportTitle: input.mapName,
         reportSubtitle: `Process Map · v${input.version}`,
         generatedAt,

@@ -22,7 +22,6 @@ import { withApiErrorHandling } from '@/lib/errors/api';
 import { jsonResponse } from '@/lib/api-response';
 import { getProcessMap } from '@/app-layer/usecases/process-map';
 import { generateProcessMapPdf } from '@/app-layer/reports/pdf/processMap';
-import prisma from '@/lib/prisma';
 import { badRequest } from '@/lib/errors/types';
 
 // Force Node.js runtime — pdfkit needs stream / zlib / Buffer.
@@ -89,16 +88,11 @@ export const POST = withApiErrorHandling(
             throw badRequest('Invalid PNG payload');
         }
 
-        // Look up the tenant display name for the cover page —
-        // ctx.tenantId is the FK; the cover page wants the human
-        // name.
-        const tenant = await prisma.tenant.findUnique({
-            where: { id: ctx.tenantId },
-            select: { name: true },
-        });
-
-        const pdfDoc = generateProcessMapPdf({
-            tenantName: tenant?.name ?? '—',
+        // PDF generator owns the tenant-name lookup (same pattern
+        // as riskRegister.ts) so the route layer stays a thin
+        // orchestration shell — the `no-prisma-in-routes`
+        // structural guardrail enforces it.
+        const pdfDoc = await generateProcessMapPdf(ctx, {
             mapName: map.name,
             version: map.version,
             pngBytes,

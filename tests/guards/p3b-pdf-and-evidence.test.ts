@@ -26,11 +26,21 @@ describe("Epic P3-PR-B — PDF export + Evidence attachment", () => {
         const src = read("src/app-layer/reports/pdf/processMap.ts");
 
         it("exports generateProcessMapPdf + the canonical input shape", () => {
+            // The tenant-name lookup lives INSIDE the generator
+            // (same pattern as riskRegister.ts) so the route stays
+            // free of direct prisma calls; the input shape carries
+            // only what the caller can't infer.
             expect(src).toMatch(
-                /export interface ProcessMapPdfInput \{[\s\S]{0,400}tenantName:\s*string;[\s\S]{0,200}mapName:\s*string;[\s\S]{0,200}version:\s*number;[\s\S]{0,200}pngBytes:\s*Buffer;/,
+                /export interface ProcessMapPdfInput \{[\s\S]{0,400}mapName:\s*string;[\s\S]{0,200}version:\s*number;[\s\S]{0,200}pngBytes:\s*Buffer;/,
             );
             expect(src).toMatch(
-                /export function generateProcessMapPdf\([\s\S]{0,200}\):\s*PDFKit\.PDFDocument/,
+                /export async function generateProcessMapPdf\([\s\S]{0,400}\):\s*Promise<PDFKit\.PDFDocument>/,
+            );
+        });
+
+        it("the generator looks up the tenant name via prisma (route stays prisma-free)", () => {
+            expect(src).toMatch(
+                /prisma\.tenant\.findUnique\([\s\S]{0,200}id:\s*ctx\.tenantId/,
             );
         });
 
