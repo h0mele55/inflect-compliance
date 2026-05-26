@@ -1585,6 +1585,8 @@ function Inner({
                             canvasEl={canvasWrapperRef.current}
                             nodes={nodes}
                             mapName={activeProcess.name}
+                            tenantSlug={tenantSlug}
+                            mapId={activeId}
                             disabled={saving || loading}
                         />
                     ) : null
