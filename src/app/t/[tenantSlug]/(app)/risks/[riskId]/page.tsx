@@ -387,6 +387,7 @@ export default function RiskDetailPage() {
                         entityType="RISK"
                         entityId={riskId}
                         tenantHref={href}
+                        canWrite={canWrite}
                     />
                 </div>
             )}
