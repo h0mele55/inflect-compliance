@@ -217,6 +217,7 @@ export default function AssetDetailPage() {
                         entityType="ASSET"
                         entityId={assetId}
                         tenantHref={tenantHref}
+                        canWrite={permissions.canWrite}
                     />
                 </div>
             )}
