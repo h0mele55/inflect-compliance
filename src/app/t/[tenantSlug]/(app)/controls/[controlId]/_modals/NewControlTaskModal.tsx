@@ -148,6 +148,7 @@ export function NewControlTaskModal({
                         variant="primary"
                         size="sm"
                         disabled={saving || title.trim().length === 0}
+                        id="submit-task-btn"
                         data-testid="submit-task-btn"
                     >
                         {saving ? 'Creating...' : 'Create'}
