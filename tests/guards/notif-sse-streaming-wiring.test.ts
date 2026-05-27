@@ -136,6 +136,19 @@ describe('PR-C SSE notification streaming wiring', () => {
             expect(s).toMatch(/typeof EventSource !== ['"]undefined['"]/);
         });
 
+        it('gates SSE client behind NEXT_PUBLIC_NOTIFICATIONS_SSE=1 feature flag', () => {
+            // Initial rollout: server-side bus + endpoint are wired
+            // but the client cutover is opt-in. Default (flag absent)
+            // keeps the 60s poll so E2E specs that wait on
+            // `networkidle` aren't blocked by a long-lived stream.
+            // Flip the env var when client integration has been
+            // manually verified end-to-end.
+            const s = read(PATH_BELL);
+            expect(s).toMatch(
+                /process\.env\.NEXT_PUBLIC_NOTIFICATIONS_SSE === ['"]1['"]/,
+            );
+        });
+
         it('wires onmessage to prepend the parsed event into state', () => {
             const s = read(PATH_BELL);
             expect(s).toMatch(/es\.onmessage\s*=/);

@@ -165,7 +165,18 @@ export function NotificationsBell() {
         let sseHealthy = false;
         let es: EventSource | null = null;
         // typeof check — SSR + jsdom unit tests both lack EventSource.
-        if (typeof EventSource !== 'undefined') {
+        // Feature flag: NEXT_PUBLIC_NOTIFICATIONS_SSE=1 opts the
+        // client into the SSE channel. Defaults OFF so the bell keeps
+        // polling — the server-side bus + endpoint stay wired (so
+        // future opt-in is one env-var flip), but E2E specs that wait
+        // on `networkidle` aren't blocked by a long-lived stream that
+        // never lets the page settle. Flip when the client integration
+        // has been manually verified end-to-end (browser → bell →
+        // event arriving inside <1s).
+        const sseEnabled =
+            typeof process !== 'undefined' &&
+            process.env.NEXT_PUBLIC_NOTIFICATIONS_SSE === '1';
+        if (sseEnabled && typeof EventSource !== 'undefined') {
             try {
                 es = new EventSource('/api/notifications/stream', {
                     withCredentials: true,
