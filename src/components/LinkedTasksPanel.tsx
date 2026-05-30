@@ -9,10 +9,12 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { StatusBadge, type StatusBadgeVariant } from '@/components/ui/status-badge';
-import {
-    LinkedTaskCreateModal,
-    type LinkedTaskEntityType,
-} from './LinkedTaskCreateModal';
+// The canonical task-create modal (the SAME one the Tasks page "+ Task"
+// button opens). Reused here so a task created from a control / asset /
+// risk detail page is identical to a standalone task — full fields, and
+// it lands in the global Tasks table (visible in the Tasks list) linked
+// back to this entity via TaskLink.
+import { NewTaskModal } from '@/app/t/[tenantSlug]/(app)/tasks/NewTaskModal';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TASK_STATUS_BADGE: Record<string, StatusBadgeVariant> = {
@@ -91,13 +93,15 @@ export default function LinkedTasksPanel({
         void loadTasks();
     }, [loadTasks]);
 
-    // The create modal accepts only the two canonical entity types.
-    // Other callers (legacy) pass strings that don't fit; we gate
-    // the modal entirely behind a runtime check so a stray entity
+    // The unified create modal links back to the canonical entity
+    // types (ASSET / RISK / CONTROL). Other callers (legacy) pass
+    // strings that don't fit; gate the affordance so a stray entity
     // type can't render an unmoored create dialog.
-    const canonicalEntityType: LinkedTaskEntityType | null =
-        entityType === 'ASSET' || entityType === 'RISK'
-            ? (entityType as LinkedTaskEntityType)
+    const canonicalEntityType: 'ASSET' | 'RISK' | 'CONTROL' | null =
+        entityType === 'ASSET' ||
+        entityType === 'RISK' ||
+        entityType === 'CONTROL'
+            ? entityType
             : null;
     const showCreate = canWrite && canonicalEntityType !== null;
 
@@ -115,12 +119,20 @@ export default function LinkedTasksPanel({
                             + Task
                         </Button>
                     </div>
-                    <LinkedTaskCreateModal
+                    {/* The canonical Tasks-page create modal. The preset
+                        link wires the new task back to this entity AND the
+                        create POSTs to /tasks so it shows in the global
+                        Tasks list. `onCreated` keeps us on the detail page
+                        and refreshes this panel. */}
+                    <NewTaskModal
                         open={creating}
                         setOpen={setCreating}
-                        apiBase={apiBase}
-                        entityType={canonicalEntityType}
-                        entityId={entityId}
+                        initialPendingLinks={[
+                            {
+                                entityType: canonicalEntityType,
+                                entityId,
+                            },
+                        ]}
                         onCreated={() => void loadTasks()}
                     />
                 </>
