@@ -64,13 +64,20 @@ export default function LinkedTasksPanel({
     const loadTasks = useCallback(async () => {
         setLoading(true);
         try {
+            // `apiBase` is `apiUrl('')`, which carries a trailing slash
+            // (`/api/t/<slug>/`). Appending `/tasks` would yield a double
+            // slash (`//tasks`) — Next.js 308-redirects that to a
+            // normalised ABSOLUTE url, which breaks under plain HTTP
+            // (ERR_SSL_PROTOCOL_ERROR) and silently empties the panel.
+            // Strip the trailing slash so the request stays same-origin.
+            const base = apiBase.replace(/\/+$/, '');
             // PR #158 changed `/tasks` to return `{ rows, truncated }` from
             // the prior raw-array shape. Accept both — older deploys still
             // emit arrays, and this is the only LinkedTasksPanel touch
             // point so a defensive read is cheaper than a coordinated
             // schema flip.
             const res = await fetch(
-                `${apiBase}/tasks?linkedEntityType=${encodeURIComponent(entityType)}&linkedEntityId=${encodeURIComponent(entityId)}`,
+                `${base}/tasks?linkedEntityType=${encodeURIComponent(entityType)}&linkedEntityId=${encodeURIComponent(entityId)}`,
             );
             const data: unknown = res.ok ? await res.json() : { rows: [] };
             if (Array.isArray(data)) setTasks(data);
