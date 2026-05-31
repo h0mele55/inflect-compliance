@@ -34,7 +34,7 @@ export function PoliciesTable({ policies }: { policies: Policy[] }) {
       accessorKey: 'title',
       header: 'Title',
       cell: ({ getValue }) => (
-        <span className="font-medium text-white">{getValue<string>()}</span>
+        <span className="font-medium text-content-emphasis">{getValue<string>()}</span>
       ),
     },
     {
