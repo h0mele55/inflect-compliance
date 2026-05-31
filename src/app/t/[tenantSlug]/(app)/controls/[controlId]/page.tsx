@@ -868,8 +868,7 @@ export default function ControlDetailPage() {
                         options={STATUS_CB_OPTIONS}
                         disabled={changingStatus}
                         placeholder="Status"
-                        matchTriggerWidth
-                        buttonProps={{ className: 'w-40 text-sm' }}
+                        buttonProps={{ className: 'text-sm' }}
                     />
                     <Button variant="secondary" onClick={() => { setAppChoice(control.applicability); setAppJustification(control.applicabilityJustification || ''); setShowApplicability(!showApplicability); }} id="toggle-applicability-btn">
                         Applicability
