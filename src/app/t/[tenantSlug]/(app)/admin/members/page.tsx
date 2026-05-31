@@ -438,7 +438,7 @@ export default function MembersAdminPage() {
                                     title="Custom role"
                                     content={m.customRole.name}
                                 >
-                                    <span className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-medium bg-purple-500/20 text-purple-300 border border-purple-500/30 cursor-help">
+                                    <span className="inline-flex items-center rounded-md px-2 py-1 text-[10px] font-medium bg-info text-content-info border border-border-info cursor-help">
                                         {m.customRole.name}
                                     </span>
                                 </Tooltip>

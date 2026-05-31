@@ -56,7 +56,15 @@ export default function MappingPage() {
                                 <span className="text-xs font-mono text-[var(--brand-default)] mr-2">{item.code}</span>
                                 <span className="font-medium text-sm">{item.name}</span>
                             </div>
-                            <span className="text-sm font-bold" style={{ color: item.coverage >= 80 ? '#22c55e' : item.coverage >= 50 ? '#f59e0b' : '#ef4444' }}>
+                            <span
+                                className={`text-sm font-bold ${
+                                    item.coverage >= 80
+                                        ? 'text-content-success'
+                                        : item.coverage >= 50
+                                          ? 'text-content-warning'
+                                          : 'text-content-error'
+                                }`}
+                            >
                                 {item.coverage}%
                             </span>
                         </div>

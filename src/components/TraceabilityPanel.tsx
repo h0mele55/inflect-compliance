@@ -280,7 +280,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
             {showRisks && (
                 <div>
                     <div className="flex items-center justify-between mb-3">
-                        <Heading level={3} className="text-white inline-flex items-center gap-tight">{entityType === 'control' ? <><AppIcon name="shield" size={16} /> Mitigates Risks</> : <><AppIcon name="warning" size={16} /> Associated Risks</>} ({risks.length})</Heading>
+                        <Heading level={3} className="text-content-emphasis inline-flex items-center gap-tight">{entityType === 'control' ? <><AppIcon name="shield" size={16} /> Mitigates Risks</> : <><AppIcon name="warning" size={16} /> Associated Risks</>} ({risks.length})</Heading>
                         {canWrite && (
                             <Button variant="primary" size="xs" onClick={() => { setShowAddRisk(!showAddRisk); setAddId(''); }} id="add-risk-link-btn">Link Risk</Button>
                         )}
@@ -316,7 +316,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
                                             <tr key={l.id} className={l.id?.startsWith('temp:') ? 'opacity-50 animate-pulse' : ''}>
                                                 <td className="text-sm text-content-default">{r?.title || '—'}</td>
                                                 <td><StatusBadge variant={RISK_STATUS_BADGE[r?.status] || 'neutral'}>{r?.status || '—'}</StatusBadge></td>
-                                                <td className="text-sm text-white font-medium">{r?.score ?? '—'}</td>
+                                                <td className="text-sm text-content-emphasis font-medium">{r?.score ?? '—'}</td>
                                                 <td className="text-xs text-content-muted">{l.rationale || '—'}</td>
                                                 {canWrite && (
                                                     <td>
@@ -339,7 +339,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
             {showControls && (
                 <div>
                     <div className="flex items-center justify-between mb-3">
-                        <Heading level={3} className="text-white inline-flex items-center gap-tight">{entityType === 'risk' ? <><AppIcon name="shield" size={16} /> Mitigated by Controls</> : <><AppIcon name="controls" size={16} /> Covered by Controls</>} ({controls.length})</Heading>
+                        <Heading level={3} className="text-content-emphasis inline-flex items-center gap-tight">{entityType === 'risk' ? <><AppIcon name="shield" size={16} /> Mitigated by Controls</> : <><AppIcon name="controls" size={16} /> Covered by Controls</>} ({controls.length})</Heading>
                         {canWrite && (
                             <Button variant="primary" size="xs" onClick={() => { setShowAddControl(!showAddControl); setAddId(''); }} id="add-control-link-btn">Link Control</Button>
                         )}
@@ -398,7 +398,7 @@ export default function TraceabilityPanel({ apiBase: apiBaseRaw, entityType, ent
             {showAssets && (
                 <div>
                     <div className="flex items-center justify-between mb-3">
-                        <Heading level={3} className="text-white inline-flex items-center gap-tight"><AppIcon name="package" size={16} /> {entityType === 'control' ? 'Covers Assets' : 'Affects Assets'} ({assets.length})</Heading>
+                        <Heading level={3} className="text-content-emphasis inline-flex items-center gap-tight"><AppIcon name="package" size={16} /> {entityType === 'control' ? 'Covers Assets' : 'Affects Assets'} ({assets.length})</Heading>
                         {canWrite && (
                             <Button variant="primary" size="xs" onClick={() => { setShowAddAsset(!showAddAsset); setAddId(''); }} id="add-asset-link-btn">Link Asset</Button>
                         )}
