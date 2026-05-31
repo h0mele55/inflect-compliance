@@ -133,6 +133,34 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading ? <LoadingSpinner className="h-4 w-4" /> : icon ? icon : null}
+        {/**
+         * PR — leading balance ghost (the mirror of the trailing
+         * icon-balance ghost below).
+         *
+         * When a button carries trailing content via `right` but NO
+         * leading icon, the prior layout centred [text][gap][right]
+         * as one unit — placing the TEXT left of the button's
+         * geometric centre by half the right+gap width (the same
+         * asymmetry the trailing ghost fixes for leading icons, just
+         * mirrored). A `visibility: hidden` ghost of `right` parked
+         * at the LEADING edge makes the flex group
+         * [ghost][gap][text][gap][right] symmetric around the text.
+         *
+         * Suppressed when an `icon` is present (the leading edge
+         * already carries weight, so a leading ghost would double it;
+         * an icon+right button is left to its natural flow), when a
+         * `shortcut` is present (the kbd owns the trailing-weight
+         * contract), or when there's no content.
+         */}
+        {right && !loading && content && !shortcut && !icon && (
+          <span
+            aria-hidden="true"
+            className="invisible pointer-events-none"
+            data-right-balance-ghost
+          >
+            {right}
+          </span>
+        )}
         {content && (
           <div
             className={cn(
