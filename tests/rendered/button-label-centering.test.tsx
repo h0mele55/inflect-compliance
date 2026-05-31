@@ -31,13 +31,20 @@ const Dot = () => <span data-x-dot className="size-4 rounded-full" />;
 
 describe('Button label centering — centred content unit, no ghosts', () => {
     test('no balance-ghost spans are ever rendered', () => {
-        for (const el of [
-            <Button>Mark Test Completed</Button>,
-            <Button icon={<Dot />}>Asset</Button>,
-            <Button right={<Dot />}>Save changes</Button>,
-            <Button icon={<Dot />} right={<Dot />}>Both</Button>,
-        ]) {
-            const { container, unmount } = render(el);
+        // Thunks (not an array of JSX literals) so react/jsx-key
+        // doesn't demand keys on test fixtures.
+        const cases = [
+            () => <Button>Mark Test Completed</Button>,
+            () => <Button icon={<Dot />}>Asset</Button>,
+            () => <Button right={<Dot />}>Save changes</Button>,
+            () => (
+                <Button icon={<Dot />} right={<Dot />}>
+                    Both
+                </Button>
+            ),
+        ];
+        for (const mk of cases) {
+            const { container, unmount } = render(mk());
             expect(
                 container.querySelector('[data-icon-balance-ghost]'),
             ).toBeNull();
